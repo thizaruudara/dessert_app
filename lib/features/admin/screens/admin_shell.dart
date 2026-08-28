@@ -1,0 +1,51 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/theme/app_theme.dart';
+
+class AdminShell extends StatefulWidget {
+  final Widget child;
+  const AdminShell({super.key, required this.child});
+
+  @override
+  State<AdminShell> createState() => _AdminShellState();
+}
+
+class _AdminShellState extends State<AdminShell> {
+  int _index = 0;
+  final _tabs = const ['/admin', '/admin/students'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: widget.child,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.darkSurface,
+          border: Border(top: BorderSide(color: AppColors.darkBorder)),
+        ),
+        child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          indicatorColor: AppColors.accent.withOpacity(0.15),
+          selectedIndex: _index,
+          onDestinationSelected: (i) {
+            setState(() => _index = i);
+            context.go(_tabs[i]);
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard, color: AppColors.accent),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outlined),
+              selectedIcon: Icon(Icons.people, color: AppColors.accent),
+              label: 'Students',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

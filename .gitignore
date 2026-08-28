@@ -1,0 +1,42 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+*.iml
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Android
+android/.gradle
+android/local.properties
+android/key.properties
+*.jks
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Functions node_modules
+functions/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

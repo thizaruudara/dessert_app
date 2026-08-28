@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /desserts/{studentId}/{allPaths=**} {
+      // Students can read their own uploaded files; admins can read all
+      allow read: if request.auth != null;
+      // Only Cloud Functions write to Storage
+      allow write: if false;
+    }
+  }
+}

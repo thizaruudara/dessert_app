@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users ──────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Users can read their own profile; admins can read all
+      allow read: if request.auth != null &&
+        (request.auth.uid == userId || isAdmin());
+
+      // Only the backend (Cloud Function) or the user themselves can write
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Credits can only be updated by admins (or Cloud Function)
+      allow update: if request.auth != null &&
+        (isAdmin() || (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['credits', 'role'])));
+    }
+
+    // ── Desserts ───────────────────────────────────────────────────
+    match /desserts/{dessertId} {
+      // Students can only read their own; admins can read all
+      allow read: if request.auth != null &&
+        (resource.data.studentId == request.auth.uid || isAdmin());
+
+      // Only admins can update (review) desserts
+      allow update: if request.auth != null && isAdmin();
+
+      // Create is done via Cloud Function (WhatsApp webhook), so we
+      // restrict direct client writes to admins only.
+      allow create: if request.auth != null && isAdmin();
+
+      // No deletes
+      allow delete: if false;
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}
