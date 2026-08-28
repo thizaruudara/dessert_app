@@ -30,10 +30,7 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build Android APK
-        run: flutter build apk --release --split-per-abi
-
-      - name: Build Universal APK
+      - name: Build Android Release APK
         run: flutter build apk --release
 
       - name: Upload Release APK Artifact
