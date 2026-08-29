@@ -69,9 +69,11 @@ class _StudentShellState extends State<StudentShell> {
     final selectedIndex = _calculateSelectedIndex(context);
     final location = GoRouterState.of(context).uri.path;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       extendBody: true,
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? const Color(0xFF0B0F19) : AppColors.background,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),
         switchInCurve: Curves.easeOutCubic,
@@ -107,19 +109,22 @@ class _StudentShellState extends State<StudentShell> {
           }
         },
         items: _items,
-        barColor: Colors.white,
-        borderColor: const Color(0xFFE2E8F0),
-        activeCircleGradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF227AFF),
-            Color(0xFF1565D8),
-          ],
-        ),
+        barColor: isDark ? const Color(0xFF111827) : Colors.white,
+        borderColor: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0),
+        activeCircleGradient: isDark
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF06B6D4), Color(0xFF2563EB)],
+              )
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF227AFF), Color(0xFF1565D8)],
+              ),
         activeIconColor: Colors.white,
-        inactiveIconColor: const Color(0xFF64748B),
-        activeTextColor: const Color(0xFF227AFF),
+        inactiveIconColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        activeTextColor: isDark ? const Color(0xFF38BDF8) : const Color(0xFF227AFF),
       ),
     );
   }

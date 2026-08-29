@@ -6,11 +6,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/dessert_model.dart';
 import '../../../core/widgets/media_image_view.dart';
+import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
 import '../../credits/providers/credits_provider.dart';
 import '../widgets/dessert_list_tile.dart';
 import '../widgets/student_progress_chart.dart';
+import '../widgets/exam_countdown_widget.dart';
+import '../widgets/daily_quests_widget.dart';
+import '../widgets/trophy_room_sheet.dart';
 
 class StudentHomeScreen extends StatefulWidget {
   const StudentHomeScreen({super.key});
@@ -189,6 +193,43 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                           ),
                         ),
 
+                        // Badges Trophy Room Pill
+                        GestureDetector(
+                          onTap: () {
+                            TrophyRoomSheet.show(
+                              context,
+                              totalCredits: totalCredits,
+                              approvedSubmissions: approvedCount,
+                              totalSubmissions: totalCount,
+                              streakDays: 3,
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.14),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withOpacity(0.2)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('🏆', style: TextStyle(fontSize: 13)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Badges',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
                         // Streak Pill
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -205,17 +246,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                               ),
                             ],
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Text('🔥', style: TextStyle(fontSize: 14)),
+                            children: [
+                              Text('🔥', style: TextStyle(fontSize: 13)),
                               SizedBox(width: 4),
                               Text(
-                                '3d Streak',
+                                '3d',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                 ),
                               ),
                             ],
@@ -223,7 +264,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
                     // ── Gamified XP / Level Card ────────────────────────
                     Container(
@@ -332,6 +373,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                         ],
                       ),
                     ),
+
+                    // ── Live A/L Exam Countdown Widget ──────────────────
+                    ExamCountdownWidget(examYear: examYear),
                   ],
                 ),
               ),
@@ -339,7 +383,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
 
             // ── Main Body Content ─────────────────────────────────
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   // ── Quick Study Power-Ups ──────────────────────────
@@ -363,7 +407,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                           title: 'Submit HW',
                           subtitle: 'Earn Credits 🚀',
                           gradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-                          onTap: () => context.go('/student/submit'),
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.go('/student/submit');
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -374,12 +421,22 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                           title: 'Rankings',
                           subtitle: 'Top Podium 👑',
                           gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-                          onTap: () => context.go('/student/leaderboard'),
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.go('/student/leaderboard');
+                          },
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+
+                  // ── Daily Quests & Mystery Reward Box ───────────────
+                  DailyQuestsWidget(
+                    totalSubmissions: totalCount,
+                    onOpenLeaderboard: () => context.go('/student/leaderboard'),
+                  ),
+                  const SizedBox(height: 12),
 
                   // ── Learning Progress & Line Chart ──────────────────
                   StudentProgressChart(

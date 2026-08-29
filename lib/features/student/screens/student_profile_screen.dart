@@ -7,9 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/media_image_view.dart';
+import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
+import '../widgets/trophy_room_sheet.dart';
 
 class StudentProfileScreen extends StatefulWidget {
   const StudentProfileScreen({super.key});
@@ -385,6 +388,78 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                     icon: Icons.cake_outlined,
                     title: 'Total Submissions',
                     subtitle: '${desserts.length} homework submitted',
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Features & Preferences Card ─────────────────────────
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.darkCard,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.darkBorder),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text('🏆', style: TextStyle(fontSize: 18)),
+                    ),
+                    title: const Text(
+                      'Trophy Room & Flex Zone',
+                      style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'View all 8 unlockable badges & achievements',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                    onTap: () {
+                      TrophyRoomSheet.show(
+                        context,
+                        totalCredits: user.credits,
+                        approvedSubmissions: approvedCount,
+                        totalSubmissions: desserts.length,
+                        streakDays: 3,
+                      );
+                    },
+                  ),
+                  const Divider(color: AppColors.darkBorder, height: 1),
+                  Consumer<ThemeProvider>(
+                    builder: (context, themeProvider, _) {
+                      return SwitchListTile(
+                        secondary: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF818CF8).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(themeProvider.isDarkMode ? '🌙' : '☀️', style: const TextStyle(fontSize: 18)),
+                        ),
+                        title: const Text(
+                          'Cyber Midnight Dark Mode',
+                          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          themeProvider.isDarkMode ? 'OLED Cyber Dark enabled' : 'Frost White Light enabled',
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                        ),
+                        value: themeProvider.isDarkMode,
+                        activeColor: const Color(0xFF38BDF8),
+                        onChanged: (_) {
+                          HapticFeedbackService.medium();
+                          themeProvider.toggleTheme();
+                        },
+                      );
+                    },
                   ),
                 ],
               ),

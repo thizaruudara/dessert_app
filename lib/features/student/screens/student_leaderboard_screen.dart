@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/widgets/media_image_view.dart';
+import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class StudentLeaderboardScreen extends StatefulWidget {
@@ -14,148 +15,263 @@ class StudentLeaderboardScreen extends StatefulWidget {
 }
 
 class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
+  int _selectedLeagueIndex = 0;
+
+  final List<Map<String, dynamic>> _leagues = const [
+    {'name': 'All Scholars', 'emoji': '🌐', 'minXp': 0, 'maxXp': 999999, 'color': Color(0xFF227AFF)},
+    {'name': 'Diamond', 'emoji': '💎', 'minXp': 500, 'maxXp': 999999, 'color': Color(0xFF06B6D4)},
+    {'name': 'Gold', 'emoji': '🥇', 'minXp': 250, 'maxXp': 499, 'color': Color(0xFFF59E0B)},
+    {'name': 'Silver', 'emoji': '🥈', 'minXp': 100, 'maxXp': 249, 'color': Color(0xFF94A3B8)},
+    {'name': 'Bronze', 'emoji': '🥉', 'minXp': 0, 'maxXp': 99, 'color': Color(0xFFB45309)},
+  ];
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.watch<AuthProvider>().user?.uid;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeLeague = _leagues[_selectedLeagueIndex];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? const Color(0xFF0B0F19) : AppColors.background,
       appBar: AppBar(
-        title: const Text('Leaderboard 🏆'),
+        title: const Text('League Standings 🏆'),
         elevation: 0,
-        backgroundColor: AppColors.surface,
+        backgroundColor: isDark ? const Color(0xFF111827) : AppColors.surface,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .where('role', isEqualTo: 'student')
-            .orderBy('credits', descending: true)
-            .limit(50)
-            .snapshots(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-          }
+      body: Column(
+        children: [
+          // ── League Selector Tabs ─────────────────────────────
+          Container(
+            height: 48,
+            margin: const EdgeInsets.only(top: 8, bottom: 4),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _leagues.length,
+              itemBuilder: (context, index) {
+                final league = _leagues[index];
+                final isSelected = _selectedLeagueIndex == index;
+                final Color leagueColor = league['color'];
 
-          if (!snap.hasData || snap.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('🏆', style: TextStyle(fontSize: 48)),
-                  const SizedBox(height: 12),
-                  Text('No students ranked yet', style: Theme.of(context).textTheme.headlineMedium),
-                  const SizedBox(height: 6),
-                  const Text('Submit your desserts to earn credits!', style: TextStyle(color: AppColors.textMuted)),
-                ],
-              ),
-            );
-          }
-
-          final students = snap.data!.docs
-              .map((d) => UserModel.fromFirestore(d))
-              .where((u) => u.name.isNotEmpty && !u.name.startsWith('Student ('))
-              .toList();
-
-          if (students.isEmpty) {
-            return const Center(child: Text('No active student rankings'));
-          }
-
-          final topThree = students.take(3).toList();
-          final remaining = students.length > 3 ? students.sublist(3) : <UserModel>[];
-
-          // Find current user's rank
-          int currentUserRank = -1;
-          UserModel? currentStudent;
-          for (int i = 0; i < students.length; i++) {
-            if (students[i].uid == currentUserId) {
-              currentUserRank = i + 1;
-              currentStudent = students[i];
-              break;
-            }
-          }
-
-          return Stack(
-            children: [
-              CustomScrollView(
-                slivers: [
-                  // ── Top 3 Podium Card ───────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                      child: _buildPodiumSection(topThree),
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedbackService.selection();
+                    setState(() => _selectedLeagueIndex = index);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? leagueColor.withOpacity(0.18)
+                          : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected
+                            ? leagueColor
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: leagueColor.withOpacity(0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(league['emoji'], style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 6),
+                        Text(
+                          league['name'],
+                          style: TextStyle(
+                            color: isSelected
+                                ? (isDark ? Colors.white : leagueColor)
+                                : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
+                            fontSize: 12.5,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                );
+              },
+            ),
+          ),
 
-                  // ── Section Title ──────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'All Rankings',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+          // ── Weekly League Reset Banner ─────────────────────────
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.12),
+                  const Color(0xFF227AFF).withOpacity(0.12),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+            ),
+            child: const Row(
+              children: [
+                Text('⚡', style: TextStyle(fontSize: 14)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Weekly League ends in 2d 14h • Top 5 Promoted 🟢',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Stream Rankings ──────────────────────────────────
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .where('role', isEqualTo: 'student')
+                  .orderBy('credits', descending: true)
+                  .limit(60)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                }
+
+                if (!snap.hasData || snap.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text('No students ranked yet', style: TextStyle(color: AppColors.textMuted)),
+                  );
+                }
+
+                var allStudents = snap.data!.docs
+                    .map((d) => UserModel.fromFirestore(d))
+                    .where((u) => u.name.isNotEmpty && !u.name.startsWith('Student ('))
+                    .toList();
+
+                final minXp = activeLeague['minXp'] as int;
+                final maxXp = activeLeague['maxXp'] as int;
+
+                final students = _selectedLeagueIndex == 0
+                    ? allStudents
+                    : allStudents.where((u) => u.credits >= minXp && u.credits <= maxXp).toList();
+
+                if (students.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(activeLeague['emoji'], style: const TextStyle(fontSize: 44)),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No students in ${activeLeague['name']} League yet',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('Earn more XP credits to enter this tier!', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                      ],
+                    ),
+                  );
+                }
+
+                final topThree = students.take(3).toList();
+
+                int currentUserRank = -1;
+                UserModel? currentStudent;
+                for (int i = 0; i < students.length; i++) {
+                  if (students[i].uid == currentUserId) {
+                    currentUserRank = i + 1;
+                    currentStudent = students[i];
+                    break;
+                  }
+                }
+
+                return Stack(
+                  children: [
+                    CustomScrollView(
+                      slivers: [
+                        // Podium Section
+                        if (_selectedLeagueIndex == 0 && topThree.length >= 2)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                              child: _buildPodiumSection(topThree, isDark),
                             ),
                           ),
-                          Text(
-                            '${students.length} Students',
-                            style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+
+                        // Ranked List
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final student = students[index];
+                                final rank = index + 1;
+                                final isCurrentUser = student.uid == currentUserId;
+                                final isPromoted = rank <= 5;
+
+                                return _buildRankTile(
+                                  student: student,
+                                  rank: rank,
+                                  isCurrentUser: isCurrentUser,
+                                  isPromoted: isPromoted,
+                                  isDark: isDark,
+                                );
+                              },
+                              childCount: students.length,
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ),
 
-                  // ── Ranked Students List ───────────────────────
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (index < 3) {
-                            return _buildRankTile(students[index], index + 1, currentUserId);
-                          }
-                          final student = remaining[index - 3];
-                          return _buildRankTile(student, index + 1, currentUserId);
-                        },
-                        childCount: students.length,
+                    // Sticky Your Rank Capsule
+                    if (currentUserRank > 0 && currentStudent != null)
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 16,
+                        child: _buildYourRankCapsule(currentUserRank, currentStudent, isDark),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // ── Sticky "Your Rank" Bottom Capsule ──────────────
-              if (currentUserRank > 0 && currentStudent != null)
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 16,
-                  child: _buildYourRankCapsule(currentUserRank, currentStudent),
-                ),
-            ],
-          );
-        },
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPodiumSection(List<UserModel> topThree) {
+  Widget _buildPodiumSection(List<UserModel> topThree, bool isDark) {
     final first = topThree.isNotEmpty ? topThree[0] : null;
     final second = topThree.length > 1 ? topThree[1] : null;
     final third = topThree.length > 2 ? topThree[2] : null;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isDark ? const Color(0xFF111827) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: const [
           BoxShadow(color: Color(0x080F172A), blurRadius: 16, offset: Offset(0, 4)),
         ],
@@ -168,27 +284,21 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
               Text('✨', style: TextStyle(fontSize: 16)),
               SizedBox(width: 6),
               Text(
-                'Top Achievers',
+                'Top Podium Achievers',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
               ),
               SizedBox(width: 6),
               Text('✨', style: TextStyle(fontSize: 16)),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // 2nd Place
-              if (second != null)
-                _buildPodiumColumn(second, 2, 70, const Color(0xFF94A3B8), '🥈'),
-              // 1st Place (Center & Highest)
-              if (first != null)
-                _buildPodiumColumn(first, 1, 95, AppColors.gold, '👑'),
-              // 3rd Place
-              if (third != null)
-                _buildPodiumColumn(third, 3, 55, const Color(0xFFB45309), '🥉'),
+              if (second != null) _buildPodiumColumn(second, 2, 70, const Color(0xFF94A3B8), '🥈', isDark),
+              if (first != null) _buildPodiumColumn(first, 1, 95, const Color(0xFFF59E0B), '👑', isDark),
+              if (third != null) _buildPodiumColumn(third, 3, 55, const Color(0xFFB45309), '🥉', isDark),
             ],
           ),
         ],
@@ -196,15 +306,12 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
     );
   }
 
-  Widget _buildPodiumColumn(UserModel user, int rank, double podiumHeight, Color color, String crownEmoji) {
+  Widget _buildPodiumColumn(UserModel user, int rank, double podiumHeight, Color color, String crownEmoji, bool isDark) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Crown / Rank Icon
         Text(crownEmoji, style: const TextStyle(fontSize: 22)),
         const SizedBox(height: 4),
-
-        // Avatar with Border
         Container(
           width: rank == 1 ? 58 : 48,
           height: rank == 1 ? 58 : 48,
@@ -213,7 +320,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
             border: Border.all(color: color, width: rank == 1 ? 3 : 2),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.3),
+                color: color.withOpacity(0.35),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -237,9 +344,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
                   ),
           ),
         ),
-        const SizedBox(height: 8),
-
-        // Name
+        const SizedBox(height: 6),
         SizedBox(
           width: 85,
           child: Text(
@@ -248,134 +353,86 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: rank == 1 ? 13 : 12,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              fontSize: rank == 1 ? 13 : 11.5,
+              color: isDark ? Colors.white : AppColors.textPrimary,
             ),
           ),
         ),
-        const SizedBox(height: 2),
-
-        // Points
         Text(
           '${user.credits} pts',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Podium Base
-        Container(
-          width: 75,
-          height: podiumHeight,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                color.withOpacity(0.2),
-                color.withOpacity(0.05),
-              ],
-            ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            border: Border.all(color: color.withOpacity(0.3)),
-          ),
-          child: Center(
-            child: Text(
-              '#$rank',
-              style: TextStyle(
-                fontSize: rank == 1 ? 20 : 16,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color),
         ),
       ],
     );
   }
 
-  Widget _buildRankTile(UserModel student, int rank, String? currentUserId) {
-    final isCurrentUser = student.uid == currentUserId;
-
-    Color rankColor;
-    if (rank == 1) {
-      rankColor = AppColors.gold;
-    } else if (rank == 2) {
-      rankColor = const Color(0xFF94A3B8);
-    } else if (rank == 3) {
-      rankColor = const Color(0xFFB45309);
-    } else {
-      rankColor = AppColors.textMuted;
-    }
-
+  Widget _buildRankTile({
+    required UserModel student,
+    required int rank,
+    required bool isCurrentUser,
+    required bool isPromoted,
+    required bool isDark,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isCurrentUser ? AppColors.backgroundSoft : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: isCurrentUser
+            ? const Color(0xFF227AFF).withOpacity(0.12)
+            : (isDark ? const Color(0xFF111827) : Colors.white),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isCurrentUser ? AppColors.primary : AppColors.border,
+          color: isCurrentUser
+              ? const Color(0xFF227AFF)
+              : (isPromoted
+                  ? const Color(0xFF10B981).withOpacity(0.3)
+                  : (isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0))),
           width: isCurrentUser ? 1.5 : 1,
         ),
-        boxShadow: isCurrentUser
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                )
-              ]
-            : null,
+        boxShadow: const [
+          BoxShadow(color: Color(0x040F172A), blurRadius: 10, offset: Offset(0, 2)),
+        ],
       ),
       child: Row(
         children: [
-          // Rank number
-          SizedBox(
-            width: 30,
-            child: Text(
-              '#$rank',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: rankColor,
-              ),
-            ),
-          ),
-
-          // Avatar
+          // Rank number badge
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: isCurrentUser ? AppColors.primary : AppColors.border),
+              color: rank <= 3
+                  ? const Color(0xFFF59E0B).withOpacity(0.15)
+                  : (isPromoted ? const Color(0xFF10B981).withOpacity(0.12) : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))),
             ),
-            child: ClipOval(
-              child: (student.avatarUrl != null && student.avatarUrl!.isNotEmpty)
-                  ? MediaImageView(url: student.avatarUrl!, fit: BoxFit.cover)
-                  : Container(
-                      color: AppColors.primary.withOpacity(0.1),
-                      child: Center(
-                        child: Text(
-                          student.name.isNotEmpty ? student.name[0].toUpperCase() : '👤',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
+            child: Center(
+              child: Text(
+                rank == 1 ? '🥇' : (rank == 2 ? '🥈' : (rank == 3 ? '🥉' : '$rank')),
+                style: TextStyle(
+                  fontSize: rank <= 3 ? 16 : 13,
+                  fontWeight: FontWeight.w800,
+                  color: isPromoted ? const Color(0xFF10B981) : (isDark ? Colors.white70 : AppColors.textPrimary),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),
 
-          // Student Details
+          // Avatar
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: const Color(0xFF1E293B),
+            child: ClipOval(
+              child: student.avatarUrl != null && student.avatarUrl!.isNotEmpty
+                  ? MediaImageView(url: student.avatarUrl!, fit: BoxFit.cover, width: 36, height: 36)
+                  : Text(student.name.isNotEmpty ? student.name[0].toUpperCase() : '👤',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Name and Tag
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,62 +444,49 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
                         student.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                     ),
                     if (isCurrentUser) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          color: const Color(0xFF227AFF),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
-                          'YOU',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
+                        child: const Text('YOU', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
                       ),
                     ],
                   ],
                 ),
-                Text(
-                  rank <= 3 ? '⭐ Top Scholar' : (student.credits > 200 ? '🔥 Distinction' : '📚 Active Learner'),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: rank <= 3 ? AppColors.gold : AppColors.textMuted,
-                    fontWeight: FontWeight.w500,
+                if (isPromoted)
+                  const Text(
+                    '▲ Promotion Zone',
+                    style: TextStyle(color: Color(0xFF10B981), fontSize: 10.5, fontWeight: FontWeight.w700),
                   ),
-                ),
               ],
             ),
           ),
 
-          // Credits Awarded
+          // Points Pill
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppColors.backgroundSoft,
+              color: const Color(0xFFF59E0B).withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.stars_rounded, color: AppColors.gold, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  '${student.credits}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+            child: Text(
+              '${student.credits} pts',
+              style: const TextStyle(
+                color: Color(0xFFD97706),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -450,55 +494,40 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
     );
   }
 
-  Widget _buildYourRankCapsule(int rank, UserModel student) {
+  Widget _buildYourRankCapsule(int rank, UserModel student, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: Color(0x35000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
+            padding: const EdgeInsets.all(6),
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF227AFF)),
             child: Text(
-              'Your Rank #$rank',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
+              '#$rank',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
             ),
           ),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Keep submitting homework to climb the ranks!',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white, fontSize: 12),
+              'Your Standing in this League',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
             ),
           ),
           Text(
-            '${student.credits} pts',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-            ),
+            '${student.credits} XP',
+            style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w900, fontSize: 14),
           ),
         ],
       ),
