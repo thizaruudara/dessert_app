@@ -245,6 +245,46 @@ async function handleMessage(message, contact) {
 
   console.log(`📥 Received from ${senderPhone} (${waProfileName}): Type=${msgType}, Text="${textBody}", Button="${buttonReplyId}"`);
 
+  // ── PRIORITY 1: INSTANT OTP / LOGIN REQUEST ──────────────────────────────
+  const lowerText = textBody.toLowerCase();
+  if (lowerText.includes('otp') || lowerText.includes('login') || lowerText.includes('code') || lowerText.includes('verification')) {
+    // Extract any specific phone number mentioned in the text (e.g. +94757690260)
+    const phoneMatch = textBody.match(/(\+?94\d{9}|07\d{8}|\d{9,12})/);
+    let targetPhone = senderPhone;
+    if (phoneMatch) {
+      let matched = phoneMatch[0];
+      if (matched.startsWith('0')) matched = '+94' + matched.substring(1);
+      else if (!matched.startsWith('+')) matched = '+' + matched;
+      targetPhone = matched;
+    }
+
+    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+
+    await db.collection('otp_verifications').doc(targetPhone).set({
+      otp: randomOtp,
+      phone: targetPhone,
+      name: waProfileName || 'Student',
+      expiresAt: expiresAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection('otp_verifications').doc(senderPhone).set({
+      otp: randomOtp,
+      phone: senderPhone,
+      name: waProfileName || 'Student',
+      expiresAt: expiresAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await sendWhatsAppText(
+      rawSender,
+      `🍰 *EduPeak Login Verification*\n\nHello ${waProfileName || 'Student'}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 10 minutes.\nEnter this code in the EduPeak App to log in!`
+    );
+    console.log(`📲 Priority 1: Instant WhatsApp OTP [${randomOtp}] dispatched to ${rawSender} for target ${targetPhone}`);
+    return;
+  }
+
   // 1. Fetch User Record from Firestore
   let userDoc = null;
   let userRef = null;
