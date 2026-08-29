@@ -3,6 +3,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../core/models/dessert_model.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/media_image_view.dart';
 
 class DessertListTile extends StatelessWidget {
   final DessertModel dessert;
@@ -12,94 +13,166 @@ class DessertListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.darkCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _borderColor,
-            width: dessert.isPending ? 1 : 1.5,
+    final hasImages = dessert.imageUrls.isNotEmpty || dessert.imageUrl != null;
+    final firstImg = dessert.imageUrls.isNotEmpty ? dessert.imageUrls.first : dessert.imageUrl;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 12,
+            offset: Offset(0, 3),
           ),
-        ),
-        child: Row(
-          children: [
-            // Status icon
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: _statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(child: Text(_emoji, style: const TextStyle(fontSize: 20))),
-            ),
-            const SizedBox(width: 12),
-
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          dessert.caption ?? 'Photo submission',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                // Thumbnail or Status Emoji Box
+                if (hasImages && firstImg != null && firstImg.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: MediaImageView(
+                        source: firstImg,
+                        fit: BoxFit.cover,
                       ),
-                      if (dessert.isApproved)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
+                    ),
+                  )
+                else
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: _statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(_emoji, style: const TextStyle(fontSize: 24)),
+                    ),
+                  ),
+                const SizedBox(width: 14),
+
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              dessert.caption?.isNotEmpty == true
+                                  ? dessert.caption!
+                                  : (dessert.imageUrls.length > 1
+                                      ? 'Photo Submission (${dessert.imageUrls.length} photos)'
+                                      : 'Homework Submission'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
-                          child: Text('+${dessert.creditsAwarded} pts',
-                              style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
-                        ),
+                          if (dessert.isApproved)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.success.withOpacity(0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '+${dessert.creditsAwarded} pts',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: _statusColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: _statusColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _statusLabel,
+                                  style: TextStyle(
+                                    color: _statusColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            timeago.format(dessert.submittedAt),
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _statusLabel,
-                          style: TextStyle(
-                            color: _statusColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        timeago.format(dessert.submittedAt),
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            const Icon(Icons.chevron_right, color: AppColors.textMuted),
-          ],
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: AppColors.textMuted,
+                  size: 14,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -112,20 +185,20 @@ class DessertListTile extends StatelessWidget {
   }
 
   Color get _borderColor {
-    if (dessert.isApproved) return AppColors.success.withOpacity(0.3);
+    if (dessert.isApproved) return AppColors.success.withOpacity(0.25);
     if (dessert.isRejected) return AppColors.error.withOpacity(0.2);
-    return AppColors.darkBorder;
+    return AppColors.border;
   }
 
   String get _emoji {
-    if (dessert.isApproved) return '✅';
-    if (dessert.isRejected) return '❌';
-    return '⏳';
+    if (dessert.isApproved) return '🎉';
+    if (dessert.isRejected) return '⚠️';
+    return '📝';
   }
 
   String get _statusLabel {
     if (dessert.isApproved) return 'Approved';
-    if (dessert.isRejected) return 'Rejected';
-    return 'Pending';
+    if (dessert.isRejected) return 'Revision Needed';
+    return 'Under Review';
   }
 }
