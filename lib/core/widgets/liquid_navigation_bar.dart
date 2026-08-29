@@ -18,7 +18,8 @@ class LiquidNavigationBar extends StatefulWidget {
   final ValueChanged<int> onItemSelected;
   final List<LiquidNavItem> items;
   final Color barColor;
-  final Color activeCircleColor;
+  final Color borderColor;
+  final Gradient activeCircleGradient;
   final Color activeIconColor;
   final Color inactiveIconColor;
   final Color activeTextColor;
@@ -28,26 +29,32 @@ class LiquidNavigationBar extends StatefulWidget {
     required this.selectedIndex,
     required this.onItemSelected,
     required this.items,
-    this.barColor = const Color(0xFF0F172A), // Deep Midnight Slate (as in TikTok demo)
-    this.activeCircleColor = Colors.white, // Crisp elevated white circle
-    this.activeIconColor = const Color(0xFF0F172A),
-    this.inactiveIconColor = const Color(0xFF94A3B8),
-    this.activeTextColor = Colors.white,
+    this.barColor = Colors.white,
+    this.borderColor = const Color(0xFFE2E8F0),
+    this.activeCircleGradient = const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+    ),
+    this.activeIconColor = Colors.white,
+    this.inactiveIconColor = const Color(0xFF64748B),
+    this.activeTextColor = const Color(0xFF2563EB),
   });
 
   @override
   State<LiquidNavigationBar> createState() => _LiquidNavigationBarState();
 }
 
-class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTickerProviderStateMixin {
+class _LiquidNavigationBarState extends State<LiquidNavigationBar>
+    with TickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _positionAnimation;
-  int _lastIndex = 0;
+  late AnimationController _bubblePopController;
+  late Animation<double> _bubbleScaleAnimation;
 
   @override
   void initState() {
     super.initState();
-    _lastIndex = widget.selectedIndex;
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 380),
@@ -59,6 +66,19 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
       parent: _animController,
       curve: Curves.easeInOutCubicEmphasized,
     ));
+
+    _bubblePopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _bubbleScaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.88), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.08), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.08, end: 1.0), weight: 25),
+    ]).animate(CurvedAnimation(
+      parent: _bubblePopController,
+      curve: Curves.easeOut,
+    ));
   }
 
   @override
@@ -66,27 +86,28 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedIndex != widget.selectedIndex) {
       _positionAnimation = Tween<double>(
-        begin: oldWidget.selectedIndex.toDouble(),
+        begin: _positionAnimation.value,
         end: widget.selectedIndex.toDouble(),
       ).animate(CurvedAnimation(
         parent: _animController,
         curve: Curves.easeInOutCubicEmphasized,
       ));
       _animController.forward(from: 0.0);
-      _lastIndex = widget.selectedIndex;
+      _bubblePopController.forward(from: 0.0);
     }
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _bubblePopController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final count = widget.items.length;
-    const barHeight = 68.0;
+    const barHeight = 66.0;
     const circleRadius = 26.0;
 
     return Container(
@@ -98,7 +119,7 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
           final itemWidth = width / count;
 
           return AnimatedBuilder(
-            animation: _animController,
+            animation: Listenable.merge([_animController, _bubblePopController]),
             builder: (context, child) {
               final currentPos = _animController.isAnimating
                   ? _positionAnimation.value
@@ -118,6 +139,7 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
                       painter: _LiquidBarPainter(
                         centerX: circleCenterX,
                         barColor: widget.barColor,
+                        borderColor: widget.borderColor,
                       ),
                       child: Row(
                         children: List.generate(count, (index) {
@@ -125,30 +147,43 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
                           final item = widget.items[index];
 
                           return Expanded(
-                            child: GestureDetector(
-                              onTap: () => widget.onItemSelected(index),
-                              behavior: HitTestBehavior.opaque,
-                              child: Container(
-                                height: barHeight,
-                                alignment: Alignment.center,
-                                child: isSelected
-                                    ? Padding(
-                                        padding: const EdgeInsets.only(top: 32),
-                                        child: Text(
-                                          item.label,
-                                          style: TextStyle(
-                                            color: widget.activeTextColor,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: -0.2,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => widget.onItemSelected(index),
+                                customBorder: const CircleBorder(),
+                                splashColor: widget.activeTextColor.withOpacity(0.08),
+                                highlightColor: Colors.transparent,
+                                child: Container(
+                                  height: barHeight,
+                                  alignment: Alignment.center,
+                                  child: isSelected
+                                      ? Padding(
+                                          padding: const EdgeInsets.only(top: 30),
+                                          child: AnimatedOpacity(
+                                            duration: const Duration(milliseconds: 200),
+                                            opacity: (currentPos - index).abs() < 0.3 ? 1.0 : 0.0,
+                                            child: Text(
+                                              item.label,
+                                              style: TextStyle(
+                                                color: widget.activeTextColor,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: -0.2,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : AnimatedScale(
+                                          scale: (currentPos - index).abs() < 0.5 ? 0.75 : 1.0,
+                                          duration: const Duration(milliseconds: 180),
+                                          child: Icon(
+                                            item.icon,
+                                            color: widget.inactiveIconColor,
+                                            size: 22,
                                           ),
                                         ),
-                                      )
-                                    : Icon(
-                                        item.icon,
-                                        color: widget.inactiveIconColor,
-                                        size: 22,
-                                      ),
+                                ),
                               ),
                             ),
                           );
@@ -157,36 +192,51 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
                     ),
                   ),
 
-                  // ── 2. Elevated Floating Liquid Circle ──────────────────
+                  // ── 2. Elevated Floating Liquid Circle (Bubble) ──────────
                   Positioned(
                     top: 0,
                     left: circleCenterX - circleRadius,
                     child: GestureDetector(
                       onTap: () => widget.onItemSelected(widget.selectedIndex),
-                      child: Container(
-                        width: circleRadius * 2,
-                        height: circleRadius * 2,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: widget.activeCircleColor,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.25),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+                      child: ScaleTransition(
+                        scale: _bubbleScaleAnimation,
+                        child: Container(
+                          width: circleRadius * 2,
+                          height: circleRadius * 2,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: widget.activeCircleGradient,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.85),
+                              width: 2.5,
                             ),
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.35),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF2563EB).withOpacity(0.38),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                              BoxShadow(
+                                color: const Color(0x180F172A),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              transitionBuilder: (child, anim) => ScaleTransition(
+                                scale: anim,
+                                child: FadeTransition(opacity: anim, child: child),
+                              ),
+                              child: Icon(
+                                widget.items[widget.selectedIndex].activeIcon,
+                                key: ValueKey(widget.selectedIndex),
+                                color: widget.activeIconColor,
+                                size: 23,
+                              ),
                             ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            widget.items[widget.selectedIndex].activeIcon,
-                            color: widget.activeIconColor,
-                            size: 24,
                           ),
                         ),
                       ),
@@ -205,27 +255,34 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar> with SingleTi
 class _LiquidBarPainter extends CustomPainter {
   final double centerX;
   final Color barColor;
+  final Color borderColor;
 
   _LiquidBarPainter({
     required this.centerX,
     required this.barColor,
+    required this.borderColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    const cornerRadius = 24.0;
-    const notchWidth = 72.0;
-    const notchDepth = 32.0;
+    const cornerRadius = 26.0;
+    const notchWidth = 70.0;
+    const notchDepth = 30.0;
 
     final paint = Paint()
       ..color = barColor
       ..style = PaintingStyle.fill;
 
+    final borderPaint = Paint()
+      ..color = borderColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
     final shadowPaint = Paint()
-      ..color = const Color(0x250F172A)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
+      ..color = const Color(0x140F172A)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
 
     final path = Path();
 
@@ -277,12 +334,22 @@ class _LiquidBarPainter extends CustomPainter {
 
     path.close();
 
-    // Draw shadow and bar body
+    // Draw multi-layered soft drop shadows for elevation
+    canvas.save();
+    canvas.translate(0, 4);
     canvas.drawPath(path, shadowPaint);
+    canvas.restore();
+
+    // Draw bar body
     canvas.drawPath(path, paint);
+
+    // Draw delicate subtle border
+    canvas.drawPath(path, borderPaint);
   }
 
   @override
   bool shouldRepaint(covariant _LiquidBarPainter oldDelegate) =>
-      oldDelegate.centerX != centerX || oldDelegate.barColor != barColor;
+      oldDelegate.centerX != centerX ||
+      oldDelegate.barColor != barColor ||
+      oldDelegate.borderColor != borderColor;
 }

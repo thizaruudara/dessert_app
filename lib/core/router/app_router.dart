@@ -18,6 +18,36 @@ import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_review_screen.dart';
 import '../../features/admin/screens/admin_students_screen.dart';
 
+CustomTransitionPage<void> _buildSmoothPage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ),
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.04, 0.0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          )),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 class AppRouter {
   final AuthProvider authProvider;
 
@@ -40,17 +70,23 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (_, __) => const SplashScreen(),
+        pageBuilder: (context, state) => _buildSmoothPage(
+          key: state.pageKey,
+          child: const SplashScreen(),
+        ),
       ),
 
       // ── Auth ──────────────────────────────────────────────
       GoRoute(
         path: '/auth/login',
-        builder: (_, __) => const LoginScreen(),
+        pageBuilder: (context, state) => _buildSmoothPage(
+          key: state.pageKey,
+          child: const LoginScreen(),
+        ),
       ),
       GoRoute(
         path: '/auth/otp',
-        builder: (_, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra;
           String phone = '';
           String? name;
@@ -66,11 +102,14 @@ class AppRouter {
             phone = extra;
           }
 
-          return OtpScreen(
-            phoneNumber: phone,
-            name: name,
-            examYear: examYear,
-            isRegister: isRegister,
+          return _buildSmoothPage(
+            key: state.pageKey,
+            child: OtpScreen(
+              phoneNumber: phone,
+              name: name,
+              examYear: examYear,
+              isRegister: isRegister,
+            ),
           );
         },
       ),
@@ -97,8 +136,11 @@ class AppRouter {
           ),
           GoRoute(
             path: '/student/dessert/:id',
-            builder: (_, state) => DessertDetailScreen(
-              dessertId: state.pathParameters['id']!,
+            pageBuilder: (context, state) => _buildSmoothPage(
+              key: state.pageKey,
+              child: DessertDetailScreen(
+                dessertId: state.pathParameters['id']!,
+              ),
             ),
           ),
           GoRoute(
@@ -118,8 +160,11 @@ class AppRouter {
           ),
           GoRoute(
             path: '/admin/review/:id',
-            builder: (_, state) => AdminReviewScreen(
-              dessertId: state.pathParameters['id']!,
+            pageBuilder: (context, state) => _buildSmoothPage(
+              key: state.pageKey,
+              child: AdminReviewScreen(
+                dessertId: state.pathParameters['id']!,
+              ),
             ),
           ),
           GoRoute(

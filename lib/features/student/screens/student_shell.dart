@@ -13,8 +13,6 @@ class StudentShell extends StatefulWidget {
 }
 
 class _StudentShellState extends State<StudentShell> {
-  int _index = 0;
-
   final _tabs = const [
     '/student',
     '/student/leaderboard',
@@ -51,23 +49,77 @@ class _StudentShellState extends State<StudentShell> {
     ),
   ];
 
+  int _calculateSelectedIndex(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    for (int i = 0; i < _tabs.length; i++) {
+      if (location == _tabs[i] || (i == 0 && location == '/student')) {
+        return i;
+      }
+    }
+    for (int i = _tabs.length - 1; i >= 0; i--) {
+      if (location.startsWith(_tabs[i])) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = _calculateSelectedIndex(context);
+    final location = GoRouterState.of(context).uri.path;
+
     return Scaffold(
       extendBody: true,
-      body: widget.child,
+      backgroundColor: AppColors.background,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
+            ),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.0, 0.015),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(location),
+          child: widget.child,
+        ),
+      ),
       bottomNavigationBar: LiquidNavigationBar(
-        selectedIndex: _index,
+        selectedIndex: selectedIndex,
         onItemSelected: (i) {
-          setState(() => _index = i);
-          context.go(_tabs[i]);
+          if (selectedIndex != i) {
+            context.go(_tabs[i]);
+          }
         },
         items: _items,
-        barColor: const Color(0xFF0F172A), // Deep Midnight Slate (TikTok look)
-        activeCircleColor: Colors.white, // Floating elevated white circle
-        activeIconColor: const Color(0xFF227AFF), // EduPeak Brand Blue
-        inactiveIconColor: const Color(0xFF94A3B8), // Sleek muted slate
-        activeTextColor: Colors.white,
+        barColor: Colors.white,
+        borderColor: const Color(0xFFE2E8F0),
+        activeCircleGradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF227AFF),
+            Color(0xFF1565D8),
+          ],
+        ),
+        activeIconColor: Colors.white,
+        inactiveIconColor: const Color(0xFF64748B),
+        activeTextColor: const Color(0xFF227AFF),
       ),
     );
   }
