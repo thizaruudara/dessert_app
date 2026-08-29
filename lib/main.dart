@@ -22,6 +22,11 @@ void main() async {
   // Register background FCM handler
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
