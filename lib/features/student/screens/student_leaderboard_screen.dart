@@ -28,7 +28,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .where('role', '==', 'student')
+            .where('role', isEqualTo: 'student')
             .orderBy('credits', descending: true)
             .limit(50)
             .snapshots(),
