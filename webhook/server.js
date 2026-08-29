@@ -7,21 +7,36 @@ const fs = require('fs');
 
 // ── Initialize Firebase Admin ────────────────────────────────────────────────
 let credential;
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
   try {
-    const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    const jsonStr = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64.trim(), 'base64').toString('utf8');
+    const sa = JSON.parse(jsonStr);
+    credential = admin.credential.cert(sa);
+  } catch (e) {
+    console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_BASE64:', e);
+  }
+}
+
+if (!credential && process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const sa = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      : process.env.FIREBASE_SERVICE_ACCOUNT;
     if (sa.private_key) {
       sa.private_key = sa.private_key.replace(/\\n/g, '\n');
     }
     credential = admin.credential.cert(sa);
   } catch (e) {
     console.error('Error parsing FIREBASE_SERVICE_ACCOUNT env var:', e);
-    credential = admin.credential.applicationDefault();
   }
-} else if (fs.existsSync(path.join(__dirname, 'serviceAccountKey.json'))) {
+}
+
+if (!credential && fs.existsSync(path.join(__dirname, 'serviceAccountKey.json'))) {
   const serviceAccount = require('./serviceAccountKey.json');
   credential = admin.credential.cert(serviceAccount);
-} else {
+}
+
+if (!credential) {
   credential = admin.credential.applicationDefault();
 }
 
