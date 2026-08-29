@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -45,22 +46,28 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Step 1 — send OTP
-  Future<void> sendOtp(String phoneNumber) async {
+  Future<bool> sendOtp(String phoneNumber) async {
     _setLoading(true);
     _error = null;
+    final completer = Completer<bool>();
+
     try {
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
         verificationCompleted: (PhoneAuthCredential credential) async {
           await _auth.signInWithCredential(credential);
+          _setLoading(false);
+          if (!completer.isCompleted) completer.complete(true);
         },
         verificationFailed: (FirebaseAuthException e) {
-          _error = e.message ?? 'Verification failed';
+          _error = e.message ?? 'Verification failed (${e.code})';
           _setLoading(false);
+          if (!completer.isCompleted) completer.complete(false);
         },
         codeSent: (String verificationId, int? resendToken) {
           _verificationId = verificationId;
           _setLoading(false);
+          if (!completer.isCompleted) completer.complete(true);
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           _verificationId = verificationId;
@@ -70,7 +77,10 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       _setLoading(false);
+      if (!completer.isCompleted) completer.complete(false);
     }
+
+    return completer.future;
   }
 
   /// Step 2 — verify OTP and login/register

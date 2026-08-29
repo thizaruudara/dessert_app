@@ -34,12 +34,16 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final phone = '$_countryCode$cleanNumber';
     final auth = context.read<AuthProvider>();
-    await auth.sendOtp(phone);
-    if (auth.error == null && mounted) {
+    final success = await auth.sendOtp(phone);
+    if (success && mounted) {
       context.push('/auth/otp', extra: phone);
-    } else if (auth.error != null && mounted) {
+    } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
+        SnackBar(
+          content: Text(auth.error ?? 'Failed to send OTP. Please check your connection and Firebase configuration.'),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
