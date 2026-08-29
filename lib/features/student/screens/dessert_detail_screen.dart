@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/models/dessert_model.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/media_image_view.dart';
 
 class DessertDetailScreen extends StatelessWidget {
   final String dessertId;
@@ -83,13 +84,10 @@ class _DessertDetailView extends StatelessWidget {
                     color: AppColors.darkCard,
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: CachedNetworkImage(
-                    imageUrl: url,
+                  child: MediaImageView(
+                    url: url,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => const AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
