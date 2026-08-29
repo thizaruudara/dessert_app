@@ -58,43 +58,44 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Transparent EduPeak Logo
                 Container(
-                  width: 110,
-                  height: 110,
+                  width: 140,
+                  height: 140,
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(28),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.primary, AppColors.primaryDark],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.35),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
                   ),
-                  child: const Center(
-                    child: Text('🎓', style: TextStyle(fontSize: 54)),
+                  child: Image.asset(
+                    'assets/images/edupeak_logo.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Text(
                   'EduPeak',
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -1,
+                    color: AppColors.primary,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
-                  'AI & Learning Institute',
+                  'AI & Advanced Level Institute',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textMuted,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                   ),
                 ),
               ],

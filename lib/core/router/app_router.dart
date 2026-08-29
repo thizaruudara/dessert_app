@@ -50,9 +50,29 @@ class AppRouter {
       ),
       GoRoute(
         path: '/auth/otp',
-        builder: (_, state) => OtpScreen(
-          phoneNumber: state.extra as String? ?? '',
-        ),
+        builder: (_, state) {
+          final extra = state.extra;
+          String phone = '';
+          String? name;
+          String? examYear;
+          bool isRegister = false;
+
+          if (extra is Map<String, dynamic>) {
+            phone = extra['phone']?.toString() ?? '';
+            name = extra['name']?.toString();
+            examYear = extra['examYear']?.toString();
+            isRegister = extra['isRegister'] == true;
+          } else if (extra is String) {
+            phone = extra;
+          }
+
+          return OtpScreen(
+            phoneNumber: phone,
+            name: name,
+            examYear: examYear,
+            isRegister: isRegister,
+          );
+        },
       ),
 
       // ── Student Shell ─────────────────────────────────────

@@ -32,15 +32,30 @@ class DessertsProvider extends ChangeNotifier {
     });
   }
 
-  /// Listen to a specific student's submissions
-  void listenToStudentDesserts(String studentId) {
+  /// Listen to a specific student's submissions (matches studentId or studentPhone)
+  void listenToStudentDesserts(String studentId, {String? studentPhone}) {
+    _loading = true;
+    notifyListeners();
+
+    final cleanPhone = (studentPhone ?? '').replaceAll(RegExp(r'\s+'), '');
+
     _db
         .collection('desserts')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('submittedAt', descending: true)
         .snapshots()
         .listen((snap) {
-      _desserts = snap.docs.map(DessertModel.fromFirestore).toList();
+      _desserts = snap.docs
+          .map(DessertModel.fromFirestore)
+          .where((d) =>
+              d.studentId == studentId ||
+              (cleanPhone.isNotEmpty &&
+                  d.studentPhone.replaceAll(RegExp(r'\s+'), '') == cleanPhone))
+          .toList()
+        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      _loading = false;
+      notifyListeners();
+    }, onError: (e) {
+      _error = e.toString();
+      _loading = false;
       notifyListeners();
     });
   }

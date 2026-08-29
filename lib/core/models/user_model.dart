@@ -11,6 +11,7 @@ class UserModel {
   final int credits;
   final String? studentId;
   final String? avatarUrl;
+  final String? examYear;
   final DateTime createdAt;
 
   const UserModel({
@@ -22,6 +23,7 @@ class UserModel {
     this.email,
     this.studentId,
     this.avatarUrl,
+    this.examYear,
     required this.createdAt,
   });
 
@@ -39,6 +41,7 @@ class UserModel {
       credits: data['credits'] ?? 0,
       studentId: data['studentId'],
       avatarUrl: data['avatarUrl'] ?? data['photoUrl'],
+      examYear: data['examYear']?.toString(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -53,6 +56,7 @@ class UserModel {
       'studentId': studentId,
       'avatarUrl': avatarUrl,
       'photoUrl': avatarUrl,
+      'examYear': examYear,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }

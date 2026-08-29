@@ -18,11 +18,11 @@ class StudentProgressChart extends StatefulWidget {
 }
 
 class _StudentProgressChartState extends State<StudentProgressChart> {
-  int _selectedTab = 0; // 0 = Weekly Activity, 1 = Credit Growth
+  int _selectedTab = 0; // 0 = Activity Line Chart, 1 = Credit Growth
 
   @override
   Widget build(BuildContext context) {
-    // Compute last 7 days submissions
+    // Compute last 7 days submissions (Mon to Sun)
     final now = DateTime.now();
     final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final counts = List.filled(7, 0);
@@ -35,8 +35,6 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
       }
     }
 
-    final maxCount = counts.reduce(math.max);
-    final highestVal = maxCount > 0 ? maxCount : 4;
     final approvedCount = widget.desserts.where((d) => d.isApproved).length;
     final totalSubmissions = widget.desserts.length;
     final successRate = totalSubmissions > 0
@@ -73,7 +71,7 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
                       color: AppColors.backgroundSoft,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.insights_rounded, color: AppColors.primary, size: 20),
+                    child: const Icon(Icons.show_chart_rounded, color: AppColors.primary, size: 20),
                   ),
                   const SizedBox(width: 10),
                   const Column(
@@ -138,13 +136,13 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Chart Display
+          // Line Chart Display
           SizedBox(
-            height: 140,
+            height: 160,
             child: _selectedTab == 0
-                ? _buildWeeklyBarChart(dayNames, counts, highestVal)
+                ? _buildWeeklyLineChart(dayNames, counts)
                 : _buildCreditGrowthCurve(),
           ),
         ],
@@ -201,7 +199,7 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
                 children: [
                   Text(
                     value,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -222,119 +220,63 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
     );
   }
 
-  Widget _buildWeeklyBarChart(List<String> dayNames, List<int> counts, int highestVal) {
-    final todayWeekday = (DateTime.now().weekday - 1) % 7;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(7, (i) {
-        final count = counts[i];
-        final isToday = i == todayWeekday;
-        final heightFactor = math.max(0.12, count / highestVal);
-
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (count > 0)
-                  Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isToday ? AppColors.primary : AppColors.textSecondary,
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                // Animated / Styled Bar
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: FractionallySizedBox(
-                      heightFactor: heightFactor,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: isToday
-                                ? [AppColors.primary, AppColors.primaryDark]
-                                : count > 0
-                                    ? [AppColors.primaryLight.withOpacity(0.8), AppColors.primary.withOpacity(0.5)]
-                                    : [AppColors.backgroundSoft, AppColors.border],
-                          ),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: isToday && count > 0
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  dayNames[i],
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                    color: isToday ? AppColors.primary : AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }),
+  Widget _buildWeeklyLineChart(List<String> dayNames, List<int> counts) {
+    return CustomPaint(
+      size: const Size(double.infinity, 160),
+      painter: _ActivityLineChartPainter(
+        dayNames: dayNames,
+        counts: counts,
+        todayWeekday: (DateTime.now().weekday - 1) % 7,
+      ),
     );
   }
 
   Widget _buildCreditGrowthCurve() {
     return CustomPaint(
-      size: const Size(double.infinity, 140),
+      size: const Size(double.infinity, 160),
       painter: _GrowthCurvePainter(totalCredits: widget.totalCredits),
     );
   }
 }
 
-class _GrowthCurvePainter extends CustomPainter {
-  final int totalCredits;
+class _ActivityLineChartPainter extends CustomPainter {
+  final List<String> dayNames;
+  final List<int> counts;
+  final int todayWeekday;
 
-  _GrowthCurvePainter({required this.totalCredits});
+  _ActivityLineChartPainter({
+    required this.dayNames,
+    required this.counts,
+    required this.todayWeekday,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
-    final h = size.height;
+    final chartHeight = size.height - 30; // Reserve 30px for X-axis labels
+    final maxCount = counts.reduce(math.max);
+    final highestVal = maxCount > 0 ? (maxCount + 1) : 4;
 
-    // Grid lines
+    // Grid lines (3 horizontal levels)
     final gridPaint = Paint()
-      ..color = AppColors.border.withOpacity(0.6)
+      ..color = AppColors.border.withOpacity(0.5)
       ..strokeWidth = 1;
 
     for (int i = 1; i <= 3; i++) {
-      final y = (h / 4) * i;
+      final y = (chartHeight / 4) * i;
       canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
     }
 
-    // Points calculation (simulating cumulative growth)
-    final points = [
-      Offset(0, h * 0.85),
-      Offset(w * 0.2, h * 0.70),
-      Offset(w * 0.4, h * 0.65),
-      Offset(w * 0.6, h * 0.45),
-      Offset(w * 0.8, h * 0.30),
-      Offset(w, h * 0.15),
-    ];
+    // Compute coordinate points for each of the 7 days
+    final points = <Offset>[];
+    final stepX = w / 6;
+
+    for (int i = 0; i < 7; i++) {
+      final x = i * stepX;
+      final val = counts[i];
+      final y = chartHeight - (val / highestVal) * (chartHeight - 20) - 10;
+      points.add(Offset(x, y));
+    }
 
     // Smooth Bezier path
     final path = Path()..moveTo(points[0].dx, points[0].dy);
@@ -345,7 +287,132 @@ class _GrowthCurvePainter extends CustomPainter {
       path.cubicTo(cx, p0.dy, cx, p1.dy, p1.dx, p1.dy);
     }
 
-    // Gradient Fill under curve
+    // Gradient Fill Area
+    final fillPath = Path.from(path)
+      ..lineTo(w, chartHeight)
+      ..lineTo(0, chartHeight)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0x35227AFF),
+          Color(0x02227AFF),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, chartHeight));
+
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Line Stroke
+    final linePaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [AppColors.primaryLight, AppColors.primary, AppColors.primaryDark],
+      ).createShader(Rect.fromLTWH(0, 0, w, chartHeight))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(path, linePaint);
+
+    // Draw Data Points, Values & X-Axis Labels
+    for (int i = 0; i < 7; i++) {
+      final pt = points[i];
+      final count = counts[i];
+      final isToday = i == todayWeekday;
+
+      // Glow & Dot on Active days or Today
+      if (count > 0 || isToday) {
+        final glowPaint = Paint()
+          ..color = (isToday ? AppColors.primary : AppColors.primaryLight).withOpacity(0.3)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+        canvas.drawCircle(pt, 7, glowPaint);
+
+        final dotPaint = Paint()..color = isToday ? AppColors.primary : AppColors.primaryLight;
+        canvas.drawCircle(pt, 4.5, dotPaint);
+
+        final innerDot = Paint()..color = Colors.white;
+        canvas.drawCircle(pt, 2, innerDot);
+
+        // Value text bubble above dot
+        if (count > 0) {
+          final tpVal = TextPainter(
+            text: TextSpan(
+              text: '$count',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isToday ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          tpVal.paint(canvas, Offset(pt.dx - tpVal.width / 2, pt.dy - 16));
+        }
+      } else {
+        // Subtle dot for zero activity days
+        final zeroDot = Paint()..color = AppColors.border;
+        canvas.drawCircle(pt, 2.5, zeroDot);
+      }
+
+      // X-Axis Day Label (Mon, Tue, ...)
+      final tpLabel = TextPainter(
+        text: TextSpan(
+          text: dayNames[i],
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+            color: isToday ? AppColors.primary : AppColors.textMuted,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      tpLabel.paint(canvas, Offset(pt.dx - tpLabel.width / 2, chartHeight + 10));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ActivityLineChartPainter oldDelegate) => true;
+}
+
+class _GrowthCurvePainter extends CustomPainter {
+  final int totalCredits;
+
+  _GrowthCurvePainter({required this.totalCredits});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height - 20;
+
+    final gridPaint = Paint()
+      ..color = AppColors.border.withOpacity(0.5)
+      ..strokeWidth = 1;
+
+    for (int i = 1; i <= 3; i++) {
+      final y = (h / 4) * i;
+      canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
+    }
+
+    final points = [
+      Offset(0, h * 0.85),
+      Offset(w * 0.2, h * 0.70),
+      Offset(w * 0.4, h * 0.65),
+      Offset(w * 0.6, h * 0.45),
+      Offset(w * 0.8, h * 0.30),
+      Offset(w, h * 0.15),
+    ];
+
+    final path = Path()..moveTo(points[0].dx, points[0].dy);
+    for (int i = 0; i < points.length - 1; i++) {
+      final p0 = points[i];
+      final p1 = points[i + 1];
+      final cx = (p0.dx + p1.dx) / 2;
+      path.cubicTo(cx, p0.dy, cx, p1.dy, p1.dx, p1.dy);
+    }
+
     final fillPath = Path.from(path)
       ..lineTo(w, h)
       ..lineTo(0, h)
@@ -356,14 +423,13 @@ class _GrowthCurvePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0x33227AFF),
-          Color(0x00227AFF),
+          Color(0x35227AFF),
+          Color(0x02227AFF),
         ],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
 
     canvas.drawPath(fillPath, fillPaint);
 
-    // Line stroke
     final strokePaint = Paint()
       ..shader = const LinearGradient(
         colors: [AppColors.primaryLight, AppColors.primary, AppColors.primaryDark],
@@ -374,10 +440,9 @@ class _GrowthCurvePainter extends CustomPainter {
 
     canvas.drawPath(path, strokePaint);
 
-    // Draw Glowing End Point
     final lastPt = points.last;
     final glowPaint = Paint()
-      ..color = AppColors.primary.withOpacity(0.3)
+      ..color = AppColors.primary.withOpacity(0.35)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
     canvas.drawCircle(lastPt, 8, glowPaint);
 
@@ -386,6 +451,20 @@ class _GrowthCurvePainter extends CustomPainter {
 
     final innerDot = Paint()..color = Colors.white;
     canvas.drawCircle(lastPt, 2.5, innerDot);
+
+    // Label on curve
+    final tp = TextPainter(
+      text: TextSpan(
+        text: '$totalCredits pts',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: AppColors.primary,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(lastPt.dx - tp.width - 8, lastPt.dy - 18));
   }
 
   @override

@@ -26,7 +26,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     super.initState();
     final auth = context.read<AuthProvider>();
     if (auth.user != null) {
-      context.read<DessertsProvider>().listenToStudentDesserts(auth.user!.uid);
+      context.read<DessertsProvider>().listenToStudentDesserts(
+            auth.user!.uid,
+            studentPhone: auth.user!.phone,
+          );
       context.read<CreditsProvider>().updateCredits(auth.user!.credits);
     }
   }
@@ -245,18 +248,24 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           ),
 
           if (desserts.loading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              ),
             )
           else if (desserts.desserts.isEmpty)
-            SliverFillRemaining(
-              child: _EmptyState(
-                onSubmit: () => context.go('/student/submit'),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                child: _EmptyState(
+                  onSubmit: () => context.go('/student/submit'),
+                ),
               ),
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) {
@@ -270,6 +279,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 ),
               ),
             ),
+          const SliverToBoxAdapter(child: SizedBox(height: 60)),
         ],
       ),
     );

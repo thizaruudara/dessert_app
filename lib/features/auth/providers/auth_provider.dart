@@ -84,17 +84,19 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Step 1 — Send OTP (via WhatsApp + Firebase Phone Auth)
-  Future<bool> sendOtp(String phoneNumber, {String? name}) async {
+  Future<bool> sendOtp(String phoneNumber, {String? name, String? examYear}) async {
     _setLoading(true);
     _error = null;
     _currentPhone = phoneNumber;
     _currentName = name;
+    _currentExamYear = examYear;
 
     try {
       // 1. Submit WhatsApp OTP request to Firestore
       await _db.collection('otp_requests').add({
         'phone': phoneNumber,
         'name': name ?? 'Student',
+        'examYear': examYear,
         'requestedAt': FieldValue.serverTimestamp(),
       });
 
@@ -142,11 +144,12 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Step 2 — Verify OTP and persist session
-  Future<bool> verifyOtp(String otp, {String? name, String? phone}) async {
+  Future<bool> verifyOtp(String otp, {String? name, String? phone, String? examYear}) async {
     _setLoading(true);
     _error = null;
     final targetPhone = phone ?? _currentPhone ?? '';
-    final targetName = name ?? _currentName ?? 'Student';
+    final targetName = name ?? _currentName ?? '';
+    final targetExamYear = examYear ?? _currentExamYear;
 
     try {
       bool isVerified = false;
@@ -208,7 +211,19 @@ class AuthProvider extends ChangeNotifier {
       final userQuery = await _db.collection('users').where('phone', isEqualTo: targetPhone).limit(1).get();
 
       if (userQuery.docs.isNotEmpty) {
-        _user = UserModel.fromFirestore(userQuery.docs.first);
+        final existingDoc = userQuery.docs.first;
+        final updates = <String, dynamic>{};
+        if (targetName.isNotEmpty && (existingDoc.data()['name'] == null || existingDoc.data()['name'].toString().isEmpty || existingDoc.data()['name'].toString().startsWith('Student ('))) {
+          updates['name'] = targetName;
+        }
+        if (targetExamYear != null && targetExamYear.isNotEmpty) {
+          updates['examYear'] = targetExamYear;
+        }
+        if (updates.isNotEmpty) {
+          await existingDoc.ref.update(updates);
+        }
+        final updatedDoc = await existingDoc.ref.get();
+        _user = UserModel.fromFirestore(updatedDoc);
       } else {
         final docRef = _db.collection('users').doc(uid);
         final doc = await docRef.get();
@@ -218,10 +233,11 @@ class AuthProvider extends ChangeNotifier {
           // Create new student profile
           final newUser = UserModel(
             uid: uid,
-            name: targetName,
+            name: targetName.isNotEmpty ? targetName : 'Student',
             phone: targetPhone,
             role: UserRole.student,
             credits: 0,
+            examYear: targetExamYear,
             createdAt: DateTime.now(),
           );
           await docRef.set(newUser.toFirestore());
