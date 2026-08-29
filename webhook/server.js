@@ -54,7 +54,7 @@ app.use(express.static(path.join(__dirname, '../demo')));
 
 // ── Meta WhatsApp & Gemini Config ───────────────────────────────────────────
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'dessert_secret_2026';
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBSWRotwyGFeYYxdeqTyxspnT0iZCr8tyunggLHJMFpN2S6bZA0nDCkFo6flQdGpWJHRyaZCfOx25frrsO08KYYMgrbDhITYGUC9ZBEbhjgaNdIZAQbkpjNLqPLHsQTdTQZA9tZAIlUdWweZA7Cr9TVxOr91bDGAh8yvSzzcmym7RMmXJPGAqpvAZDZD';
+const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBScDWq0kZCAQSRItrKyZAHqA6RWghMiiRdeGWiAvtQCsYlo3sG1xKtH7BeQAymfrzPWiTIlfyPe8NVSUtg4r4kojIPg2aZBQQQljZBFZAqtwBr3URuwL3SqtyNN7j8zIzbgHC5sDeShKvmWptlxYdPRCf3KN5kbOJSee43qNvB2DMZChjdirQZDZD';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1259475067252677';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -77,10 +77,8 @@ app.post('/api/send-otp', async (req, res) => {
     });
 
     const targetWaNumber = phone.replace(/\D/g, '');
-    const messageBody = `🍰 *EduPeak Verification*\n\nHello ${studentName}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 10 minutes.\n🔒 Do not share this code with anyone.`;
-
-    await sendWhatsAppText(targetWaNumber, messageBody);
-    console.log(`📲 Direct API: WhatsApp OTP [${randomOtp}] sent to ${phone} (${studentName})`);
+    await sendWhatsAppOtp(targetWaNumber, randomOtp, studentName);
+    console.log(`📲 Direct API: WhatsApp OTP [${randomOtp}] dispatched to ${phone} (${studentName})`);
 
     return res.status(200).json({ success: true, message: 'OTP sent successfully' });
   } catch (err) {
@@ -349,7 +347,7 @@ async function handleMessage(message, contact) {
     await userRef.update({ awaitingDessert: true });
     await sendWhatsAppText(
       rawSender,
-      `📸 *Dessert Homework Submission*\n\nPlease send a clear photo of your dessert creation with a short description or recipe note.\n\nIt will be uploaded directly to your *EduPeak Student Portal* for teacher grading! 🍰`
+      `📸 *Dessert Homework Submission*\n\nPlease send your dessert photos (you can send multiple photos at once!) with a short description or recipe note.\n\nThey will be uploaded together to your *EduPeak Student Portal* for teacher grading! 🍰`
     );
     return;
   }
@@ -466,12 +464,13 @@ Student Name: ${studentName}.
 Role:
 1. Answer questions clearly about the Sri Lankan G.C.E. Advanced Level (A/L) syllabus across Science, Maths, Commerce, Tech, and Arts streams (Physics, Chemistry, Combined Maths, Biology, ICT, Accounting, Economics, Business Studies, etc.).
 2. You can also answer questions about pastry, dessert culinary arts, or institute details.
-3. If the student wants to submit homework, remind them they can send a photo of their dessert creation here anytime.
+3. If the student wants to submit homework, remind them they can send photos of their dessert creation here anytime (they can send multiple photos in one go!).
 4. Respond in the same language the student asks in (English, Sinhala සිංහල, Singlish, or Tamil தமிழ்).
 5. Format your answers clearly using WhatsApp markdown (*bold*, bullet points, numbered steps, simple formulas). Keep explanations concise and easy to understand for a student.`;
 
       // Call Gemini 3.6 Flash
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const geminiApiKey = GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiApiKey}`;
       const gRes = await axios.post(geminiUrl, {
         contents: contents,
         systemInstruction: {
@@ -538,6 +537,71 @@ function formatForWhatsApp(text) {
 }
 
 // ── WhatsApp Message Dispatch Utilities ─────────────────────────────────────
+async function sendWhatsAppOtp(to, otp, studentName) {
+  try {
+    if (!ACCESS_TOKEN) {
+      console.warn('⚠️ sendWhatsAppOtp: No ACCESS_TOKEN configured');
+      return false;
+    }
+    const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
+
+    // 1. Try sending Meta Authentication Template (Authorized for ANY student worldwide)
+    try {
+      const templatePayload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to,
+        type: 'template',
+        template: {
+          name: 'edupeak_otp',
+          language: { code: 'en_US' },
+          components: [
+            {
+              type: 'body',
+              parameters: [{ type: 'text', text: otp }]
+            },
+            {
+              type: 'button',
+              sub_type: 'url',
+              index: '0',
+              parameters: [{ type: 'text', text: otp }]
+            }
+          ]
+        }
+      };
+
+      const tRes = await axios.post(url, templatePayload, {
+        headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+      });
+      console.log(`✅ Template OTP [${otp}] delivered successfully to ${to} (Message ID: ${tRes.data?.messages?.[0]?.id})`);
+      return true;
+    } catch (templateErr) {
+      const errMsg = templateErr.response?.data?.error?.message || templateErr.message;
+      console.log(`ℹ️ Template dispatch info: ${errMsg} — attempting direct message format...`);
+    }
+
+    // 2. Direct message format
+    const messageBody = `🍰 *EduPeak Verification*\n\nHello ${studentName}! 👋\n\nYour 6-digit login code is:\n\n👉 *${otp}*\n\n⏱️ This code is valid for 10 minutes.\n🔒 Do not share this code with anyone.`;
+    const textRes = await axios.post(
+      url,
+      {
+        messaging_product: 'whatsapp',
+        to: to,
+        type: 'text',
+        text: { body: messageBody },
+      },
+      {
+        headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+      }
+    );
+    console.log(`✅ Direct text OTP [${otp}] delivered to ${to} (Message ID: ${textRes.data?.messages?.[0]?.id})`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Meta WhatsApp API Dispatch Failed for ${to}:`, JSON.stringify(err.response?.data || err.message));
+    return false;
+  }
+}
+
 async function sendWhatsAppText(to, body) {
   try {
     if (!ACCESS_TOKEN) return;
@@ -612,7 +676,7 @@ db.collection('otp_requests').onSnapshot(snapshot => {
       if (!phone) return;
 
       const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 5 * 60 * 1000;
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
       try {
         await db.collection('otp_verifications').doc(phone).set({
@@ -624,14 +688,12 @@ db.collection('otp_requests').onSnapshot(snapshot => {
         });
 
         const targetWaNumber = phone.replace(/\D/g, '');
-        const messageBody = `🍰 *EduPeak Verification*\n\nHello ${name}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 5 minutes.\n🔒 Do not share this code with anyone.`;
-
-        await sendWhatsAppText(targetWaNumber, messageBody);
-        console.log(`📲 WhatsApp OTP [${randomOtp}] sent to ${phone} (${name})`);
+        await sendWhatsAppOtp(targetWaNumber, randomOtp, name);
+        console.log(`📲 Firestore Listener: WhatsApp OTP [${randomOtp}] sent to ${phone} (${name})`);
 
         await change.doc.ref.delete();
       } catch (err) {
-        console.error(`❌ Failed to send OTP to ${phone}:`, err.message);
+        console.error(`❌ Failed to process OTP for ${phone}:`, err.message);
       }
     }
   });
