@@ -261,7 +261,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   ),
 
                   // Camera Edit Badge
-                  Position precedent = Position.bottomRight;
                   Positioned(
                     bottom: 0,
                     right: 0,

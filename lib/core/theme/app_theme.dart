@@ -8,6 +8,7 @@ class AppColors {
   static const Color primaryDark = Color(0xFF4B44CC);
   static const Color accent = Color(0xFFFF6584);
   static const Color gold = Color(0xFFFFB830);
+  static const Color warning = Color(0xFFFFB830);
   static const Color success = Color(0xFF2DD4BF);
   static const Color error = Color(0xFFFF4D6D);
 
