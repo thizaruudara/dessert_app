@@ -33,14 +33,15 @@ class _LoginScreenState extends State<LoginScreen> {
       cleanNumber = cleanNumber.substring(1);
     }
     final phone = '$_countryCode$cleanNumber';
+    final name = _nameCtrl.text.trim();
     final auth = context.read<AuthProvider>();
-    final success = await auth.sendOtp(phone);
+    final success = await auth.sendOtp(phone, name: name);
     if (success && mounted) {
       context.push('/auth/otp', extra: phone);
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.error ?? 'Failed to send OTP. Please check your connection and Firebase configuration.'),
+          content: Text(auth.error ?? 'Failed to send OTP. Please check your connection.'),
           backgroundColor: Colors.redAccent,
           duration: const Duration(seconds: 5),
         ),
@@ -75,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Text('Welcome back!', style: Theme.of(context).textTheme.displayMedium),
               const SizedBox(height: 8),
               Text(
-                'Enter your phone number to continue',
+                'Enter your phone number to receive your WhatsApp OTP',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 40),
@@ -164,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   strokeWidth: 2, color: Colors.white,
                                 ),
                               )
-                            : const Text('Send OTP', style: TextStyle(fontSize: 16)),
+                            : const Text('Send WhatsApp OTP 💬', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -176,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Disclaimer
               Center(
                 child: Text(
-                  'Your phone number will be used to verify your identity.',
+                  'Your 6-digit verification code will be sent to your WhatsApp.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
                 ),

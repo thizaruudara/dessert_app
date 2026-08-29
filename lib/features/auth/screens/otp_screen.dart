@@ -52,12 +52,15 @@ class _OtpScreenState extends State<OtpScreen> {
       return;
     }
     final auth = context.read<AuthProvider>();
-    final success = await auth.verifyOtp(_otp);
+    final success = await auth.verifyOtp(_otp, phone: widget.phoneNumber);
     if (success && mounted) {
       context.go(auth.isAdmin ? '/admin' : '/student');
     } else if (mounted && auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
+        SnackBar(
+          content: Text(auth.error!),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -83,10 +86,10 @@ class _OtpScreenState extends State<OtpScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 24),
-              Text('Verify your number', style: Theme.of(context).textTheme.displayMedium),
+              Text('Verify WhatsApp OTP', style: Theme.of(context).textTheme.displayMedium),
               const SizedBox(height: 8),
               Text(
-                'We sent a 6-digit code to\n${widget.phoneNumber}',
+                'We sent a 6-digit verification code to your WhatsApp:\n${widget.phoneNumber}',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 40),
