@@ -226,10 +226,8 @@ class AuthProvider extends ChangeNotifier {
       final data = doc.data();
       final storedPassword = data['password']?.toString();
 
-      // Master password bypass or matching password
-      final isMatch = (storedPassword != null && storedPassword == password) ||
-          password == '123456' ||
-          (isPhoneAdmin(phone) && password.isNotEmpty);
+      // Check matching password
+      final isMatch = storedPassword != null && storedPassword == password;
 
       if (!isMatch) {
         _error = 'Incorrect password. You can also log in via WhatsApp OTP below.';
@@ -390,12 +388,7 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
-      // 2. Universal Master / Test code fallback
-      if (otp == '123456') {
-        isVerified = true;
-      }
-
-      // 3. Fallback to Firebase Phone Auth verificationId
+      // 2. Fallback to Firebase Phone Auth verificationId
       if (!isVerified && _verificationId != null) {
         try {
           final credential = PhoneAuthProvider.credential(
