@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -96,7 +98,23 @@ class AuthProvider extends ChangeNotifier {
         'requestedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Also trigger Firebase Phone Auth in background if available (test numbers)
+      // 2. Also trigger direct API call to wake up Render & send OTP instantly
+      try {
+        final client = HttpClient();
+        final req = await client.postUrl(Uri.parse('https://edupeak-webhook.onrender.com/api/send-otp'));
+        req.headers.set('Content-Type', 'application/json');
+        req.add(utf8.encode(jsonEncode({
+          'phone': phoneNumber,
+          'name': name ?? 'Student',
+        })));
+        final res = await req.close();
+        debugPrint('📲 Direct OTP API Response: ${res.statusCode}');
+        client.close();
+      } catch (httpErr) {
+        debugPrint('Direct OTP HTTP notice: $httpErr');
+      }
+
+      // 3. Also trigger Firebase Phone Auth in background if available (test numbers)
       _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
         verificationCompleted: (PhoneAuthCredential credential) async {

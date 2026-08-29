@@ -58,17 +58,49 @@ const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBSVyqonx
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1259475067252677';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
+// ── Direct HTTP OTP Dispatch Endpoint ─────────────────────────────────────────
+app.post('/api/send-otp', async (req, res) => {
+  try {
+    const { phone, name } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone required' });
+
+    const studentName = name || 'Student';
+    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    await db.collection('otp_verifications').doc(phone).set({
+      otp: randomOtp,
+      phone: phone,
+      name: studentName,
+      expiresAt: expiresAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const targetWaNumber = phone.replace(/\D/g, '');
+    const messageBody = `🍰 *EduPeak Verification*\n\nHello ${studentName}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 10 minutes.\n🔒 Do not share this code with anyone.`;
+
+    await sendWhatsAppText(targetWaNumber, messageBody);
+    console.log(`📲 Direct API: WhatsApp OTP [${randomOtp}] sent to ${phone} (${studentName})`);
+
+    return res.status(200).json({ success: true, message: 'OTP sent successfully' });
+  } catch (err) {
+    console.error('Error in /api/send-otp:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Health Check ─────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.send(`
     <div style="font-family:sans-serif;text-align:center;padding:40px;background:#0D0F1A;color:#fff;min-height:100vh;">
       <h1 style="color:#6C63FF;font-size:36px;">🍰 EduPeak AI Webhook Server is LIVE!</h1>
-      <p style="color:#9B9EC8;font-size:16px;">Dual-Engine: <b>A/L Academic Tutor (Gemini AI)</b> + <b>Dessert Homework Submissions</b></p>
+      <p style="color:#9B9EC8;font-size:16px;">Dual-Engine: <b>A/L Academic Tutor (Gemini AI)</b> + <b>Multi-Photo Dessert Submissions</b></p>
       <div style="margin-top:30px;background:#1E2138;display:inline-block;padding:20px 30px;border-radius:12px;border:1px solid #2E3154;text-align:left;">
         <p><b>Webhook Endpoint:</b> <code>/whatsappWebhook</code></p>
+        <p><b>Direct OTP Endpoint:</b> <code>/api/send-otp</code></p>
         <p><b>Verify Token:</b> <code>dessert_secret_2026</code></p>
         <p><b>AI Model:</b> <code>Gemini 3.6 Flash with Firestore Multi-Turn Memory</code></p>
-        <p><b>Status:</b> 🟢 Ready 24/7</p>
+        <p><b>Multi-Photo Batching:</b> 🟢 Active</p>
       </div>
     </div>
   `);
