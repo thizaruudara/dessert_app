@@ -64,7 +64,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
 
     final displayName = user?.name.isNotEmpty == true ? user!.name : 'Scholar';
     final examYear = user?.examYear ?? '2025 A/L';
-    final totalCredits = user?.credits ?? credits.credits;
+    final totalCredits = user?.credits ?? credits.totalCredits;
     final approvedCount = desserts.desserts.where((d) => d.isApproved).length;
     final pendingCount = desserts.pendingDesserts.length;
     final totalCount = desserts.desserts.length;
@@ -137,7 +137,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                               child: ClipOval(
                                 child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
                                     ? MediaImageView(
-                                        source: user.avatarUrl!,
+                                        url: user.avatarUrl!,
                                         fit: BoxFit.cover,
                                         width: 48,
                                         height: 48,

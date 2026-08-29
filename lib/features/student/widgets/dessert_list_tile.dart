@@ -13,8 +13,8 @@ class DessertListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasImages = dessert.imageUrls.isNotEmpty || dessert.imageUrl != null;
-    final firstImg = dessert.imageUrls.isNotEmpty ? dessert.imageUrls.first : dessert.imageUrl;
+    final hasImages = dessert.mediaUrls.isNotEmpty;
+    final firstImg = dessert.mediaUrls.isNotEmpty ? dessert.mediaUrls.first : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -48,7 +48,7 @@ class DessertListTile extends StatelessWidget {
                       width: 52,
                       height: 52,
                       child: MediaImageView(
-                        source: firstImg,
+                        url: firstImg,
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -78,8 +78,8 @@ class DessertListTile extends StatelessWidget {
                             child: Text(
                               dessert.caption?.isNotEmpty == true
                                   ? dessert.caption!
-                                  : (dessert.imageUrls.length > 1
-                                      ? 'Photo Submission (${dessert.imageUrls.length} photos)'
+                                  : (dessert.mediaUrls.length > 1
+                                      ? 'Photo Submission (${dessert.mediaUrls.length} photos)'
                                       : 'Homework Submission'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
