@@ -72,7 +72,7 @@ class _StudentShellState extends State<StudentShell> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       backgroundColor: isDark ? const Color(0xFF0B0F19) : AppColors.background,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),

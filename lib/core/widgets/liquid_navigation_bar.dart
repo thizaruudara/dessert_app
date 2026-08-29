@@ -107,146 +107,144 @@ class _LiquidNavigationBarState extends State<LiquidNavigationBar>
   @override
   Widget build(BuildContext context) {
     final count = widget.items.length;
-    const barHeight = 66.0;
+    const barHeight = 62.0;
     const circleRadius = 26.0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      height: barHeight + circleRadius,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final itemWidth = width / count;
+      color: widget.barColor,
+      child: SafeArea(
+        top: false,
+        bottom: true,
+        child: SizedBox(
+          height: barHeight + circleRadius,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final itemWidth = width / count;
 
-          return AnimatedBuilder(
-            animation: Listenable.merge([_animController, _bubblePopController]),
-            builder: (context, child) {
-              final currentPos = _animController.isAnimating
-                  ? _positionAnimation.value
-                  : widget.selectedIndex.toDouble();
-              final circleCenterX = (currentPos + 0.5) * itemWidth;
+              return AnimatedBuilder(
+                animation: Listenable.merge([_animController, _bubblePopController]),
+                builder: (context, child) {
+                  final currentPos = _animController.isAnimating
+                      ? _positionAnimation.value
+                      : widget.selectedIndex.toDouble();
+                  final circleCenterX = (currentPos + 0.5) * itemWidth;
 
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // ── 1. Curved Scooped Liquid Bar ────────────────────────
-                  Positioned(
-                    top: circleRadius,
-                    left: 0,
-                    right: 0,
-                    height: barHeight,
-                    child: CustomPaint(
-                      painter: _LiquidBarPainter(
-                        centerX: circleCenterX,
-                        barColor: widget.barColor,
-                        borderColor: widget.borderColor,
-                      ),
-                      child: Row(
-                        children: List.generate(count, (index) {
-                          final isSelected = widget.selectedIndex == index;
-                          final item = widget.items[index];
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // ── 1. Curved Scooped Liquid Bar ────────────────────────
+                      Positioned(
+                        top: circleRadius,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: CustomPaint(
+                          painter: _LiquidBarPainter(
+                            centerX: circleCenterX,
+                            barColor: widget.barColor,
+                            borderColor: widget.borderColor,
+                          ),
+                          child: Row(
+                            children: List.generate(count, (index) {
+                              final isSelected = widget.selectedIndex == index;
+                              final item = widget.items[index];
 
-                          return Expanded(
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () => widget.onItemSelected(index),
-                                customBorder: const CircleBorder(),
-                                splashColor: widget.activeTextColor.withOpacity(0.08),
-                                highlightColor: Colors.transparent,
-                                child: Container(
-                                  height: barHeight,
-                                  alignment: Alignment.center,
-                                  child: isSelected
-                                      ? Padding(
-                                          padding: const EdgeInsets.only(top: 30),
-                                          child: AnimatedOpacity(
-                                            duration: const Duration(milliseconds: 200),
-                                            opacity: (currentPos - index).abs() < 0.3 ? 1.0 : 0.0,
-                                            child: Text(
-                                              item.label,
-                                              style: TextStyle(
-                                                color: widget.activeTextColor,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: -0.2,
+                              return Expanded(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => widget.onItemSelected(index),
+                                    customBorder: const CircleBorder(),
+                                    splashColor: widget.activeTextColor.withOpacity(0.08),
+                                    highlightColor: Colors.transparent,
+                                    child: Container(
+                                      height: barHeight,
+                                      alignment: Alignment.center,
+                                      child: isSelected
+                                          ? Padding(
+                                              padding: const EdgeInsets.only(top: 28),
+                                              child: AnimatedOpacity(
+                                                duration: const Duration(milliseconds: 200),
+                                                opacity: (currentPos - index).abs() < 0.3 ? 1.0 : 0.0,
+                                                child: Text(
+                                                  item.label,
+                                                  style: TextStyle(
+                                                    color: widget.activeTextColor,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: -0.2,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : AnimatedScale(
+                                              scale: (currentPos - index).abs() < 0.5 ? 0.75 : 1.0,
+                                              duration: const Duration(milliseconds: 180),
+                                              child: Icon(
+                                                item.icon,
+                                                color: widget.inactiveIconColor,
+                                                size: 22,
                                               ),
                                             ),
-                                          ),
-                                        )
-                                      : AnimatedScale(
-                                          scale: (currentPos - index).abs() < 0.5 ? 0.75 : 1.0,
-                                          duration: const Duration(milliseconds: 180),
-                                          child: Icon(
-                                            item.icon,
-                                            color: widget.inactiveIconColor,
-                                            size: 22,
-                                          ),
-                                        ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-
-                  // ── 2. Elevated Floating Liquid Circle (Bubble) ──────────
-                  Positioned(
-                    top: 0,
-                    left: circleCenterX - circleRadius,
-                    child: GestureDetector(
-                      onTap: () => widget.onItemSelected(widget.selectedIndex),
-                      child: ScaleTransition(
-                        scale: _bubbleScaleAnimation,
-                        child: Container(
-                          width: circleRadius * 2,
-                          height: circleRadius * 2,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: widget.activeCircleGradient,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.85),
-                              width: 2.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF2563EB).withOpacity(0.38),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
-                              ),
-                              BoxShadow(
-                                color: const Color(0x180F172A),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                              );
+                            }),
                           ),
-                          child: Center(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
-                              transitionBuilder: (child, anim) => ScaleTransition(
-                                scale: anim,
-                                child: FadeTransition(opacity: anim, child: child),
+                        ),
+                      ),
+
+                      // ── 2. Elevated Floating Liquid Circle (Bubble) ──────────
+                      Positioned(
+                        top: 0,
+                        left: circleCenterX - circleRadius,
+                        child: GestureDetector(
+                          onTap: () => widget.onItemSelected(widget.selectedIndex),
+                          child: ScaleTransition(
+                            scale: _bubbleScaleAnimation,
+                            child: Container(
+                              width: circleRadius * 2,
+                              height: circleRadius * 2,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: widget.activeCircleGradient,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.85),
+                                  width: 2.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF2563EB).withOpacity(0.38),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0x180F172A),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                              child: Icon(
-                                widget.items[widget.selectedIndex].activeIcon,
-                                key: ValueKey(widget.selectedIndex),
-                                color: widget.activeIconColor,
-                                size: 23,
+                              child: Center(
+                                child: Icon(
+                                  widget.items[widget.selectedIndex].activeIcon,
+                                  color: widget.activeIconColor,
+                                  size: 24,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -267,9 +265,8 @@ class _LiquidBarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    const cornerRadius = 26.0;
-    const notchWidth = 70.0;
-    const notchDepth = 30.0;
+    const notchWidth = 72.0;
+    const notchDepth = 28.0;
 
     final paint = Paint()
       ..color = barColor
@@ -281,13 +278,13 @@ class _LiquidBarPainter extends CustomPainter {
       ..strokeWidth = 1.0;
 
     final shadowPaint = Paint()
-      ..color = const Color(0x140F172A)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+      ..color = const Color(0x100F172A)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     final path = Path();
 
     // Start top-left
-    path.moveTo(cornerRadius, 0);
+    path.moveTo(0, 0);
 
     // Left notch start point
     final notchLeft = centerX - (notchWidth / 2);
@@ -309,42 +306,41 @@ class _LiquidBarPainter extends CustomPainter {
     );
 
     // Line to top-right
-    path.lineTo(w - cornerRadius, 0);
-
-    // Top-right rounded corner
-    path.quadraticBezierTo(w, 0, w, cornerRadius);
+    path.lineTo(w, 0);
 
     // Line down to bottom-right
-    path.lineTo(w, h - cornerRadius);
-
-    // Bottom-right rounded corner
-    path.quadraticBezierTo(w, h, w - cornerRadius, h);
+    path.lineTo(w, h);
 
     // Line to bottom-left
-    path.lineTo(cornerRadius, h);
-
-    // Bottom-left rounded corner
-    path.quadraticBezierTo(0, h, 0, h - cornerRadius);
-
-    // Line to top-left
-    path.lineTo(0, cornerRadius);
-
-    // Top-left rounded corner
-    path.quadraticBezierTo(0, 0, cornerRadius, 0);
+    path.lineTo(0, h);
 
     path.close();
 
-    // Draw multi-layered soft drop shadows for elevation
+    // Draw subtle drop shadow above bar
     canvas.save();
-    canvas.translate(0, 4);
+    canvas.translate(0, -2);
     canvas.drawPath(path, shadowPaint);
     canvas.restore();
 
     // Draw bar body
     canvas.drawPath(path, paint);
 
-    // Draw delicate subtle border
-    canvas.drawPath(path, borderPaint);
+    // Draw top border + notch curve
+    final borderPath = Path();
+    borderPath.moveTo(0, 0);
+    borderPath.lineTo(notchLeft, 0);
+    borderPath.cubicTo(
+      notchLeft + 12, 0,
+      centerX - 24, notchDepth,
+      centerX, notchDepth,
+    );
+    borderPath.cubicTo(
+      centerX + 24, notchDepth,
+      notchRight - 12, 0,
+      notchRight, 0,
+    );
+    borderPath.lineTo(w, 0);
+    canvas.drawPath(borderPath, borderPaint);
   }
 
   @override
