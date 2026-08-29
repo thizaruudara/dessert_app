@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../widgets/phone_flag_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  String _countryCode = '+91';
+  static const String _countryCode = '+94';
 
   @override
   void dispose() {
@@ -28,7 +28,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _sendOtp() async {
     if (!_formKey.currentState!.validate()) return;
-    final phone = '$_countryCode${_phoneCtrl.text.trim()}';
+    String cleanNumber = _phoneCtrl.text.trim();
+    if (cleanNumber.startsWith('0')) {
+      cleanNumber = cleanNumber.substring(1);
+    }
+    final phone = '$_countryCode$cleanNumber';
     final auth = context.read<AuthProvider>();
     await auth.sendOtp(phone);
     if (auth.error == null && mounted) {
@@ -76,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Name field (only shown for new users — kept simple here)
+                    // Name field
                     TextFormField(
                       controller: _nameCtrl,
                       style: const TextStyle(color: AppColors.textPrimary),
@@ -85,34 +89,33 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: Icon(Icons.person_outline, color: AppColors.textMuted),
                       ),
                       validator: (v) =>
-                          v == null || v.isEmpty ? 'Please enter your name' : null,
+                          v == null || v.trim().isEmpty ? 'Please enter your name' : null,
                     ),
                     const SizedBox(height: 16),
 
-                    // Phone field
+                    // Phone field with fixed +94 country code
                     Row(
                       children: [
-                        // Country code picker
-                        GestureDetector(
-                          onTap: () async {
-                            final code = await _showCodePicker(context);
-                            if (code != null) setState(() => _countryCode = code);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: AppColors.darkCard,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.darkBorder),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(_countryCode,
-                                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.arrow_drop_down, color: AppColors.textMuted),
-                              ],
-                            ),
+                        // Fixed Country Code Badge (Cannot be changed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                          decoration: BoxDecoration(
+                            color: AppColors.darkCard,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.darkBorder),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '🇱🇰 +94',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -120,14 +123,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: TextFormField(
                             controller: _phoneCtrl,
                             keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(10),
+                            ],
                             style: const TextStyle(color: AppColors.textPrimary),
                             decoration: const InputDecoration(
                               labelText: 'Phone Number',
+                              hintText: '7XXXXXXXX',
                               prefixIcon: Icon(Icons.phone_outlined, color: AppColors.textMuted),
                             ),
                             validator: (v) {
-                              if (v == null || v.isEmpty) return 'Required';
-                              if (v.length < 7) return 'Enter a valid number';
+                              if (v == null || v.trim().isEmpty) return 'Required';
+                              final digits = v.trim().replaceAll(RegExp(r'\D'), '');
+                              if (digits.length < 8) return 'Enter a valid number';
                               return null;
                             },
                           ),
@@ -171,31 +180,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Future<String?> _showCodePicker(BuildContext context) async {
-    final codes = ['+91', '+1', '+44', '+971', '+966', '+92', '+880', '+20'];
-    return showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.darkCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => ListView(
-        shrinkWrap: true,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Select Country Code',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16)),
-          ),
-          ...codes.map((c) => ListTile(
-                title: Text(c, style: const TextStyle(color: AppColors.textPrimary)),
-                onTap: () => Navigator.pop(context, c),
-              )),
-        ],
       ),
     );
   }
