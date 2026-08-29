@@ -245,7 +245,7 @@ async function handleMessage(message, contact) {
 
   console.log(`📥 Received from ${senderPhone} (${waProfileName}): Type=${msgType}, Text="${textBody}", Button="${buttonReplyId}"`);
 
-  // ── PRIORITY 1: INSTANT OTP / HASHTAG / LOGIN REQUEST ──────────────────────
+  // ── PRIORITY 1: INSTANT OTP / LOGIN REQUEST ──────────────────────────────
   const lowerText = textBody.toLowerCase();
   if (
     textBody.includes('#') ||
@@ -254,14 +254,8 @@ async function handleMessage(message, contact) {
     lowerText.includes('code') ||
     lowerText.includes('verification')
   ) {
-    // 1. Extract OTP code if provided in #<number> (e.g. #582914 or #123)
-    let otpCode = null;
-    const codeMatch = textBody.match(/#(\d+)/) || textBody.match(/#OTP-(\d+)/i) || textBody.match(/\b(\d{6})\b/);
-    if (codeMatch && codeMatch[1]) {
-      otpCode = codeMatch[1];
-    } else {
-      otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    }
+    // 1. Always generate a fresh, unique 6-digit random code for every login request
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // 2. Extract any specific phone number mentioned in the text (e.g. +94757690260 or 94757690260)
     let targetPhone = senderPhone;
