@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -332,11 +333,39 @@ class _OtpScreenState extends State<OtpScreen> {
                         style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
                       ),
               ),
+
+              const SizedBox(height: 12),
+
+              // Instant WhatsApp Direct Code Helper
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _openWhatsAppForCode,
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF25D366), size: 18),
+                  label: const Text(
+                    'Get Code via WhatsApp 💬',
+                    style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF25D366)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _openWhatsAppForCode() async {
+    final cleanPhone = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
+    final uri = Uri.parse('https://wa.me/94707938883?text=OTP%20for%20%2B$cleanPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 }
 

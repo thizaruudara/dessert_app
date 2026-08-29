@@ -323,6 +323,27 @@ async function handleMessage(message, contact) {
   const studentName = userData.name || waProfileName || 'Student';
   const studentId = userDoc.id;
 
+  // ── Flow 1.5: Instant OTP Request on WhatsApp ───────────────────────────────
+  if (textBody.toLowerCase().includes('otp') || textBody.toLowerCase().includes('login') || textBody.toLowerCase().includes('code')) {
+    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+
+    await db.collection('otp_verifications').doc(senderPhone).set({
+      otp: randomOtp,
+      phone: senderPhone,
+      name: studentName,
+      expiresAt: expiresAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await sendWhatsAppText(
+      rawSender,
+      `🍰 *EduPeak Verification Code*\n\nHello ${studentName}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 10 minutes.\nEnter this code in the EduPeak App to log in!`
+    );
+    console.log(`📲 Chat-Initiated OTP [${randomOtp}] sent to ${senderPhone}`);
+    return;
+  }
+
   // ── Flow 2: Interactive Button Click Handlers ──────────────────────────────
   if (buttonReplyId === 'btn_submit_yes' || textBody.toLowerCase() === 'submit dessert') {
     await userRef.update({ awaitingDessert: true });
