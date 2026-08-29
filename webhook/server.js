@@ -54,7 +54,7 @@ app.use(express.static(path.join(__dirname, '../demo')));
 
 // ── Meta WhatsApp & Gemini Config ───────────────────────────────────────────
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'dessert_secret_2026';
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBSVyqonxSGZC3ZBZAZAozq1RwMt4OSZA3MTuHD2jhtWDjAnrQnGQUz7Kn7VZBXUY7ZAw4pDxFuT3szkZCZArPQ326XYu80ejMzaYfCzTNuyKblZCJrXfB66T9lbhgZBCAQgZCOuZBSq1bVaX3QnJIMynANC1ZAmpG60PD0re9tZBz0OVBlu8prPPZB2unUAZDZD';
+const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBSWRotwyGFeYYxdeqTyxspnT0iZCr8tyunggLHJMFpN2S6bZA0nDCkFo6flQdGpWJHRyaZCfOx25frrsO08KYYMgrbDhITYGUC9ZBEbhjgaNdIZAQbkpjNLqPLHsQTdTQZA9tZAIlUdWweZA7Cr9TVxOr91bDGAh8yvSzzcmym7RMmXJPGAqpvAZDZD';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1259475067252677';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
