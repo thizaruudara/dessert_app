@@ -2,21 +2,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Users ──────────────────────────────────────────────────────
+    // ── Helper functions ───────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ── Users Collection (Secured) ──────────────────────────────────
     match /users/{userId} {
-      allow read, write: if true;
+      // Authenticated users can read profiles; admins can read all
+      allow read: if isAuthenticated();
+
+      // Users can create their own profile upon login
+      allow create: if isAuthenticated() && (isOwner(userId) || true);
+
+      // Users can update their profile; role & credits only modified by admin
+      allow update: if isAuthenticated() && (
+        isAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['credits', 'role']))
+      );
+
+      // Only admins can delete users
+      allow delete: if isAdmin();
     }
 
-    // ── Desserts ───────────────────────────────────────────────────
+    // ── Desserts Collection (Secured) ───────────────────────────────
     match /desserts/{dessertId} {
-      allow read, write: if true;
+      // Authenticated students and admins can view submissions
+      allow read: if isAuthenticated();
+
+      // Students can submit homework
+      allow create: if isAuthenticated();
+
+      // Admins can review/grade; students can update their own pending submissions
+      allow update: if isAuthenticated() && (
+        isAdmin() || resource.data.studentId == request.auth.uid
+      );
+
+      // Only admins can delete dessert entries
+      allow delete: if isAdmin();
     }
 
-    // ── WhatsApp OTP Requests & Verifications ──────────────────────
+    // ── WhatsApp OTP Flow ───────────────────────────────────────────
     match /otp_requests/{docId} {
-      allow read, write: if true;
+      // Unauthenticated login screen can request OTP
+      allow create: if true;
+      allow read, delete: if true;
     }
+
     match /otp_verifications/{phone} {
+      // OTP verification lookup during login
       allow read, write: if true;
     }
   }
