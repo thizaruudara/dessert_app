@@ -41,9 +41,29 @@ jobs:
       - name: Find APK
         run: find build -name "*.apk" -type f 2>/dev/null || find . -name "*.apk" -type f 2>/dev/null
 
-      - name: Upload Release APK
+      - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dessert-institute-apk
+          name: edupeak-app-release
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      - name: Create Direct Download GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "EduPeak App v1.0.0 (Build #${{ github.run_number }})"
+          body: |
+            ### 🍰 EduPeak Android App Release
+            
+            #### 🌟 What's New:
+            - 👤 **Student Profile & DP**: Upload custom avatar from camera/gallery, edit name & view credits.
+            - 🔒 **Auto-Login**: Stay logged in across app restarts.
+            - 🖼️ **Universal Image Viewer**: Smooth viewing of WhatsApp submissions & dessert photos.
+            - 🍰 **Multi-Photo Submissions**: View multi-image dessert creations together in one card.
+            - 🧠 **Gemini A/L Academic Tutor + Chat Memory** integrated with your official WhatsApp number.
+          files: build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

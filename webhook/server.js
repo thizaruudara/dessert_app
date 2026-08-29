@@ -259,9 +259,12 @@ async function handleMessage(message, contact) {
 
     if (userData.awaitingName) {
       let extractedName = textBody;
-      extractedName = extractedName.replace(/^(my name is|i am|this is|i'm|name is)\s+/i, '').trim();
+      extractedName = extractedName
+        .replace(/^(my name is|i am|this is|i'm|name is)\s+/i, '')
+        .replace(/[\uE000-\uF8FF\uFFFD\u0000-\u001F\u007F-\u009F]/g, '')
+        .trim();
       if (!extractedName || extractedName.length < 2) {
-        extractedName = waProfileName || 'Student';
+        extractedName = (waProfileName || 'Student').replace(/[\uE000-\uF8FF\uFFFD\u0000-\u001F\u007F-\u009F]/g, '').trim();
       }
 
       await userRef.update({
