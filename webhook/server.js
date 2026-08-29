@@ -2,7 +2,6 @@ const express = require('express');
 const admin = require('firebase-admin');
 const axios = require('axios');
 const path = require('path');
-
 const fs = require('fs');
 
 // ── Initialize Firebase Admin ────────────────────────────────────────────────
@@ -53,124 +52,23 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static frontend demo
 app.use(express.static(path.join(__dirname, '../demo')));
 
-// ── Live Firestore API Endpoints for Web App ─────────────────────────────────
-app.get('/api/users', async (req, res) => {
-  try {
-    const snap = await db.collection('users').get();
-    const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    res.json(users);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/desserts', async (req, res) => {
-  try {
-    const snap = await db.collection('desserts').orderBy('submittedAt', 'desc').get();
-    const desserts = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        ...data,
-        submittedAt: data.submittedAt ? data.submittedAt.toMillis() : Date.now(),
-        reviewedAt: data.reviewedAt ? data.reviewedAt.toMillis() : null,
-      };
-    });
-    res.json(desserts);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/review', async (req, res) => {
-  try {
-    const { id, approve, credits, feedback } = req.body;
-    const dessertRef = db.collection('desserts').doc(id);
-    const dessertDoc = await dessertRef.get();
-    if (!dessertDoc.exists) return res.status(404).json({ error: 'Not found' });
-
-    const dessert = dessertDoc.data();
-    const newStatus = approve ? 'approved' : 'rejected';
-    const creditsAwarded = approve ? parseInt(credits || 10) : 0;
-
-    await dessertRef.update({
-      status: newStatus,
-      creditsAwarded: creditsAwarded,
-      adminFeedback: feedback || (approve ? 'Great work! ✅' : 'Needs improvement. ❌'),
-      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    if (approve && dessert.studentId) {
-      await db.collection('users').doc(dessert.studentId).update({
-        credits: admin.firestore.FieldValue.increment(creditsAwarded),
-      });
-    }
-
-    // Send WhatsApp notification to student about the review result!
-    if (dessert.studentPhone) {
-      const resultText = approve
-        ? `🎉 *Dessert Approved!*\n\nYour homework has been reviewed and marked as correct! ✅\n\n⭐ *+${creditsAwarded} Credits* added to your score!\nTeacher Feedback: "${feedback || 'Great work!'}"`
-        : `❌ *Dessert Needs Improvement*\n\nYour teacher reviewed your homework.\nFeedback: "${feedback || 'Please try again'}"`;
-      
-      const cleanPhone = dessert.studentPhone.replace(/\+/g, '').replace(/\s+/g, '');
-      await sendWhatsAppReply(cleanPhone, resultText);
-    }
-
-    res.json({ success: true, status: newStatus, creditsAwarded });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/user/photo', async (req, res) => {
-  try {
-    const { userId, photoUrl, name } = req.body;
-    if (!photoUrl) return res.status(400).json({ error: 'Missing photoUrl' });
-
-    let updated = false;
-    if (userId) {
-      const docRef = db.collection('users').doc(userId);
-      const doc = await docRef.get();
-      if (doc.exists) {
-        await docRef.update({ photoUrl });
-        updated = true;
-      }
-    }
-
-    if (!updated && name) {
-      const q = await db.collection('users').where('name', '==', name).get();
-      if (!q.empty) {
-        await q.docs[0].ref.update({ photoUrl });
-        updated = true;
-      }
-    }
-
-    if (!updated) {
-      const all = await db.collection('users').get();
-      for (const doc of all.docs) {
-        if (doc.data().name?.includes('ThiZaru') || doc.id === userId) {
-          await doc.ref.update({ photoUrl });
-        }
-      }
-    }
-
-    console.log(`📸 Updated DP photo in Firestore for ${name || userId}`);
-    res.json({ success: true });
-  } catch (e) {
-    console.error('Error saving user photo:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Meta WhatsApp Config ────────────────────────────────────────────────────
+// ── Meta WhatsApp & Gemini Config ───────────────────────────────────────────
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'dessert_secret_2026';
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBSVyqonxSGZC3ZBZAZAozq1RwMt4OSZA3MTuHD2jhtWDjAnrQnGQUz7Kn7VZBXUY7ZAw4pDxFuT3szkZCZArPQ326XYu80ejMzaYfCzTNuyKblZCJrXfB66T9lbhgZBCAQgZCOuZBSq1bVaX3QnJIMynANC1ZAmpG60PD0re9tZBz0OVBlu8prPPZB2unUAZDZD';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1259475067252677';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // ── Health Check ─────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.send(`
     <div style="font-family:sans-serif;text-align:center;padding:40px;background:#0D0F1A;color:#fff;min-height:100vh;">
-      <h1 style="color:#6C63FF;font-size:36px;">🍰 Dessert Webhook Server is LIVE!</h1>
-      <p style="color:#9B9EC8;font-size:16px;">Connected to Firebase Project: <b>dessert-institute</b></p>
+      <h1 style="color:#6C63FF;font-size:36px;">🍰 EduPeak AI Webhook Server is LIVE!</h1>
+      <p style="color:#9B9EC8;font-size:16px;">Dual-Engine: <b>A/L Academic Tutor (Gemini AI)</b> + <b>Dessert Homework Submissions</b></p>
       <div style="margin-top:30px;background:#1E2138;display:inline-block;padding:20px 30px;border-radius:12px;border:1px solid #2E3154;text-align:left;">
         <p><b>Webhook Endpoint:</b> <code>/whatsappWebhook</code></p>
         <p><b>Verify Token:</b> <code>dessert_secret_2026</code></p>
-        <p><b>Status:</b> 🟢 Ready to receive WhatsApp homework</p>
+        <p><b>AI Model:</b> <code>Gemini 3.6 Flash with Firestore Multi-Turn Memory</code></p>
+        <p><b>Status:</b> 🟢 Ready 24/7</p>
       </div>
     </div>
   `);
@@ -214,124 +112,302 @@ app.post('/whatsappWebhook', async (req, res) => {
     return res.status(200).send('EVENT_RECEIVED');
   } catch (err) {
     console.error('Error handling webhook POST:', err);
-    return res.status(200).send('EVENT_RECEIVED'); // Always return 200 to Meta
+    return res.status(200).send('EVENT_RECEIVED');
   }
 });
 
+// ── Conversational AI + A/L Tutor + Homework Handler ─────────────────────────
 async function handleMessage(message, contact) {
-  const rawSender = message.from; // e.g. "919876543210" or "15556780059"
+  const rawSender = message.from; // e.g. "94770557769"
   const senderPhone = rawSender.startsWith('+') ? rawSender : '+' + rawSender;
-  const senderName = contact?.profile?.name || 'Student (' + senderPhone + ')';
-  const msgType = message.type; // 'text', 'image', 'document'
-  
-  let caption = '';
-  let mediaUrls = [];
+  const cleanPhone = senderPhone.replace(/\s+/g, '');
+  const waProfileName = contact?.profile?.name || '';
+  const msgType = message.type; // 'text', 'image', 'document', 'interactive'
 
+  // Extract button reply ID if user clicked an interactive button
+  const buttonReplyId = message.interactive?.button_reply?.id;
+  const buttonReplyTitle = message.interactive?.button_reply?.title;
+
+  let textBody = '';
   if (msgType === 'text') {
-    caption = message.text?.body || '';
-  } else if (msgType === 'image') {
-    caption = message.image?.caption || 'Photo homework submission';
+    textBody = message.text?.body?.trim() || '';
+  } else if (msgType === 'interactive') {
+    textBody = buttonReplyTitle || '';
+  }
+
+  console.log(`📥 Received from ${senderPhone} (${waProfileName}): Type=${msgType}, Text="${textBody}", Button="${buttonReplyId}"`);
+
+  // 1. Fetch User Record from Firestore
+  let userDoc = null;
+  let userRef = null;
+
+  const q1 = await db.collection('users').where('phone', '==', senderPhone).limit(1).get();
+  if (!q1.empty) {
+    userDoc = q1.docs[0];
+    userRef = userDoc.ref;
+  } else {
+    const q2 = await db.collection('users').where('phone', '==', cleanPhone).limit(1).get();
+    if (!q2.empty) {
+      userDoc = q2.docs[0];
+      userRef = userDoc.ref;
+    }
+  }
+
+  const userData = userDoc ? userDoc.data() : null;
+  const hasRealName = userData?.name && !userData.name.startsWith('Student (') && userData.name !== 'Student';
+
+  // ── Flow 1: First-Time Student (Ask & Register Full Name) ────────────────────
+  if (!userData || !hasRealName || userData.awaitingName) {
+    if (!userData) {
+      // First time student: Create draft user profile and ask for name
+      const newRef = db.collection('users').doc();
+      await newRef.set({
+        id: newRef.id,
+        name: waProfileName || '',
+        phone: senderPhone,
+        role: 'student',
+        credits: 0,
+        awaitingName: true,
+        awaitingDessert: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await sendWhatsAppText(
+        rawSender,
+        `👋 *Welcome to EduPeak Institute!* 🎓🍰\n\nPlease reply with your *Full Name* to activate your student account:`
+      );
+      return;
+    }
+
+    if (userData.awaitingName) {
+      let extractedName = textBody;
+      extractedName = extractedName.replace(/^(my name is|i am|this is|i'm|name is)\s+/i, '').trim();
+      if (!extractedName || extractedName.length < 2) {
+        extractedName = waProfileName || 'Student';
+      }
+
+      await userRef.update({
+        name: extractedName,
+        awaitingName: false,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`👤 Student name registered: ${extractedName} (${senderPhone})`);
+
+      await sendInteractiveButtons(
+        rawSender,
+        `🎉 Nice to meet you, *${extractedName}*!\n\nYour EduPeak account is now active. I am your 24/7 AI Assistant & A/L Tutor! 🧠\n\nHow can I help you today?`,
+        [
+          { id: 'btn_submit_yes', title: '🍰 Submit Dessert' },
+          { id: 'btn_ask_tutor', title: '📚 Ask A/L Question' },
+          { id: 'btn_check_credits', title: '⭐ My Credits' },
+        ]
+      );
+      return;
+    }
+  }
+
+  const studentName = userData.name || waProfileName || 'Student';
+  const studentId = userDoc.id;
+
+  // ── Flow 2: Interactive Button Click Handlers ──────────────────────────────
+  if (buttonReplyId === 'btn_submit_yes' || textBody.toLowerCase() === 'submit dessert') {
+    await userRef.update({ awaitingDessert: true });
+    await sendWhatsAppText(
+      rawSender,
+      `📸 *Dessert Homework Submission*\n\nPlease send a clear photo of your dessert creation with a short description or recipe note.\n\nIt will be uploaded directly to your *EduPeak Student Portal* for teacher grading! 🍰`
+    );
+    return;
+  }
+
+  if (buttonReplyId === 'btn_ask_tutor') {
+    await userRef.update({ awaitingDessert: false });
+    await sendWhatsAppText(
+      rawSender,
+      `📚 *EduPeak A/L AI Tutor*\n\nHi ${studentName}! Ask me any question related to your Sri Lankan G.C.E. A/L Syllabus (Maths, Physics, Chemistry, Biology, ICT, Accounting, Economics, etc.).\n\nYou can ask in English, Sinhala (සිංහල), or Singlish!`
+    );
+    return;
+  }
+
+  if (buttonReplyId === 'btn_check_credits' || textBody.toLowerCase().includes('credit')) {
+    const credits = userData.credits || 0;
+    const dSnap = await db.collection('desserts').where('studentPhone', '==', senderPhone).get();
+    const totalSubmissions = dSnap.size;
+    const approved = dSnap.docs.filter(d => d.data().status === 'approved').length;
+
+    await sendInteractiveButtons(
+      rawSender,
+      `⭐ *EduPeak Student Report*\n\n👤 *Student:* ${studentName}\n📞 *Phone:* ${senderPhone}\n⭐ *Credits Earned:* ${credits} pts\n🍰 *Total Submissions:* ${totalSubmissions}\n✅ *Approved:* ${approved}\n\nKeep up the great work! 🧁`,
+      [
+        { id: 'btn_submit_yes', title: '🍰 Submit Dessert' },
+        { id: 'btn_ask_tutor', title: '📚 Ask A/L Tutor' },
+      ]
+    );
+    return;
+  }
+
+  if (buttonReplyId === 'btn_later') {
+    await userRef.update({ awaitingDessert: false });
+    await sendWhatsAppText(
+      rawSender,
+      `👍 No problem, *${studentName}*! Message anytime with your A/L questions or when your dessert is ready. 🎓🍰`
+    );
+    return;
+  }
+
+  // ── Flow 3: Photo / Dessert Submission ──────────────────────────────────────
+  if (msgType === 'image') {
+    const caption = message.image?.caption || 'Photo dessert homework';
     const mediaId = message.image?.id;
+    let mediaUrls = [];
+
     if (mediaId && ACCESS_TOKEN) {
       try {
-        console.log(`🖼️ Fetching photo media URL from Meta for ID: ${mediaId}...`);
+        console.log(`🖼️ Fetching photo binary from Meta for ID: ${mediaId}...`);
         const mRes = await axios.get(`https://graph.facebook.com/v19.0/${mediaId}`, {
           headers: { Authorization: `Bearer ${ACCESS_TOKEN}` }
         });
         if (mRes.data?.url) {
-          console.log(`⬇️ Downloading image binary from Meta...`);
           const imgRes = await axios.get(mRes.data.url, {
             headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
             responseType: 'arraybuffer'
           });
           const base64 = Buffer.from(imgRes.data).toString('base64');
           const mimeType = mRes.data.mime_type || 'image/jpeg';
-          const dataUrl = `data:${mimeType};base64,${base64}`;
-          mediaUrls.push(dataUrl);
+          mediaUrls.push(`data:${mimeType};base64,${base64}`);
           console.log(`✅ Photo downloaded and attached successfully!`);
         }
       } catch (err) {
         console.error('Error downloading image from Meta:', err.response?.data || err.message);
       }
     }
-  } else if (msgType === 'document') {
-    caption = message.document?.filename ? `Document: ${message.document.filename}` : 'Document submission';
-  } else {
-    caption = `Unsupported message type: ${msgType}`;
+
+    // Save dessert homework to Firestore
+    const dessertRef = db.collection('desserts').doc();
+    const dessertData = {
+      id: dessertRef.id,
+      studentId: studentId,
+      studentName: studentName,
+      studentPhone: senderPhone,
+      type: 'image',
+      caption: caption,
+      mediaUrls: mediaUrls,
+      status: 'pending',
+      creditsAwarded: 0,
+      adminFeedback: null,
+      whatsappMessageId: message.id,
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reviewedAt: null,
+    };
+
+    await dessertRef.set(dessertData);
+    await userRef.update({ awaitingDessert: false });
+    console.log(`🍰 Dessert homework saved to Firestore! ID: ${dessertRef.id} for ${studentName}`);
+
+    await sendInteractiveButtons(
+      rawSender,
+      `🍰 *Dessert Received!*\n\nHi ${studentName}, your homework has been received and added to your *EduPeak Student Portal*.\n\nYour teachers will review your submission and award credits soon! ⭐`,
+      [
+        { id: 'btn_check_credits', title: '⭐ Check Credits' },
+        { id: 'btn_ask_tutor', title: '📚 Ask A/L Tutor' },
+      ]
+    );
+    return;
   }
 
-  console.log(`📥 Received submission from ${senderName} (${senderPhone}): "${caption}"`);
+  // ── Flow 4: Gemini AI A/L Academic Tutor with Multi-Turn Memory ──────────────
+  if (textBody) {
+    try {
+      // 1. Fetch recent conversation history from Firestore for memory
+      const historySnap = await db.collection('users')
+        .doc(studentId)
+        .collection('chat_history')
+        .orderBy('timestamp', 'desc')
+        .limit(6)
+        .get();
 
-  // 1. Find or create student in Firestore
-  let studentId = null;
-  const usersSnap = await db.collection('users')
-    .where('phone', '==', senderPhone)
-    .limit(1)
-    .get();
+      const historyDocs = historySnap.docs.reverse();
+      const contents = [];
 
-  if (!usersSnap.empty) {
-    studentId = usersSnap.docs[0].id;
-  } else {
-    // Check without '+' or formatted
-    const cleanPhone = senderPhone.replace(/\s+/g, '');
-    const altSnap = await db.collection('users')
-      .where('phone', '==', cleanPhone)
-      .limit(1)
-      .get();
+      // Add conversation history
+      for (const doc of historyDocs) {
+        const d = doc.data();
+        if (d.role === 'user' || d.role === 'model') {
+          contents.push({
+            role: d.role,
+            parts: [{ text: d.text }]
+          });
+        }
+      }
 
-    if (!altSnap.empty) {
-      studentId = altSnap.docs[0].id;
-    } else {
-      // Auto-create student profile
-      const newRef = db.collection('users').doc();
-      studentId = newRef.id;
-      await newRef.set({
-        id: studentId,
-        name: senderName,
-        phone: senderPhone,
-        role: 'student',
-        credits: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      // Add current user turn
+      contents.push({
+        role: 'user',
+        parts: [{ text: textBody }]
       });
-      console.log(`👤 Created new student profile: ${senderName} (ID: ${studentId})`);
+
+      const systemPrompt = `You are "EduPeak AI" - the smart 24/7 academic tutor and virtual assistant for EduPeak Institute in Sri Lanka.
+Student Name: ${studentName}.
+Role:
+1. Answer questions clearly about the Sri Lankan G.C.E. Advanced Level (A/L) syllabus across Science, Maths, Commerce, Tech, and Arts streams (Physics, Chemistry, Combined Maths, Biology, ICT, Accounting, Economics, Business Studies, etc.).
+2. You can also answer questions about pastry, dessert culinary arts, or institute details.
+3. If the student wants to submit homework, remind them they can send a photo of their dessert creation here anytime.
+4. Respond in the same language the student asks in (English, Sinhala සිංහල, Singlish, or Tamil தமிழ்).
+5. Format your answers clearly using WhatsApp markdown (*bold*, bullet points, numbered steps, simple formulas). Keep explanations concise and easy to understand for a student.`;
+
+      // Call Gemini 3.6 Flash
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const gRes = await axios.post(geminiUrl, {
+        contents: contents,
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        }
+      });
+
+      const aiReply = gRes.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `Hi ${studentName}! How can I help you with your studies or dessert homework today? 🍰`;
+
+      // Save user question and AI reply to Firestore memory
+      const historyRef = db.collection('users').doc(studentId).collection('chat_history');
+      await historyRef.add({
+        role: 'user',
+        text: textBody,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await historyRef.add({
+        role: 'model',
+        text: aiReply,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Send AI response to WhatsApp
+      await sendInteractiveButtons(
+        rawSender,
+        aiReply,
+        [
+          { id: 'btn_submit_yes', title: '🍰 Submit Dessert' },
+          { id: 'btn_check_credits', title: '⭐ My Credits' },
+        ]
+      );
+      return;
+    } catch (err) {
+      console.error('Gemini A/L Tutor processing error:', err.response?.data || err.message);
+      // Fallback
+      await sendInteractiveButtons(
+        rawSender,
+        `Hi *${studentName}*! 🍰\nHow can I help you today? Would you like to submit dessert homework or check your student credits?`,
+        [
+          { id: 'btn_submit_yes', title: '🍰 Submit Dessert' },
+          { id: 'btn_check_credits', title: '⭐ My Credits' },
+        ]
+      );
     }
   }
-
-  // 2. Save Dessert submission to Firestore
-  const dessertRef = db.collection('desserts').doc();
-  const dessertData = {
-    id: dessertRef.id,
-    studentId: studentId,
-    studentName: senderName,
-    studentPhone: senderPhone,
-    type: msgType === 'image' ? 'image' : msgType === 'document' ? 'file' : 'text',
-    caption: caption,
-    mediaUrls: mediaUrls,
-    status: 'pending',
-    creditsAwarded: 0,
-    adminFeedback: null,
-    whatsappMessageId: message.id,
-    submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-    reviewedAt: null,
-  };
-
-  await dessertRef.set(dessertData);
-  console.log(`🍰 Dessert saved to Firestore with ID: ${dessertRef.id}`);
-
-  // 3. Send automated WhatsApp confirmation reply to student
-  await sendWhatsAppReply(
-    rawSender,
-    `🍰 *Dessert Received!*\n\nHi ${senderName}, your homework has been received and sent to your teachers for review.\n\nYou will earn credits once approved! ⭐`
-  );
 }
 
-async function sendWhatsAppReply(to, text) {
+// ── WhatsApp Message Dispatch Utilities ─────────────────────────────────────
+async function sendWhatsAppText(to, body) {
   try {
-    if (!ACCESS_TOKEN || ACCESS_TOKEN === 'CHANGE_ME') {
-      console.log('No WhatsApp access token configured. Skipping reply.');
-      return;
-    }
-
+    if (!ACCESS_TOKEN) return;
     const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
     await axios.post(
       url,
@@ -339,55 +415,91 @@ async function sendWhatsAppReply(to, text) {
         messaging_product: 'whatsapp',
         to: to,
         type: 'text',
-        text: { body: text },
+        text: { body: body },
       },
       {
-        headers: {
-          Authorization: `Bearer ${ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
       }
     );
-    console.log(`📤 Automated WhatsApp reply sent to ${to}`);
-  } catch (err) {
-    console.error('Error sending WhatsApp confirmation reply:', err.response?.data || err.message);
+  } catch (e) {
+    console.error('Error sending WhatsApp text:', e.response?.data || e.message);
   }
 }
 
-// ── Real-Time WhatsApp OTP Listener ───────────────────────────────────────────
+async function sendInteractiveButtons(to, bodyText, buttons) {
+  try {
+    if (!ACCESS_TOKEN) return;
+    const url = `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`;
+    await axios.post(
+      url,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          header: {
+            type: 'text',
+            text: '🎓 EduPeak AI Institute',
+          },
+          body: {
+            text: bodyText.length > 1024 ? bodyText.substring(0, 1020) + '...' : bodyText,
+          },
+          action: {
+            buttons: buttons.slice(0, 3).map(b => ({
+              type: 'reply',
+              reply: {
+                id: b.id,
+                title: b.title,
+              },
+            })),
+          },
+        },
+      },
+      {
+        headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (e) {
+    console.error('Error sending interactive buttons, falling back to text:', e.response?.data || e.message);
+    await sendWhatsAppText(to, bodyText);
+  }
+}
+
+// ── Live Firestore OTP Delivery Listener ────────────────────────────────────
+console.log('📲 WhatsApp OTP delivery listener: ACTIVE 🟢');
 db.collection('otp_requests').onSnapshot(snapshot => {
   snapshot.docChanges().forEach(async change => {
     if (change.type === 'added') {
       const data = change.doc.data();
       const phone = data.phone;
       const name = data.name || 'Student';
-      const docId = change.doc.id;
 
       if (!phone) return;
 
-      // Generate 6-digit random code
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const cleanPhone = phone.replace(/\+/g, '').replace(/\s+/g, '');
+      const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 5 * 60 * 1000;
 
-      // Store in otp_verifications collection
-      await db.collection('otp_verifications').doc(phone).set({
-        phone: phone,
-        otp: otp,
-        name: name,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
-      });
+      try {
+        await db.collection('otp_verifications').doc(phone).set({
+          otp: randomOtp,
+          phone: phone,
+          name: name,
+          expiresAt: expiresAt,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
 
-      // Send via WhatsApp Meta Cloud API
-      await sendWhatsAppReply(
-        cleanPhone,
-        `🍰 *Dessert Institute Verification*\n\nHello ${name}! 👋\n\nYour 6-digit login code is:\n\n👉 *${otp}*\n\n⏱️ This code is valid for 5 minutes.\n🔒 Do not share this code with anyone.`
-      );
+        const targetWaNumber = phone.replace(/\D/g, '');
+        const messageBody = `🍰 *EduPeak Verification*\n\nHello ${name}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 5 minutes.\n🔒 Do not share this code with anyone.`;
 
-      console.log(`📲 WhatsApp OTP [${otp}] sent to ${phone} (${name})`);
+        await sendWhatsAppText(targetWaNumber, messageBody);
+        console.log(`📲 WhatsApp OTP [${randomOtp}] sent to ${phone} (${name})`);
 
-      // Delete the request document
-      await db.collection('otp_requests').doc(docId).delete();
+        await change.doc.ref.delete();
+      } catch (err) {
+        console.error(`❌ Failed to send OTP to ${phone}:`, err.message);
+      }
     }
   });
 });
@@ -397,5 +509,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Webhook server running on http://localhost:${PORT}`);
   console.log(`🔗 Webhook endpoint: http://localhost:${PORT}/whatsappWebhook`);
-  console.log(`📲 WhatsApp OTP delivery listener: ACTIVE 🟢`);
 });
