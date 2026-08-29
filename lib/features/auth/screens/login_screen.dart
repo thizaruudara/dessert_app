@@ -97,9 +97,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     final otpCode = await auth.prepareWhatsAppLoginOtp(phone);
 
-    // Open WhatsApp prefilled with unique #OTP identifier code
+    // Open WhatsApp prefilled with unique #<otpCode> identifier format
+    final message = '#$otpCode Hi EduPeak! Please verify my login code for +$cleanDigits';
     final uri = Uri.parse(
-      'https://wa.me/94707938883?text=%23OTP-$otpCode-$cleanDigits',
+      'https://wa.me/94707938883?text=${Uri.encodeComponent(message)}',
     );
 
     if (await canLaunchUrl(uri)) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -270,7 +271,8 @@ class AuthProvider extends ChangeNotifier {
   /// ── 3. Generate & Save WhatsApp OTP for Chat-Based Login ─────────────────
   Future<String> prepareWhatsAppLoginOtp(String phoneNumber) async {
     _currentPhone = phoneNumber;
-    final randomOtp = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
+    final rng = Random.secure();
+    final randomOtp = (100000 + rng.nextInt(900000)).toString();
     final expiresAt = DateTime.now().millisecondsSinceEpoch + 10 * 60 * 1000;
 
     try {

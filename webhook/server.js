@@ -254,10 +254,10 @@ async function handleMessage(message, contact) {
     lowerText.includes('code') ||
     lowerText.includes('verification')
   ) {
-    // 1. Extract OTP code if already provided in #OTP-123456 or #123456
+    // 1. Extract OTP code if provided in #<number> (e.g. #582914 or #123)
     let otpCode = null;
-    const codeMatch = textBody.match(/#OTP-(\d{6})/i) || textBody.match(/#(\d{4,6})/) || textBody.match(/\b(\d{6})\b/);
-    if (codeMatch) {
+    const codeMatch = textBody.match(/#(\d+)/) || textBody.match(/#OTP-(\d+)/i) || textBody.match(/\b(\d{6})\b/);
+    if (codeMatch && codeMatch[1]) {
       otpCode = codeMatch[1];
     } else {
       otpCode = Math.floor(100000 + Math.random() * 900000).toString();
