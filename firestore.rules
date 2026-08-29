@@ -4,29 +4,20 @@ service cloud.firestore {
 
     // ── Users ──────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow read, write: if true;
     }
 
     // ── Desserts ───────────────────────────────────────────────────
     match /desserts/{dessertId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
-      allow delete: if false;
+      allow read, write: if true;
     }
 
     // ── WhatsApp OTP Requests & Verifications ──────────────────────
     match /otp_requests/{docId} {
-      allow create: if true;
-      allow read, delete: if true;
+      allow read, write: if true;
     }
     match /otp_verifications/{phone} {
       allow read, write: if true;
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
   }
 }
