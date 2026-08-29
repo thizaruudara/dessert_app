@@ -116,6 +116,84 @@ app.post('/whatsappWebhook', async (req, res) => {
   }
 });
 
+// ── Multi-Photo Album Batch Buffer ─────────────────────────────────────────
+// WhatsApp sends each photo in an album as a separate webhook event.
+// We buffer photos for 3.5 seconds to combine them into 1 SINGLE dessert submission in Firestore & Admin!
+const pendingPhotoBatches = new Map();
+
+function handlePhotoSubmission(studentId, studentName, senderPhone, rawSender, mediaUrl, caption, messageId, userRef) {
+  let batch = pendingPhotoBatches.get(senderPhone);
+
+  if (batch) {
+    if (batch.timer) clearTimeout(batch.timer);
+    if (mediaUrl) batch.mediaUrls.push(mediaUrl);
+    if (caption && caption !== 'Photo dessert homework' && !batch.captions.includes(caption)) {
+      batch.captions.push(caption);
+    }
+    if (messageId) batch.messageIds.push(messageId);
+  } else {
+    batch = {
+      studentId,
+      studentName,
+      senderPhone,
+      rawSender,
+      userRef,
+      mediaUrls: mediaUrl ? [mediaUrl] : [],
+      captions: caption && caption !== 'Photo dessert homework' ? [caption] : [],
+      messageIds: messageId ? [messageId] : [],
+      timer: null,
+    };
+    pendingPhotoBatches.set(senderPhone, batch);
+  }
+
+  // Set debounce timer: wait 3.5 seconds for any remaining photos sent in the same batch
+  batch.timer = setTimeout(async () => {
+    try {
+      pendingPhotoBatches.delete(senderPhone);
+      const finalMediaUrls = batch.mediaUrls;
+      const finalCaption = batch.captions.length > 0 ? batch.captions.join(' | ') : 'Dessert homework submission';
+      const photoCount = finalMediaUrls.length;
+
+      // 1. Save 1 SINGLE Dessert Document to Firestore with all photos
+      const dessertRef = db.collection('desserts').doc();
+      const dessertData = {
+        id: dessertRef.id,
+        studentId: batch.studentId,
+        studentName: batch.studentName,
+        studentPhone: batch.senderPhone,
+        type: 'image',
+        caption: finalCaption,
+        mediaUrls: finalMediaUrls,
+        status: 'pending',
+        creditsAwarded: 0,
+        adminFeedback: null,
+        whatsappMessageId: batch.messageIds.join(','),
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewedAt: null,
+      };
+
+      await dessertRef.set(dessertData);
+      if (batch.userRef) {
+        await batch.userRef.update({ awaitingDessert: false });
+      }
+      console.log(`🍰 Multi-photo dessert saved to Firestore! ID: ${dessertRef.id} (${photoCount} photos) for ${batch.studentName}`);
+
+      // 2. Send 1 SINGLE WhatsApp confirmation reply
+      const countText = photoCount > 1 ? ` (${photoCount} Photos Attached)` : '';
+      await sendInteractiveButtons(
+        batch.rawSender,
+        `🍰 *Dessert Received!*${countText}\n\nHi ${batch.studentName}, your homework with *${photoCount}* ${photoCount === 1 ? 'photo' : 'photos'} has been received and added to your *EduPeak Student Portal*.\n\nYour teachers will review all photos together and award credits soon! ⭐`,
+        [
+          { id: 'btn_check_credits', title: '⭐ Check Credits' },
+          { id: 'btn_ask_tutor', title: '📚 Ask A/L Tutor' },
+        ]
+      );
+    } catch (e) {
+      console.error('Error saving multi-photo dessert submission:', e);
+    }
+  }, 3500);
+}
+
 // ── Conversational AI + A/L Tutor + Homework Handler ─────────────────────────
 async function handleMessage(message, contact) {
   const rawSender = message.from; // e.g. "94770557769"
@@ -255,11 +333,11 @@ async function handleMessage(message, contact) {
     return;
   }
 
-  // ── Flow 3: Photo / Dessert Submission ──────────────────────────────────────
+  // ── Flow 3: Photo / Dessert Submission (Handles Single & Multiple Photos) ───
   if (msgType === 'image') {
     const caption = message.image?.caption || 'Photo dessert homework';
     const mediaId = message.image?.id;
-    let mediaUrls = [];
+    let dataUrl = null;
 
     if (mediaId && ACCESS_TOKEN) {
       try {
@@ -274,43 +352,24 @@ async function handleMessage(message, contact) {
           });
           const base64 = Buffer.from(imgRes.data).toString('base64');
           const mimeType = mRes.data.mime_type || 'image/jpeg';
-          mediaUrls.push(`data:${mimeType};base64,${base64}`);
-          console.log(`✅ Photo downloaded and attached successfully!`);
+          dataUrl = `data:${mimeType};base64,${base64}`;
+          console.log(`✅ Photo downloaded successfully (${(base64.length / 1024).toFixed(1)} KB)`);
         }
       } catch (err) {
         console.error('Error downloading image from Meta:', err.response?.data || err.message);
       }
     }
 
-    // Save dessert homework to Firestore
-    const dessertRef = db.collection('desserts').doc();
-    const dessertData = {
-      id: dessertRef.id,
-      studentId: studentId,
-      studentName: studentName,
-      studentPhone: senderPhone,
-      type: 'image',
-      caption: caption,
-      mediaUrls: mediaUrls,
-      status: 'pending',
-      creditsAwarded: 0,
-      adminFeedback: null,
-      whatsappMessageId: message.id,
-      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-      reviewedAt: null,
-    };
-
-    await dessertRef.set(dessertData);
-    await userRef.update({ awaitingDessert: false });
-    console.log(`🍰 Dessert homework saved to Firestore! ID: ${dessertRef.id} for ${studentName}`);
-
-    await sendInteractiveButtons(
+    // Queue into intelligent multi-photo batch buffer
+    handlePhotoSubmission(
+      studentId,
+      studentName,
+      senderPhone,
       rawSender,
-      `🍰 *Dessert Received!*\n\nHi ${studentName}, your homework has been received and added to your *EduPeak Student Portal*.\n\nYour teachers will review your submission and award credits soon! ⭐`,
-      [
-        { id: 'btn_check_credits', title: '⭐ Check Credits' },
-        { id: 'btn_ask_tutor', title: '📚 Ask A/L Tutor' },
-      ]
+      dataUrl,
+      caption,
+      message.id,
+      userRef
     );
     return;
   }
