@@ -154,7 +154,7 @@ class AuthProvider extends ChangeNotifier {
       final uid = currentUser?.uid ?? targetPhone.replaceAll(RegExp(r'\D'), '');
 
       // Check or create user profile in Firestore
-      final userQuery = await _db.collection('users').where('phone', '==', targetPhone).limit(1).get();
+      final userQuery = await _db.collection('users').where('phone', isEqualTo: targetPhone).limit(1).get();
 
       if (userQuery.docs.isNotEmpty) {
         _user = UserModel.fromFirestore(userQuery.docs.first);
