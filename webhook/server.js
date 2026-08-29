@@ -364,7 +364,8 @@ Role:
         }
       });
 
-      const aiReply = gRes.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `Hi ${studentName}! How can I help you with your studies or dessert homework today? 🍰`;
+      let aiReply = gRes.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || `Hi ${studentName}! How can I help you with your studies or dessert homework today? 🍰`;
+      aiReply = formatForWhatsApp(aiReply);
 
       // Save user question and AI reply to Firestore memory
       const historyRef = db.collection('users').doc(studentId).collection('chat_history');
@@ -402,6 +403,23 @@ Role:
       );
     }
   }
+}
+
+// ── WhatsApp Text Formatting Helper ─────────────────────────────────────────
+function formatForWhatsApp(text) {
+  if (!text) return '';
+  return text
+    // Replace markdown headers with WhatsApp bold (*Title*)
+    .replace(/^#{1,6}\s*(.+)$/gm, '*$1*')
+    // Replace triple asterisks ***text*** with *text*
+    .replace(/\*\*\*(.*?)\*\*\*/g, '*$1*')
+    // Replace standard double asterisks **text** with single *text* for WhatsApp bold
+    .replace(/\*\*(.*?)\*\*/g, '*$1*')
+    // Replace bullet dashes and asterisks with clean bullet symbol •
+    .replace(/^[\*\-]\s+/gm, '• ')
+    // Clean up empty lines and trailing whitespace
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // ── WhatsApp Message Dispatch Utilities ─────────────────────────────────────
