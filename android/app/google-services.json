@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "400647872169",
+    "project_id": "dessert-institute",
+    "storage_bucket": "dessert-institute.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400647872169:android:fae72682b4da8841ec93b8",
+        "android_client_info": {
+          "package_name": "com.institute.dessert.dessert_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVaNNyALnsrqrqTj371nGn8gbeBWL7fGc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

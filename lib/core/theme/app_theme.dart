@@ -70,7 +70,7 @@ class AppTheme {
           fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
         ),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: AppColors.darkCard,
         elevation: 0,
         shape: RoundedRectangleBorder(

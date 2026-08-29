@@ -4,11 +4,6 @@
 build/
 *.iml
 
-# Firebase
-google-services.json
-GoogleService-Info.plist
-lib/firebase_options.dart
-
 # Android
 android/.gradle
 android/local.properties
