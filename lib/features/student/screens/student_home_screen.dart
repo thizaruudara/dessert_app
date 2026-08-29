@@ -44,14 +44,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
-            backgroundColor: AppColors.darkBg,
+            backgroundColor: AppColors.background,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.primary, Color(0xFF1A1B35)],
+                    colors: [AppColors.primary, AppColors.primaryDark],
                   ),
                 ),
                 child: SafeArea(

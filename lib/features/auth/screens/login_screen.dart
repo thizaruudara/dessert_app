@@ -67,10 +67,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.accent],
+                    colors: [AppColors.primary, AppColors.primaryDark],
                   ),
                 ),
-                child: const Center(child: Text('🍰', style: TextStyle(fontSize: 36))),
+                child: const Center(child: Text('🎓', style: TextStyle(fontSize: 36))),
               ),
               const SizedBox(height: 32),
               Text('Welcome back!', style: Theme.of(context).textTheme.displayMedium),

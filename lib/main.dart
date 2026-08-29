@@ -30,7 +30,7 @@ void main() async {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
     ),
   );
 
@@ -61,11 +61,11 @@ class DessertApp extends StatelessWidget {
           });
 
           return MaterialApp.router(
-            title: 'Dessert',
+            title: 'EduPeak',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.dark,
+            themeMode: ThemeMode.light,
             routerConfig: router,
           );
         },

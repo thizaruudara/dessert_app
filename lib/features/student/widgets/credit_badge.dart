@@ -17,7 +17,7 @@ class CreditBadge extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2A1A5E), Color(0xFF1A2060)],
+          colors: [AppColors.primary, AppColors.primaryDark],
         ),
         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
         boxShadow: [

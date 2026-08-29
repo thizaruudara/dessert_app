@@ -46,14 +46,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           SliverAppBar(
             pinned: true,
             expandedHeight: 160,
-            backgroundColor: AppColors.darkBg,
+            backgroundColor: AppColors.background,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF3D1080), Color(0xFF1A1B35)],
+                    colors: [AppColors.primary, AppColors.primaryDark],
                   ),
                 ),
                 child: SafeArea(

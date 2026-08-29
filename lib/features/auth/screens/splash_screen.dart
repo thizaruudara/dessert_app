@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBg,
+      backgroundColor: AppColors.background,
       body: Center(
         child: FadeTransition(
           opacity: _fade,
@@ -66,32 +66,36 @@ class _SplashScreenState extends State<SplashScreen>
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppColors.primary, AppColors.accent],
+                      colors: [AppColors.primary, AppColors.primaryDark],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.5),
-                        blurRadius: 40,
+                        color: AppColors.primary.withOpacity(0.35),
+                        blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
                     ],
                   ),
                   child: const Center(
-                    child: Text('🍰', style: TextStyle(fontSize: 54)),
+                    child: Text('🎓', style: TextStyle(fontSize: 54)),
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Dessert',
+                  'EduPeak',
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                     fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                     letterSpacing: -1,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Institute Learning Portal',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  'AI & Learning Institute',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),

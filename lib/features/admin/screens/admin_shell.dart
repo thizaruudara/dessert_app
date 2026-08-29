@@ -21,12 +21,12 @@ class _AdminShellState extends State<AdminShell> {
       body: widget.child,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: AppColors.darkSurface,
-          border: Border(top: BorderSide(color: AppColors.darkBorder)),
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: NavigationBar(
           backgroundColor: Colors.transparent,
-          indicatorColor: AppColors.accent.withOpacity(0.15),
+          indicatorColor: AppColors.backgroundSoft,
           selectedIndex: _index,
           onDestinationSelected: (i) {
             setState(() => _index = i);

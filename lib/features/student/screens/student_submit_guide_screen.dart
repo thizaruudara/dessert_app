@@ -3,9 +3,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-// ⚠️ Replace this with your actual institute WhatsApp Business number
-const String kInstituteWhatsAppNumber = '+1234567890';
-const String kInstituteWhatsAppName = 'Dessert Institute';
+// Official EduPeak WhatsApp Business number
+const String kInstituteWhatsAppNumber = '+94707938883';
+const String kInstituteWhatsAppName = 'EduPeak AI Institute';
 
 class StudentSubmitGuideScreen extends StatelessWidget {
   const StudentSubmitGuideScreen({super.key});
