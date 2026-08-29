@@ -18,6 +18,7 @@ class AuthProvider extends ChangeNotifier {
   String? _verificationId;
   String? _currentPhone;
   String? _currentName;
+  String? _currentExamYear;
 
   UserModel? get user => _user;
   bool get loading => _loading;
@@ -25,6 +26,8 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoggedIn => _user != null;
   bool get isAdmin => _user?.isAdmin ?? false;
   String? get currentPhone => _currentPhone;
+  String? get currentName => _currentName;
+  String? get currentExamYear => _currentExamYear;
 
   AuthProvider() {
     _initAuth();
@@ -220,9 +223,9 @@ class AuthProvider extends ChangeNotifier {
           updates['examYear'] = targetExamYear;
         }
         if (updates.isNotEmpty) {
-          await existingDoc.ref.update(updates);
+          await existingDoc.reference.update(updates);
         }
-        final updatedDoc = await existingDoc.ref.get();
+        final updatedDoc = await existingDoc.reference.get();
         _user = UserModel.fromFirestore(updatedDoc);
       } else {
         final docRef = _db.collection('users').doc(uid);
