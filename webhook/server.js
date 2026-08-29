@@ -10,6 +10,9 @@ let credential;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (sa.private_key) {
+      sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+    }
     credential = admin.credential.cert(sa);
   } catch (e) {
     console.error('Error parsing FIREBASE_SERVICE_ACCOUNT env var:', e);
