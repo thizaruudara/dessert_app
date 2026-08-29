@@ -11,6 +11,7 @@ import '../../desserts/providers/desserts_provider.dart';
 import '../../credits/providers/credits_provider.dart';
 import '../widgets/credit_badge.dart';
 import '../widgets/dessert_list_tile.dart';
+import '../widgets/student_progress_chart.dart';
 
 class StudentHomeScreen extends StatefulWidget {
   const StudentHomeScreen({super.key});
@@ -134,7 +135,70 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 children: [
                   // ── Credit Card ───────────────────────────────
                   CreditBadge(credits: credits.totalCredits, level: credits.creditLevel),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
+
+                  // ── Progress Graph (Activity & Growth) ────────
+                  StudentProgressChart(
+                    desserts: desserts.desserts,
+                    totalCredits: credits.totalCredits,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Leaderboard Quick Spotlight ───────────────
+                  GestureDetector(
+                    onTap: () => context.push('/student/leaderboard'),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.primaryDark],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text('🏆', style: TextStyle(fontSize: 22)),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Institute Leaderboard',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'See where you stand among top scholars',
+                                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
                   // ── Stats Row ─────────────────────────────────
                   Row(
@@ -161,7 +225,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
                   // ── Recent Desserts ───────────────────────────
                   Row(

@@ -8,6 +8,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
 import '../../features/student/screens/student_shell.dart';
 import '../../features/student/screens/student_home_screen.dart';
+import '../../features/student/screens/student_leaderboard_screen.dart';
 import '../../features/student/screens/student_desserts_screen.dart';
 import '../../features/student/screens/student_submit_guide_screen.dart';
 import '../../features/student/screens/dessert_detail_screen.dart';
@@ -61,6 +62,10 @@ class AppRouter {
           GoRoute(
             path: '/student',
             builder: (_, __) => const StudentHomeScreen(),
+          ),
+          GoRoute(
+            path: '/student/leaderboard',
+            builder: (_, __) => const StudentLeaderboardScreen(),
           ),
           GoRoute(
             path: '/student/desserts',
