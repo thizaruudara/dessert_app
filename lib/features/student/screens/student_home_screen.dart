@@ -21,11 +21,24 @@ class StudentHomeScreen extends StatefulWidget {
 }
 
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
+  String? _lastListenedUid;
+
   @override
   void initState() {
     super.initState();
+    _checkAndListen();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkAndListen();
+  }
+
+  void _checkAndListen() {
     final auth = context.read<AuthProvider>();
-    if (auth.user != null) {
+    if (auth.user != null && auth.user!.uid != _lastListenedUid) {
+      _lastListenedUid = auth.user!.uid;
       context.read<DessertsProvider>().listenToStudentDesserts(
             auth.user!.uid,
             studentPhone: auth.user!.phone,
@@ -42,8 +55,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     final user = auth.user;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          if (auth.user != null) {
+            await context.read<DessertsProvider>().refreshStudentDesserts(
+                  auth.user!.uid,
+                  studentPhone: auth.user!.phone,
+                );
+          }
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // ── App Bar ───────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 200,
@@ -281,6 +304,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 60)),
         ],
+      ),
       ),
     );
   }

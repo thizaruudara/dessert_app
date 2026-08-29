@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +11,8 @@ class DessertsProvider extends ChangeNotifier {
   List<DessertModel> _desserts = [];
   bool _loading = false;
   String? _error;
+  StreamSubscription? _dessertSub;
+  String? _activeStudentId;
 
   List<DessertModel> get desserts => _desserts;
   bool get loading => _loading;
@@ -20,44 +23,117 @@ class DessertsProvider extends ChangeNotifier {
   List<DessertModel> get reviewedDesserts =>
       _desserts.where((d) => !d.isPending).toList();
 
+  @override
+  void dispose() {
+    _dessertSub?.cancel();
+    super.dispose();
+  }
+
   /// Listen to all submissions (admin view)
   void listenToAllDesserts() {
-    _db
+    _dessertSub?.cancel();
+    _loading = true;
+    notifyListeners();
+
+    _dessertSub = _db
         .collection('desserts')
         .orderBy('submittedAt', descending: true)
         .snapshots()
         .listen((snap) {
       _desserts = snap.docs.map(DessertModel.fromFirestore).toList();
-      notifyListeners();
-    });
-  }
-
-  /// Listen to a specific student's submissions (matches studentId or studentPhone)
-  void listenToStudentDesserts(String studentId, {String? studentPhone}) {
-    _loading = true;
-    notifyListeners();
-
-    final cleanPhone = (studentPhone ?? '').replaceAll(RegExp(r'\s+'), '');
-
-    _db
-        .collection('desserts')
-        .snapshots()
-        .listen((snap) {
-      _desserts = snap.docs
-          .map(DessertModel.fromFirestore)
-          .where((d) =>
-              d.studentId == studentId ||
-              (cleanPhone.isNotEmpty &&
-                  d.studentPhone.replaceAll(RegExp(r'\s+'), '') == cleanPhone))
-          .toList()
-        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _loading = false;
+      _error = null;
       notifyListeners();
     }, onError: (e) {
+      debugPrint('Error listening to all desserts: $e');
       _error = e.toString();
       _loading = false;
       notifyListeners();
     });
+  }
+
+  /// Listen to a specific student's submissions (matches studentId or phone number)
+  void listenToStudentDesserts(String studentId, {String? studentPhone}) {
+    if (_activeStudentId == studentId && _desserts.isNotEmpty) {
+      return; // Already actively listening and data loaded
+    }
+    _activeStudentId = studentId;
+    _dessertSub?.cancel();
+    _loading = true;
+    notifyListeners();
+
+    final rawPhone = (studentPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    final last7 = rawPhone.length >= 7 ? rawPhone.substring(rawPhone.length - 7) : rawPhone;
+
+    bool matchesStudent(DessertModel d) {
+      if (d.studentId == studentId) return true;
+      if (last7.isNotEmpty) {
+        final dPhone = d.studentPhone.replaceAll(RegExp(r'\D'), '');
+        if (dPhone.isNotEmpty && (dPhone.contains(last7) || dPhone.endsWith(rawPhone) || rawPhone.endsWith(dPhone))) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // 1. Instant one-time get for zero-delay initial load
+    _db.collection('desserts').get().then((snap) {
+      _desserts = snap.docs
+          .map(DessertModel.fromFirestore)
+          .where(matchesStudent)
+          .toList()
+        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      _loading = false;
+      _error = null;
+      notifyListeners();
+    }).catchError((e) {
+      debugPrint('One-time desserts get error: $e');
+      _loading = false;
+      notifyListeners();
+    });
+
+    // 2. Real-time stream for live updates
+    _dessertSub = _db.collection('desserts').snapshots().listen((snap) {
+      _desserts = snap.docs
+          .map(DessertModel.fromFirestore)
+          .where(matchesStudent)
+          .toList()
+        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      _loading = false;
+      _error = null;
+      notifyListeners();
+    }, onError: (e) {
+      debugPrint('Desserts stream error: $e');
+      _loading = false;
+      _error = e.toString();
+      notifyListeners();
+    });
+  }
+
+  /// Manual refresh
+  Future<void> refreshStudentDesserts(String studentId, {String? studentPhone}) async {
+    final rawPhone = (studentPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    final last7 = rawPhone.length >= 7 ? rawPhone.substring(rawPhone.length - 7) : rawPhone;
+
+    try {
+      final snap = await _db.collection('desserts').get();
+      _desserts = snap.docs
+          .map(DessertModel.fromFirestore)
+          .where((d) {
+            if (d.studentId == studentId) return true;
+            if (last7.isNotEmpty) {
+              final dPhone = d.studentPhone.replaceAll(RegExp(r'\D'), '');
+              return dPhone.contains(last7) || dPhone.endsWith(rawPhone) || rawPhone.endsWith(dPhone);
+            }
+            return false;
+          })
+          .toList()
+        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      _loading = false;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Refresh error: $e');
+    }
   }
 
   /// Admin: approve a dessert and award credits
