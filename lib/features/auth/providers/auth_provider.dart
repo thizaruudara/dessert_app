@@ -86,7 +86,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Step 1 — Send OTP (via WhatsApp + Firebase Phone Auth)
+  /// Step 1 — Send OTP (via WhatsApp + Direct Webhook)
   Future<bool> sendOtp(String phoneNumber, {String? name, String? examYear}) async {
     _setLoading(true);
     _error = null;
@@ -95,55 +95,68 @@ class AuthProvider extends ChangeNotifier {
     _currentExamYear = examYear;
 
     try {
-      // 1. Submit WhatsApp OTP request to Firestore
-      await _db.collection('otp_requests').add({
-        'phone': phoneNumber,
-        'name': name ?? 'Student',
-        'examYear': examYear,
-        'requestedAt': FieldValue.serverTimestamp(),
-      });
-
-      // 2. Also trigger direct API call to wake up Render & send OTP instantly
+      // 1. Submit WhatsApp OTP request to Firestore (with 3s timeout)
       try {
-        final client = HttpClient();
-        final req = await client.postUrl(Uri.parse('https://edupeak-webhook.onrender.com/api/send-otp'));
-        req.headers.set('Content-Type', 'application/json');
-        req.add(utf8.encode(jsonEncode({
+        await _db.collection('otp_requests').add({
           'phone': phoneNumber,
           'name': name ?? 'Student',
-        })));
-        final res = await req.close();
-        debugPrint('📲 Direct OTP API Response: ${res.statusCode}');
-        client.close();
-      } catch (httpErr) {
-        debugPrint('Direct OTP HTTP notice: $httpErr');
+          'examYear': examYear,
+          'requestedAt': FieldValue.serverTimestamp(),
+        }).timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Firestore OTP write notice: $e');
       }
 
-      // 3. Also trigger Firebase Phone Auth in background if available (test numbers)
-      _auth.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          await _auth.signInWithCredential(credential);
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          debugPrint('Firebase phone auth fallback notice: ${e.message}');
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          _verificationId = verificationId;
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          _verificationId = verificationId;
-        },
-        timeout: const Duration(seconds: 60),
-      );
+      // 2. Trigger direct API call in background (fire-and-forget, non-blocking)
+      _triggerDirectOtpAsync(phoneNumber, name ?? 'Student');
+
+      // 3. Also trigger Firebase Phone Auth fallback in background
+      try {
+        _auth.verifyPhoneNumber(
+          phoneNumber: phoneNumber,
+          verificationCompleted: (PhoneAuthCredential credential) async {
+            await _auth.signInWithCredential(credential);
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            debugPrint('Firebase phone auth fallback notice: ${e.message}');
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            _verificationId = verificationId;
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {
+            _verificationId = verificationId;
+          },
+          timeout: const Duration(seconds: 30),
+        );
+      } catch (_) {}
 
       _setLoading(false);
       return true;
     } catch (e) {
       _error = e.toString();
       _setLoading(false);
-      return false;
+      return true; // Still return true so user can navigate to OTP screen
     }
+  }
+
+  void _triggerDirectOtpAsync(String phone, String name) {
+    Future.microtask(() async {
+      try {
+        final client = HttpClient();
+        client.connectionTimeout = const Duration(seconds: 5);
+        final req = await client.postUrl(Uri.parse('https://edupeak-webhook.onrender.com/api/send-otp'));
+        req.headers.set('Content-Type', 'application/json');
+        req.add(utf8.encode(jsonEncode({
+          'phone': phone,
+          'name': name,
+        })));
+        final res = await req.close().timeout(const Duration(seconds: 6));
+        debugPrint('📲 Direct OTP API Response: ${res.statusCode}');
+        client.close();
+      } catch (httpErr) {
+        debugPrint('Direct OTP HTTP notice: $httpErr');
+      }
+    });
   }
 
   /// Step 2 — Verify OTP and persist session
