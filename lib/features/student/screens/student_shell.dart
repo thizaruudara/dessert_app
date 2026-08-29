@@ -14,7 +14,7 @@ class StudentShell extends StatefulWidget {
 class _StudentShellState extends State<StudentShell> {
   int _index = 0;
 
-  final _tabs = const ['/student', '/student/desserts', '/student/submit'];
+  final _tabs = const ['/student', '/student/desserts', '/student/submit', '/student/profile'];
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +48,11 @@ class _StudentShellState extends State<StudentShell> {
               icon: Icon(Icons.send_outlined),
               selectedIcon: Icon(Icons.send, color: AppColors.primary),
               label: 'Submit',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person, color: AppColors.primary),
+              label: 'Profile',
             ),
           ],
         ),

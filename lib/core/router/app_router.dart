@@ -11,6 +11,7 @@ import '../../features/student/screens/student_home_screen.dart';
 import '../../features/student/screens/student_desserts_screen.dart';
 import '../../features/student/screens/student_submit_guide_screen.dart';
 import '../../features/student/screens/dessert_detail_screen.dart';
+import '../../features/student/screens/student_profile_screen.dart';
 import '../../features/admin/screens/admin_shell.dart';
 import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_review_screen.dart';
@@ -74,6 +75,10 @@ class AppRouter {
             builder: (_, state) => DessertDetailScreen(
               dessertId: state.pathParameters['id']!,
             ),
+          ),
+          GoRoute(
+            path: '/student/profile',
+            builder: (_, __) => const StudentProfileScreen(),
           ),
         ],
       ),

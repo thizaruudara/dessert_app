@@ -5,6 +5,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/dessert_model.dart';
+import '../../../core/widgets/media_image_view.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
 import '../../credits/providers/credits_provider.dart';
@@ -62,15 +63,33 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              child: Text(
-                                user?.name.isNotEmpty == true
-                                    ? user!.name[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white,
+                            GestureDetector(
+                              onTap: () => context.push('/student/profile'),
+                              child: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: ClipOval(
+                                  child: (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty)
+                                      ? MediaImageView(url: user.avatarUrl!, fit: BoxFit.cover)
+                                      : Container(
+                                          color: Colors.white.withOpacity(0.2),
+                                          child: Center(
+                                            child: Text(
+                                              user?.name.isNotEmpty == true
+                                                  ? user!.name[0].toUpperCase()
+                                                  : '🍰',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                 ),
                               ),
                             ),
@@ -91,6 +110,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                                   ),
                                 ],
                               ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.person_outline, color: Colors.white),
+                              tooltip: 'My Profile',
+                              onPressed: () => context.push('/student/profile'),
                             ),
                           ],
                         ),

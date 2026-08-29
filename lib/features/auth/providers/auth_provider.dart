@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/user_model.dart';
 
@@ -24,13 +25,45 @@ class AuthProvider extends ChangeNotifier {
   String? get currentPhone => _currentPhone;
 
   AuthProvider() {
+    _initAuth();
+  }
+
+  Future<void> _initAuth() async {
+    // 1. Try loading saved session from SharedPreferences
+    await _loadPersistedSession();
+
+    // 2. Also listen to Firebase Auth state
     _auth.authStateChanges().listen(_onAuthStateChanged);
+  }
+
+  Future<void> _loadPersistedSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUid = prefs.getString('saved_uid');
+      final savedPhone = prefs.getString('saved_phone');
+
+      if (savedUid != null && savedUid.isNotEmpty) {
+        await _fetchUser(savedUid);
+      }
+
+      if (_user == null && savedPhone != null && savedPhone.isNotEmpty) {
+        final q = await _db.collection('users').where('phone', isEqualTo: savedPhone).limit(1).get();
+        if (q.docs.isNotEmpty) {
+          _user = UserModel.fromFirestore(q.docs.first);
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error restoring saved session: $e');
+    }
   }
 
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
     if (firebaseUser == null) {
-      _user = null;
-      notifyListeners();
+      // If we already loaded a session from SharedPreferences, keep it
+      if (_user == null) {
+        notifyListeners();
+      }
       return;
     }
     await _fetchUser(firebaseUser.uid);
@@ -90,7 +123,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Step 2 — Verify OTP
+  /// Step 2 — Verify OTP and persist session
   Future<bool> verifyOtp(String otp, {String? name, String? phone}) async {
     _setLoading(true);
     _error = null;
@@ -178,6 +211,54 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
+      // Persist session to SharedPreferences so reopening the app stays logged in
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('saved_uid', _user!.uid);
+      await prefs.setString('saved_phone', targetPhone);
+
+      _setLoading(false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update Profile Picture (DP)
+  Future<bool> updateProfilePhoto(String base64OrUrl) async {
+    if (_user == null) return false;
+    _setLoading(true);
+    try {
+      await _db.collection('users').doc(_user!.uid).update({
+        'avatarUrl': base64OrUrl,
+        'photoUrl': base64OrUrl,
+      });
+
+      _user = _user!.copyWith(avatarUrl: base64OrUrl);
+      _setLoading(false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update Profile Name
+  Future<bool> updateProfileName(String newName) async {
+    if (_user == null || newName.trim().isEmpty) return false;
+    _setLoading(true);
+    try {
+      await _db.collection('users').doc(_user!.uid).update({
+        'name': newName.trim(),
+      });
+
+      _user = _user!.copyWith(name: newName.trim());
       _setLoading(false);
       notifyListeners();
       return true;
@@ -190,14 +271,19 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _auth.signOut();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('saved_uid');
+      await prefs.remove('saved_phone');
+      await _auth.signOut();
+    } catch (_) {}
     _user = null;
     notifyListeners();
   }
 
   Future<void> refreshUser() async {
-    if (_auth.currentUser != null) {
-      await _fetchUser(_auth.currentUser!.uid);
+    if (_user != null) {
+      await _fetchUser(_user!.uid);
     }
   }
 

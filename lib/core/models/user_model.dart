@@ -38,7 +38,7 @@ class UserModel {
       role: data['role'] == 'admin' ? UserRole.admin : UserRole.student,
       credits: data['credits'] ?? 0,
       studentId: data['studentId'],
-      avatarUrl: data['avatarUrl'],
+      avatarUrl: data['avatarUrl'] ?? data['photoUrl'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -52,6 +52,7 @@ class UserModel {
       'credits': credits,
       'studentId': studentId,
       'avatarUrl': avatarUrl,
+      'photoUrl': avatarUrl,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
