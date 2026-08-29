@@ -95,11 +95,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
 
     final auth = context.read<AuthProvider>();
-    await auth.prepareWhatsAppLoginOtp(phone);
+    final otpCode = await auth.prepareWhatsAppLoginOtp(phone);
 
-    // Open WhatsApp prefilled with student's request
+    // Open WhatsApp prefilled with unique #OTP identifier code
     final uri = Uri.parse(
-      'https://wa.me/94707938883?text=Hi%20EduPeak!%20Please%20send%20my%20login%20verification%20code%20for%20%2B$cleanDigits',
+      'https://wa.me/94707938883?text=%23OTP-$otpCode-$cleanDigits',
     );
 
     if (await canLaunchUrl(uri)) {

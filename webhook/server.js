@@ -245,12 +245,27 @@ async function handleMessage(message, contact) {
 
   console.log(`📥 Received from ${senderPhone} (${waProfileName}): Type=${msgType}, Text="${textBody}", Button="${buttonReplyId}"`);
 
-  // ── PRIORITY 1: INSTANT OTP / LOGIN REQUEST ──────────────────────────────
+  // ── PRIORITY 1: INSTANT OTP / HASHTAG / LOGIN REQUEST ──────────────────────
   const lowerText = textBody.toLowerCase();
-  if (lowerText.includes('otp') || lowerText.includes('login') || lowerText.includes('code') || lowerText.includes('verification')) {
-    // Extract any specific phone number mentioned in the text (e.g. +94757690260)
-    const phoneMatch = textBody.match(/(\+?94\d{9}|07\d{8}|\d{9,12})/);
+  if (
+    textBody.includes('#') ||
+    lowerText.includes('otp') ||
+    lowerText.includes('login') ||
+    lowerText.includes('code') ||
+    lowerText.includes('verification')
+  ) {
+    // 1. Extract OTP code if already provided in #OTP-123456 or #123456
+    let otpCode = null;
+    const codeMatch = textBody.match(/#OTP-(\d{6})/i) || textBody.match(/#(\d{4,6})/) || textBody.match(/\b(\d{6})\b/);
+    if (codeMatch) {
+      otpCode = codeMatch[1];
+    } else {
+      otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    // 2. Extract any specific phone number mentioned in the text (e.g. +94757690260 or 94757690260)
     let targetPhone = senderPhone;
+    const phoneMatch = textBody.match(/(\+?94\d{9}|07\d{8})/);
     if (phoneMatch) {
       let matched = phoneMatch[0];
       if (matched.startsWith('0')) matched = '+94' + matched.substring(1);
@@ -258,11 +273,11 @@ async function handleMessage(message, contact) {
       targetPhone = matched;
     }
 
-    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000;
 
+    // Save to Firestore under target phone and sender phone
     await db.collection('otp_verifications').doc(targetPhone).set({
-      otp: randomOtp,
+      otp: otpCode,
       phone: targetPhone,
       name: waProfileName || 'Student',
       expiresAt: expiresAt,
@@ -270,7 +285,7 @@ async function handleMessage(message, contact) {
     });
 
     await db.collection('otp_verifications').doc(senderPhone).set({
-      otp: randomOtp,
+      otp: otpCode,
       phone: senderPhone,
       name: waProfileName || 'Student',
       expiresAt: expiresAt,
@@ -279,9 +294,9 @@ async function handleMessage(message, contact) {
 
     await sendWhatsAppText(
       rawSender,
-      `🍰 *EduPeak Login Verification*\n\nHello ${waProfileName || 'Student'}! 👋\n\nYour 6-digit login code is:\n\n👉 *${randomOtp}*\n\n⏱️ This code is valid for 10 minutes.\nEnter this code in the EduPeak App to log in!`
+      `🍰 *EduPeak Login Verification*\n\nHello ${waProfileName || 'Student'}! 👋\n\nYour 6-digit login code is:\n\n👉 *${otpCode}*\n\n⏱️ Valid for 10 minutes.\nEnter this code in the EduPeak App to log in! 🚀`
     );
-    console.log(`📲 Priority 1: Instant WhatsApp OTP [${randomOtp}] dispatched to ${rawSender} for target ${targetPhone}`);
+    console.log(`📲 Priority 1: Instant WhatsApp OTP [${otpCode}] sent to ${rawSender} for target ${targetPhone}`);
     return;
   }
 
