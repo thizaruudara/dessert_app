@@ -64,19 +64,22 @@ class UserModel {
   UserModel copyWith({
     String? name,
     String? email,
+    UserRole? role,
     int? credits,
     String? avatarUrl,
     String? studentId,
+    String? examYear,
   }) {
     return UserModel(
       uid: uid,
       name: name ?? this.name,
       phone: phone,
       email: email ?? this.email,
-      role: role,
+      role: role ?? this.role,
       credits: credits ?? this.credits,
       studentId: studentId ?? this.studentId,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      examYear: examYear ?? this.examYear,
       createdAt: createdAt,
     );
   }

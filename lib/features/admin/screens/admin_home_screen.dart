@@ -90,7 +90,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.logout_outlined),
+                icon: const Icon(Icons.school_outlined, color: Colors.white),
+                tooltip: 'Switch to Student View',
+                onPressed: () => context.go('/student'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout_outlined, color: Colors.white),
                 onPressed: () async {
                   await context.read<AuthProvider>().signOut();
                   if (context.mounted) context.go('/auth/login');

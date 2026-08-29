@@ -392,6 +392,25 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
             const SizedBox(height: 32),
 
+            // ── Admin Dashboard Switch Button (If Admin) ────────────
+            if (auth.isAdmin || AuthProvider.isPhoneAdmin(user.phone)) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => context.go('/admin'),
+                  icon: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
+                  label: const Text('Open Teacher / Admin Dashboard 👑',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // ── Logout Button ───────────────────────────────────────
             SizedBox(
               width: double.infinity,

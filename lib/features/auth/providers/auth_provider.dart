@@ -54,13 +54,27 @@ class AuthProvider extends ChangeNotifier {
       if (_user == null && savedPhone != null && savedPhone.isNotEmpty) {
         final q = await _db.collection('users').where('phone', isEqualTo: savedPhone).limit(1).get();
         if (q.docs.isNotEmpty) {
-          _user = UserModel.fromFirestore(q.docs.first);
+          var u = UserModel.fromFirestore(q.docs.first);
+          if (isPhoneAdmin(u.phone) && !u.isAdmin) {
+            u = u.copyWith(role: UserRole.admin);
+            q.docs.first.reference.update({'role': 'admin'}).catchError((_) {});
+          }
+          _user = u;
           notifyListeners();
         }
       }
     } catch (e) {
       debugPrint('Error restoring saved session: $e');
     }
+  }
+
+  static bool isPhoneAdmin(String? phone) {
+    if (phone == null) return false;
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return digits.contains('770557769') ||
+        digits.contains('707938883') ||
+        digits.endsWith('770557769') ||
+        digits.endsWith('707938883');
   }
 
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
@@ -78,7 +92,12 @@ class AuthProvider extends ChangeNotifier {
     try {
       final doc = await _db.collection('users').doc(uid).get();
       if (doc.exists) {
-        _user = UserModel.fromFirestore(doc);
+        var u = UserModel.fromFirestore(doc);
+        if (isPhoneAdmin(u.phone) && !u.isAdmin) {
+          u = u.copyWith(role: UserRole.admin);
+          doc.reference.update({'role': 'admin'}).catchError((_) {});
+        }
+        _user = u;
       }
     } catch (e) {
       _error = e.toString();
@@ -223,6 +242,8 @@ class AuthProvider extends ChangeNotifier {
 
       final uid = currentUser?.uid ?? targetPhone.replaceAll(RegExp(r'\D'), '');
 
+      final bool isTargetAdmin = isPhoneAdmin(targetPhone);
+
       // Check or create user profile in Firestore
       final userQuery = await _db.collection('users').where('phone', isEqualTo: targetPhone).limit(1).get();
 
@@ -235,23 +256,35 @@ class AuthProvider extends ChangeNotifier {
         if (targetExamYear != null && targetExamYear.isNotEmpty) {
           updates['examYear'] = targetExamYear;
         }
+        if (isTargetAdmin && existingDoc.data()['role'] != 'admin') {
+          updates['role'] = 'admin';
+        }
         if (updates.isNotEmpty) {
           await existingDoc.reference.update(updates);
         }
         final updatedDoc = await existingDoc.reference.get();
-        _user = UserModel.fromFirestore(updatedDoc);
+        var u = UserModel.fromFirestore(updatedDoc);
+        if (isTargetAdmin && !u.isAdmin) {
+          u = u.copyWith(role: UserRole.admin);
+        }
+        _user = u;
       } else {
         final docRef = _db.collection('users').doc(uid);
         final doc = await docRef.get();
         if (doc.exists) {
-          _user = UserModel.fromFirestore(doc);
+          var u = UserModel.fromFirestore(doc);
+          if (isTargetAdmin && !u.isAdmin) {
+            u = u.copyWith(role: UserRole.admin);
+            doc.reference.update({'role': 'admin'}).catchError((_) {});
+          }
+          _user = u;
         } else {
-          // Create new student profile
+          // Create new user profile
           final newUser = UserModel(
             uid: uid,
-            name: targetName.isNotEmpty ? targetName : 'Student',
+            name: targetName.isNotEmpty ? targetName : (isTargetAdmin ? 'Teacher Admin' : 'Student'),
             phone: targetPhone,
-            role: UserRole.student,
+            role: isTargetAdmin ? UserRole.admin : UserRole.student,
             credits: 0,
             examYear: targetExamYear,
             createdAt: DateTime.now(),
