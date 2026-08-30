@@ -362,7 +362,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Future<void> _openWhatsAppForCode() async {
     final cleanPhone = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/94707938883?text=OTP%20for%20%2B$cleanPhone');
+    final uri = Uri.parse('https://wa.me/94701068489?text=OTP%20for%20%2B$cleanPhone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

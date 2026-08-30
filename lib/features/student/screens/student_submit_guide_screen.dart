@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 
 // Official EduPeak WhatsApp Business number
-const String kInstituteWhatsAppNumber = '+94707938883';
+const String kInstituteWhatsAppNumber = '+94701068489';
 const String kInstituteWhatsAppName = 'EduPeak AI Institute';
 
 class StudentSubmitGuideScreen extends StatelessWidget {

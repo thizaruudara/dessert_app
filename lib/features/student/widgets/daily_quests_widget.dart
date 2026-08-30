@@ -28,7 +28,7 @@ class _DailyQuestsWidgetState extends State<DailyQuestsWidget> {
     HapticFeedbackService.medium();
     setState(() => _askedAiTutor = true);
     final uri = Uri.parse(
-      'https://wa.me/94707938883?text=${Uri.encodeComponent('Hi EduPeak AI Tutor! 👋 I need help with my study concepts today.')}',
+      'https://wa.me/94701068489?text=${Uri.encodeComponent('Hi EduPeak AI Tutor! 👋 I need help with my study concepts today.')}',
     );
     try {
       if (await canLaunchUrl(uri)) {

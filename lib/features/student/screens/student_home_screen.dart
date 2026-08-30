@@ -51,7 +51,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   Future<void> _openWhatsAppTutor() async {
-    final uri = Uri.parse('https://wa.me/94707938883?text=Hi%20EduPeak%20AI%20Tutor,%20I%20have%20a%20question!');
+    final uri = Uri.parse('https://wa.me/94701068489?text=Hi%20EduPeak%20AI%20Tutor,%20I%20have%20a%20question!');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
