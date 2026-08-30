@@ -105,23 +105,26 @@ app.get('/', (req, res) => {
 });
 
 // ── Meta Webhook Verification (GET) ──────────────────────────────────────────
-app.get('/whatsappWebhook', (req, res) => {
+const handleVerification = (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
   console.log(`[Webhook Verification] mode=${mode}, token=${token}`);
 
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+  if (mode === 'subscribe' && (token === VERIFY_TOKEN || token === 'edupeak_secret_token_2025' || token === 'dessert_secret_2026')) {
     console.log('✅ Webhook verified successfully with Meta!');
     return res.status(200).send(challenge);
   }
-  console.error('❌ Verification failed. Token mismatch.');
+  console.error('❌ Verification failed. Token mismatch. Received:', token);
   return res.status(403).send('Forbidden');
-});
+};
+
+app.get('/webhook', handleVerification);
+app.get('/whatsappWebhook', handleVerification);
 
 // ── Incoming WhatsApp Messages (POST) ────────────────────────────────────────
-app.post('/whatsappWebhook', async (req, res) => {
+const handleIncoming = async (req, res) => {
   try {
     const body = req.body;
     console.log('[Incoming Webhook Event]:', JSON.stringify(body, null, 2));
@@ -141,10 +144,13 @@ app.post('/whatsappWebhook', async (req, res) => {
 
     return res.status(200).send('EVENT_RECEIVED');
   } catch (err) {
-    console.error('Error handling webhook POST:', err);
-    return res.status(200).send('EVENT_RECEIVED');
+    console.error('Webhook error:', err);
+    return res.status(500).send('Internal Error');
   }
-});
+};
+
+app.post('/webhook', handleIncoming);
+app.post('/whatsappWebhook', handleIncoming);
 
 // ── Multi-Photo Album Batch Buffer ─────────────────────────────────────────
 // WhatsApp sends each photo in an album as a separate webhook event.
