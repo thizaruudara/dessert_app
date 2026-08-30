@@ -74,8 +74,10 @@ class AuthProvider extends ChangeNotifier {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     return digits.contains('770557769') ||
         digits.contains('707938883') ||
+        digits.contains('701068489') ||
         digits.endsWith('770557769') ||
-        digits.endsWith('707938883');
+        digits.endsWith('707938883') ||
+        digits.endsWith('701068489');
   }
 
   Future<void> _onAuthStateChanged(User? firebaseUser) async {

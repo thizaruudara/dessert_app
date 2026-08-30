@@ -53,9 +53,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../demo')));
 
 // ── Meta WhatsApp & Gemini Config ───────────────────────────────────────────
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'dessert_secret_2026';
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAPB4Ug7ZABgBScDWq0kZCAQSRItrKyZAHqA6RWghMiiRdeGWiAvtQCsYlo3sG1xKtH7BeQAymfrzPWiTIlfyPe8NVSUtg4r4kojIPg2aZBQQQljZBFZAqtwBr3URuwL3SqtyNN7j8zIzbgHC5sDeShKvmWptlxYdPRCf3KN5kbOJSee43qNvB2DMZChjdirQZDZD';
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1259475067252677';
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'edupeak_secret_token_2025';
+const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAeBBzDxMAsBSVSHdQW6XLWtUCMIWWrPqNj1uuHl9dXedPivFzuICMR4mW4m53HcNri31EGy4AOlU0DBBlD68JVR6GSExFpZCxgfQ5WYTPT5rFQZA3uZB7i3A3VT6c0wMIc39NbjrPxa8pWPF84pZC6vZAjSDEZB2ezxa4G4MdAeNKFhpqpuf2ss4CYWQZB9UY53k7piiWTOwTPguWyYZCheZAHm1i9xV6lvZBELfZAESRsekjCdZC7DduTrSgL2nMZCf9Dxdv6miXazy2CgzQJaeUuUi';
+const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1282807424918189';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // ── Direct HTTP OTP Dispatch Endpoint ─────────────────────────────────────────

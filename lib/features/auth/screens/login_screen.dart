@@ -100,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Open WhatsApp prefilled with clean, professional request message
     final message = 'Hi EduPeak! Please send my login verification code for +$cleanDigits';
     final uri = Uri.parse(
-      'https://wa.me/94707938883?text=${Uri.encodeComponent(message)}',
+      'https://wa.me/94701068489?text=${Uri.encodeComponent(message)}',
     );
 
     if (await canLaunchUrl(uri)) {
