@@ -15,24 +15,32 @@ class AdminStudentsScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('users')
             .where('role', isEqualTo: 'student')
-            .orderBy('credits', descending: true)
             .snapshots(),
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+          if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
             return const Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
+          if (snap.hasError) {
+            return Center(
+              child: Text('Error: ${snap.error}', style: const TextStyle(color: AppColors.textMuted)),
+            );
+          }
           final docs = snap.data?.docs ?? [];
-          if (docs.isEmpty) {
+          final students = docs
+              .map((d) => UserModel.fromFirestore(d))
+              .toList()
+            ..sort((a, b) => b.credits.compareTo(a.credits));
+
+          if (students.isEmpty) {
             return const Center(
               child: Text('No students registered yet', style: TextStyle(color: AppColors.textMuted)),
             );
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
+            itemCount: students.length,
             itemBuilder: (_, i) {
-              final user = UserModel.fromFirestore(docs[i]);
-              return _StudentCard(user: user, rank: i + 1);
+              return _StudentCard(user: students[i], rank: i + 1);
             },
           );
         },

@@ -142,12 +142,16 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
               stream: FirebaseFirestore.instance
                   .collection('users')
                   .where('role', isEqualTo: 'student')
-                  .orderBy('credits', descending: true)
-                  .limit(60)
                   .snapshots(),
               builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+                if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
                   return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                }
+
+                if (snap.hasError) {
+                  return Center(
+                    child: Text('Error: ${snap.error}', style: const TextStyle(color: AppColors.textMuted)),
+                  );
                 }
 
                 if (!snap.hasData || snap.data!.docs.isEmpty) {
@@ -159,7 +163,8 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
                 var allStudents = snap.data!.docs
                     .map((d) => UserModel.fromFirestore(d))
                     .where((u) => u.name.isNotEmpty && !u.name.startsWith('Student ('))
-                    .toList();
+                    .toList()
+                  ..sort((a, b) => b.credits.compareTo(a.credits));
 
                 final minXp = activeLeague['minXp'] as int;
                 final maxXp = activeLeague['maxXp'] as int;
