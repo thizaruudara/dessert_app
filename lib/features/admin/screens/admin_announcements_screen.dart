@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/haptic_feedback_service.dart';
+import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminAnnouncementsScreen extends StatefulWidget {
@@ -518,13 +518,13 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
             prefixIcon: Icon(Icons.person_outline_rounded, color: AppColors.textMuted),
           ),
           hint: const Text('Choose a student'),
-          items: students.map((d) {
+          items: students.map<DropdownMenuItem<String>>((d) {
             final data = d.data();
             final name = data['name'] ?? 'Unknown';
-            final phone = data['phone'] ?? '';
+            final phone = data['phone']?.toString() ?? '';
             final year = data['examYear'] ?? '';
             final hasTg = data['telegramChatId'] != null ? '✈️' : '⚠️';
-            return DropdownMenuItem(
+            return DropdownMenuItem<String>(
               value: phone,
               child: Text('$hasTg $name ($year) - $phone', style: const TextStyle(fontSize: 13)),
             );
