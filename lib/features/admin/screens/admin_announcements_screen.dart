@@ -45,7 +45,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     super.dispose();
   }
 
-  // ── Dispatch Broadcast to Telegram & Firestore ─────────────────────────────
+  // ── Dispatch Broadcast via Secure Vercel Backend ──────────────────────────
   Future<void> _handleBroadcast() async {
     if (!_formKey.currentState!.validate()) return;
     if (_targetType == 'single' && _selectedStudentPhone == null) {
@@ -64,102 +64,34 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     final adminName = auth.user?.name ?? 'EduPeak Admin';
 
     try {
-      final db = FirebaseFirestore.instance;
+      final res = await http.post(
+        Uri.parse('https://edupeak-telegram-bot.vercel.app/api/broadcast'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'title': title,
+          'message': message,
+          'priority': _priority,
+          'targetType': _targetType,
+          'targetExamYear': _targetType == 'year' ? _selectedExamYear : null,
+          'targetStudentPhone': _targetType == 'single' ? _selectedStudentPhone : null,
+          'adminName': adminName,
+        }),
+      );
 
-      // 1. Query target students
-      Query<Map<String, dynamic>> query = db.collection('users').where('role', isEqualTo: 'student');
-      if (_targetType == 'year') {
-        query = query.where('examYear', isEqualTo: _selectedExamYear);
-      }
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final total = data['totalTargeted'] ?? 0;
+        final sent = data['sentCount'] ?? 0;
+        final failed = data['failedCount'] ?? 0;
 
-      final snap = await query.get();
-      final List<Map<String, dynamic>> targetStudents = [];
-
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        if (_targetType == 'single' && _selectedStudentPhone != null) {
-          if (data['phone'] != _selectedStudentPhone && !(data['phone']?.toString().endsWith(_selectedStudentPhone!) ?? false)) {
-            continue;
-          }
+        if (mounted) {
+          HapticFeedbackService.success();
+          _titleCtrl.clear();
+          _messageCtrl.clear();
+          _showSuccessDialog(total, sent, failed);
         }
-        if (data['telegramChatId'] != null && data['telegramChatId'].toString().isNotEmpty) {
-          targetStudents.add({
-            'name': data['name'] ?? 'Student',
-            'chatId': data['telegramChatId'].toString(),
-            'phone': data['phone'] ?? '',
-            'examYear': data['examYear'] ?? 'A/L',
-          });
-        }
-      }
-
-      int sentCount = 0;
-      int failedCount = 0;
-
-      final priorityEmoji = _priority == 'urgent'
-          ? '🚨'
-          : _priority == 'homework'
-              ? '📝'
-              : _priority == 'tip'
-                  ? '💡'
-                  : '📢';
-
-      final tgText = '$priorityEmoji <b>EduPeak Announcement</b>\n\n'
-          '<b>$title</b>\n\n'
-          '$message\n\n'
-          '<i>— $adminName • EduPeak Institute</i>';
-
-      // 2. Dispatch to each student via Telegram Bot API
-      for (final s in targetStudents) {
-        try {
-          final res = await http.post(
-            Uri.parse('https://api.telegram.org/bot$_botToken/sendMessage'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'chat_id': s['chatId'],
-              'text': tgText,
-              'parse_mode': 'HTML',
-              'reply_markup': {
-                'inline_keyboard': [
-                  [
-                    {'text': '📱 Open Student Portal', 'url': 'https://edupeak.lk'},
-                    {'text': '📚 Ask AI Tutor', 'callback_data': 'btn_ask_tutor'}
-                  ]
-                ]
-              }
-            }),
-          );
-
-          if (res.statusCode == 200) {
-            sentCount++;
-          } else {
-            failedCount++;
-          }
-        } catch (_) {
-          failedCount++;
-        }
-      }
-
-      // 3. Save Record in Firestore announcements collection
-      await db.collection('announcements').add({
-        'title': title,
-        'message': message,
-        'priority': _priority,
-        'targetType': _targetType,
-        'targetExamYear': _targetType == 'year' ? _selectedExamYear : null,
-        'targetStudentName': _targetType == 'single' ? _selectedStudentName : null,
-        'targetStudentPhone': _targetType == 'single' ? _selectedStudentPhone : null,
-        'adminName': adminName,
-        'recipientsTargeted': targetStudents.length,
-        'sentCount': sentCount,
-        'failedCount': failedCount,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) {
-        HapticFeedbackService.success();
-        _titleCtrl.clear();
-        _messageCtrl.clear();
-        _showSuccessDialog(targetStudents.length, sentCount, failedCount);
+      } else {
+        throw Exception('Server returned status code ${res.statusCode}');
       }
     } catch (e) {
       if (mounted) {
@@ -545,14 +477,34 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('announcements')
-          .orderBy('createdAt', descending: true)
-          .limit(15)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final docs = snapshot.data?.docs ?? [];
+        if (snapshot.hasError) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Center(
+              child: Text(
+                'No past announcements recorded yet.',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        final docs = (snapshot.data?.docs ?? []).toList()
+          ..sort((a, b) {
+            final aTime = (a.data()['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2000);
+            final bTime = (b.data()['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2000);
+            return bTime.compareTo(aTime);
+          });
+
         if (docs.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(24),
