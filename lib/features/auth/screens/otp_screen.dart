@@ -336,18 +336,18 @@ class _OtpScreenState extends State<OtpScreen> {
 
               const SizedBox(height: 12),
 
-              // Instant WhatsApp Direct Code Helper
+              // Instant Telegram Direct Code Helper
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _openWhatsAppForCode,
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF25D366), size: 18),
+                  onPressed: _openTelegramForCode,
+                  icon: const Icon(Icons.send_rounded, color: Color(0xFF229ED9), size: 18),
                   label: const Text(
-                    'Get Code via WhatsApp 💬',
-                    style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold, fontSize: 13),
+                    'Get Code via Telegram ✈️',
+                    style: TextStyle(color: Color(0xFF229ED9), fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF25D366)),
+                    side: const BorderSide(color: Color(0xFF229ED9)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -360,11 +360,20 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  Future<void> _openWhatsAppForCode() async {
+  Future<void> _openTelegramForCode() async {
     final cleanPhone = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/94701068489?text=OTP%20for%20%2B$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=otp_$cleanPhone');
+    final webUri = Uri.parse('https://t.me/edupeakbot?start=otp_$cleanPhone');
+    try {
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
     }
   }
 }

@@ -17,6 +17,7 @@ import '../../features/admin/screens/admin_shell.dart';
 import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_review_screen.dart';
 import '../../features/admin/screens/admin_students_screen.dart';
+import '../../features/admin/screens/admin_announcements_screen.dart';
 
 CustomTransitionPage<void> _buildSmoothPage({
   required LocalKey key,
@@ -170,6 +171,10 @@ class AppRouter {
           GoRoute(
             path: '/admin/students',
             builder: (_, __) => const AdminStudentsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/announcements',
+            builder: (_, __) => const AdminAnnouncementsScreen(),
           ),
         ],
       ),

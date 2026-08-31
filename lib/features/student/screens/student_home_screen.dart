@@ -51,12 +51,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   Future<void> _openWhatsAppTutor() async {
-    final uri = Uri.parse('https://wa.me/94701068489?text=Hi%20EduPeak%20AI%20Tutor,%20I%20have%20a%20question!');
+    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=ask_tutor');
+    final webUri = Uri.parse('https://t.me/edupeakbot?start=ask_tutor');
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 
   @override

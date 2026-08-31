@@ -82,8 +82,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // ── 2. LOGIN WITH WHATSAPP 1-TAP OTP ──────────────────────────────────────
-  Future<void> _handleWhatsAppOtpLogin() async {
+  // ── 2. TELEGRAM 1-TAP OTP LOGIN ──────────────────────────────────────────
+  Future<void> _handleTelegramOtpLogin() async {
     final rawNumber = _loginPhoneCtrl.text.trim();
     if (rawNumber.isEmpty) {
       _showError('Please enter your phone number first');
@@ -95,16 +95,22 @@ class _LoginScreenState extends State<LoginScreen> {
     final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
 
     final auth = context.read<AuthProvider>();
-    final otpCode = await auth.prepareWhatsAppLoginOtp(phone);
+    await auth.prepareWhatsAppLoginOtp(phone);
 
-    // Open WhatsApp prefilled with clean, professional request message
-    final message = 'Hi EduPeak! Please send my login verification code for +$cleanDigits';
-    final uri = Uri.parse(
-      'https://wa.me/94701068489?text=${Uri.encodeComponent(message)}',
-    );
+    // Open Telegram prefilled with deep link OTP request
+    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=otp_$cleanDigits');
+    final webUri = Uri.parse('https://t.me/edupeakbot?start=otp_$cleanDigits');
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
     }
 
     if (mounted) {
@@ -410,18 +416,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const SizedBox(height: 16),
 
-            // Secondary: WhatsApp 1-Tap OTP Login Button
+            // Secondary: Telegram 1-Tap OTP Login Button
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: auth.loading ? null : _handleWhatsAppOtpLogin,
-                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF25D366), size: 19),
+                onPressed: auth.loading ? null : _handleTelegramOtpLogin,
+                icon: const Icon(Icons.send_rounded, color: Color(0xFF229ED9), size: 19),
                 label: const Text(
-                  'Login via WhatsApp OTP 💬',
-                  style: TextStyle(color: Color(0xFF25D366), fontWeight: FontWeight.bold, fontSize: 14),
+                  'Login via Telegram OTP ✈️',
+                  style: TextStyle(color: Color(0xFF229ED9), fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
+                  side: const BorderSide(color: Color(0xFF229ED9), width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -506,14 +512,15 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 14),
 
-            // Password Input
+            // Password Input (8-Digit Requirement)
             TextFormField(
               controller: _regPasswordCtrl,
               obscureText: _obscureRegPw,
               style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
               decoration: InputDecoration(
-                labelText: 'Create Password',
-                hintText: 'Min 4 characters',
+                labelText: 'Create Password (8+ Digits)',
+                hintText: 'Minimum 8 characters',
+                helperText: 'Must be at least 8 characters long',
                 prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -525,7 +532,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Password required';
-                if (v.trim().length < 4) return 'Password must be at least 4 characters';
+                if (v.trim().length < 8) return 'Password must be at least 8 characters';
                 return null;
               },
             ),
@@ -537,8 +544,8 @@ class _LoginScreenState extends State<LoginScreen> {
               obscureText: _obscureRegConfirmPw,
               style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
               decoration: InputDecoration(
-                labelText: 'Confirm Password',
-                hintText: 'Re-enter your password',
+                labelText: 'Confirm 8-Digit Password',
+                hintText: 'Re-enter your 8-digit password',
                 prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -549,7 +556,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               validator: (v) {
-                if (v != _regPasswordCtrl.text.trim()) return 'Passwords do not match';
+                if (v == null || v.trim().isEmpty) return 'Please confirm your password';
+                if (v.trim() != _regPasswordCtrl.text.trim()) return 'Passwords do not match';
                 return null;
               },
             ),

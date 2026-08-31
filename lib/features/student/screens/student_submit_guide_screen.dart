@@ -3,9 +3,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-// Official EduPeak WhatsApp Business number
-const String kInstituteWhatsAppNumber = '+94701068489';
-const String kInstituteWhatsAppName = 'EduPeak AI Institute';
+// Official EduPeak Telegram Bot
+const String kInstituteTelegramBot = 'edupeakbot';
+const String kInstituteTelegramName = 'EduPeak AI Tutor (@edupeakbot)';
 
 class StudentSubmitGuideScreen extends StatelessWidget {
   const StudentSubmitGuideScreen({super.key});
@@ -13,7 +13,7 @@ class StudentSubmitGuideScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Submit Dessert 🍰')),
+      appBar: AppBar(title: const Text('Submit Homework 🍰')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -25,12 +25,12 @@ class StudentSubmitGuideScreen extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+                  colors: [Color(0xFF229ED9), Color(0xFF0088CC)],
                 ),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF25D366).withOpacity(0.3),
+                    color: const Color(0xFF229ED9).withOpacity(0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -38,10 +38,10 @@ class StudentSubmitGuideScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const Text('📱', style: TextStyle(fontSize: 48)),
+                  const Text('✈️', style: TextStyle(fontSize: 48)),
                   const SizedBox(height: 12),
                   const Text(
-                    'Submit via WhatsApp',
+                    'Submit via Telegram',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -50,18 +50,18 @@ class StudentSubmitGuideScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Send your homework to our official number',
+                    'Send your homework photos to @edupeakbot',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    onPressed: () => _openWhatsApp(context),
+                    onPressed: () => _openTelegram(context),
                     icon: const Icon(Icons.open_in_new, size: 18),
-                    label: const Text('Open WhatsApp Chat'),
+                    label: const Text('Open Telegram Bot'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF128C7E),
+                      foregroundColor: const Color(0xFF0088CC),
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                   ),
@@ -102,7 +102,7 @@ class StudentSubmitGuideScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Your WhatsApp number must match the one you registered with in this app.',
+                      'You can upload photos, albums, and PDFs directly to @edupeakbot anytime!',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                     ),
                   ),
@@ -115,16 +115,18 @@ class StudentSubmitGuideScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _openWhatsApp(BuildContext context) async {
-    final number = kInstituteWhatsAppNumber.replaceAll('+', '').replaceAll(' ', '');
-    final uri = Uri.parse('https://wa.me/$number?text=Dessert+Submission%3A+');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open WhatsApp')),
-        );
+  Future<void> _openTelegram(BuildContext context) async {
+    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=submit_dessert');
+    final webUri = Uri.parse('https://t.me/edupeakbot?start=submit_dessert');
+    try {
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
       }
     }
   }
@@ -132,28 +134,28 @@ class StudentSubmitGuideScreen extends StatelessWidget {
 
 const _steps = [
   (
-    title: 'Open WhatsApp',
-    desc: 'Tap the button above or open WhatsApp and search for $kInstituteWhatsAppName.',
-    icon: '📱',
+    title: 'Open Telegram Bot',
+    desc: 'Tap the button above or search for @edupeakbot in Telegram.',
+    icon: '✈️',
   ),
   (
-    title: 'Write your student ID',
-    desc: 'Start your message with your student ID so we know who you are. Example: "ID: S-2024-001"',
-    icon: '🪪',
+    title: 'Start the Bot',
+    desc: 'Tap Start or tap "Submit Homework" in the menu.',
+    icon: '🚀',
   ),
   (
     title: 'Send your homework',
-    desc: 'Type your answer, attach a photo of your written work, or send a PDF file.',
-    icon: '📚',
+    desc: 'Attach photos of your written work or send a PDF file with a short note.',
+    icon: '📸',
   ),
   (
     title: 'Wait for review',
-    desc: 'Your teacher will review it and mark it as correct or incorrect. You\'ll see the result here!',
+    desc: 'Your teachers and AI grader will review it and award XP credits!',
     icon: '⏳',
   ),
   (
     title: 'Earn credits',
-    desc: 'Correct desserts earn you 10 credits each. Climb the leaderboard!',
+    desc: 'Correct homework earns you XP and moves you up the Leaderboard!',
     icon: '⭐',
   ),
 ];

@@ -13,7 +13,7 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
-  final _tabs = const ['/admin', '/admin/students'];
+  final _tabs = const ['/admin', '/admin/students', '/admin/announcements'];
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +42,11 @@ class _AdminShellState extends State<AdminShell> {
               icon: Icon(Icons.people_outlined),
               selectedIcon: Icon(Icons.people, color: AppColors.accent),
               label: 'Students',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.send_outlined),
+              selectedIcon: Icon(Icons.send, color: Color(0xFF229ED9)),
+              label: 'Broadcasts',
             ),
           ],
         ),

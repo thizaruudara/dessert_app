@@ -27,14 +27,19 @@ class _DailyQuestsWidgetState extends State<DailyQuestsWidget> {
   Future<void> _launchWhatsAppAiTutor() async {
     HapticFeedbackService.medium();
     setState(() => _askedAiTutor = true);
-    final uri = Uri.parse(
-      'https://wa.me/94701068489?text=${Uri.encodeComponent('Hi EduPeak AI Tutor! 👋 I need help with my study concepts today.')}',
-    );
+    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=daily_quest');
+    final webUri = Uri.parse('https://t.me/edupeakbot?start=daily_quest');
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 
   void _claimMysteryBox() {
