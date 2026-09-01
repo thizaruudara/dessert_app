@@ -15,9 +15,9 @@ class StudentShell extends StatefulWidget {
 class _StudentShellState extends State<StudentShell> {
   final _tabs = const [
     '/student',
+    '/student/papers',
     '/student/leaderboard',
     '/student/desserts',
-    '/student/submit',
     '/student/profile',
   ];
 
@@ -28,6 +28,11 @@ class _StudentShellState extends State<StudentShell> {
       label: 'Home',
     ),
     LiquidNavItem(
+      icon: Icons.assignment_outlined,
+      activeIcon: Icons.assignment_rounded,
+      label: 'Papers',
+    ),
+    LiquidNavItem(
       icon: Icons.emoji_events_outlined,
       activeIcon: Icons.emoji_events_rounded,
       label: 'Ranks',
@@ -36,11 +41,6 @@ class _StudentShellState extends State<StudentShell> {
       icon: Icons.folder_special_outlined,
       activeIcon: Icons.folder_special_rounded,
       label: 'Desserts',
-    ),
-    LiquidNavItem(
-      icon: Icons.add_circle_outline_rounded,
-      activeIcon: Icons.add_circle_rounded,
-      label: 'Submit',
     ),
     LiquidNavItem(
       icon: Icons.person_outline_rounded,

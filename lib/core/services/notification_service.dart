@@ -3,70 +3,78 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
-/// Handles FCM token registration, topic subscriptions, and foreground messages.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  debugPrint('Handling background FCM message: ${message.messageId}');
+}
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<void> initialize({required bool isAdmin}) async {
-    // Request permission (iOS)
-    await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+  Future<void> initialize({bool isAdmin = false}) async {
+    try {
+      // 1. Request Permission
+      final settings = await _fcm.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: true,
+        provisional: false,
+        sound: true,
+      );
 
-    // Get and store FCM token
-    final token = await _fcm.getToken();
-    if (token != null) {
-      await _saveToken(token);
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        debugPrint('🔔 FCM Notification Permission Granted: ${settings.authorizationStatus}');
+
+        // 2. Fetch Token & Sync with Current User
+        final token = await _fcm.getToken();
+        if (token != null) {
+          debugPrint('🔑 FCM Token: $token');
+          await saveTokenToDatabase(token);
+        }
+
+        // 3. Listen for token refreshes
+        _fcm.onTokenRefresh.listen((newToken) async {
+          await saveTokenToDatabase(newToken);
+        });
+
+        // 4. Subscribe to Institute Topics (Free Broadcast Channel)
+        await _fcm.subscribeToTopic('paper_sessions');
+        await _fcm.subscribeToTopic('announcements');
+
+        // 5. Handle Foreground Messages
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          debugPrint('📩 Foreground Push Notification: ${message.notification?.title} - ${message.notification?.body}');
+        });
+
+        // 6. Handle Background / Opened Notifications
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          debugPrint('🚀 App opened via Notification: ${message.data}');
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Notification initialization error: $e');
     }
+  }
 
-    // Listen for token refresh
-    _fcm.onTokenRefresh.listen(_saveToken);
-
-    // Subscribe to appropriate topic
-    if (isAdmin) {
-      await _fcm.subscribeToTopic('admins');
+  Future<void> saveTokenToDatabase(String token) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await _firestore.collection('users').doc(user.uid).set({
+          'fcmTokens': FieldValue.arrayUnion([token]),
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error saving FCM token: $e');
+      }
     }
-
-    // Handle foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
-    // Handle message tap (background / terminated)
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
   }
-
-  Future<void> _saveToken(String token) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    await _db.collection('users').doc(uid).update({'fcmToken': token});
-  }
-
-  void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('Foreground FCM: ${message.notification?.title}');
-    // TODO: Show in-app snackbar / overlay notification
-  }
-
-  void _handleMessageTap(RemoteMessage message) {
-    final route = message.data['route'];
-    debugPrint('Notification tapped → route: $route');
-    // Navigation is handled via the router in main.dart
-    // You can use a global navigator key to push here if needed
-  }
-
-  Future<void> unsubscribe() async {
-    await _fcm.unsubscribeFromTopic('admins');
-    await _fcm.deleteToken();
-  }
-}
-
-/// Top-level background message handler (must be a top-level function)
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Background FCM: ${message.notification?.title}');
 }

@@ -19,6 +19,10 @@ import '../../features/admin/screens/admin_review_screen.dart';
 import '../../features/admin/screens/admin_students_screen.dart';
 import '../../features/admin/screens/admin_announcements_screen.dart';
 import '../../features/admin/screens/admin_mcq_sprint_screen.dart';
+import '../../features/student/screens/paper_sessions_screen.dart';
+import '../../features/student/screens/live_exam_room_screen.dart';
+import '../../features/admin/screens/admin_paper_sessions_screen.dart';
+import '../../features/admin/screens/admin_live_proctor_screen.dart';
 
 CustomTransitionPage<void> _buildSmoothPage({
   required LocalKey key,
@@ -125,6 +129,20 @@ class AppRouter {
             builder: (_, __) => const StudentHomeScreen(),
           ),
           GoRoute(
+            path: '/student/papers',
+            builder: (_, __) => const PaperSessionsScreen(),
+          ),
+          GoRoute(
+            path: '/student/papers/exam/:id',
+            pageBuilder: (context, state) => _buildSmoothPage(
+              key: state.pageKey,
+              child: LiveExamRoomScreen(
+                paperId: state.pathParameters['id']!,
+                slotId: state.uri.queryParameters['slot'] ?? 'slot1',
+              ),
+            ),
+          ),
+          GoRoute(
             path: '/student/leaderboard',
             builder: (_, __) => const StudentLeaderboardScreen(),
           ),
@@ -159,6 +177,19 @@ class AppRouter {
           GoRoute(
             path: '/admin',
             builder: (_, __) => const AdminHomeScreen(),
+          ),
+          GoRoute(
+            path: '/admin/papers',
+            builder: (_, __) => const AdminPaperSessionsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/papers/proctor/:id',
+            pageBuilder: (context, state) => _buildSmoothPage(
+              key: state.pageKey,
+              child: AdminLiveProctorScreen(
+                paperId: state.pathParameters['id']!,
+              ),
+            ),
           ),
           GoRoute(
             path: '/admin/sprints',

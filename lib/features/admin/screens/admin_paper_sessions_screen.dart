@@ -1,0 +1,623 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/models/paper_session_model.dart';
+import '../../../core/services/paper_session_service.dart';
+
+class AdminPaperSessionsScreen extends StatefulWidget {
+  const AdminPaperSessionsScreen({super.key});
+
+  @override
+  State<AdminPaperSessionsScreen> createState() => _AdminPaperSessionsScreenState();
+}
+
+class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
+  final PaperSessionService _paperService = PaperSessionService();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        elevation: 0,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.assignment_turned_in, color: Color(0xFF818CF8), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Paper Writing Manager',
+                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+                Text(
+                  'විභාග සැසි සහ සජීවී කැමරා අධීක්ෂණය',
+                  style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: () => _showCreatePaperDialog(),
+            icon: const Icon(Icons.add_circle, color: Color(0xFF6366F1), size: 28),
+            tooltip: 'Create New Paper Session',
+          ),
+        ],
+      ),
+      body: StreamBuilder<List<PaperSession>>(
+        stream: _paperService.streamSessions(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+          }
+
+          final sessions = snapshot.data ?? [];
+          if (sessions.isEmpty) {
+            return _buildEmptyAdminState();
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: sessions.length,
+            itemBuilder: (context, index) {
+              return _buildAdminPaperCard(sessions[index]);
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF6366F1),
+        onPressed: () => _showCreatePaperDialog(),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(
+          'Add Paper Session',
+          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyAdminState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: const Icon(Icons.note_add_outlined, size: 48, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'තවම Paper Sessions නිර්මාණය කර නොමැත',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'නව විභාග සැසියක් නිර්මාණය කර Slot 1 සහ Slot 2 වේලාවන් සකසන්න.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => _showCreatePaperDialog(),
+              icon: const Icon(Icons.add, size: 18, color: Colors.white),
+              label: Text(
+                'Create First Paper Session',
+                style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminPaperCard(PaperSession session) {
+    final dateFormat = DateFormat('yyyy MMMM dd (EEEE)');
+    final timeFormat = DateFormat('hh:mm a');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Badges & Actions
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withOpacity(0.6),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        session.subject,
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFA5B4FC)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        session.examYear,
+                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.edit_calendar_outlined, size: 20, color: Color(0xFF38BDF8)),
+                      tooltip: 'Change Session Times (Slot 1 / Slot 2)',
+                      onPressed: () => _showEditTimesDialog(session),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  session.title,
+                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 13, color: Color(0xFF64748B)),
+                    const SizedBox(width: 6),
+                    Text(
+                      dateFormat.format(DateTime.tryParse(session.date) ?? DateTime.now()),
+                      style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    ),
+                    const SizedBox(width: 14),
+                    const Icon(Icons.timer_outlined, size: 13, color: Color(0xFF64748B)),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${session.durationMinutes} Mins',
+                      style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Two Slots Status Overview
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.wb_sunny_outlined, size: 15, color: Color(0xFFF59E0B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Slot 1 (Morning)',
+                                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${timeFormat.format(session.slot1.startTime)} - ${timeFormat.format(session.slot1.endTime)}',
+                              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '👥 ${session.slot1.registeredCount} Registered',
+                              style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.nights_stay_outlined, size: 15, color: Color(0xFF818CF8)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Slot 2 (Evening)',
+                                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${timeFormat.format(session.slot2.startTime)} - ${timeFormat.format(session.slot2.endTime)}',
+                              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '👥 ${session.slot2.registeredCount} Registered',
+                              style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF818CF8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Button: Open Live Camera Proctoring Monitor
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      context.push('/admin/papers/proctor/${session.id}');
+                    },
+                    icon: const Icon(Icons.videocam_outlined, size: 18, color: Colors.white),
+                    label: Text(
+                      'Live Camera Proctor Monitor (අධීක්ෂණ මධ්‍යස්ථානය)',
+                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreatePaperDialog() {
+    final titleCtrl = TextEditingController();
+    final subjectCtrl = TextEditingController(text: 'Combined Mathematics');
+    final examYearCtrl = TextEditingController(text: '2026 A/L');
+    final durationCtrl = TextEditingController(text: '180');
+    final pdfUrlCtrl = TextEditingController();
+
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay slot1Start = const TimeOfDay(hour: 8, minute: 0);
+    TimeOfDay slot1End = const TimeOfDay(hour: 11, minute: 15);
+    TimeOfDay slot2Start = const TimeOfDay(hour: 14, minute: 0);
+    TimeOfDay slot2End = const TimeOfDay(hour: 17, minute: 15);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'New Paper Writing Session',
+            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTextField('Paper Title / Topic', titleCtrl, 'e.g. Unit Test 03 - Mechanics'),
+                const SizedBox(height: 10),
+                _buildTextField('Subject', subjectCtrl, 'Combined Maths / Physics / etc.'),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _buildTextField('Exam Year', examYearCtrl, '2026 A/L')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildTextField('Duration (Mins)', durationCtrl, '180')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _buildTextField('PDF URL (Optional)', pdfUrlCtrl, 'https://.../paper.pdf'),
+                const SizedBox(height: 14),
+                Text(
+                  '⏰ Slot 1 (Morning Session Times):',
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final t = await showTimePicker(context: context, initialTime: slot1Start);
+                          if (t != null) setDlgState(() => slot1Start = t);
+                        },
+                        child: Text('Start: ${slot1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final t = await showTimePicker(context: context, initialTime: slot1End);
+                          if (t != null) setDlgState(() => slot1End = t);
+                        },
+                        child: Text('End: ${slot1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '🌙 Slot 2 (Evening Session Times):',
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final t = await showTimePicker(context: context, initialTime: slot2Start);
+                          if (t != null) setDlgState(() => slot2Start = t);
+                        },
+                        child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final t = await showTimePicker(context: context, initialTime: slot2End);
+                          if (t != null) setDlgState(() => slot2End = t);
+                        },
+                        child: Text('End: ${slot2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+              onPressed: () async {
+                if (titleCtrl.text.trim().isEmpty) return;
+
+                final dateStr = selectedDate.toIso8601String().split('T')[0];
+                final slot1StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1Start.hour, slot1Start.minute);
+                final slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1End.hour, slot1End.minute);
+                final slot2StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2Start.hour, slot2Start.minute);
+                final slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
+
+                final newSession = PaperSession(
+                  id: '',
+                  title: titleCtrl.text.trim(),
+                  subject: subjectCtrl.text.trim(),
+                  examYear: examYearCtrl.text.trim(),
+                  date: dateStr,
+                  durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
+                  pdfUrl: pdfUrlCtrl.text.trim().isEmpty ? null : pdfUrlCtrl.text.trim(),
+                  slot1: PaperSlot(id: 'slot1', name: 'Morning Session (උදෑසන සැසිය)', startTime: slot1StartDt, endTime: slot1EndDt),
+                  slot2: PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt),
+                  createdAt: DateTime.now(),
+                );
+
+                await _paperService.createOrUpdatePaperSession(newSession);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ New Paper Session Created!'), backgroundColor: Color(0xFF22C55E)),
+                  );
+                }
+              },
+              child: Text('Create Paper', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditTimesDialog(PaperSession session) {
+    TimeOfDay s1Start = TimeOfDay.fromDateTime(session.slot1.startTime);
+    TimeOfDay s1End = TimeOfDay.fromDateTime(session.slot1.endTime);
+    TimeOfDay s2Start = TimeOfDay.fromDateTime(session.slot2.startTime);
+    TimeOfDay s2End = TimeOfDay.fromDateTime(session.slot2.endTime);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Change Session Times (වේලාවන් වෙනස් කිරීම)',
+            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Slot 1 (Morning Session):',
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final t = await showTimePicker(context: context, initialTime: s1Start);
+                        if (t != null) setDlgState(() => s1Start = t);
+                      },
+                      child: Text('Start: ${s1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final t = await showTimePicker(context: context, initialTime: s1End);
+                        if (t != null) setDlgState(() => s1End = t);
+                      },
+                      child: Text('End: ${s1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Slot 2 (Evening Session):',
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final t = await showTimePicker(context: context, initialTime: s2Start);
+                        if (t != null) setDlgState(() => s2Start = t);
+                      },
+                      child: Text('Start: ${s2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final t = await showTimePicker(context: context, initialTime: s2End);
+                        if (t != null) setDlgState(() => s2End = t);
+                      },
+                      child: Text('End: ${s2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E)),
+              onPressed: () async {
+                final baseDate = session.slot1.startTime;
+                final updatedSlot1 = PaperSlot(
+                  id: 'slot1',
+                  name: session.slot1.name,
+                  startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1Start.hour, s1Start.minute),
+                  endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1End.hour, s1End.minute),
+                  maxCapacity: session.slot1.maxCapacity,
+                  registeredCount: session.slot1.registeredCount,
+                );
+
+                final updatedSlot2 = PaperSlot(
+                  id: 'slot2',
+                  name: session.slot2.name,
+                  startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute),
+                  endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute),
+                  maxCapacity: session.slot2.maxCapacity,
+                  registeredCount: session.slot2.registeredCount,
+                );
+
+                await _paperService.updateSlotTimes(session.id, slot1: updatedSlot1, slot2: updatedSlot2);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ Session Times Updated Successfully!'), backgroundColor: Color(0xFF22C55E)),
+                  );
+                }
+              },
+              child: Text('Save Changes', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController ctrl, String hint) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+        const SizedBox(height: 4),
+        TextField(
+          controller: ctrl,
+          style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+            filled: true,
+            fillColor: const Color(0xFF0F172A),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+          ),
+        ),
+      ],
+    );
+  }
+}
