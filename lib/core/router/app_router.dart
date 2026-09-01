@@ -18,6 +18,7 @@ import '../../features/admin/screens/admin_home_screen.dart';
 import '../../features/admin/screens/admin_review_screen.dart';
 import '../../features/admin/screens/admin_students_screen.dart';
 import '../../features/admin/screens/admin_announcements_screen.dart';
+import '../../features/admin/screens/admin_mcq_sprint_screen.dart';
 
 CustomTransitionPage<void> _buildSmoothPage({
   required LocalKey key,
@@ -158,6 +159,10 @@ class AppRouter {
           GoRoute(
             path: '/admin',
             builder: (_, __) => const AdminHomeScreen(),
+          ),
+          GoRoute(
+            path: '/admin/sprints',
+            builder: (_, __) => const AdminMcqSprintScreen(),
           ),
           GoRoute(
             path: '/admin/review/:id',
