@@ -29,6 +29,7 @@ class UserModel {
     required this.createdAt,
   });
 
+  String get id => uid;
   bool get isAdmin => role == UserRole.admin;
   bool get isStudent => role == UserRole.student;
 

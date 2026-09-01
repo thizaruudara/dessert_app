@@ -63,8 +63,8 @@ class PaperSessionService {
 
       if (!paperSnap.exists) throw Exception('Paper session does not exist');
       final paperData = paperSnap.data() as Map<String, dynamic>;
-
-      final previousSlot = regSnap.exists ? regSnap.data()?['selectedSlot'] : null;
+      final regData = regSnap.data() as Map<String, dynamic>?;
+      final previousSlot = regSnap.exists && regData != null ? regData['selectedSlot'] as String? : null;
 
       // Update slot counts on paper_sessions
       if (previousSlot != null && previousSlot != slotId) {

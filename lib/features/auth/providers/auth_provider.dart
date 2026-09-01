@@ -22,6 +22,7 @@ class AuthProvider extends ChangeNotifier {
   String? _currentExamYear;
 
   UserModel? get user => _user;
+  UserModel? get userModel => _user;
   bool get loading => _loading;
   String? get error => _error;
   bool get isLoggedIn => _user != null;
