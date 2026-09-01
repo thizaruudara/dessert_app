@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -100,16 +101,28 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
     });
   }
 
-  void _sendHeartbeat(bool isActive) {
+  Future<void> _sendHeartbeat(bool isActive) async {
     final user = context.read<AuthProvider>().userModel;
-    if (user != null) {
-      _paperService.updateCameraHeartbeat(
-        paperId: widget.paperId,
-        studentId: user.id,
-        isCameraActive: isActive,
-        status: 'in_exam',
-      );
+    if (user == null) return;
+
+    String? snapshotBase64;
+    if (isActive && _cameraController != null && _cameraController!.value.isInitialized) {
+      try {
+        final image = await _cameraController!.takePicture();
+        final bytes = await image.readAsBytes();
+        snapshotBase64 = base64Encode(bytes);
+      } catch (e) {
+        debugPrint('Snapshot capture error: $e');
+      }
     }
+
+    await _paperService.updateCameraHeartbeat(
+      paperId: widget.paperId,
+      studentId: user.id,
+      isCameraActive: isActive,
+      cameraSnapshotUrl: snapshotBase64,
+      status: 'in_exam',
+    );
   }
 
   void _listenForProctorAlerts() {

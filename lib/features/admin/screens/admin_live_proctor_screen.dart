@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -207,7 +208,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Camera Preview Area / Placeholder
+          // Camera Preview Area / Live Image Stream
           Expanded(
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
@@ -216,46 +217,31 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isSubmitted
-                                ? Icons.task_alt
-                                : isLive
-                                    ? Icons.videocam
-                                    : Icons.videocam_off,
-                            size: 32,
-                            color: isSubmitted
-                                ? const Color(0xFF38BDF8)
-                                : isLive
-                                    ? const Color(0xFF22C55E)
-                                    : const Color(0xFFEF4444),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            isSubmitted
-                                ? 'Paper Submitted'
-                                : isLive
-                                    ? 'Proctor Stream Active'
-                                    : 'Camera Offline',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: isLive ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
+                      Builder(
+                        builder: (_) {
+                          try {
+                            final raw = reg.cameraSnapshotUrl!;
+                            if (raw.startsWith('http')) {
+                              return Image.network(raw, fit: BoxFit.cover);
+                            } else {
+                              final bytes = base64Decode(raw.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), ''));
+                              return Image.memory(bytes, fit: BoxFit.cover);
+                            }
+                          } catch (_) {
+                            return _buildCameraPlaceholder(isSubmitted, isLive);
+                          }
+                        },
+                      )
+                    else
+                      _buildCameraPlaceholder(isSubmitted, isLive),
                     Positioned(
                       top: 6,
                       left: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isLive ? const Color(0xFF22C55E).withOpacity(0.2) : const Color(0xFFEF4444).withOpacity(0.2),
+                          color: isLive ? const Color(0xFF22C55E).withOpacity(0.8) : const Color(0xFFEF4444).withOpacity(0.8),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(color: isLive ? const Color(0xFF22C55E) : const Color(0xFFEF4444)),
                         ),
@@ -264,7 +250,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                           style: GoogleFonts.poppins(
                             fontSize: 8,
                             fontWeight: FontWeight.bold,
-                            color: isLive ? const Color(0xFF4ADE80) : const Color(0xFFEF4444),
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -311,6 +297,42 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraPlaceholder(bool isSubmitted, bool isLive) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isSubmitted
+                ? Icons.task_alt
+                : isLive
+                    ? Icons.videocam
+                    : Icons.videocam_off,
+            size: 32,
+            color: isSubmitted
+                ? const Color(0xFF38BDF8)
+                : isLive
+                    ? const Color(0xFF22C55E)
+                    : const Color(0xFFEF4444),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isSubmitted
+                ? 'Paper Submitted'
+                : isLive
+                    ? 'Proctor Stream Active'
+                    : 'Camera Offline',
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: isLive ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8),
             ),
           ),
         ],
