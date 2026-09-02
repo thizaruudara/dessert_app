@@ -34,13 +34,12 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     });
   }
 
-  String _selectedFilter = 'All';
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final user = context.read<AuthProvider>().userModel;
     if (_sessionsStream == null) {
-      _sessionsStream = _paperService.streamSessions();
+      _sessionsStream = _paperService.streamSessions(examYear: user?.examYear);
     }
   }
 
@@ -83,7 +82,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                   ),
                 ),
                 Text(
-                  'සජීවී විභාග සහ අධීක්ෂණ සැසි',
+                  user?.examYear != null ? '${user!.examYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි' : 'සජීවී විභාග සහ අධීක්ෂණ සැසි',
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     color: const Color(0xFF94A3B8),
@@ -94,83 +93,26 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // Filter Chips Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: const Color(0xFF0F172A),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: ['All', '2026 A/L', '2025 A/L', '2024 A/L', 'Other'].map((f) {
-                  final isSel = _selectedFilter == f;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: InkWell(
-                      onTap: () => setState(() => _selectedFilter = f),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isSel ? const Color(0xFF6366F1) : const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSel ? const Color(0xFF818CF8) : const Color(0xFF334155),
-                          ),
-                        ),
-                        child: Text(
-                          f == 'All' ? 'සියලුම Papers (All)' : f,
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                            color: isSel ? Colors.white : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
+      body: StreamBuilder<List<PaperSession>>(
+        stream: _sessionsStream ?? _paperService.streamSessions(examYear: user?.examYear),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+          }
 
-          // Main Session Stream
-          Expanded(
-            child: StreamBuilder<List<PaperSession>>(
-              stream: _sessionsStream ?? _paperService.streamSessions(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
-                }
+          final sessions = snapshot.data ?? [];
+          if (sessions.isEmpty) {
+            return _buildEmptyState();
+          }
 
-                var sessions = snapshot.data ?? [];
-
-                // Apply UI filter if not 'All'
-                if (_selectedFilter != 'All') {
-                  final norm = _selectedFilter.replaceAll(RegExp(r'\D'), '');
-                  sessions = sessions.where((s) {
-                    if (s.examYear.toLowerCase() == 'all') return true;
-                    final sNorm = s.examYear.replaceAll(RegExp(r'\D'), '');
-                    return norm.isEmpty || sNorm.isEmpty || norm == sNorm;
-                  }).toList();
-                }
-
-                if (sessions.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: sessions.length,
-                  itemBuilder: (context, index) {
-                    return _buildPaperSessionCard(sessions[index], user?.id ?? '');
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: sessions.length,
+            itemBuilder: (context, index) {
+              return _buildPaperSessionCard(sessions[index], user?.id ?? '');
+            },
+          );
+        },
       ),
     );
   }

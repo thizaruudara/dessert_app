@@ -46,14 +46,8 @@ class PaperSessionService {
     return _firestore.collection('paper_sessions').snapshots().map((snapshot) {
       final list = snapshot.docs.map((doc) => PaperSession.fromFirestore(doc)).toList();
       list.sort((a, b) => b.date.compareTo(a.date));
-      if (examYear != null && examYear.trim().isNotEmpty && examYear != 'All') {
-        final norm = examYear.replaceAll(RegExp(r'\D'), '');
-        if (norm.isEmpty) return list;
-        return list.where((p) {
-          if (p.examYear.toLowerCase() == 'all') return true;
-          final pNorm = p.examYear.replaceAll(RegExp(r'\D'), '');
-          return pNorm.isEmpty || norm == pNorm || p.examYear.toLowerCase().contains(norm);
-        }).toList();
+      if (examYear != null && examYear.trim().isNotEmpty && examYear != 'All' && examYear != 'All Batches') {
+        return list.where((p) => p.examYear == examYear || p.examYear == 'All Batches' || p.examYear == 'All').toList();
       }
       return list;
     });
