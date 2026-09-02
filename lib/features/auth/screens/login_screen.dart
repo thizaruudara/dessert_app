@@ -35,13 +35,13 @@ class _LoginScreenState extends State<LoginScreen> {
   static const String _countryCode = '+94';
   int _selectedTabIndex = 0; // 0 = Login, 1 = Register
 
-  final List<String> _examYears = ['2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', 'Other'];
+  final List<String> _examYears = ['2027 A/L', '2028 A/L', '2029 A/L'];
   late String _selectedExamYear;
 
   @override
   void initState() {
     super.initState();
-    _selectedExamYear = _examYears[1]; // Default: 2025 A/L
+    _selectedExamYear = _examYears[0]; // Default: 2027 A/L
   }
 
   @override

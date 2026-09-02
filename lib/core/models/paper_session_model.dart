@@ -93,7 +93,7 @@ class PaperSession {
       id: doc.id,
       title: data['title'] ?? 'A/L Examination Paper',
       subject: data['subject'] ?? 'Combined Mathematics',
-      examYear: data['examYear'] ?? '2026 A/L',
+      examYear: data['examYear'] ?? '2027 A/L',
       date: data['date'] ?? now.toIso8601String().split('T')[0],
       durationMinutes: data['durationMinutes'] ?? 180,
       pdfUrl: data['pdfUrl'],

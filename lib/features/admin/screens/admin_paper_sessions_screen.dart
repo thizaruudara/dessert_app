@@ -341,12 +341,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       'General / Other',
     ];
 
-    String selectedExamYear = '2026 A/L';
+    String selectedExamYear = '2027 A/L';
     final List<String> examYearOptions = [
-      '2026 A/L',
-      '2025 A/L',
       '2027 A/L',
-      '2024 A/L',
+      '2028 A/L',
+      '2029 A/L',
       'All Batches',
     ];
 

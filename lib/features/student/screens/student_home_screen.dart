@@ -74,7 +74,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     final user = auth.user;
 
     final displayName = user?.name.isNotEmpty == true ? user!.name : 'Scholar';
-    final examYear = user?.examYear ?? '2025 A/L';
+    final examYear = user?.examYear ?? '2027 A/L';
     final totalCredits = user?.credits ?? credits.totalCredits;
     final approvedCount = desserts.desserts.where((d) => d.isApproved).length;
     final pendingCount = desserts.pendingDesserts.length;

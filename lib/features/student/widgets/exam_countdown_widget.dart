@@ -7,7 +7,7 @@ class ExamCountdownWidget extends StatefulWidget {
 
   const ExamCountdownWidget({
     super.key,
-    this.examYear = '2025 A/L',
+    this.examYear = '2027 A/L',
   });
 
   @override
@@ -34,12 +34,8 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
   }
 
   void _initTargetDate() {
-    int year = 2025;
-    if (widget.examYear.contains('2026')) {
-      year = 2026;
-    } else if (widget.examYear.contains('2027')) {
-      year = 2027;
-    }
+    final match = RegExp(r'\d{4}').firstMatch(widget.examYear);
+    int year = match != null ? int.parse(match.group(0)!) : 2027;
     _targetDate = DateTime(year, 11, 25, 8, 30);
   }
 

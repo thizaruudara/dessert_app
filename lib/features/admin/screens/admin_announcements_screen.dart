@@ -22,18 +22,17 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   String _priority = 'normal'; // 'normal', 'urgent', 'homework', 'tip'
   String _targetType = 'all'; // 'all', 'year', 'single'
-  String _selectedExamYear = '2026 A/L';
+  String _selectedExamYear = '2027 A/L';
   String? _selectedStudentPhone;
   String? _selectedStudentName;
 
   bool _isSending = false;
 
   final List<String> _examYears = [
-    '2025 A/L',
-    '2026 A/L',
     '2027 A/L',
     '2028 A/L',
-    'O/L',
+    '2029 A/L',
+    'All Batches',
   ];
 
   static const String _botToken = '8837234143:AAEFLrgpMuTa4bxwIxl-SDqAuOy4P_o7vtI';
