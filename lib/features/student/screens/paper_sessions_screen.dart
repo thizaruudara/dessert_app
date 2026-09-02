@@ -20,6 +20,8 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   final PaperSessionService _paperService = PaperSessionService();
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
+  Stream<List<PaperSession>>? _sessionsStream;
+  String? _lastExamYear;
 
   @override
   void initState() {
@@ -31,6 +33,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         });
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final user = context.read<AuthProvider>().userModel;
+    if (_sessionsStream == null || _lastExamYear != user?.examYear) {
+      _lastExamYear = user?.examYear;
+      _sessionsStream = _paperService.streamSessions(examYear: user?.examYear);
+    }
   }
 
   @override
@@ -84,9 +96,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         ),
       ),
       body: StreamBuilder<List<PaperSession>>(
-        stream: _paperService.streamSessions(examYear: user?.examYear),
+        stream: _sessionsStream ?? _paperService.streamSessions(examYear: user?.examYear),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
           }
 

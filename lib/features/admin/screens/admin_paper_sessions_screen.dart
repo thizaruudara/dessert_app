@@ -15,6 +15,7 @@ class AdminPaperSessionsScreen extends StatefulWidget {
 
 class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   final PaperSessionService _paperService = PaperSessionService();
+  late final Stream<List<PaperSession>> _sessionsStream = _paperService.streamSessions();
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +59,9 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
         ],
       ),
       body: StreamBuilder<List<PaperSession>>(
-        stream: _paperService.streamSessions(),
+        stream: _sessionsStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
           }
 
