@@ -157,7 +157,10 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
               child: students.isEmpty
                   ? Center(
                       child: Text(
-                        'මෙම සැසිය සඳහා තවම ශිෂ්‍යයින් ලියාපදිංචි වී නොමැත.',
+                        slotId == 'slot2' && session?.slot2 == null
+                            ? 'මෙම Paper එක සඳහා 2nd Slot එකක් සකසා නොමැත.\n(Single Slot Session)'
+                            : 'මෙම සැසිය සඳහා තවම ශිෂ්‍යයින් ලියාපදිංචි වී නොමැත.',
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF94A3B8)),
                       ),
                     )

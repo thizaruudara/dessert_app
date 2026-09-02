@@ -199,6 +199,7 @@ class PaperSessionService {
     required String message,
     String type = 'info',
   }) async {
+    await _ensureAuth();
     await _firestore.collection('proctor_alerts').add({
       'paperId': paperId,
       'studentId': 'ALL',
@@ -231,6 +232,7 @@ class PaperSessionService {
 
   // ── 12. Mark Alert as Read ────────────────────────────────────────────────
   Future<void> markAlertRead(String alertId) async {
+    await _ensureAuth();
     await _firestore.collection('proctor_alerts').doc(alertId).update({'isRead': true});
   }
 }
