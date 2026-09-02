@@ -27,6 +27,7 @@ class LiveExamRoomScreen extends StatefulWidget {
 
 class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   final PaperSessionService _paperService = PaperSessionService();
+  late final Stream<PaperSession?> _sessionStream = _paperService.streamPaperSession(widget.paperId);
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   bool _isCameraPermissionGranted = false;
@@ -247,7 +248,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<PaperSession?>(
-      stream: _paperService.streamPaperSession(widget.paperId),
+      stream: _sessionStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(

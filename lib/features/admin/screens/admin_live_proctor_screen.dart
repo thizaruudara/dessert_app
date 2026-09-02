@@ -20,6 +20,9 @@ class AdminLiveProctorScreen extends StatefulWidget {
 class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with SingleTickerProviderStateMixin {
   final PaperSessionService _paperService = PaperSessionService();
   late TabController _tabController;
+  late final Stream<PaperSession?> _sessionStream = _paperService.streamPaperSession(widget.paperId);
+  late final Stream<List<PaperRegistration>> _slot1Stream = _paperService.streamSlotRegistrations(widget.paperId, 'slot1');
+  late final Stream<List<PaperRegistration>> _slot2Stream = _paperService.streamSlotRegistrations(widget.paperId, 'slot2');
 
   @override
   void initState() {
@@ -36,7 +39,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<PaperSession?>(
-      stream: _paperService.streamPaperSession(widget.paperId),
+      stream: _sessionStream,
       builder: (context, sessionSnap) {
         final session = sessionSnap.data;
 
@@ -122,9 +125,9 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 
   Widget _buildSlotProctorGrid(String slotId) {
     return StreamBuilder<List<PaperRegistration>>(
-      stream: _paperService.streamSlotRegistrations(widget.paperId, slotId),
+      stream: slotId == 'slot1' ? _slot1Stream : _slot2Stream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
         }
 

@@ -31,9 +31,14 @@ class PaperSessionService {
 
   // ── 3. Stream Upcoming & Active Sessions ──────────────────────────────────
   Stream<List<PaperSession>> streamSessions({String? examYear}) {
-    Query query = _firestore.collection('paper_sessions').orderBy('date', descending: true);
+    Query query = _firestore.collection('paper_sessions');
+    if (examYear != null && examYear.trim().isNotEmpty) {
+      query = query.where('examYear', isEqualTo: examYear.trim());
+    }
     return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => PaperSession.fromFirestore(doc)).toList();
+      final list = snapshot.docs.map((doc) => PaperSession.fromFirestore(doc)).toList();
+      list.sort((a, b) => b.date.compareTo(a.date));
+      return list;
     });
   }
 
@@ -193,13 +198,14 @@ class PaperSessionService {
     return _firestore
         .collection('proctor_alerts')
         .where('paperId', isEqualTo: paperId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final list = snapshot.docs
           .map((doc) => ProctorAlert.fromFirestore(doc))
           .where((alert) => alert.studentId == studentId || alert.studentId == 'ALL')
           .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
     });
   }
 
