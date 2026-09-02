@@ -115,8 +115,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
           body: TabBarView(
             controller: _tabController,
             children: [
-              _buildSlotProctorGrid('slot1'),
-              _buildSlotProctorGrid('slot2'),
+              _buildSlotProctorGrid('slot1', session),
+              _buildSlotProctorGrid('slot2', session),
             ],
           ),
         );
@@ -124,7 +124,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     );
   }
 
-  Widget _buildSlotProctorGrid(String slotId) {
+  Widget _buildSlotProctorGrid(String slotId, PaperSession? session) {
     return StreamBuilder<List<PaperRegistration>>(
       stream: slotId == 'slot1' ? _slot1Stream : _slot2Stream,
       builder: (context, snapshot) {
