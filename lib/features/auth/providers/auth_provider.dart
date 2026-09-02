@@ -36,6 +36,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _initAuth() async {
+    if (_auth.currentUser == null) {
+      try {
+        await _auth.signInAnonymously();
+      } catch (e) {
+        debugPrint('Anonymous auth on init: $e');
+      }
+    }
+
     // 1. Try loading saved session from SharedPreferences
     await _loadPersistedSession();
 
@@ -45,6 +53,12 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _loadPersistedSession() async {
     try {
+      if (_auth.currentUser == null) {
+        try {
+          await _auth.signInAnonymously();
+        } catch (_) {}
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final savedUid = prefs.getString('saved_uid');
       final savedPhone = prefs.getString('saved_phone');

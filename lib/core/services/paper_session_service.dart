@@ -1,11 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/paper_session_model.dart';
 
 class PaperSessionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  Future<void> _ensureAuth() async {
+    if (_auth.currentUser == null) {
+      try {
+        await _auth.signInAnonymously();
+      } catch (_) {}
+    }
+  }
 
   // ── 1. Create or Update Paper Session ──────────────────────────────────────
   Future<String> createOrUpdatePaperSession(PaperSession session) async {
+    await _ensureAuth();
     final docRef = session.id.isEmpty
         ? _firestore.collection('paper_sessions').doc()
         : _firestore.collection('paper_sessions').doc(session.id);
@@ -20,6 +31,7 @@ class PaperSessionService {
     PaperSlot? slot1,
     PaperSlot? slot2,
   }) async {
+    await _ensureAuth();
     final Map<String, dynamic> updates = {};
     if (slot1 != null) updates['slot1'] = slot1.toMap();
     if (slot2 != null) updates['slot2'] = slot2.toMap();
@@ -58,6 +70,7 @@ class PaperSessionService {
     required String studentPhone,
     required String slotId, // 'slot1' or 'slot2'
   }) async {
+    await _ensureAuth();
     final regDocId = '${paperId}_$studentId';
     final regRef = _firestore.collection('paper_registrations').doc(regDocId);
 
@@ -122,6 +135,7 @@ class PaperSessionService {
     String? cameraSnapshotUrl,
     String? status,
   }) async {
+    await _ensureAuth();
     final regDocId = '${paperId}_$studentId';
     final Map<String, dynamic> updates = {
       'isCameraActive': isCameraActive,
@@ -161,6 +175,7 @@ class PaperSessionService {
     required String message,
     String type = 'warning',
   }) async {
+    await _ensureAuth();
     await _firestore.collection('proctor_alerts').add({
       'paperId': paperId,
       'studentId': studentId,

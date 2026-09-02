@@ -221,8 +221,6 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               ],
             ),
           ),
-
-          // Two Slots Status Overview
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -245,7 +243,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                 const Icon(Icons.wb_sunny_outlined, size: 15, color: Color(0xFFF59E0B)),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'Slot 1 (Morning)',
+                                  session.slot2 != null ? 'Slot 1 (Morning)' : 'Exam Session Time',
                                   style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
                                 ),
                               ],
@@ -264,47 +262,47 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.nights_stay_outlined, size: 15, color: Color(0xFF818CF8)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Slot 2 (Evening)',
-                                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${timeFormat.format(session.slot2.startTime)} - ${timeFormat.format(session.slot2.endTime)}',
-                              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '👥 ${session.slot2.registeredCount} Registered',
-                              style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF818CF8)),
-                            ),
-                          ],
+                    if (session.slot2 != null) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.nights_stay_outlined, size: 15, color: Color(0xFF818CF8)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Slot 2 (Evening)',
+                                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${timeFormat.format(session.slot2!.startTime)} - ${timeFormat.format(session.slot2!.endTime)}',
+                                style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '👥 ${session.slot2!.registeredCount} Registered',
+                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF818CF8)),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Button: Open Live Camera Proctoring Monitor
                 SizedBox(
                   width: double.infinity,
                   height: 46,
@@ -338,6 +336,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     final durationCtrl = TextEditingController(text: '180');
     final pdfUrlCtrl = TextEditingController();
 
+    int slotCount = 1; // Default: 1 Slot
     DateTime selectedDate = DateTime.now();
     TimeOfDay slot1Start = const TimeOfDay(hour: 8, minute: 0);
     TimeOfDay slot1End = const TimeOfDay(hour: 11, minute: 15);
@@ -385,8 +384,6 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 const SizedBox(height: 10),
                 _buildTextField('PDF URL (Optional)', pdfUrlCtrl, 'https://.../paper.pdf'),
                 const SizedBox(height: 14),
-
-                // Exam Date Picker
                 Text(
                   '📅 Examination Date:',
                   style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
@@ -418,9 +415,71 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-
                 Text(
-                  '⏰ Slot 1 (Morning Session Times):',
+                  '⚡ Session Format (සැසි ගණන):',
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFA5B4FC)),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setDlgState(() => slotCount = 1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: slotCount == 1 ? const Color(0xFF6366F1).withOpacity(0.3) : const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: slotCount == 1 ? const Color(0xFF6366F1) : const Color(0xFF334155),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '1 Session Slot',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: slotCount == 1 ? FontWeight.bold : FontWeight.w500,
+                                color: slotCount == 1 ? Colors.white : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setDlgState(() => slotCount = 2),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: slotCount == 2 ? const Color(0xFF6366F1).withOpacity(0.3) : const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: slotCount == 2 ? const Color(0xFF6366F1) : const Color(0xFF334155),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '2 Session Slots',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: slotCount == 2 ? FontWeight.bold : FontWeight.w500,
+                                color: slotCount == 2 ? Colors.white : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  slotCount == 1 ? '⏰ Examination Time (විභාග වේලාව):' : '⏰ Slot 1 (Morning Session Times):',
                   style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
                 ),
                 const SizedBox(height: 4),
@@ -451,39 +510,41 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  '🌙 Slot 2 (Evening Session Times):',
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSubmitting
-                            ? null
-                            : () async {
-                                final t = await showTimePicker(context: context, initialTime: slot2Start);
-                                if (t != null) setDlgState(() => slot2Start = t);
-                              },
-                        child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                if (slotCount == 2) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '🌙 Slot 2 (Evening Session Times):',
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  final t = await showTimePicker(context: context, initialTime: slot2Start);
+                                  if (t != null) setDlgState(() => slot2Start = t);
+                                },
+                          child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSubmitting
-                            ? null
-                            : () async {
-                                final t = await showTimePicker(context: context, initialTime: slot2End);
-                                if (t != null) setDlgState(() => slot2End = t);
-                              },
-                        child: Text('End: ${slot2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  final t = await showTimePicker(context: context, initialTime: slot2End);
+                                  if (t != null) setDlgState(() => slot2End = t);
+                                },
+                          child: Text('End: ${slot2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -515,8 +576,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         final dateStr = selectedDate.toIso8601String().split('T')[0];
                         final slot1StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1Start.hour, slot1Start.minute);
                         final slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1End.hour, slot1End.minute);
-                        final slot2StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2Start.hour, slot2Start.minute);
-                        final slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
+
+                        PaperSlot? slot2;
+                        if (slotCount == 2) {
+                          final slot2StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2Start.hour, slot2Start.minute);
+                          final slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
+                          slot2 = PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt);
+                        }
 
                         final newSession = PaperSession(
                           id: '',
@@ -526,8 +592,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           date: dateStr,
                           durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
                           pdfUrl: pdfUrlCtrl.text.trim().isEmpty ? null : pdfUrlCtrl.text.trim(),
-                          slot1: PaperSlot(id: 'slot1', name: 'Morning Session (උදෑසන සැසිය)', startTime: slot1StartDt, endTime: slot1EndDt),
-                          slot2: PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt),
+                          slot1: PaperSlot(
+                            id: 'slot1',
+                            name: slotCount == 2 ? 'Morning Session (උදෑසන සැසිය)' : 'Exam Session (විභාග සැසිය)',
+                            startTime: slot1StartDt,
+                            endTime: slot1EndDt,
+                          ),
+                          slot2: slot2,
                           createdAt: DateTime.now(),
                         );
 
@@ -548,7 +619,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('❌ Failed to create paper: $e'),
+                              content: Text('❌ Failed to create paper: ${e.toString()}'),
                               backgroundColor: const Color(0xFFEF4444),
                             ),
                           );
@@ -559,9 +630,12 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : Text('Create Paper', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                  : Text(
+                      'Create Paper',
+                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
             ),
           ],
         ),
@@ -572,8 +646,8 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   void _showEditTimesDialog(PaperSession session) {
     TimeOfDay s1Start = TimeOfDay.fromDateTime(session.slot1.startTime);
     TimeOfDay s1End = TimeOfDay.fromDateTime(session.slot1.endTime);
-    TimeOfDay s2Start = TimeOfDay.fromDateTime(session.slot2.startTime);
-    TimeOfDay s2End = TimeOfDay.fromDateTime(session.slot2.endTime);
+    TimeOfDay s2Start = session.slot2 != null ? TimeOfDay.fromDateTime(session.slot2!.startTime) : const TimeOfDay(hour: 14, minute: 0);
+    TimeOfDay s2End = session.slot2 != null ? TimeOfDay.fromDateTime(session.slot2!.endTime) : const TimeOfDay(hour: 17, minute: 15);
 
     showDialog(
       context: context,
@@ -590,7 +664,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Slot 1 (Morning Session):',
+                session.slot2 != null ? 'Slot 1 (Morning Session):' : 'Exam Session Times:',
                 style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
               ),
               const SizedBox(height: 6),
@@ -617,35 +691,37 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                'Slot 2 (Evening Session):',
-                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        final t = await showTimePicker(context: context, initialTime: s2Start);
-                        if (t != null) setDlgState(() => s2Start = t);
-                      },
-                      child: Text('Start: ${s2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+              if (session.slot2 != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  'Slot 2 (Evening Session):',
+                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final t = await showTimePicker(context: context, initialTime: s2Start);
+                          if (t != null) setDlgState(() => s2Start = t);
+                        },
+                        child: Text('Start: ${s2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        final t = await showTimePicker(context: context, initialTime: s2End);
-                        if (t != null) setDlgState(() => s2End = t);
-                      },
-                      child: Text('End: ${s2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final t = await showTimePicker(context: context, initialTime: s2End);
+                          if (t != null) setDlgState(() => s2End = t);
+                        },
+                        child: Text('End: ${s2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
           actions: [
@@ -667,14 +743,17 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     registeredCount: session.slot1.registeredCount,
                   );
 
-                  final updatedSlot2 = PaperSlot(
-                    id: 'slot2',
-                    name: session.slot2.name,
-                    startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute),
-                    endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute),
-                    maxCapacity: session.slot2.maxCapacity,
-                    registeredCount: session.slot2.registeredCount,
-                  );
+                  PaperSlot? updatedSlot2;
+                  if (session.slot2 != null) {
+                    updatedSlot2 = PaperSlot(
+                      id: 'slot2',
+                      name: session.slot2!.name,
+                      startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute),
+                      endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute),
+                      maxCapacity: session.slot2!.maxCapacity,
+                      registeredCount: session.slot2!.registeredCount,
+                    );
+                  }
 
                   await _paperService.updateSlotTimes(session.id, slot1: updatedSlot1, slot2: updatedSlot2);
                   if (ctx.mounted) Navigator.of(ctx).pop();

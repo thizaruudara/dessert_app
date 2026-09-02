@@ -167,12 +167,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     return StreamBuilder<PaperRegistration?>(
       stream: _paperService.streamStudentRegistration(session.id, studentId),
       builder: (context, regSnap) {
-        final registration = regSnap.data;
-        final selectedSlotId = registration?.selectedSlot;
-        final selectedSlot = selectedSlotId == 'slot2' ? session.slot2 : session.slot1;
+        final selectedSlotId = registration?.selectedSlot ?? (session.slot2 == null ? 'slot1' : null);
+        final selectedSlot = (selectedSlotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
         // Calculate countdown to the selected slot or slot 1 fallback
-        final targetSlot = selectedSlotId != null ? selectedSlot : session.slot1;
+        final targetSlot = selectedSlot;
         final isLive = targetSlot.isLive(_now);
         final isUpcoming = targetSlot.isUpcoming(_now);
         final isEnded = targetSlot.isEnded(_now);
@@ -314,14 +313,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 ),
               ),
 
-              // Two Session Slots Selector
+              // Session Slots Selector
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:',
+                      session.slot2 != null
+                          ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:'
+                          : 'විභාග සැසිය (Exam Session):',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -329,29 +330,38 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSlotCard(
-                            slot: session.slot1,
-                            slotId: 'slot1',
-                            isSelected: selectedSlotId == 'slot1',
-                            paperId: session.id,
-                            timeFormat: timeFormat,
+                    if (session.slot2 != null)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSlotCard(
+                              slot: session.slot1,
+                              slotId: 'slot1',
+                              isSelected: selectedSlotId == 'slot1',
+                              paperId: session.id,
+                              timeFormat: timeFormat,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildSlotCard(
-                            slot: session.slot2,
-                            slotId: 'slot2',
-                            isSelected: selectedSlotId == 'slot2',
-                            paperId: session.id,
-                            timeFormat: timeFormat,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSlotCard(
+                              slot: session.slot2!,
+                              slotId: 'slot2',
+                              isSelected: selectedSlotId == 'slot2',
+                              paperId: session.id,
+                              timeFormat: timeFormat,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      )
+                    else
+                      _buildSlotCard(
+                        slot: session.slot1,
+                        slotId: 'slot1',
+                        isSelected: selectedSlotId == 'slot1',
+                        paperId: session.id,
+                        timeFormat: timeFormat,
+                      ),
 
                     const SizedBox(height: 16),
 

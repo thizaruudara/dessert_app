@@ -61,7 +61,7 @@ class PaperSession {
   final String? paperImageUrl;
   final String status; // 'upcoming', 'active', 'ended'
   final PaperSlot slot1;
-  final PaperSlot slot2;
+  final PaperSlot? slot2;
   final DateTime createdAt;
 
   PaperSession({
@@ -75,7 +75,7 @@ class PaperSession {
     this.paperImageUrl,
     this.status = 'upcoming',
     required this.slot1,
-    required this.slot2,
+    this.slot2,
     required this.createdAt,
   });
 
@@ -100,7 +100,7 @@ class PaperSession {
       paperImageUrl: data['paperImageUrl'],
       status: data['status'] ?? 'upcoming',
       slot1: PaperSlot.fromMap('slot1', data['slot1'] as Map<String, dynamic>? ?? {}),
-      slot2: PaperSlot.fromMap('slot2', data['slot2'] as Map<String, dynamic>? ?? {}),
+      slot2: data['slot2'] != null ? PaperSlot.fromMap('slot2', data['slot2'] as Map<String, dynamic>) : null,
       createdAt: parseTime(data['createdAt']),
     );
   }
@@ -114,9 +114,11 @@ class PaperSession {
       'durationMinutes': durationMinutes,
       'status': status,
       'slot1': slot1.toMap(),
-      'slot2': slot2.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
     };
+    if (slot2 != null) {
+      map['slot2'] = slot2!.toMap();
+    }
     if (pdfUrl != null && pdfUrl!.trim().isNotEmpty) {
       map['pdfUrl'] = pdfUrl!.trim();
     }
