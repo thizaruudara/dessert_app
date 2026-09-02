@@ -229,4 +229,24 @@ class PaperSessionService {
     await _ensureAuth();
     await _firestore.collection('proctor_alerts').doc(alertId).update({'isRead': true});
   }
+
+  // ── 13. Delete Paper Session & Associated Registrations / Alerts ───────────
+  Future<void> deletePaperSession(String paperId) async {
+    await _ensureAuth();
+    await _firestore.collection('paper_sessions').doc(paperId).delete();
+
+    try {
+      final regs = await _firestore.collection('paper_registrations').where('paperId', isEqualTo: paperId).get();
+      for (final doc in regs.docs) {
+        await doc.reference.delete();
+      }
+    } catch (_) {}
+
+    try {
+      final alerts = await _firestore.collection('proctor_alerts').where('paperId', isEqualTo: paperId).get();
+      for (final doc in alerts.docs) {
+        await doc.reference.delete();
+      }
+    } catch (_) {}
+  }
 }

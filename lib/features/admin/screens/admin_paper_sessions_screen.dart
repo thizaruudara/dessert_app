@@ -193,6 +193,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       tooltip: 'Change Session Times (Slot 1 / Slot 2)',
                       onPressed: () => _showEditTimesDialog(session),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFEF4444)),
+                      tooltip: 'Delete Paper Session (සැසිය මකා දැමීම)',
+                      onPressed: () => _showDeleteConfirmation(session),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -857,6 +862,111 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(PaperSession session) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 22),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Delete Session?',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete this paper session?',
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.title,
+                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${session.subject} • ${session.examYear}',
+                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'මෙම සැසිය සහ ඊට අදාළ සියලුම ශිෂ්‍ය ලියාපදිංචි දත්ත මකා දැමෙනු ඇත.',
+              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFF87171)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await _paperService.deletePaperSession(session.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🗑️ Paper session deleted successfully.'),
+                      backgroundColor: Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting paper: $e'),
+                      backgroundColor: const Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text(
+              'Delete Paper',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
