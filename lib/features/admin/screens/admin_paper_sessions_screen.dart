@@ -331,8 +331,25 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
 
   void _showCreatePaperDialog() {
     final titleCtrl = TextEditingController();
-    final subjectCtrl = TextEditingController(text: 'Combined Mathematics');
-    final examYearCtrl = TextEditingController(text: '2026 A/L');
+    String selectedSubject = 'Combined Mathematics';
+    final List<String> subjectOptions = [
+      'Combined Mathematics',
+      'Physics',
+      'Chemistry',
+      'Biology',
+      'ICT',
+      'General / Other',
+    ];
+
+    String selectedExamYear = '2026 A/L';
+    final List<String> examYearOptions = [
+      '2026 A/L',
+      '2025 A/L',
+      '2027 A/L',
+      '2024 A/L',
+      'All Batches',
+    ];
+
     final durationCtrl = TextEditingController(text: '180');
     final pdfUrlCtrl = TextEditingController();
 
@@ -372,11 +389,78 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ),
                 ],
                 const SizedBox(height: 10),
-                _buildTextField('Subject', subjectCtrl, 'Combined Maths / Physics / etc.'),
+                Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: selectedSubject,
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF1E293B),
+                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8)),
+                      items: subjectOptions.map((sub) {
+                        return DropdownMenuItem<String>(
+                          value: sub,
+                          child: Text(
+                            sub,
+                            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: isSubmitting
+                          ? null
+                          : (val) {
+                              if (val != null) setDlgState(() => selectedSubject = val);
+                            },
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(child: _buildTextField('Exam Year', examYearCtrl, '2026 A/L')),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Exam Year', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: selectedExamYear,
+                                isExpanded: true,
+                                dropdownColor: const Color(0xFF1E293B),
+                                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8)),
+                                items: examYearOptions.map((yr) {
+                                  return DropdownMenuItem<String>(
+                                    value: yr,
+                                    child: Text(
+                                      yr,
+                                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: isSubmitting
+                                    ? null
+                                    : (val) {
+                                        if (val != null) setDlgState(() => selectedExamYear = val);
+                                      },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(child: _buildTextField('Duration (Mins)', durationCtrl, '180')),
                   ],
@@ -587,8 +671,8 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         final newSession = PaperSession(
                           id: '',
                           title: title,
-                          subject: subjectCtrl.text.trim().isEmpty ? 'Combined Mathematics' : subjectCtrl.text.trim(),
-                          examYear: examYearCtrl.text.trim().isEmpty ? '2026 A/L' : examYearCtrl.text.trim(),
+                          subject: selectedSubject,
+                          examYear: selectedExamYear,
                           date: dateStr,
                           durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
                           pdfUrl: pdfUrlCtrl.text.trim().isEmpty ? null : pdfUrlCtrl.text.trim(),
