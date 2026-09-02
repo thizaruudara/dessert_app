@@ -17,5 +17,29 @@ service cloud.firestore {
     match /otp_verifications/{phone} {
       allow read, write: if true;
     }
+
+    match /paper_sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    match /paper_registrations/{regId} {
+      allow read, write: if true;
+    }
+
+    match /proctor_alerts/{alertId} {
+      allow read, write: if true;
+    }
+
+    match /daily_sprints/{sprintId} {
+      allow read, write: if true;
+    }
+
+    match /announcements/{docId} {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
   }
 }
