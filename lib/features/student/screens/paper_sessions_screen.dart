@@ -167,6 +167,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     return StreamBuilder<PaperRegistration?>(
       stream: _paperService.streamStudentRegistration(session.id, studentId),
       builder: (context, regSnap) {
+        final registration = regSnap.data;
         final selectedSlotId = registration?.selectedSlot ?? (session.slot2 == null ? 'slot1' : null);
         final selectedSlot = (selectedSlotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 

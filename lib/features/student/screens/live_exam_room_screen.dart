@@ -258,7 +258,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         }
 
         final session = snapshot.data!;
-        final slot = widget.slotId == 'slot2' ? session.slot2 : session.slot1;
+        final slot = (widget.slotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
         Duration remaining = slot.endTime.difference(_now);
         if (remaining.isNegative) remaining = Duration.zero;
 
