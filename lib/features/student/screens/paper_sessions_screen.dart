@@ -21,7 +21,6 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
   Stream<List<PaperSession>>? _sessionsStream;
-  String? _lastExamYear;
 
   @override
   void initState() {
@@ -35,13 +34,13 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     });
   }
 
+  String _selectedFilter = 'All';
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final user = context.read<AuthProvider>().userModel;
-    if (_sessionsStream == null || _lastExamYear != user?.examYear) {
-      _lastExamYear = user?.examYear;
-      _sessionsStream = _paperService.streamSessions(examYear: user?.examYear);
+    if (_sessionsStream == null) {
+      _sessionsStream = _paperService.streamSessions();
     }
   }
 
@@ -95,26 +94,83 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           ],
         ),
       ),
-      body: StreamBuilder<List<PaperSession>>(
-        stream: _sessionsStream ?? _paperService.streamSessions(examYear: user?.examYear),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
-          }
+      body: Column(
+        children: [
+          // Filter Chips Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: const Color(0xFF0F172A),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: ['All', '2026 A/L', '2025 A/L', '2024 A/L', 'Other'].map((f) {
+                  final isSel = _selectedFilter == f;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedFilter = f),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSel ? const Color(0xFF6366F1) : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSel ? const Color(0xFF818CF8) : const Color(0xFF334155),
+                          ),
+                        ),
+                        child: Text(
+                          f == 'All' ? 'සියලුම Papers (All)' : f,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                            color: isSel ? Colors.white : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
 
-          final sessions = snapshot.data ?? [];
-          if (sessions.isEmpty) {
-            return _buildEmptyState();
-          }
+          // Main Session Stream
+          Expanded(
+            child: StreamBuilder<List<PaperSession>>(
+              stream: _sessionsStream ?? _paperService.streamSessions(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: sessions.length,
-            itemBuilder: (context, index) {
-              return _buildPaperSessionCard(sessions[index], user?.id ?? '');
-            },
-          );
-        },
+                var sessions = snapshot.data ?? [];
+
+                // Apply UI filter if not 'All'
+                if (_selectedFilter != 'All') {
+                  final norm = _selectedFilter.replaceAll(RegExp(r'\D'), '');
+                  sessions = sessions.where((s) {
+                    if (s.examYear.toLowerCase() == 'all') return true;
+                    final sNorm = s.examYear.replaceAll(RegExp(r'\D'), '');
+                    return norm.isEmpty || sNorm.isEmpty || norm == sNorm;
+                  }).toList();
+                }
+
+                if (sessions.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: sessions.length,
+                  itemBuilder: (context, index) {
+                    return _buildPaperSessionCard(sessions[index], user?.id ?? '');
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

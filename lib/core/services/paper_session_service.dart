@@ -43,13 +43,18 @@ class PaperSessionService {
 
   // ── 3. Stream Upcoming & Active Sessions ──────────────────────────────────
   Stream<List<PaperSession>> streamSessions({String? examYear}) {
-    Query query = _firestore.collection('paper_sessions');
-    if (examYear != null && examYear.trim().isNotEmpty) {
-      query = query.where('examYear', isEqualTo: examYear.trim());
-    }
-    return query.snapshots().map((snapshot) {
+    return _firestore.collection('paper_sessions').snapshots().map((snapshot) {
       final list = snapshot.docs.map((doc) => PaperSession.fromFirestore(doc)).toList();
       list.sort((a, b) => b.date.compareTo(a.date));
+      if (examYear != null && examYear.trim().isNotEmpty && examYear != 'All') {
+        final norm = examYear.replaceAll(RegExp(r'\D'), '');
+        if (norm.isEmpty) return list;
+        return list.where((p) {
+          if (p.examYear.toLowerCase() == 'all') return true;
+          final pNorm = p.examYear.replaceAll(RegExp(r'\D'), '');
+          return pNorm.isEmpty || norm == pNorm || p.examYear.toLowerCase().contains(norm);
+        }).toList();
+      }
       return list;
     });
   }
