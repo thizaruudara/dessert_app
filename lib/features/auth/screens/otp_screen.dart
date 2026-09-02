@@ -362,17 +362,40 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Future<void> _openTelegramForCode() async {
     final cleanPhone = widget.phoneNumber.replaceAll(RegExp(r'\D'), '');
-    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=otp_$cleanPhone');
-    final webUri = Uri.parse('https://t.me/edupeakbot?start=otp_$cleanPhone');
-    try {
-      if (await canLaunchUrl(appUri)) {
-        await launchUrl(appUri, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('⏳ Checking Telegram connection...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    final res = await context.read<AuthProvider>().requestTelegramOtp(widget.phoneNumber, name: widget.name);
+    final mode = res['mode'];
+
+    if (mode == 'deep_link') {
+      final deepLink = res['deepLink'] ?? 'https://t.me/edupeakbot?start=otp_$cleanPhone';
+      final appUri = Uri.parse(deepLink.replaceFirst('https://t.me/', 'tg://resolve?domain='));
+      final webUri = Uri.parse(deepLink);
+      try {
+        if (await canLaunchUrl(appUri)) {
+          await launchUrl(appUri, mode: LaunchMode.externalApplication);
+        } else if (await canLaunchUrl(webUri)) {
+          await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        }
+      } catch (_) {
+        if (await canLaunchUrl(webUri)) {
+          await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        }
       }
-    } catch (_) {
-      if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📩 Verification code sent directly to your Telegram!'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
       }
     }
   }

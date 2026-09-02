@@ -97,19 +97,42 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     await auth.prepareWhatsAppLoginOtp(phone);
 
-    // Open Telegram prefilled with deep link OTP request
-    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=otp_$cleanDigits');
-    final webUri = Uri.parse('https://t.me/edupeakbot?start=otp_$cleanDigits');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('⏳ Checking Telegram connection...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
 
-    try {
-      if (await canLaunchUrl(appUri)) {
-        await launchUrl(appUri, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    final res = await auth.requestTelegramOtp(phone);
+    final mode = res['mode'];
+
+    if (mode == 'deep_link') {
+      // First-time user only -> Open Telegram so they can tap Start once
+      final deepLink = res['deepLink'] ?? 'https://t.me/edupeakbot?start=otp_$cleanDigits';
+      final webUri = Uri.parse(deepLink);
+      final appUri = Uri.parse(deepLink.replaceFirst('https://t.me/', 'tg://resolve?domain='));
+
+      try {
+        if (await canLaunchUrl(appUri)) {
+          await launchUrl(appUri, mode: LaunchMode.externalApplication);
+        } else if (await canLaunchUrl(webUri)) {
+          await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        }
+      } catch (_) {
+        if (await canLaunchUrl(webUri)) {
+          await launchUrl(webUri, mode: LaunchMode.externalApplication);
+        }
       }
-    } catch (_) {
-      if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    } else {
+      // Returning user -> Code is already sent directly to Telegram chat in background!
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📩 Verification code sent directly to your Telegram!'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
       }
     }
 

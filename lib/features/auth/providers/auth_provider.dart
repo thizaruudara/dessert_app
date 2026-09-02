@@ -344,15 +344,46 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// ── 4. Request Telegram OTP (Direct vs 1st-time Deep Link) ────────────────
+  Future<Map<String, dynamic>> requestTelegramOtp(String phone, {String? name}) async {
+    _currentPhone = phone;
+    _currentName = name;
+    final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
+
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 8);
+      final req = await client.postUrl(Uri.parse('https://edupeak-telegram-bot.vercel.app/api/send-otp'));
+      req.headers.set('Content-Type', 'application/json');
+      req.add(utf8.encode(jsonEncode({
+        'phone': cleanDigits,
+        'name': name ?? 'Student',
+      })));
+      final res = await req.close().timeout(const Duration(seconds: 8));
+      final body = await res.transform(utf8.decoder).join();
+      client.close();
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      debugPrint('Error calling send-otp API: $e');
+      return {
+        'success': true,
+        'mode': 'deep_link',
+        'deepLink': 'https://t.me/edupeakbot?start=otp_$cleanDigits',
+      };
+    }
+  }
+
   void _triggerDirectOtpAsync(String phone, String name) {
     Future.microtask(() async {
       try {
         final client = HttpClient();
         client.connectionTimeout = const Duration(seconds: 5);
-        final req = await client.postUrl(Uri.parse('https://edupeak-webhook.onrender.com/api/send-otp'));
+        final req = await client.postUrl(Uri.parse('https://edupeak-telegram-bot.vercel.app/api/send-otp'));
         req.headers.set('Content-Type', 'application/json');
         req.add(utf8.encode(jsonEncode({
-          'phone': phone,
+          'phone': phone.replaceAll(RegExp(r'\D'), ''),
           'name': name,
         })));
         final res = await req.close().timeout(const Duration(seconds: 6));
