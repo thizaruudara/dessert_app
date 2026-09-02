@@ -261,13 +261,35 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
 
         final session = snapshot.data!;
         final slot = (widget.slotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
-        Duration remaining = slot.endTime.difference(_now);
-        if (remaining.isNegative) remaining = Duration.zero;
 
-        final hours = remaining.inHours.toString().padLeft(2, '0');
-        final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');
-        final seconds = (remaining.inSeconds % 60).toString().padLeft(2, '0');
-        final isUrgent = remaining.inMinutes < 15;
+        final bool isUpcoming = _now.isBefore(slot.startTime);
+        final bool isEnded = _now.isAfter(slot.endTime);
+        final bool isLive = !isUpcoming && !isEnded;
+
+        Duration durationToShow;
+        String timerPrefix;
+        Color timerColor;
+
+        if (isUpcoming) {
+          durationToShow = slot.startTime.difference(_now);
+          timerPrefix = 'Starts in: ';
+          timerColor = const Color(0xFFF59E0B);
+        } else if (isLive) {
+          durationToShow = slot.endTime.difference(_now);
+          final bool isUrgent = durationToShow.inMinutes < 15;
+          timerPrefix = '';
+          timerColor = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+        } else {
+          durationToShow = Duration.zero;
+          timerPrefix = 'Time Over: ';
+          timerColor = const Color(0xFFEF4444);
+        }
+
+        if (durationToShow.isNegative) durationToShow = Duration.zero;
+
+        final hours = durationToShow.inHours.toString().padLeft(2, '0');
+        final minutes = (durationToShow.inMinutes % 60).toString().padLeft(2, '0');
+        final seconds = (durationToShow.inSeconds % 60).toString().padLeft(2, '0');
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
@@ -299,28 +321,30 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
                 margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isUrgent
-                      ? const Color(0xFFEF4444).withOpacity(0.2)
-                      : const Color(0xFF22C55E).withOpacity(0.2),
+                  color: timerColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+                    color: timerColor,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      Icons.timer_outlined,
+                      isEnded
+                          ? Icons.alarm_off_rounded
+                          : isUpcoming
+                              ? Icons.hourglass_top_rounded
+                              : Icons.timer_outlined,
                       size: 14,
-                      color: isUrgent ? const Color(0xFFEF4444) : const Color(0xFF4ADE80),
+                      color: timerColor,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '$hours:$minutes:$seconds',
+                      '$timerPrefix$hours:$minutes:$seconds',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isUrgent ? const Color(0xFFEF4444) : const Color(0xFF4ADE80),
+                        color: timerColor,
                       ),
                     ),
                   ],
