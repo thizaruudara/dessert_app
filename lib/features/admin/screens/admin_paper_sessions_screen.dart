@@ -342,9 +342,14 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     TimeOfDay slot1End = const TimeOfDay(hour: 11, minute: 15);
     TimeOfDay slot2Start = const TimeOfDay(hour: 14, minute: 0);
     TimeOfDay slot2End = const TimeOfDay(hour: 17, minute: 15);
+    bool isSubmitting = false;
+    String? validationError;
+
+    final dateFormat = DateFormat('yyyy-MM-dd (EEEE)');
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           backgroundColor: const Color(0xFF1E293B),
@@ -358,7 +363,14 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTextField('Paper Title / Topic', titleCtrl, 'e.g. Unit Test 03 - Mechanics'),
+                _buildTextField('Paper Title / Topic *', titleCtrl, 'e.g. Unit Test 03 - Mechanics'),
+                if (validationError != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    validationError!,
+                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFEF4444)),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 _buildTextField('Subject', subjectCtrl, 'Combined Maths / Physics / etc.'),
                 const SizedBox(height: 10),
@@ -372,6 +384,40 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 const SizedBox(height: 10),
                 _buildTextField('PDF URL (Optional)', pdfUrlCtrl, 'https://.../paper.pdf'),
                 const SizedBox(height: 14),
+
+                // Exam Date Picker
+                Text(
+                  '📅 Examination Date:',
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      side: const BorderSide(color: Color(0xFF38BDF8)),
+                    ),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime.now().subtract(const Duration(days: 7)),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (d != null) setDlgState(() => selectedDate = d);
+                          },
+                    icon: const Icon(Icons.calendar_today, size: 16, color: Color(0xFF38BDF8)),
+                    label: Text(
+                      dateFormat.format(selectedDate),
+                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
                 Text(
                   '⏰ Slot 1 (Morning Session Times):',
                   style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
@@ -381,20 +427,24 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () async {
-                          final t = await showTimePicker(context: context, initialTime: slot1Start);
-                          if (t != null) setDlgState(() => slot1Start = t);
-                        },
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final t = await showTimePicker(context: context, initialTime: slot1Start);
+                                if (t != null) setDlgState(() => slot1Start = t);
+                              },
                         child: Text('Start: ${slot1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () async {
-                          final t = await showTimePicker(context: context, initialTime: slot1End);
-                          if (t != null) setDlgState(() => slot1End = t);
-                        },
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final t = await showTimePicker(context: context, initialTime: slot1End);
+                                if (t != null) setDlgState(() => slot1End = t);
+                              },
                         child: Text('End: ${slot1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
                       ),
                     ),
@@ -410,20 +460,24 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () async {
-                          final t = await showTimePicker(context: context, initialTime: slot2Start);
-                          if (t != null) setDlgState(() => slot2Start = t);
-                        },
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final t = await showTimePicker(context: context, initialTime: slot2Start);
+                                if (t != null) setDlgState(() => slot2Start = t);
+                              },
                         child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () async {
-                          final t = await showTimePicker(context: context, initialTime: slot2End);
-                          if (t != null) setDlgState(() => slot2End = t);
-                        },
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final t = await showTimePicker(context: context, initialTime: slot2End);
+                                if (t != null) setDlgState(() => slot2End = t);
+                              },
                         child: Text('End: ${slot2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
                       ),
                     ),
@@ -434,42 +488,79 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
               child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
-              onPressed: () async {
-                if (titleCtrl.text.trim().isEmpty) return;
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      final title = titleCtrl.text.trim();
+                      if (title.isEmpty) {
+                        setDlgState(() => validationError = 'කරුණාකර Paper Title එක ඇතුළත් කරන්න (Please enter Paper Title)');
+                        return;
+                      }
 
-                final dateStr = selectedDate.toIso8601String().split('T')[0];
-                final slot1StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1Start.hour, slot1Start.minute);
-                final slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1End.hour, slot1End.minute);
-                final slot2StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2Start.hour, slot2Start.minute);
-                final slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
+                      setDlgState(() {
+                        isSubmitting = true;
+                        validationError = null;
+                      });
 
-                final newSession = PaperSession(
-                  id: '',
-                  title: titleCtrl.text.trim(),
-                  subject: subjectCtrl.text.trim(),
-                  examYear: examYearCtrl.text.trim(),
-                  date: dateStr,
-                  durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
-                  pdfUrl: pdfUrlCtrl.text.trim().isEmpty ? null : pdfUrlCtrl.text.trim(),
-                  slot1: PaperSlot(id: 'slot1', name: 'Morning Session (උදෑසන සැසිය)', startTime: slot1StartDt, endTime: slot1EndDt),
-                  slot2: PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt),
-                  createdAt: DateTime.now(),
-                );
+                      try {
+                        final dateStr = selectedDate.toIso8601String().split('T')[0];
+                        final slot1StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1Start.hour, slot1Start.minute);
+                        final slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1End.hour, slot1End.minute);
+                        final slot2StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2Start.hour, slot2Start.minute);
+                        final slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
 
-                await _paperService.createOrUpdatePaperSession(newSession);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ New Paper Session Created!'), backgroundColor: Color(0xFF22C55E)),
-                  );
-                }
-              },
-              child: Text('Create Paper', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                        final newSession = PaperSession(
+                          id: '',
+                          title: title,
+                          subject: subjectCtrl.text.trim().isEmpty ? 'Combined Mathematics' : subjectCtrl.text.trim(),
+                          examYear: examYearCtrl.text.trim().isEmpty ? '2026 A/L' : examYearCtrl.text.trim(),
+                          date: dateStr,
+                          durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
+                          pdfUrl: pdfUrlCtrl.text.trim().isEmpty ? null : pdfUrlCtrl.text.trim(),
+                          slot1: PaperSlot(id: 'slot1', name: 'Morning Session (උදෑසන සැසිය)', startTime: slot1StartDt, endTime: slot1EndDt),
+                          slot2: PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt),
+                          createdAt: DateTime.now(),
+                        );
+
+                        await _paperService.createOrUpdatePaperSession(newSession);
+
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ New Paper Session Created Successfully!'),
+                              backgroundColor: Color(0xFF22C55E),
+                            ),
+                          );
+                        }
+                      } catch (e, stack) {
+                        debugPrint('Error creating paper session: $e\n$stack');
+                        setDlgState(() => isSubmitting = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('❌ Failed to create paper: $e'),
+                              backgroundColor: const Color(0xFFEF4444),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : Text('Create Paper', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -564,31 +655,39 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E)),
               onPressed: () async {
-                final baseDate = session.slot1.startTime;
-                final updatedSlot1 = PaperSlot(
-                  id: 'slot1',
-                  name: session.slot1.name,
-                  startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1Start.hour, s1Start.minute),
-                  endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1End.hour, s1End.minute),
-                  maxCapacity: session.slot1.maxCapacity,
-                  registeredCount: session.slot1.registeredCount,
-                );
-
-                final updatedSlot2 = PaperSlot(
-                  id: 'slot2',
-                  name: session.slot2.name,
-                  startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute),
-                  endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute),
-                  maxCapacity: session.slot2.maxCapacity,
-                  registeredCount: session.slot2.registeredCount,
-                );
-
-                await _paperService.updateSlotTimes(session.id, slot1: updatedSlot1, slot2: updatedSlot2);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ Session Times Updated Successfully!'), backgroundColor: Color(0xFF22C55E)),
+                try {
+                  final baseDate = session.slot1.startTime;
+                  final updatedSlot1 = PaperSlot(
+                    id: 'slot1',
+                    name: session.slot1.name,
+                    startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1Start.hour, s1Start.minute),
+                    endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1End.hour, s1End.minute),
+                    maxCapacity: session.slot1.maxCapacity,
+                    registeredCount: session.slot1.registeredCount,
                   );
+
+                  final updatedSlot2 = PaperSlot(
+                    id: 'slot2',
+                    name: session.slot2.name,
+                    startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute),
+                    endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute),
+                    maxCapacity: session.slot2.maxCapacity,
+                    registeredCount: session.slot2.registeredCount,
+                  );
+
+                  await _paperService.updateSlotTimes(session.id, slot1: updatedSlot1, slot2: updatedSlot2);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('✅ Session Times Updated Successfully!'), backgroundColor: Color(0xFF22C55E)),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('❌ Error updating times: $e'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                  }
                 }
               },
               child: Text('Save Changes', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),

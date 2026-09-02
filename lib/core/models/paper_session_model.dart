@@ -106,19 +106,24 @@ class PaperSession {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final Map<String, dynamic> map = {
       'title': title,
       'subject': subject,
       'examYear': examYear,
       'date': date,
       'durationMinutes': durationMinutes,
-      'pdfUrl': pdfUrl,
-      'paperImageUrl': paperImageUrl,
       'status': status,
       'slot1': slot1.toMap(),
       'slot2': slot2.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
     };
+    if (pdfUrl != null && pdfUrl!.trim().isNotEmpty) {
+      map['pdfUrl'] = pdfUrl!.trim();
+    }
+    if (paperImageUrl != null && paperImageUrl!.trim().isNotEmpty) {
+      map['paperImageUrl'] = paperImageUrl!.trim();
+    }
+    return map;
   }
 }
 
