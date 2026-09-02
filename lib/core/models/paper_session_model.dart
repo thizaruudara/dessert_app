@@ -144,6 +144,7 @@ class PaperRegistration {
   final bool isCameraActive;
   final String? cameraSnapshotUrl;
   final String? submissionUrl;
+  final List<String> submissionPhotos;
 
   PaperRegistration({
     required this.id,
@@ -160,6 +161,7 @@ class PaperRegistration {
     this.isCameraActive = false,
     this.cameraSnapshotUrl,
     this.submissionUrl,
+    this.submissionPhotos = const [],
   });
 
   factory PaperRegistration.fromFirestore(DocumentSnapshot doc) {
@@ -169,6 +171,11 @@ class PaperRegistration {
       if (val is String) return DateTime.tryParse(val);
       return null;
     }
+
+    final rawPhotos = data['submissionPhotos'];
+    final List<String> photos = rawPhotos is List
+        ? rawPhotos.map((e) => e.toString()).toList()
+        : (data['submissionUrl'] != null ? [data['submissionUrl'].toString()] : []);
 
     return PaperRegistration(
       id: doc.id,
@@ -185,6 +192,7 @@ class PaperRegistration {
       isCameraActive: data['isCameraActive'] ?? false,
       cameraSnapshotUrl: data['cameraSnapshotUrl'],
       submissionUrl: data['submissionUrl'],
+      submissionPhotos: photos,
     );
   }
 
@@ -203,6 +211,7 @@ class PaperRegistration {
       'isCameraActive': isCameraActive,
       'cameraSnapshotUrl': cameraSnapshotUrl,
       'submissionUrl': submissionUrl,
+      'submissionPhotos': submissionPhotos,
     };
   }
 }

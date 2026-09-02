@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/models/paper_session_model.dart';
 import '../../../core/services/paper_session_service.dart';
@@ -285,9 +286,29 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
                 ),
                 const SizedBox(height: 8),
+                if (reg.submissionPhotos.isNotEmpty || reg.status == 'submitted') ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 28,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      onPressed: () => _showStudentSubmissionViewer(reg),
+                      icon: const Icon(Icons.collections_rounded, size: 13, color: Colors.white),
+                      label: Text(
+                        'View Answers (${reg.submissionPhotos.length})',
+                        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 SizedBox(
                   width: double.infinity,
-                  height: 30,
+                  height: 28,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF6366F1),
@@ -459,6 +480,192 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showStudentSubmissionViewer(PaperRegistration student) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) {
+          final photos = student.submissionPhotos;
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF475569),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.menu_book_rounded, color: Color(0xFF4ADE80), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student.studentName,
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          Text(
+                            '${student.studentPhone} • Submitted: ${photos.length} Answer Items',
+                            style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                if (photos.isEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.info_outline, size: 36, color: Color(0xFF64748B)),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No answer sheet photos attached yet.',
+                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  for (int i = 0; i < photos.length; i++) ...[
+                    if (photos[i].startsWith('http://') || photos[i].startsWith('https://')) ...[
+                      // Drive / Web Link
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link, color: Color(0xFF38BDF8), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Attached Document / Drive Link',
+                                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                  Text(
+                                    photos[i],
+                                    style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF38BDF8)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8), size: 18),
+                              onPressed: () async {
+                                final uri = Uri.tryParse(photos[i]);
+                                if (uri != null && await canLaunchUrl(uri)) {
+                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      // Base64 Answer Sheet Image
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF6366F1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Page ${i + 1}',
+                                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  const Icon(Icons.zoom_in, color: Color(0xFF94A3B8), size: 16),
+                                ],
+                              ),
+                            ),
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                              child: InteractiveViewer(
+                                panEnabled: true,
+                                minScale: 0.8,
+                                maxScale: 4.0,
+                                child: Image.memory(
+                                  base64Decode(
+                                    photos[i].contains(',') ? photos[i].split(',')[1] : photos[i],
+                                  ),
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }

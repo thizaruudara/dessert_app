@@ -133,6 +133,7 @@ class PaperSessionService {
     required bool isCameraActive,
     String? cameraSnapshotUrl,
     String? status,
+    List<String>? submissionPhotos,
   }) async {
     await _ensureAuth();
     final regDocId = '${paperId}_$studentId';
@@ -142,6 +143,10 @@ class PaperSessionService {
     };
     if (cameraSnapshotUrl != null) {
       updates['cameraSnapshotUrl'] = cameraSnapshotUrl;
+    }
+    if (submissionPhotos != null && submissionPhotos.isNotEmpty) {
+      updates['submissionPhotos'] = submissionPhotos;
+      updates['submissionUrl'] = submissionPhotos.first;
     }
     if (status != null) {
       updates['status'] = status;

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -633,61 +635,317 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   }
 
   void _showSubmissionDialog() {
-    showDialog(
+    final ImagePicker picker = ImagePicker();
+    final List<String> capturedPhotosBase64 = [];
+    final List<File> localPhotoFiles = [];
+    final pdfLinkCtrl = TextEditingController();
+    bool isUploading = false;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'පිළිතුරු පත්‍රය භාරදීම (Submit Paper)',
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        content: Text(
-          'ඔබගේ අතින් ලියන ලද පිළිතුරු පත්‍රවල ඡායාරූප (Photos) හෝ PDF ගොනුව Upload කිරීමට සූදානම්ද?',
-          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(
-              'තව ලියනවා (Cancel)',
-              style: GoogleFonts.poppins(color: const Color(0xFF94A3B8)),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF22C55E),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              final user = context.read<AuthProvider>().userModel;
-              if (user != null) {
-                _paperService.updateCameraHeartbeat(
-                  paperId: widget.paperId,
-                  studentId: user.id,
-                  isCameraActive: false,
-                  status: 'submitted',
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> pickPhotos(ImageSource source) async {
+            try {
+              if (source == ImageSource.camera) {
+                final XFile? photo = await picker.pickImage(
+                  source: ImageSource.camera,
+                  maxWidth: 1200,
+                  maxHeight: 1600,
+                  imageQuality: 80,
                 );
+                if (photo != null) {
+                  final bytes = await File(photo.path).readAsBytes();
+                  final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                  setSheetState(() {
+                    localPhotoFiles.add(File(photo.path));
+                    capturedPhotosBase64.add(base64);
+                  });
+                }
+              } else {
+                final List<XFile> photos = await picker.pickMultiImage(
+                  maxWidth: 1200,
+                  maxHeight: 1600,
+                  imageQuality: 80,
+                );
+                if (photos.isNotEmpty) {
+                  for (final photo in photos) {
+                    final bytes = await File(photo.path).readAsBytes();
+                    final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                    localPhotoFiles.add(File(photo.path));
+                    capturedPhotosBase64.add(base64);
+                  }
+                  setSheetState(() {});
+                }
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✅ පිළිතුරු පත්‍රය සාර්ථකව භාරදෙන ලදී!'),
-                  backgroundColor: Color(0xFF22C55E),
-                ),
-              );
-              context.pop();
-            },
-            child: Text(
-              'Confirm Submit',
-              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+            } catch (e) {
+              debugPrint('Error picking answer sheet photos: $e');
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20,
             ),
-          ),
-        ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF475569),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.cloud_upload_rounded, color: Color(0xFF4ADE80), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Submit Answer Sheets',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          Text(
+                            'පිළිතුරු පත්‍රවල ඡායාරූප (Photos) Upload කරන්න',
+                            style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Photo Capture / Add Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6366F1),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: isUploading ? null : () => pickPhotos(ImageSource.camera),
+                          icon: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
+                          label: Text(
+                            'Take Photo (Camera)',
+                            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Color(0xFF38BDF8)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: isUploading ? null : () => pickPhotos(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_rounded, size: 18, color: Color(0xFF38BDF8)),
+                          label: Text(
+                            'From Gallery',
+                            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Photos Preview Grid
+                  if (localPhotoFiles.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      '📸 Uploaded Pages (${localPhotoFiles.length} Pages):',
+                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFCBD5E1)),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 120,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: localPhotoFiles.length,
+                        itemBuilder: (context, index) {
+                          return Container(
+                            width: 90,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF475569)),
+                            ),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.file(
+                                    localPhotoFiles[index],
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 4,
+                                  left: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.7),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Page ${index + 1}',
+                                      style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: GestureDetector(
+                                    onTap: isUploading
+                                        ? null
+                                        : () {
+                                            setSheetState(() {
+                                              localPhotoFiles.removeAt(index);
+                                              capturedPhotosBase64.removeAt(index);
+                                            });
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFEF4444),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  Text(
+                    'Optional: PDF / Drive Link (විකල්ප PDF ලින්ක් එක):',
+                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: pdfLinkCtrl,
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'https://drive.google.com/.../answers.pdf',
+                      hintStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFF0F172A),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Finalize Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: isUploading
+                          ? null
+                          : () async {
+                              final user = context.read<AuthProvider>().userModel;
+                              if (user == null) return;
+
+                              setSheetState(() => isUploading = true);
+
+                              final List<String> allSubmissions = List.from(capturedPhotosBase64);
+                              final driveLink = pdfLinkCtrl.text.trim();
+                              if (driveLink.isNotEmpty) {
+                                allSubmissions.add(driveLink);
+                              }
+
+                              try {
+                                await _paperService.updateCameraHeartbeat(
+                                  paperId: widget.paperId,
+                                  studentId: user.id,
+                                  isCameraActive: false,
+                                  status: 'submitted',
+                                  submissionPhotos: allSubmissions,
+                                );
+
+                                if (ctx.mounted) Navigator.of(ctx).pop();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('✅ පිළිතුරු පත්‍ර (${allSubmissions.length} Items) සාර්ථකව භාරදෙන ලදී!'),
+                                      backgroundColor: const Color(0xFF22C55E),
+                                    ),
+                                  );
+                                  context.pop();
+                                }
+                              } catch (e) {
+                                setSheetState(() => isUploading = false);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Submission Error: $e'),
+                                      backgroundColor: const Color(0xFFEF4444),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      icon: isUploading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_circle_rounded, color: Colors.white),
+                      label: Text(
+                        isUploading ? 'Submitting Answer Sheets...' : 'Submit & Finish Exam (විභාගය අවසන් කරන්න)',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
