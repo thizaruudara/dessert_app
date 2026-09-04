@@ -618,7 +618,6 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     // Action Button
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: selectedSlotId == null
@@ -628,6 +627,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   : isUpcoming
                                       ? const Color(0xFF6366F1)
                                       : const Color(0xFF334155),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: isLive ? 4 : 0,
                         ),
@@ -666,20 +666,26 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                               color: Colors.white,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              selectedSlotId == null
-                                  ? 'පළමුව සැසියක් (Slot) තෝරන්න'
-                                  : isLive
-                                      ? (isPackageOpening
-                                          ? 'Open Package in Camera Room (කැමරාව ON කරන්න)'
-                                          : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
-                                      : isUpcoming
-                                          ? 'Enter Waiting Room (පොරොත්තු ශාලාවට පිවිසෙන්න)'
-                                          : 'View Paper / Submissions',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                            Expanded(
+                              child: Text(
+                                selectedSlotId == null
+                                    ? 'පළමුව සැසියක් (Slot) තෝරන්න'
+                                    : isLive
+                                        ? (isPackageOpening
+                                            ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
+                                            : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
+                                        : isUpcoming
+                                            ? 'Enter Waiting Room (පොරොත්තු ශාලාව)'
+                                            : 'View Paper / Submissions',
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  height: 1.25,
+                                ),
                               ),
                             ),
                           ],
