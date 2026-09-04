@@ -231,13 +231,16 @@ class PaperRegistration {
     return hash <= 0 ? 1001 : hash;
   }
 
+  bool get isSubmitted => status == 'submitted';
+
   bool get isOnline {
     if (!isCameraActive) return false;
     if (lastCameraPing == null) return false;
+    if (isSubmitted || status == 'ended') return false;
     final diff = DateTime.now().difference(lastCameraPing!).inSeconds;
-    // Allow for network jitter and device clock skew across mobile and admin devices.
-    // If student explicitly has isCameraActive = true in exam, consider online if ping is within a reasonable window.
-    return diff.abs() < 60 || (isCameraActive && status == 'in_exam' && diff < 180);
+    // Mobile proctor ping is sent every 4 seconds.
+    // Beyond 12 seconds (3 missed intervals), the student has disconnected/closed app/crashed.
+    return diff >= -5 && diff <= 12;
   }
 
   PaperRegistration({

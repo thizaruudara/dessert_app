@@ -7,7 +7,6 @@ import 'package:camera/camera.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -31,7 +30,6 @@ class InAppDocumentScannerScreen extends StatefulWidget {
 class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
     with SingleTickerProviderStateMixin {
   final PaperSessionService _paperService = PaperSessionService();
-  final ImagePicker _picker = ImagePicker();
 
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
@@ -174,23 +172,6 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
     }
   }
 
-  Future<void> _pickFromGallery() async {
-    try {
-      final List<XFile> photos = await _picker.pickMultiImage(
-        maxWidth: 1600,
-        maxHeight: 2200,
-        imageQuality: 82,
-      );
-      if (photos.isNotEmpty) {
-        for (final photo in photos) {
-          _scannedFiles.add(File(photo.path));
-        }
-        if (mounted) setState(() {});
-      }
-    } catch (e) {
-      debugPrint('Gallery pick error: $e');
-    }
-  }
 
   void _previewPageDialog(int index) {
     showDialog(
@@ -891,11 +872,25 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // From Gallery Fallback
-              IconButton(
-                icon: const Icon(Icons.photo_library_outlined, color: Colors.white, size: 28),
-                tooltip: 'Choose from Gallery (ගැලරියෙන්)',
-                onPressed: _isCapturing ? null : _pickFromGallery,
+              // Page Count Indicator (Direct in-app capture only)
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
+                ),
+                child: Center(
+                  child: Text(
+                    '${_scannedFiles.length}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
 
               // Big Shutter Button

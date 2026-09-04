@@ -245,6 +245,19 @@ class PaperSessionService {
     });
   }
 
+  Future<PaperRegistration?> getStudentRegistration(String paperId, String studentId) async {
+    if (paperId.isEmpty || studentId.isEmpty) return null;
+    final regDocId = '${paperId}_$studentId';
+    try {
+      final doc = await _firestore.collection('paper_registrations').doc(regDocId).get();
+      if (!doc.exists) return null;
+      return PaperRegistration.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Error getting student registration: $e');
+      return null;
+    }
+  }
+
   // ── 7. Update Student Proctored Heartbeat & Live Camera State ──────────────
   Future<void> updateCameraHeartbeat({
     required String paperId,
@@ -329,6 +342,7 @@ class PaperSessionService {
   Future<void> sendProctorAlert({
     required String paperId,
     required String studentId,
+    String? studentPhone,
     required String senderName,
     required String message,
     String type = 'warning',
@@ -337,6 +351,7 @@ class PaperSessionService {
     await _firestore.collection('proctor_alerts').add({
       'paperId': paperId,
       'studentId': studentId,
+      if (studentPhone != null && studentPhone.isNotEmpty) 'studentPhone': studentPhone,
       'senderName': senderName,
       'message': message,
       'type': type,
@@ -368,18 +383,41 @@ class PaperSessionService {
   Stream<List<ProctorAlert>> streamStudentAlerts({
     required String paperId,
     required String studentId,
+    String? studentPhone,
   }) {
-    if (paperId.isEmpty || studentId.isEmpty) return Stream.value([]);
+    if (paperId.isEmpty || (studentId.isEmpty && (studentPhone == null || studentPhone.isEmpty))) {
+      return Stream.value([]);
+    }
     return _firestore
         .collection('proctor_alerts')
         .where('paperId', isEqualTo: paperId)
         .snapshots()
         .map((snapshot) {
       final list = <ProctorAlert>[];
+      final normPhone = (studentPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+      final normStudentId = studentId.replaceAll(RegExp(r'[^0-9]'), '');
+
       for (final doc in snapshot.docs) {
         try {
           final alert = ProctorAlert.fromFirestore(doc);
-          if (alert.studentId == studentId || alert.studentId == 'ALL') {
+          final alertSid = alert.studentId;
+          final rawData = doc.data();
+          final alertPhone = (rawData is Map && rawData['studentPhone'] != null)
+              ? rawData['studentPhone'].toString()
+              : '';
+          final normAlertPhone = alertPhone.replaceAll(RegExp(r'[^0-9]'), '');
+          final normAlertSid = alertSid.replaceAll(RegExp(r'[^0-9]'), '');
+
+          bool matches = alertSid == 'ALL' ||
+              alertSid == studentId ||
+              (studentPhone != null && studentPhone.isNotEmpty && alertSid == studentPhone) ||
+              (alertPhone.isNotEmpty && alertPhone == studentPhone) ||
+              (alertPhone.isNotEmpty && alertPhone == studentId) ||
+              (normPhone.isNotEmpty && normAlertPhone.isNotEmpty && (normPhone.endsWith(normAlertPhone) || normAlertPhone.endsWith(normPhone))) ||
+              (normPhone.isNotEmpty && normAlertSid.isNotEmpty && (normPhone.endsWith(normAlertSid) || normAlertSid.endsWith(normPhone))) ||
+              (normStudentId.isNotEmpty && normAlertSid.isNotEmpty && (normStudentId.endsWith(normAlertSid) || normAlertSid.endsWith(normStudentId)));
+
+          if (matches) {
             list.add(alert);
           }
         } catch (e) {

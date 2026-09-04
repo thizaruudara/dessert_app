@@ -316,6 +316,15 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   }
 
   Widget _buildPaperSessionCard(PaperSession session, String studentId) {
+    try {
+      return _buildPaperSessionCardInternal(session, studentId);
+    } catch (e) {
+      debugPrint('Error building paper session card: $e');
+      return _buildFallbackCard(session);
+    }
+  }
+
+  Widget _buildPaperSessionCardInternal(PaperSession session, String studentId) {
     final dateFormat = DateFormat('yyyy MMMM dd (EEEE)');
     final timeFormat = DateFormat('hh:mm a');
 
@@ -323,6 +332,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
       stream: _paperService.streamStudentRegistration(session.id, studentId),
       builder: (context, regSnap) {
         final registration = regSnap.data;
+        final bool isSubmitted = registration?.isSubmitted == true || registration?.status == 'submitted';
         final selectedSlotId = registration?.selectedSlot ?? (session.slot2 == null ? 'slot1' : null);
         final selectedSlot = (selectedSlotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
@@ -359,11 +369,13 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
             color: const Color(0xFF1E293B),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isLive ? const Color(0xFF22C55E) : const Color(0xFF334155),
-              width: isLive ? 1.5 : 1,
+              color: isSubmitted
+                  ? const Color(0xFF22C55E)
+                  : (isLive ? const Color(0xFF22C55E) : const Color(0xFF334155)),
+              width: (isSubmitted || isLive) ? 1.5 : 1,
             ),
             boxShadow: [
-              if (isLive)
+              if (isLive || isSubmitted)
                 BoxShadow(
                   color: const Color(0xFF22C55E).withOpacity(0.15),
                   blurRadius: 16,
@@ -419,7 +431,31 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           ),
                         ),
                         const Spacer(),
-                        if (isLive)
+                        if (isSubmitted)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF22C55E).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF22C55E)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'SUBMITTED',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF4ADE80),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (isLive)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
@@ -536,7 +572,54 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     const SizedBox(height: 16),
 
                     // Countdown & Status Box
-                    if (selectedSlotId != null) ...[
+                    if (isSubmitted) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF22C55E).withOpacity(0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.verified_rounded,
+                              color: Color(0xFF4ADE80),
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '🎉 පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF4ADE80),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    (registration?.submissionPhotos.isNotEmpty ?? false)
+                                        ? 'ඔබ විසින් පිටු ${registration!.submissionPhotos.length} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදෙන ලදී.'
+                                        : 'ඔබගේ පිළිතුරු ගුරුභවතුන් වෙත සාර්ථකව යොමු විය.',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: const Color(0xFFCBD5E1),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ] else if (selectedSlotId != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
@@ -620,95 +703,124 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     ],
 
                     // Action Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: session.isEnded
-                              ? const Color(0xFF475569)
-                              : selectedSlotId == null
-                                  ? const Color(0xFF334155)
-                                  : isLive
-                                      ? (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF22C55E))
-                                      : isUpcoming
-                                          ? const Color(0xFF6366F1)
-                                          : const Color(0xFF334155),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: (isLive && !session.isEnded) ? 4 : 0,
-                        ),
-                        onPressed: session.isEnded
-                            ? () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත. නැවත ඇතුල් විය නොහැක (Session Ended).'),
-                                    backgroundColor: Color(0xFFEF4444),
-                                  ),
-                                );
-                              }
-                            : () {
-                                final auth = context.read<AuthProvider>().userModel;
-                                final effectiveSlotId = selectedSlotId ?? 'slot1';
-                                if (auth != null) {
-                                  _paperService.registerStudentSlot(
-                                    paperId: session.id,
-                                    studentId: auth.id,
-                                    studentName: auth.name,
-                                    studentPhone: auth.phone,
-                                    slotId: effectiveSlotId,
-                                  ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
-                                }
-                                final targetUrl = '/student/papers/exam/${session.id}?slot=$effectiveSlotId';
-                                try {
-                                  context.push(targetUrl);
-                                } catch (e) {
-                                  debugPrint('Student exam route push failed: $e, trying go');
-                                  context.go(targetUrl);
-                                }
-                              },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              session.isEnded
-                                  ? Icons.cancel_outlined
-                                  : isLive
-                                      ? (isTimeUp ? Icons.document_scanner : Icons.videocam)
-                                      : isUpcoming
-                                          ? Icons.meeting_room
-                                          : Icons.check_circle_outline,
-                              size: 20,
-                              color: Colors.white,
+                    if (isSubmitted)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E293B),
+                            side: const BorderSide(color: Color(0xFF22C55E), width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () {
+                            if (registration != null) {
+                              _showSubmissionDetailsDialog(session, registration);
+                            }
+                          },
+                          icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 20),
+                          label: Text(
+                            (registration?.submissionPhotos.isNotEmpty ?? false)
+                                ? '✅ Submitted (${registration!.submissionPhotos.length} Pages) • විස්තර බලන්න'
+                                : '✅ Answers Submitted • විස්තර බලන්න',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF4ADE80),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: session.isEnded
+                                ? const Color(0xFF475569)
+                                : selectedSlotId == null
+                                    ? const Color(0xFF334155)
+                                    : isLive
+                                        ? (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF22C55E))
+                                        : isUpcoming
+                                            ? const Color(0xFF6366F1)
+                                            : const Color(0xFF334155),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: (isLive && !session.isEnded) ? 4 : 0,
+                          ),
+                          onPressed: session.isEnded
+                              ? () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත. නැවත ඇතුල් විය නොහැක (Session Ended).'),
+                                      backgroundColor: Color(0xFFEF4444),
+                                    ),
+                                  );
+                                }
+                              : () {
+                                  final auth = context.read<AuthProvider>().userModel;
+                                  final effectiveSlotId = selectedSlotId ?? 'slot1';
+                                  if (auth != null) {
+                                    _paperService.registerStudentSlot(
+                                      paperId: session.id,
+                                      studentId: auth.id,
+                                      studentName: auth.name,
+                                      studentPhone: auth.phone,
+                                      slotId: effectiveSlotId,
+                                    ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
+                                  }
+                                  final targetUrl = '/student/papers/exam/${session.id}?slot=$effectiveSlotId';
+                                  try {
+                                    context.push(targetUrl);
+                                  } catch (e) {
+                                    debugPrint('Student exam route push failed: $e, trying go');
+                                    context.go(targetUrl);
+                                  }
+                                },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
                                 session.isEnded
-                                    ? '🛑 විභාග සැසිය අවසන් විය (Ended)'
-                                    : selectedSlotId == null
-                                        ? 'පළමුව සැසියක් (Slot) තෝරන්න'
-                                        : isLive
-                                            ? (isPackageOpening
-                                                ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
-                                                : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
-                                            : isUpcoming
-                                                ? 'Enter Waiting Room (පොරොත්තු ශාලාව)'
-                                                : 'View Paper / Submissions',
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                  height: 1.25,
+                                    ? Icons.cancel_outlined
+                                    : isLive
+                                        ? (isTimeUp ? Icons.document_scanner : Icons.videocam)
+                                        : isUpcoming
+                                            ? Icons.meeting_room
+                                            : Icons.check_circle_outline,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  session.isEnded
+                                      ? '🛑 විභාග සැසිය අවසන් විය (Ended)'
+                                      : selectedSlotId == null
+                                          ? 'පළමුව සැසියක් (Slot) තෝරන්න'
+                                          : isLive
+                                              ? (isPackageOpening
+                                                  ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
+                                                  : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
+                                              : isUpcoming
+                                                  ? 'Enter Waiting Room (පොරොත්තු ශාලාව)'
+                                                  : 'View Paper / Submissions',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                    height: 1.25,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -716,6 +828,97 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFallbackCard(PaperSession session) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            session.title,
+            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${session.subject} • ${session.examYear}',
+            style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSubmissionDetailsDialog(PaperSession session, PaperRegistration reg) {
+    final timeFormat = DateFormat('yyyy-MM-dd hh:mm a');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Submission Confirmed',
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              session.title,
+              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFA5B4FC)),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Subject: ${session.subject} (${session.examYear})',
+              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Submitted Pages: ${reg.submissionPhotos.length}',
+              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF4ADE80)),
+            ),
+            if (reg.submittedAt != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Time: ${timeFormat.format(reg.submittedAt!)}',
+                style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              'ඔබගේ පිළිතුරු පත්‍ර ගුරුභවතුන් වෙත සුරක්ෂිතව ලැබී ඇති බැවින් නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.',
+              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFCBD5E1)),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('හරි (Done)', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 

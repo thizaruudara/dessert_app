@@ -327,8 +327,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
         }
 
         final students = snapshot.data ?? [];
-        final liveCount = students.where((s) => s.isOnline || _activeStreamingUids.contains(s.computedAgoraUid)).length;
-        final submittedCount = students.where((s) => s.status == 'submitted').length;
+        final liveCount = students.where((s) => !s.isSubmitted && (s.isOnline || _activeStreamingUids.contains(s.computedAgoraUid))).length;
+        final submittedCount = students.where((s) => s.isSubmitted).length;
 
         return Column(
           children: [
@@ -391,9 +391,10 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 
   Widget _buildStudentProctorCard(PaperRegistration reg) {
     final studentUid = reg.computedAgoraUid;
-    final bool isStreamingVideo = _isAgoraInitialized && _agoraEngine != null && (_activeStreamingUids.contains(studentUid) || reg.isOnline);
-    final bool isLive = reg.isOnline || isStreamingVideo || _activeStreamingUids.contains(studentUid);
-    final bool isSubmitted = reg.status == 'submitted';
+    final bool isSubmitted = reg.isSubmitted;
+    final bool hasAgoraStream = _isAgoraInitialized && _agoraEngine != null && _activeStreamingUids.contains(studentUid);
+    final bool isStreamingVideo = hasAgoraStream && !isSubmitted;
+    final bool isLive = (isStreamingVideo || reg.isOnline) && !isSubmitted;
     final bool canStreamVideo = isStreamingVideo;
 
     return Container(
@@ -741,6 +742,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   await _paperService.sendProctorAlert(
                     paperId: widget.paperId,
                     studentId: student.studentId,
+                    studentPhone: student.studentPhone,
                     senderName: 'Admin / Teacher',
                     message: msgCtrl.text.trim(),
                     type: 'warning',

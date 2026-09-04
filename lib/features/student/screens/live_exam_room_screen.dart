@@ -5,9 +5,9 @@ import 'dart:ui' as ui;
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -45,7 +45,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   Timer? _heartbeatTimer;
   Timer? _examCountdownTimer;
   DateTime _now = DateTime.now();
-  final DateTime _enteredRoomAt = DateTime.now().subtract(const Duration(seconds: 10));
   bool _isCurrentlyWaiting = true;
   String _currentStudentId = '';
   DateTime? _localPackageOpeningStartTime;
@@ -73,6 +72,67 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     _initCamera();
     _startTimers();
     _listenForProctorAlerts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkIfAlreadySubmitted();
+    });
+  }
+
+  Future<void> _checkIfAlreadySubmitted() async {
+    final user = context.read<AuthProvider>().userModel;
+    if (user == null) return;
+    try {
+      final reg = await _paperService.getStudentRegistration(widget.paperId, user.id);
+      if (reg != null && (reg.isSubmitted || reg.status == 'submitted')) {
+        if (!mounted) return;
+        _heartbeatTimer?.cancel();
+        _examCountdownTimer?.cancel();
+        _alertSubscription?.cancel();
+        _localVideoViewController?.dispose();
+        _localVideoViewController = null;
+        AgoraRtcService.leaveAndRelease(_agoraEngine);
+        _agoraEngine = null;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 26),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Paper Already Submitted',
+                    style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'ඔබ මෙම විභාගයේ පිළිතුරු පත්‍ර දැනටමත් සාර්ථකව භාරදී ඇත. නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.',
+              style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFFCBD5E1)),
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF22C55E),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  if (mounted) context.go('/student/papers');
+                },
+                child: Text('හරි (OK)', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Check submitted on enter error: $e');
+    }
   }
 
   @override
@@ -139,6 +199,10 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     final user = context.read<AuthProvider>().userModel;
     if (user == null) return;
     try {
+      final reg = await _paperService.getStudentRegistration(widget.paperId, user.id);
+      if (reg != null && (reg.isSubmitted || reg.status == 'submitted')) {
+        return; // Already submitted, do not re-register or overwrite!
+      }
       await _paperService.registerStudentSlot(
         paperId: widget.paperId,
         studentId: user.id,
@@ -261,6 +325,13 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       final user = context.read<AuthProvider>().userModel;
       if (user == null) return;
 
+      final reg = await _paperService.getStudentRegistration(widget.paperId, user.id);
+      if (reg != null && (reg.isSubmitted || reg.status == 'submitted')) {
+        // Stop heartbeat if submitted so presence drops cleanly
+        _heartbeatTimer?.cancel();
+        return;
+      }
+
       await _paperService.updateCameraHeartbeat(
         paperId: widget.paperId,
         studentId: user.id,
@@ -281,16 +352,17 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   void _listenForProctorAlerts() {
     final user = context.read<AuthProvider>().userModel;
     if (user != null) {
+      _alertSubscription?.cancel();
       _alertSubscription = _paperService
-          .streamStudentAlerts(paperId: widget.paperId, studentId: user.id)
+          .streamStudentAlerts(
+            paperId: widget.paperId,
+            studentId: user.id,
+            studentPhone: user.phone,
+          )
           .listen((alerts) {
         for (final alert in alerts) {
           if (!alert.isRead && !_shownAlertIds.contains(alert.id)) {
             _shownAlertIds.add(alert.id);
-            // Skip old historical alerts that occurred before student entered room
-            if (alert.createdAt.isBefore(_enteredRoomAt)) {
-              continue;
-            }
             if (alert.studentId == 'ALL') {
               _showBroadcastAlertNotification(alert);
             } else {
@@ -353,15 +425,26 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   }
 
   void _showProctorAlertDialog(ProctorAlert alert) {
-    // Also trigger native lock screen & heads-up notification in case screen is locked or minimized
+    // 1. Heavy haptic feedback to physically notify student
+    try {
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 250), () => HapticFeedback.heavyImpact());
+    } catch (_) {}
+
+    // 2. Also trigger native lock screen & heads-up notification in case screen is locked or minimized
     NotificationService.showNotification(
       title: '⚠️ Proctor Alert: ${alert.title}',
       body: alert.message,
     );
 
+    // 3. Show prominent floating in-app banner
+    _showBroadcastAlertNotification(alert);
+
+    // 4. Show modal Alert Dialog
+    if (!mounted) return;
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1538,434 +1621,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       _initCamera();
       _startTimers();
     }
-  }
-
-  void _showSubmissionDialog() {
-    final ImagePicker picker = ImagePicker();
-    final List<File> localPhotoFiles = [];
-    final pdfLinkCtrl = TextEditingController();
-    bool isUploading = false;
-    String uploadStatus = '';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          Future<void> pickPhotos(ImageSource source) async {
-            try {
-              if (source == ImageSource.camera) {
-                final XFile? photo = await picker.pickImage(
-                  source: ImageSource.camera,
-                  maxWidth: 1600,
-                  maxHeight: 2000,
-                  imageQuality: 85,
-                );
-                if (photo != null) {
-                  setSheetState(() {
-                    localPhotoFiles.add(File(photo.path));
-                  });
-                }
-              } else {
-                final List<XFile> photos = await picker.pickMultiImage(
-                  maxWidth: 1600,
-                  maxHeight: 2000,
-                  imageQuality: 85,
-                );
-                if (photos.isNotEmpty) {
-                  setSheetState(() {
-                    for (final photo in photos) {
-                      localPhotoFiles.add(File(photo.path));
-                    }
-                  });
-                }
-              }
-            } catch (e) {
-              debugPrint('Error picking answer sheet photos: $e');
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF475569),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.cloud_upload_rounded, color: Color(0xFF4ADE80), size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Submit Answer Sheets',
-                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          Text(
-                            'පිළිතුරු පත්‍රවල ඡායාරූප (Photos) Upload කරන්න',
-                            style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Photo Capture / Add Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6366F1),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: isUploading ? null : () => pickPhotos(ImageSource.camera),
-                          icon: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
-                          label: Text(
-                            'Take Photo (Camera)',
-                            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: const BorderSide(color: Color(0xFF38BDF8)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: isUploading ? null : () => pickPhotos(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library_rounded, size: 18, color: Color(0xFF38BDF8)),
-                          label: Text(
-                            'From Gallery',
-                            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Photos Preview Grid
-                  if (localPhotoFiles.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      '📸 Uploaded Pages (${localPhotoFiles.length} Pages):',
-                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFCBD5E1)),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 120,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: localPhotoFiles.length,
-                        itemBuilder: (context, index) {
-                          return Container(
-                            width: 90,
-                            margin: const EdgeInsets.only(right: 10),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF475569)),
-                            ),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(
-                                    localPhotoFiles[index],
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: 4,
-                                  left: 4,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.7),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'Page ${index + 1}',
-                                      style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 4,
-                                  right: 4,
-                                  child: GestureDetector(
-                                    onTap: isUploading
-                                        ? null
-                                        : () {
-                                            setSheetState(() {
-                                              localPhotoFiles.removeAt(index);
-                                            });
-                                          },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFEF4444),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.close, size: 12, color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 16),
-                  Text(
-                    'Optional: PDF / Drive Link (විකල්ප PDF ලින්ක් එක):',
-                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: pdfLinkCtrl,
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'https://drive.google.com/.../answers.pdf',
-                      hintStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
-                      filled: true,
-                      fillColor: const Color(0xFF0F172A),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                    ),
-                  ),
-
-                  if (uploadStatus.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              uploadStatus,
-                              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF38BDF8), fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 20),
-
-                  // Finalize Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF22C55E),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: isUploading
-                          ? null
-                          : () async {
-                              final user = context.read<AuthProvider>().userModel;
-                              if (user == null) return;
-
-                              final driveLink = pdfLinkCtrl.text.trim();
-                              if (localPhotoFiles.isEmpty && driveLink.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('කරුණාකර අවම වශයෙන් එක් පිළිතුරු පිටුවක් හෝ Drive ලින්ක් එකක් ඇතුළත් කරන්න.'),
-                                    backgroundColor: Color(0xFFEF4444),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              setSheetState(() {
-                                isUploading = true;
-                                uploadStatus = 'Starting upload...';
-                              });
-
-                              try {
-                                final storage = FirebaseStorage.instance;
-                                final List<String> uploadedUrls = [];
-
-                                for (int i = 0; i < localPhotoFiles.length; i++) {
-                                  setSheetState(() {
-                                    uploadStatus = 'Processing page ${i + 1} of ${localPhotoFiles.length}...';
-                                  });
-                                  final file = localPhotoFiles[i];
-                                  final url = await _processAndUploadAnswerSheet(file, i, widget.paperId, user.id);
-                                  uploadedUrls.add(url);
-                                }
-
-                                if (driveLink.isNotEmpty) {
-                                  uploadedUrls.add(driveLink);
-                                }
-
-                                setSheetState(() {
-                                  uploadStatus = 'Saving submission records...';
-                                });
-
-                                await _paperService.updateCameraHeartbeat(
-                                  paperId: widget.paperId,
-                                  studentId: user.id,
-                                  isCameraActive: false,
-                                  status: 'submitted',
-                                  submissionPhotos: uploadedUrls,
-                                );
-
-                                if (ctx.mounted) Navigator.of(ctx).pop();
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('✅ පිළිතුරු පත්‍ර (${uploadedUrls.length} Items) සාර්ථකව භාරදෙන ලදී!'),
-                                      backgroundColor: const Color(0xFF22C55E),
-                                    ),
-                                  );
-                                  context.go('/student/papers');
-                                }
-                              } catch (e) {
-                                setSheetState(() {
-                                  isUploading = false;
-                                  uploadStatus = '';
-                                });
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Submission Error: $e'),
-                                      backgroundColor: const Color(0xFFEF4444),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                      icon: isUploading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Icon(Icons.check_circle_rounded, color: Colors.white),
-                      label: Text(
-                        isUploading ? 'Uploading Answer Sheets...' : 'Submit & Finish Exam (විභාගය අවසන් කරන්න)',
-                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<String> _processAndUploadAnswerSheet(File file, int pageIndex, String paperId, String userId) async {
-    final filename = 'p${pageIndex + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-    // Tier 1: Primary Firebase Storage Bucket
-    try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('paper_submissions')
-          .child(paperId)
-          .child(userId)
-          .child(filename);
-      final uploadTask = await storageRef.putFile(
-        file,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-      return await uploadTask.ref.getDownloadURL();
-    } catch (e1) {
-      debugPrint('Primary Storage upload error (sheet): $e1. Trying alternate bucket...');
-    }
-
-    // Tier 2: Alternate Bucket (appspot.com)
-    try {
-      final altStorage = FirebaseStorage.instanceFor(bucket: 'dessert-institute.appspot.com');
-      final altRef = altStorage
-          .ref()
-          .child('paper_submissions')
-          .child(paperId)
-          .child(userId)
-          .child(filename);
-      final uploadTask = await altRef.putFile(
-        file,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-      return await uploadTask.ref.getDownloadURL();
-    } catch (e2) {
-      debugPrint('Alternate Storage upload error (sheet): $e2. Using compressed image fallback.');
-    }
-
-    // Tier 3: Guaranteed In-Memory Compression to Base64 data URI
-    final rawBytes = await file.readAsBytes();
-    try {
-      final codec = await ui.instantiateImageCodec(
-        rawBytes,
-        targetWidth: 800,
-      );
-      final frame = await codec.getNextFrame();
-      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData != null) {
-        final b64 = base64Encode(byteData.buffer.asUint8List());
-        return 'data:image/png;base64,$b64';
-      }
-    } catch (compressErr) {
-      debugPrint('Image compression error (sheet): $compressErr');
-    }
-
-    return 'data:image/jpeg;base64,${base64Encode(rawBytes)}';
   }
 
   void _showExitWarningDialog() {
