@@ -38,7 +38,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _initAuth() async {
     if (_auth.currentUser == null) {
       try {
-        await _auth.signInAnonymously();
+        await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
       } catch (e) {
         debugPrint('Anonymous auth on init: $e');
       }
@@ -55,7 +55,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       if (_auth.currentUser == null) {
         try {
-          await _auth.signInAnonymously();
+          await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
         } catch (_) {}
       }
 
@@ -186,7 +186,7 @@ class AuthProvider extends ChangeNotifier {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) {
         try {
-          final anonResult = await _auth.signInAnonymously();
+          final anonResult = await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
           currentUser = anonResult.user;
         } catch (_) {}
       }
@@ -205,7 +205,14 @@ class AuthProvider extends ChangeNotifier {
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        final updatedDoc = await docRef.get();
+        DocumentSnapshot<Map<String, dynamic>> updatedDoc;
+        try {
+          updatedDoc = await docRef
+              .get(const GetOptions(source: Source.serverAndCache))
+              .timeout(const Duration(seconds: 4));
+        } catch (_) {
+          updatedDoc = await docRef.get(const GetOptions(source: Source.cache));
+        }
         _user = UserModel.fromFirestore(updatedDoc);
       } else {
         // Create new user profile document
@@ -305,7 +312,7 @@ class AuthProvider extends ChangeNotifier {
       // Sign in anonymously if needed
       if (_auth.currentUser == null) {
         try {
-          await _auth.signInAnonymously();
+          await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
         } catch (_) {}
       }
 
