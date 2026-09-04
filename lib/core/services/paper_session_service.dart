@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/paper_session_model.dart';
 
 class PaperSessionService {
@@ -139,17 +140,20 @@ class PaperSessionService {
       final paperSnap = await transaction.get(paperRef);
 
       if (!paperSnap.exists) throw Exception('Paper session does not exist');
-      final rawPaperData = paperSnap.data();
-      final paperData = (rawPaperData is Map) ? Map<String, dynamic>.from(rawPaperData) : <String, dynamic>{};
-      final rawRegData = regSnap.data();
-      final regData = (rawRegData is Map) ? Map<String, dynamic>.from(rawRegData) : null;
+      final Map<String, dynamic> paperData = paperSnap.data() ?? <String, dynamic>{};
+      final Map<String, dynamic>? regData = regSnap.data();
       final previousSlot = regSnap.exists && regData != null ? regData['selectedSlot'] as String? : null;
+
+      Map<String, dynamic> safeSlotMap(dynamic val) {
+        if (val is Map) return Map<String, dynamic>.from(val);
+        return <String, dynamic>{};
+      }
 
       // Update slot counts on paper_sessions
       if (previousSlot != null && previousSlot != slotId) {
         // Switching slot
-        final prevSlotMap = (paperData[previousSlot] is Map) ? Map<String, dynamic>.from(paperData[previousSlot] as Map) : {};
-        final nextSlotMap = (paperData[slotId] is Map) ? Map<String, dynamic>.from(paperData[slotId] as Map) : {};
+        final prevSlotMap = safeSlotMap(paperData[previousSlot]);
+        final nextSlotMap = safeSlotMap(paperData[slotId]);
         final prevCount = ((prevSlotMap['registeredCount'] is num) ? (prevSlotMap['registeredCount'] as num).toInt() : 1) - 1;
         final newCount = ((nextSlotMap['registeredCount'] is num) ? (nextSlotMap['registeredCount'] as num).toInt() : 0) + 1;
         transaction.update(paperRef, {
@@ -158,7 +162,7 @@ class PaperSessionService {
         });
       } else if (!regSnap.exists) {
         // New registration
-        final nextSlotMap = (paperData[slotId] is Map) ? Map<String, dynamic>.from(paperData[slotId] as Map) : {};
+        final nextSlotMap = safeSlotMap(paperData[slotId]);
         final currentCount = ((nextSlotMap['registeredCount'] is num) ? (nextSlotMap['registeredCount'] as num).toInt() : 0) + 1;
         transaction.update(paperRef, {
           '$slotId.registeredCount': currentCount,
