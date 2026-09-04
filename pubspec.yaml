@@ -45,6 +45,7 @@ dependencies:
 
   # Real-Time Video Proctoring (Agora RTC)
   agora_rtc_engine: ^6.3.2
+  agora_token_generator: ^0.0.1
 
   cupertino_icons: ^1.0.8
 

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:agora_token_generator/agora_token_generator.dart';
 
 class AgoraRtcService {
-  // Agora App ID configured for Dessert App
+  // Agora App ID & Primary Certificate configured for Dessert App
   static const String appId = '1a021dff70b447058f17a8881a03834e';
+  static const String appCertificate = '80640aa2f43642b58c993929935a68d9';
 
   /// Generates a deterministic, positive 32-bit integer UID for Agora from a string ID or phone number
   static int getNumericUid(String id) {
@@ -32,6 +34,26 @@ class AgoraRtcService {
     // Agora channel names: alphanumeric and underscores only
     final sanitized = paperId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
     return 'exam_$sanitized';
+  }
+
+  /// Generates a valid HMAC-SHA256 signed Agora RTC token for joining channel
+  static String generateRtcToken({
+    required String channelName,
+    required int uid,
+    int expireSeconds = 86400, // Valid for 24 hours
+  }) {
+    try {
+      return RtcTokenBuilder.buildTokenWithUid(
+        appId: appId,
+        appCertificate: appCertificate,
+        channelName: channelName,
+        uid: uid,
+        tokenExpireSeconds: expireSeconds,
+      );
+    } catch (e) {
+      debugPrint('Error generating Agora token: $e');
+      return '';
+    }
   }
 
   /// Create and initialize an Agora RTC Engine instance
@@ -81,9 +103,11 @@ class AgoraRtcService {
     await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
     await engine.startPreview();
 
-    // Join channel with tokenless mode (or token if provided)
+    // Generate secure token using Primary Certificate
+    final token = generateRtcToken(channelName: channelId, uid: uid);
+
     await engine.joinChannel(
-      token: '',
+      token: token,
       channelId: channelId,
       uid: uid,
       options: const ChannelMediaOptions(
@@ -106,8 +130,11 @@ class AgoraRtcService {
   }) async {
     await engine.setClientRole(role: ClientRoleType.clientRoleAudience);
 
+    // Generate secure token for Admin monitor
+    final token = generateRtcToken(channelName: channelId, uid: uid);
+
     await engine.joinChannel(
-      token: '',
+      token: token,
       channelId: channelId,
       uid: uid,
       options: const ChannelMediaOptions(
