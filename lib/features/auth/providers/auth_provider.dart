@@ -187,9 +187,10 @@ class AuthProvider extends ChangeNotifier {
               .get(const GetOptions(source: Source.cache));
         } catch (_) {}
       }
-      if (existing != null && existing.docs.isNotEmpty) {
+      final existingDocs = existing?.docs;
+      if (existingDocs != null && existingDocs.isNotEmpty) {
         // User already exists, check if has password
-        final existingData = existing.docs.first.data();
+        final existingData = existingDocs.first.data();
         if (existingData['password'] != null && existingData['password'].toString().isNotEmpty) {
           _error = 'An account already exists with this phone number. Please sign in.';
           _setLoading(false);
@@ -210,14 +211,14 @@ class AuthProvider extends ChangeNotifier {
       final uid = currentUser?.uid ?? phone.replaceAll(RegExp(r'\D'), '');
       final isTargetAdmin = isPhoneAdmin(phone);
 
-      if (existing.docs.isNotEmpty) {
+      if (existingDocs != null && existingDocs.isNotEmpty) {
         // Update existing record with password & details
-        final docRef = existing.docs.first.reference;
+        final docRef = existingDocs.first.reference;
         await docRef.update({
           'name': name,
           'password': password,
           'examYear': examYear,
-          'role': isTargetAdmin ? 'admin' : (existing.docs.first.data()['role'] ?? 'student'),
+          'role': isTargetAdmin ? 'admin' : (existingDocs.first.data()['role'] ?? 'student'),
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
@@ -294,7 +295,8 @@ class AuthProvider extends ChangeNotifier {
         } catch (_) {}
       }
 
-      if (userQuery == null || userQuery.docs.isEmpty) {
+      final userDocs = userQuery?.docs;
+      if (userDocs == null || userDocs.isEmpty) {
         // If it's the designated admin phone, auto-create
         if (isPhoneAdmin(phone)) {
           return await registerWithPassword(
@@ -311,7 +313,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      final doc = userQuery.docs.first;
+      final doc = userDocs.first;
       final data = doc.data();
       final storedPassword = data['password']?.toString();
 
@@ -575,8 +577,9 @@ class AuthProvider extends ChangeNotifier {
         } catch (_) {}
       }
 
-      if (userQuery != null && userQuery.docs.isNotEmpty) {
-        final existingDoc = userQuery.docs.first;
+      final queryDocs = userQuery?.docs;
+      if (queryDocs != null && queryDocs.isNotEmpty) {
+        final existingDoc = queryDocs.first;
         final updates = <String, dynamic>{};
         if (targetName.isNotEmpty && (existingDoc.data()['name'] == null || existingDoc.data()['name'].toString().isEmpty || existingDoc.data()['name'].toString().startsWith('Student ('))) {
           updates['name'] = targetName;

@@ -105,19 +105,21 @@ class PaperSessionService {
   // ── 3b. One-shot Fetch for Fast Initial Render & Pull-to-Refresh ──────────
   Future<List<PaperSession>> getSessions({String? examYear}) async {
     try {
-      QuerySnapshot<Map<String, dynamic>> snapshot;
+      QuerySnapshot<Map<String, dynamic>>? snapshot;
       try {
         snapshot = await _firestore
             .collection('paper_sessions')
             .get(const GetOptions(source: Source.serverAndCache))
             .timeout(const Duration(seconds: 4));
       } catch (_) {
-        snapshot = await _firestore
-            .collection('paper_sessions')
-            .get(const GetOptions(source: Source.cache));
+        try {
+          snapshot = await _firestore
+              .collection('paper_sessions')
+              .get(const GetOptions(source: Source.cache));
+        } catch (_) {}
       }
       final list = <PaperSession>[];
-      for (final doc in snapshot.docs) {
+      for (final doc in snapshot?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
         try {
           list.add(PaperSession.fromFirestore(doc));
         } catch (e) {
