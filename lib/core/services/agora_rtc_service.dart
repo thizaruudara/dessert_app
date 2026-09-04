@@ -81,7 +81,7 @@ class AgoraRtcService {
         dimensions: VideoDimensions(width: 360, height: 640),
         frameRate: 15,
         bitrate: 350,
-        orientationMode: OrientationMode.orientationModeAdaptative,
+        orientationMode: OrientationMode.orientationModeAdaptive,
       ),
     );
 

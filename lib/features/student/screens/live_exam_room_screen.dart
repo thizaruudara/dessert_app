@@ -545,7 +545,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               ],
             ),
             actions: [
-              if (!isWaiting && _availableCameras.length > 1)
+              if (!isWaiting && _isCameraInitialized && _agoraEngine != null)
                 IconButton(
                   tooltip: 'Switch Camera (Flip)',
                   icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 20),
@@ -758,7 +758,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                           style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF94A3B8)),
                         ),
                       ),
-                      if (_availableCameras.length > 1)
+                      if (_isCameraInitialized && _agoraEngine != null)
                         TextButton.icon(
                           onPressed: _switchCamera,
                           icon: const Icon(Icons.flip_camera_ios, size: 14, color: Color(0xFF818CF8)),

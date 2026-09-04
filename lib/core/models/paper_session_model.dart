@@ -352,6 +352,8 @@ class ProctorAlert {
     required this.createdAt,
   });
 
+  String get title => senderName.isNotEmpty ? senderName : (type == 'urgent' ? 'Urgent Alert' : 'Proctor Alert');
+
   factory ProctorAlert.fromFirestore(DocumentSnapshot doc) {
     final rawData = doc.data();
     final Map<String, dynamic> data = (rawData is Map)
