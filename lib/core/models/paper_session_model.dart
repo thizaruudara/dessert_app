@@ -215,7 +215,7 @@ class PaperRegistration {
   bool get isOnline {
     if (!isCameraActive) return false;
     if (lastCameraPing == null) return false;
-    return DateTime.now().difference(lastCameraPing!).inSeconds < 15;
+    return DateTime.now().difference(lastCameraPing!).inSeconds < 10;
   }
 
   PaperRegistration({

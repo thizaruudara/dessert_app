@@ -1723,9 +1723,19 @@ class _FullScreenStudentViewerScreen extends StatefulWidget {
 class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewerScreen> {
   final TransformationController _transformationController = TransformationController();
   bool _showControls = true;
+  Timer? _statusTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _statusTicker = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
+    _statusTicker?.cancel();
     _transformationController.dispose();
     super.dispose();
   }

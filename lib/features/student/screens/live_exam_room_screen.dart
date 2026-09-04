@@ -69,13 +69,50 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      // Immediately report camera inactive when student leaves the app or turns off screen
-      _sendHeartbeat(false);
+      // 1. Immediately pause background heartbeat timer so it does NOT fire while app is in background
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
+      // 2. Immediately report camera inactive when student leaves the app or turns off screen
+      _setOfflineStatus();
     } else if (state == AppLifecycleState.resumed) {
       if (_isCameraInitialized) {
+        _startTimers();
         _sendHeartbeat(true);
       }
     }
+  }
+
+  Future<void> _setOfflineStatus() async {
+    try {
+      final user = context.read<AuthProvider>().userModel;
+      if (user == null) return;
+      await _paperService.updateCameraHeartbeat(
+        paperId: widget.paperId,
+        studentId: user.id,
+        isCameraActive: false,
+      );
+    } catch (e) {
+      debugPrint('Error reporting student offline status: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _examCountdownTimer?.cancel();
+    _examCountdownTimer = null;
+    _alertSubscription?.cancel();
+    _alertSubscription = null;
+    _cameraController?.dispose();
+    _cameraController = null;
+    ScreenKeepOnService.setKeepScreenOn(false);
+
+    // Immediately mark offline in Firestore when leaving exam room
+    _setOfflineStatus();
+
+    super.dispose();
   }
 
   Future<void> _ensureStudentRegistered() async {
@@ -150,6 +187,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   }
 
   void _startTimers() {
+    _examCountdownTimer?.cancel();
     _examCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() {
@@ -159,12 +197,18 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     });
 
     // Send proctor heartbeat every 4 seconds (Super-smooth proctoring optimized for 5 students)
+    _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       _sendHeartbeat(_isCameraInitialized);
     });
   }
 
   Future<void> _sendHeartbeat(bool isActive) async {
+    if (!isActive) {
+      await _setOfflineStatus();
+      return;
+    }
+
     if (_isSendingHeartbeat) return;
     _isSendingHeartbeat = true;
 
