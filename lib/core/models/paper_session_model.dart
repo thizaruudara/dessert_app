@@ -211,6 +211,25 @@ class PaperRegistration {
   final String? cameraSnapshotUrl;
   final String? submissionUrl;
   final List<String> submissionPhotos;
+  final int? agoraUid;
+
+  int get computedAgoraUid {
+    if (agoraUid != null && agoraUid! > 0) return agoraUid!;
+    final idToUse = studentPhone.isNotEmpty ? studentPhone : studentId;
+    final digits = idToUse.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length >= 6) {
+      final sub = digits.length > 8 ? digits.substring(digits.length - 8) : digits;
+      final parsed = int.tryParse(sub);
+      if (parsed != null && parsed > 0 && parsed <= 2147483647) {
+        return parsed;
+      }
+    }
+    int hash = 0;
+    for (int i = 0; i < idToUse.length; i++) {
+      hash = (31 * hash + idToUse.codeUnitAt(i)) & 0x7FFFFFFF;
+    }
+    return hash <= 0 ? 1001 : hash;
+  }
 
   bool get isOnline {
     if (!isCameraActive) return false;
@@ -234,6 +253,7 @@ class PaperRegistration {
     this.cameraSnapshotUrl,
     this.submissionUrl,
     this.submissionPhotos = const [],
+    this.agoraUid,
   });
 
   factory PaperRegistration.fromFirestore(DocumentSnapshot doc) {
@@ -286,6 +306,7 @@ class PaperRegistration {
       cameraSnapshotUrl: data['cameraSnapshotUrl']?.toString(),
       submissionUrl: data['submissionUrl']?.toString(),
       submissionPhotos: photos,
+      agoraUid: data['agoraUid'] is num ? (data['agoraUid'] as num).toInt() : null,
     );
   }
 
@@ -305,6 +326,7 @@ class PaperRegistration {
       'cameraSnapshotUrl': cameraSnapshotUrl,
       'submissionUrl': submissionUrl,
       'submissionPhotos': submissionPhotos,
+      'agoraUid': agoraUid,
     };
   }
 }

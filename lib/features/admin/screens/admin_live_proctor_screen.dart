@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/models/paper_session_model.dart';
+import '../../../core/services/agora_rtc_service.dart';
 import '../../../core/services/paper_session_service.dart';
 
 class AdminLiveProctorScreen extends StatefulWidget {
@@ -28,20 +31,76 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   late final Stream<List<PaperRegistration>> _allRegistrationsStream = _paperService.streamSlotRegistrations(widget.paperId, null);
   Timer? _statusTicker;
 
+  // Real-time Agora Video Monitoring
+  RtcEngine? _agoraEngine;
+  final Set<int> _activeStreamingUids = {};
+  bool _isAgoraInitialized = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _initAgoraMonitoring();
     // Periodically update offline calculation every 4s
     _statusTicker = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted) setState(() {});
     });
   }
 
+  Future<void> _initAgoraMonitoring() async {
+    try {
+      await Permission.camera.request();
+      await Permission.microphone.request();
+
+      _agoraEngine = await AgoraRtcService.createAndInitEngine(
+        eventHandler: RtcEngineEventHandler(
+          onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+            debugPrint('Agora Admin monitor joined channel: ${connection.channelId}');
+            if (mounted) {
+              setState(() {
+                _isAgoraInitialized = true;
+              });
+            }
+          },
+          onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+            debugPrint('Agora Admin detected remote student streaming: $remoteUid');
+            if (mounted) {
+              setState(() {
+                _activeStreamingUids.add(remoteUid);
+              });
+            }
+          },
+          onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+            debugPrint('Agora Admin detected student stream offline: $remoteUid');
+            if (mounted) {
+              setState(() {
+                _activeStreamingUids.remove(remoteUid);
+              });
+            }
+          },
+          onError: (ErrorCodeType err, String msg) {
+            debugPrint('Agora Admin monitor error: $err - $msg');
+          },
+        ),
+      );
+
+      final channelName = AgoraRtcService.getChannelName(widget.paperId);
+      await AgoraRtcService.joinAsAudience(
+        engine: _agoraEngine!,
+        channelId: channelName,
+        uid: 1, // Admin monitor UID
+      );
+    } catch (e) {
+      debugPrint('Agora Admin monitor init error: $e');
+    }
+  }
+
   @override
   void dispose() {
     _statusTicker?.cancel();
     _tabController.dispose();
+    AgoraRtcService.leaveAndRelease(_agoraEngine);
+    _agoraEngine = null;
     super.dispose();
   }
 
@@ -295,6 +354,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   Widget _buildStudentProctorCard(PaperRegistration reg) {
     final isLive = reg.isOnline;
     final isSubmitted = reg.status == 'submitted';
+    final studentUid = reg.computedAgoraUid;
+    final bool isStreamingVideo = _isAgoraInitialized && _agoraEngine != null && _activeStreamingUids.contains(studentUid);
 
     return Container(
       decoration: BoxDecoration(
@@ -303,16 +364,18 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
         border: Border.all(
           color: isSubmitted
               ? const Color(0xFF38BDF8)
-              : isLive
+              : isStreamingVideo
                   ? const Color(0xFF22C55E)
-                  : const Color(0xFFEF4444),
-          width: isLive ? 1.5 : 1,
+                  : isLive
+                      ? const Color(0xFF3B82F6)
+                      : const Color(0xFFEF4444),
+          width: (isStreamingVideo || isLive) ? 1.5 : 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Camera Preview Area / Live Image Stream (Tap to view full screen)
+          // Camera Preview Area / Live Real-Time Stream (Tap to view full screen)
           Expanded(
             child: InkWell(
               onTap: () => _showFullScreenStudentViewer(reg),
@@ -323,7 +386,17 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
+                      if (isStreamingVideo)
+                        AgoraVideoView(
+                          controller: VideoViewController.remote(
+                            rtcEngine: _agoraEngine!,
+                            canvas: VideoCanvas(uid: studentUid),
+                            connection: RtcConnection(
+                              channelId: AgoraRtcService.getChannelName(widget.paperId),
+                            ),
+                          ),
+                        )
+                      else if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
                         Builder(
                           builder: (_) {
                             try {
@@ -347,17 +420,53 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isLive ? const Color(0xFF22C55E).withOpacity(0.85) : const Color(0xFFEF4444).withOpacity(0.85),
+                            color: isSubmitted
+                                ? const Color(0xFF38BDF8).withOpacity(0.85)
+                                : isStreamingVideo
+                                    ? const Color(0xFF22C55E).withOpacity(0.9)
+                                    : isLive
+                                        ? const Color(0xFF3B82F6).withOpacity(0.85)
+                                        : const Color(0xFFEF4444).withOpacity(0.85),
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: isLive ? const Color(0xFF22C55E) : const Color(0xFFEF4444)),
-                          ),
-                          child: Text(
-                            isSubmitted ? 'SUBMITTED' : isLive ? 'ONLINE' : 'OFFLINE',
-                            style: GoogleFonts.poppins(
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            border: Border.all(
+                              color: isSubmitted
+                                  ? const Color(0xFF38BDF8)
+                                  : isStreamingVideo
+                                      ? const Color(0xFF22C55E)
+                                      : isLive
+                                          ? const Color(0xFF3B82F6)
+                                          : const Color(0xFFEF4444),
                             ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isStreamingVideo) ...[
+                                Container(
+                                  width: 5,
+                                  height: 5,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                isSubmitted
+                                    ? 'SUBMITTED'
+                                    : isStreamingVideo
+                                        ? 'LIVE'
+                                        : isLive
+                                            ? 'ONLINE'
+                                            : 'OFFLINE',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -894,11 +1003,17 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 
 
   void _showFullScreenStudentViewer(PaperRegistration student) {
+    final studentUid = student.computedAgoraUid;
+    final bool isStreaming = _isAgoraInitialized && _agoraEngine != null && _activeStreamingUids.contains(studentUid);
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => _FullScreenStudentViewerScreen(
           initialRegistration: student,
           paperService: _paperService,
+          agoraEngine: _agoraEngine,
+          isAgoraStreaming: isStreaming,
+          channelId: AgoraRtcService.getChannelName(widget.paperId),
           onSendAlert: (s) => _showDirectMessageSheet(s),
           onViewAnswers: (s) => _showStudentSubmissionViewer(s),
         ),
@@ -1706,12 +1821,18 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 class _FullScreenStudentViewerScreen extends StatefulWidget {
   final PaperRegistration initialRegistration;
   final PaperSessionService paperService;
+  final RtcEngine? agoraEngine;
+  final bool isAgoraStreaming;
+  final String channelId;
   final void Function(PaperRegistration) onSendAlert;
   final void Function(PaperRegistration) onViewAnswers;
 
   const _FullScreenStudentViewerScreen({
     required this.initialRegistration,
     required this.paperService,
+    this.agoraEngine,
+    this.isAgoraStreaming = false,
+    this.channelId = '',
     required this.onSendAlert,
     required this.onViewAnswers,
   });
@@ -1786,6 +1907,17 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
                     scaleEnabled: true,
                     child: Builder(
                       builder: (context) {
+                        if (widget.agoraEngine != null && widget.isAgoraStreaming) {
+                          return SizedBox.expand(
+                            child: AgoraVideoView(
+                              controller: VideoViewController.remote(
+                                rtcEngine: widget.agoraEngine!,
+                                canvas: VideoCanvas(uid: reg.computedAgoraUid),
+                                connection: RtcConnection(channelId: widget.channelId),
+                              ),
+                            ),
+                          );
+                        }
                         final raw = reg.cameraSnapshotUrl;
                         if (raw != null && raw.isNotEmpty) {
                           try {
@@ -1881,16 +2013,20 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
                                   decoration: BoxDecoration(
                                     color: isSubmitted
                                         ? const Color(0xFF38BDF8).withOpacity(0.2)
-                                        : isLive
+                                        : widget.isAgoraStreaming
                                             ? const Color(0xFF22C55E).withOpacity(0.2)
-                                            : const Color(0xFFEF4444).withOpacity(0.2),
+                                            : isLive
+                                                ? const Color(0xFF3B82F6).withOpacity(0.2)
+                                                : const Color(0xFFEF4444).withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
                                       color: isSubmitted
                                           ? const Color(0xFF38BDF8)
-                                          : isLive
+                                          : widget.isAgoraStreaming
                                               ? const Color(0xFF22C55E)
-                                              : const Color(0xFFEF4444),
+                                              : isLive
+                                                  ? const Color(0xFF3B82F6)
+                                                  : const Color(0xFFEF4444),
                                       width: 1,
                                     ),
                                   ),

@@ -244,6 +244,7 @@ class PaperSessionService {
     String? cameraSnapshotUrl,
     String? status,
     List<String>? submissionPhotos,
+    int? agoraUid,
   }) async {
     await _ensureAuth();
     final regDocId = '${paperId}_$studentId';
@@ -253,6 +254,9 @@ class PaperSessionService {
       'isCameraActive': isCameraActive,
       'lastCameraPing': FieldValue.serverTimestamp(),
     };
+    if (agoraUid != null && agoraUid > 0) {
+      updates['agoraUid'] = agoraUid;
+    }
     if (studentName != null && studentName.trim().isNotEmpty) {
       updates['studentName'] = studentName.trim();
     }

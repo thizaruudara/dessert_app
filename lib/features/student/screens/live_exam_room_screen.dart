@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:camera/camera.dart';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/paper_session_model.dart';
+import '../../../core/services/agora_rtc_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/paper_session_service.dart';
 import '../../../core/services/screen_keep_on_service.dart';
@@ -34,7 +35,8 @@ class LiveExamRoomScreen extends StatefulWidget {
 class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBindingObserver {
   final PaperSessionService _paperService = PaperSessionService();
   late final Stream<PaperSession?> _sessionStream = _paperService.streamPaperSession(widget.paperId);
-  CameraController? _cameraController;
+  RtcEngine? _agoraEngine;
+  int _studentNumericUid = 0;
   bool _isCameraInitialized = false;
   bool _isCameraPermissionGranted = false;
   Timer? _heartbeatTimer;
@@ -46,9 +48,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   StreamSubscription<List<ProctorAlert>>? _alertSubscription;
   final Set<String> _shownAlertIds = {};
 
-  // Camera flip and availability
-  List<CameraDescription> _availableCameras = [];
-  int _selectedCameraIndex = 0;
   bool _isSendingHeartbeat = false;
   bool _hasExitedDueToEnd = false;
   bool _hasPromptedTimeUp = false;
@@ -91,6 +90,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         paperId: widget.paperId,
         studentId: user.id,
         isCameraActive: false,
+        agoraUid: _studentNumericUid,
       );
     } catch (e) {
       debugPrint('Error reporting student offline status: $e');
@@ -106,8 +106,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     _examCountdownTimer = null;
     _alertSubscription?.cancel();
     _alertSubscription = null;
-    _cameraController?.dispose();
-    _cameraController = null;
+
+    // Leave Agora Channel & Clean up RTC Engine
+    AgoraRtcService.leaveAndRelease(_agoraEngine);
+    _agoraEngine = null;
+
     ScreenKeepOnService.setKeepScreenOn(false);
 
     // Immediately mark offline in Firestore when leaving exam room
@@ -134,57 +137,61 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
 
   Future<void> _initCamera() async {
     final status = await Permission.camera.request();
+    await Permission.microphone.request();
+
     if (status.isGranted) {
-      setState(() {
-        _isCameraPermissionGranted = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isCameraPermissionGranted = true;
+        });
+      }
 
       try {
-        _availableCameras = await availableCameras();
-        if (_availableCameras.isEmpty) return;
+        final user = context.read<AuthProvider>().userModel;
+        final idToHash = (user != null && user.phone.isNotEmpty) ? user.phone : (user?.id ?? widget.slotId);
+        _studentNumericUid = AgoraRtcService.getNumericUid(idToHash);
 
-        // Prefer front camera for proctoring
-        final frontIndex = _availableCameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
-        _selectedCameraIndex = frontIndex != -1 ? frontIndex : 0;
+        _agoraEngine = await AgoraRtcService.createAndInitEngine(
+          eventHandler: RtcEngineEventHandler(
+            onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+              debugPrint('Agora Student joined: ${connection.channelId} (uid: $_studentNumericUid)');
+              if (mounted) {
+                setState(() {
+                  _isCameraInitialized = true;
+                });
+                _sendHeartbeat(true);
+              }
+            },
+            onError: (ErrorCodeType err, String msg) {
+              debugPrint('Agora Student error: $err - $msg');
+            },
+          ),
+        );
 
-        await _startCameraController(_availableCameras[_selectedCameraIndex]);
+        final channelName = AgoraRtcService.getChannelName(widget.paperId);
+        await AgoraRtcService.joinAsBroadcaster(
+          engine: _agoraEngine!,
+          channelId: channelName,
+          uid: _studentNumericUid,
+        );
       } catch (e) {
-        debugPrint('Camera init error: $e');
+        debugPrint('Agora Camera init error: $e');
       }
     } else {
-      setState(() {
-        _isCameraPermissionGranted = false;
-      });
-    }
-  }
-
-  Future<void> _startCameraController(CameraDescription camera) async {
-    // Use ResolutionPreset.low for invigilator snapshots:
-    // Super lightweight (~20-30 KB), prevents Wi-Fi network congestion,
-    // avoids Firestore 1MB document limit, and uploads in milliseconds!
-    _cameraController = CameraController(
-      camera,
-      ResolutionPreset.low,
-      enableAudio: false,
-    );
-
-    await _cameraController!.initialize();
-    if (mounted) {
-      setState(() {
-        _isCameraInitialized = true;
-      });
-      _sendHeartbeat(true);
+      if (mounted) {
+        setState(() {
+          _isCameraPermissionGranted = false;
+        });
+      }
     }
   }
 
   Future<void> _switchCamera() async {
-    if (_availableCameras.length <= 1) return;
-    _selectedCameraIndex = (_selectedCameraIndex + 1) % _availableCameras.length;
-    await _cameraController?.dispose();
-    setState(() {
-      _isCameraInitialized = false;
-    });
-    await _startCameraController(_availableCameras[_selectedCameraIndex]);
+    try {
+      await _agoraEngine?.switchCamera();
+    } catch (e) {
+      debugPrint('Error switching camera: $e');
+    }
   }
 
   void _startTimers() {
@@ -197,7 +204,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       }
     });
 
-    // Send proctor heartbeat every 4 seconds (Super-smooth proctoring optimized for 5 students)
+    // Send proctor heartbeat every 4 seconds (Super-smooth proctoring without heavy images)
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       _sendHeartbeat(_isCameraInitialized);
@@ -217,21 +224,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       final user = context.read<AuthProvider>().userModel;
       if (user == null) return;
 
-      String? snapshotBase64;
-      // Only capture heavy camera photo snapshots during live active exam phases, NOT while in the waiting room
-      if (isActive && !_isCurrentlyWaiting && _cameraController != null && _cameraController!.value.isInitialized) {
-        try {
-          final image = await _cameraController!.takePicture();
-          final bytes = await image.readAsBytes();
-          snapshotBase64 = base64Encode(bytes);
-          try {
-            File(image.path).delete().catchError((_) => image as FileSystemEntity);
-          } catch (_) {}
-        } catch (e) {
-          debugPrint('Snapshot capture error: $e');
-        }
-      }
-
       await _paperService.updateCameraHeartbeat(
         paperId: widget.paperId,
         studentId: user.id,
@@ -239,9 +231,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         studentPhone: user.phone,
         slotId: widget.slotId.isNotEmpty ? widget.slotId : 'slot1',
         isCameraActive: isActive,
-        cameraSnapshotUrl: snapshotBase64,
+        agoraUid: _studentNumericUid,
         status: 'in_exam',
       );
+    } catch (e) {
+      debugPrint('Heartbeat error: $e');
     } finally {
       _isSendingHeartbeat = false;
     }
@@ -730,8 +724,13 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     height: 220,
                     width: double.infinity,
                     color: Colors.black,
-                    child: _isCameraInitialized && _cameraController != null
-                        ? CameraPreview(_cameraController!)
+                    child: _isCameraInitialized && _agoraEngine != null
+                        ? AgoraVideoView(
+                            controller: VideoViewController(
+                              rtcEngine: _agoraEngine!,
+                              canvas: const VideoCanvas(uid: 0),
+                            ),
+                          )
                         : Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -931,7 +930,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       );
     }
 
-    if (!_isCameraInitialized || _cameraController == null) {
+    if (!_isCameraInitialized || _agoraEngine == null) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -945,12 +944,10 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     }
 
     return SizedBox.expand(
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: _cameraController!.value.previewSize?.height ?? 720,
-          height: _cameraController!.value.previewSize?.width ?? 1280,
-          child: CameraPreview(_cameraController!),
+      child: AgoraVideoView(
+        controller: VideoViewController(
+          rtcEngine: _agoraEngine!,
+          canvas: const VideoCanvas(uid: 0),
         ),
       ),
     );
@@ -1370,8 +1367,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     // 1. Temporarily pause proctor heartbeat & release front proctor camera
     // to prevent Android camera device contention when opening rear scanner
     _heartbeatTimer?.cancel();
-    await _cameraController?.dispose();
-    _cameraController = null;
+    await AgoraRtcService.leaveAndRelease(_agoraEngine);
+    _agoraEngine = null;
     if (mounted) {
       setState(() {
         _isCameraInitialized = false;
