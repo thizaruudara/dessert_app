@@ -642,28 +642,26 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   ),
                                 );
                               }
-                            : selectedSlotId == null
-                                ? () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('කරුණාකර ඉහතින් Morning හෝ Evening සැසියක් තෝරන්න.'),
-                                        backgroundColor: Color(0xFFEF4444),
-                                      ),
-                                    );
-                                  }
-                                : () {
-                                    final auth = context.read<AuthProvider>().userModel;
-                                    if (auth != null && selectedSlotId != null) {
-                                      _paperService.registerStudentSlot(
-                                        paperId: session.id,
-                                        studentId: auth.id,
-                                        studentName: auth.name,
-                                        studentPhone: auth.phone,
-                                        slotId: selectedSlotId,
-                                      ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
-                                    }
-                                    context.push('/student/papers/exam/${session.id}?slot=$selectedSlotId');
-                                  },
+                            : () {
+                                final auth = context.read<AuthProvider>().userModel;
+                                final effectiveSlotId = selectedSlotId ?? 'slot1';
+                                if (auth != null) {
+                                  _paperService.registerStudentSlot(
+                                    paperId: session.id,
+                                    studentId: auth.id,
+                                    studentName: auth.name,
+                                    studentPhone: auth.phone,
+                                    slotId: effectiveSlotId,
+                                  ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
+                                }
+                                final targetUrl = '/student/papers/exam/${session.id}?slot=$effectiveSlotId';
+                                try {
+                                  context.push(targetUrl);
+                                } catch (e) {
+                                  debugPrint('Student exam route push failed: $e, trying go');
+                                  context.go(targetUrl);
+                                }
+                              },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

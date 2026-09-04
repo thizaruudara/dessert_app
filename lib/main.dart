@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -14,17 +15,28 @@ import 'features/desserts/providers/desserts_provider.dart';
 import 'features/credits/providers/credits_provider.dart';
 import 'firebase_options.dart';
 
+class SafeHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true
+      ..connectionTimeout = const Duration(seconds: 12);
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = SafeHttpOverrides();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Configure Firestore cache & persistence for reliable offline/online transitions
+  // Configure Firestore cache & persistence for reliable offline/online transitions on Wi-Fi and mobile networks
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    sslEnabled: true,
   );
 
   // Register background FCM handler

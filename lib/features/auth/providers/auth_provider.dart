@@ -68,8 +68,24 @@ class AuthProvider extends ChangeNotifier {
       }
 
       if (_user == null && savedPhone != null && savedPhone.isNotEmpty) {
-        final q = await _db.collection('users').where('phone', isEqualTo: savedPhone).limit(1).get();
-        if (q.docs.isNotEmpty) {
+        QuerySnapshot<Map<String, dynamic>>? q;
+        try {
+          q = await _db
+              .collection('users')
+              .where('phone', isEqualTo: savedPhone)
+              .limit(1)
+              .get(const GetOptions(source: Source.serverAndCache))
+              .timeout(const Duration(seconds: 4));
+        } catch (_) {
+          try {
+            q = await _db
+                .collection('users')
+                .where('phone', isEqualTo: savedPhone)
+                .limit(1)
+                .get(const GetOptions(source: Source.cache));
+          } catch (_) {}
+        }
+        if (q != null && q.docs.isNotEmpty) {
           var u = UserModel.fromFirestore(q.docs.first);
           if (isPhoneAdmin(u.phone) && !u.isAdmin) {
             u = u.copyWith(role: UserRole.admin);
@@ -108,8 +124,24 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _fetchUser(String uid) async {
     try {
-      final doc = await _db.collection('users').doc(uid).get();
-      if (doc.exists) {
+      DocumentSnapshot<Map<String, dynamic>>? doc;
+      try {
+        doc = await _db
+            .collection('users')
+            .doc(uid)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 4));
+      } catch (e) {
+        debugPrint('Fetch user server timeout on Wi-Fi, trying cache: $e');
+        try {
+          doc = await _db
+              .collection('users')
+              .doc(uid)
+              .get(const GetOptions(source: Source.cache));
+        } catch (_) {}
+      }
+
+      if (doc != null && doc.exists) {
         var u = UserModel.fromFirestore(doc);
         if (isPhoneAdmin(u.phone) && !u.isAdmin) {
           u = u.copyWith(role: UserRole.admin);
@@ -219,10 +251,27 @@ class AuthProvider extends ChangeNotifier {
     _currentPhone = phone;
 
     try {
-      // 1. Query user by phone
-      final userQuery = await _db.collection('users').where('phone', isEqualTo: phone).limit(1).get();
+      // 1. Query user by phone with timeout fallback to avoid Wi-Fi freeze
+      QuerySnapshot<Map<String, dynamic>>? userQuery;
+      try {
+        userQuery = await _db
+            .collection('users')
+            .where('phone', isEqualTo: phone)
+            .limit(1)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 6));
+      } catch (e) {
+        debugPrint('Query by phone timed out on server, trying cache: $e');
+        try {
+          userQuery = await _db
+              .collection('users')
+              .where('phone', isEqualTo: phone)
+              .limit(1)
+              .get(const GetOptions(source: Source.cache));
+        } catch (_) {}
+      }
 
-      if (userQuery.docs.isEmpty) {
+      if (userQuery == null || userQuery.docs.isEmpty) {
         // If it's the designated admin phone, auto-create
         if (isPhoneAdmin(phone)) {
           return await registerWithPassword(

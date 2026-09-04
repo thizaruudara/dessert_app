@@ -28,14 +28,26 @@ class _SplashScreenState extends State<SplashScreen>
     _ctrl.forward();
 
     // Navigate after a short delay (auth state listener will redirect)
-    Future.delayed(const Duration(milliseconds: 2000), () {
-      if (mounted) {
-        final auth = context.read<AuthProvider>();
+    Future.delayed(const Duration(milliseconds: 2200), () async {
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (auth.isLoggedIn) {
+        context.go(auth.isAdmin ? '/admin' : '/student');
+        return;
+      }
+
+      // Check for up to 2 extra seconds if background auth restore is finalizing over Wi-Fi
+      for (int i = 0; i < 4; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
         if (auth.isLoggedIn) {
           context.go(auth.isAdmin ? '/admin' : '/student');
-        } else {
-          context.go('/auth/login');
+          return;
         }
+      }
+
+      if (mounted) {
+        context.go('/auth/login');
       }
     });
   }

@@ -352,7 +352,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
-                      context.push('/admin/papers/proctor/${session.id}');
+                      final targetUrl = '/admin/papers/proctor/${session.id}';
+                      try {
+                        context.push(targetUrl);
+                      } catch (e) {
+                        debugPrint('Admin proctor push failed: $e, trying go');
+                        context.go(targetUrl);
+                      }
                     },
                     icon: const Icon(Icons.videocam_outlined, size: 18, color: Colors.white),
                     label: Text(

@@ -19,6 +19,13 @@ class MainActivity: FlutterActivity() {
     private val CHANNEL_ID = "edupeak_high_importance_channel"
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Enforce IPv4 priority over IPv6 to resolve Sri Lankan Dialog/SLT router gRPC hangs
+        try {
+            System.setProperty("java.net.preferIPv4Stack", "true")
+            System.setProperty("java.net.preferIPv6Addresses", "false")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         super.onCreate(savedInstanceState)
         createNotificationChannel()
     }

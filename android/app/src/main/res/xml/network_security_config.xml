@@ -10,6 +10,16 @@
         <domain includeSubdomains="true">googleapis.com</domain>
         <domain includeSubdomains="true">firebaseio.com</domain>
         <domain includeSubdomains="true">firebasestorage.app</domain>
+        <domain includeSubdomains="true">firebaseapp.com</domain>
         <domain includeSubdomains="true">google.com</domain>
+        <domain includeSubdomains="true">gstatic.com</domain>
+        <domain includeSubdomains="true">agora.io</domain>
+        <domain includeSubdomains="true">sd-rtn.com</domain>
+        <domain includeSubdomains="true">edge.agora.io</domain>
+        <domain includeSubdomains="true">agoraio.cn</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
     </domain-config>
 </network-security-config>

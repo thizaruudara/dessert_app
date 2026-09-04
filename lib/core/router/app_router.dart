@@ -123,6 +123,27 @@ class AppRouter {
         },
       ),
 
+      // ── Full-Screen Exam & Proctoring (Root Navigator, Outside Shells) ──
+      GoRoute(
+        path: '/student/papers/exam/:id',
+        pageBuilder: (context, state) => _buildSmoothPage(
+          key: state.pageKey,
+          child: LiveExamRoomScreen(
+            paperId: state.pathParameters['id']!,
+            slotId: state.uri.queryParameters['slot'] ?? 'slot1',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/papers/proctor/:id',
+        pageBuilder: (context, state) => _buildSmoothPage(
+          key: state.pageKey,
+          child: AdminLiveProctorScreen(
+            paperId: state.pathParameters['id']!,
+          ),
+        ),
+      ),
+
       // ── Student Shell ─────────────────────────────────────
       ShellRoute(
         builder: (_, __, child) => StudentShell(child: child),
@@ -134,17 +155,6 @@ class AppRouter {
           GoRoute(
             path: '/student/papers',
             builder: (_, __) => const PaperSessionsScreen(),
-          ),
-          GoRoute(
-            parentNavigatorKey: _rootNavigatorKey,
-            path: '/student/papers/exam/:id',
-            pageBuilder: (context, state) => _buildSmoothPage(
-              key: state.pageKey,
-              child: LiveExamRoomScreen(
-                paperId: state.pathParameters['id']!,
-                slotId: state.uri.queryParameters['slot'] ?? 'slot1',
-              ),
-            ),
           ),
           GoRoute(
             path: '/student/leaderboard',
@@ -185,16 +195,6 @@ class AppRouter {
           GoRoute(
             path: '/admin/papers',
             builder: (_, __) => const AdminPaperSessionsScreen(),
-          ),
-          GoRoute(
-            parentNavigatorKey: _rootNavigatorKey,
-            path: '/admin/papers/proctor/:id',
-            pageBuilder: (context, state) => _buildSmoothPage(
-              key: state.pageKey,
-              child: AdminLiveProctorScreen(
-                paperId: state.pathParameters['id']!,
-              ),
-            ),
           ),
           GoRoute(
             path: '/admin/sprints',
