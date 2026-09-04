@@ -18,9 +18,10 @@ import 'firebase_options.dart';
 class SafeHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true
-      ..connectionTimeout = const Duration(seconds: 12);
+    final client = super.createHttpClient(context);
+    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    client.connectionTimeout = const Duration(seconds: 12);
+    return client;
   }
 }
 
