@@ -126,7 +126,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
               indicatorWeight: 3,
               labelColor: Colors.white,
               unselectedLabelColor: const Color(0xFF94A3B8),
-              tabs: const [
+              tabs: [
                 Tab(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
