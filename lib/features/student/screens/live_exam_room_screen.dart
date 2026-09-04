@@ -43,6 +43,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   // Camera flip and availability
   List<CameraDescription> _availableCameras = [];
   int _selectedCameraIndex = 0;
+  bool _isSendingHeartbeat = false;
 
   @override
   void initState() {
@@ -113,34 +114,41 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
       }
     });
 
-    // Send proctor heartbeat every 15 seconds
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    // Send proctor heartbeat every 4 seconds (Super-smooth proctoring optimized for 5 students)
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       _sendHeartbeat(_isCameraInitialized);
     });
   }
 
   Future<void> _sendHeartbeat(bool isActive) async {
-    final user = context.read<AuthProvider>().userModel;
-    if (user == null) return;
+    if (_isSendingHeartbeat) return;
+    _isSendingHeartbeat = true;
 
-    String? snapshotBase64;
-    if (isActive && _cameraController != null && _cameraController!.value.isInitialized) {
-      try {
-        final image = await _cameraController!.takePicture();
-        final bytes = await image.readAsBytes();
-        snapshotBase64 = base64Encode(bytes);
-      } catch (e) {
-        debugPrint('Snapshot capture error: $e');
+    try {
+      final user = context.read<AuthProvider>().userModel;
+      if (user == null) return;
+
+      String? snapshotBase64;
+      if (isActive && _cameraController != null && _cameraController!.value.isInitialized) {
+        try {
+          final image = await _cameraController!.takePicture();
+          final bytes = await image.readAsBytes();
+          snapshotBase64 = base64Encode(bytes);
+        } catch (e) {
+          debugPrint('Snapshot capture error: $e');
+        }
       }
-    }
 
-    await _paperService.updateCameraHeartbeat(
-      paperId: widget.paperId,
-      studentId: user.id,
-      isCameraActive: isActive,
-      cameraSnapshotUrl: snapshotBase64,
-      status: 'in_exam',
-    );
+      await _paperService.updateCameraHeartbeat(
+        paperId: widget.paperId,
+        studentId: user.id,
+        isCameraActive: isActive,
+        cameraSnapshotUrl: snapshotBase64,
+        status: 'in_exam',
+      );
+    } finally {
+      _isSendingHeartbeat = false;
+    }
   }
 
   void _listenForProctorAlerts() {
