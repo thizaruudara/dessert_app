@@ -326,17 +326,21 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         final selectedSlotId = registration?.selectedSlot ?? (session.slot2 == null ? 'slot1' : null);
         final selectedSlot = (selectedSlotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
-        // Calculate countdown to the selected slot or slot 1 fallback
         final targetSlot = selectedSlot;
-        // Session ends ONLY if Admin manually ended it:
         final bool isEnded = session.isEnded;
-        final bool isLive = !isEnded && (session.isActive || _now.isAfter(targetSlot.startTime));
-        final bool isUpcoming = !isEnded && !isLive;
+        final bool isWaiting = session.isWaiting;
+        final bool isPackageOpening = session.isPackageOpening;
+        final bool isWriting = session.isWriting;
+        final bool isTimeUp = session.isTimeUp;
+        final bool isLive = !isEnded && !isWaiting && (session.isActive || isPackageOpening || isWriting || isTimeUp);
+        final bool isUpcoming = !isEnded && isWaiting;
 
-        // 10-Minute Package Opening Phase (First 10 minutes of live session)
-        final int elapsedSeconds = isLive ? _now.difference(targetSlot.startTime).inSeconds : 0;
-        final bool isPackageOpening = isLive && elapsedSeconds >= 0 && elapsedSeconds < 600;
-        final int packageRemainingSecs = isPackageOpening ? (600 - elapsedSeconds) : 0;
+        // 10-Minute Package Opening Phase (directly synchronized with examiner trigger)
+        int packageRemainingSecs = 600;
+        if (session.packageOpeningStartedAt != null) {
+          final elapsed = _now.difference(session.packageOpeningStartedAt!).inSeconds;
+          packageRemainingSecs = (600 - elapsed).clamp(0, 600);
+        }
 
         Duration remaining = isUpcoming ? targetSlot.startTime.difference(_now) : Duration.zero;
         if (remaining.isNegative) remaining = Duration.zero;
@@ -558,10 +562,14 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                     isLive
                                         ? (isPackageOpening
                                             ? '📦 පැකේජය විවෘත කිරීමේ කාලය (Package Opening)'
-                                            : 'විභාග සැසිය සක්‍රීයයි (Session is Live)!')
+                                            : (isWriting
+                                                ? '✍️ විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)'
+                                                : (isTimeUp
+                                                    ? '⏰ වේලාව අවසන් (Time Up - Scan Answers)'
+                                                    : 'විභාග සැසිය සක්‍රීයයි (Session is Live)!')))
                                         : isEnded
                                             ? 'සැසිය අවසන් (Session Completed)'
-                                            : (session.isWaiting
+                                            : (isWaiting
                                                 ? '⏳ විභාග පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)'
                                                 : '${targetSlot.name} ආරම්භ වීමට:'),
                                     style: GoogleFonts.poppins(
@@ -575,21 +583,27 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                     isLive
                                         ? (isPackageOpening
                                             ? 'කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (${(packageRemainingSecs ~/ 60).toString().padLeft(2, '0')}:${(packageRemainingSecs % 60).toString().padLeft(2, '0')})'
-                                            : 'වහාම Exam Room එකට පිවිසෙන්න')
+                                            : (isWriting
+                                                ? 'දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)'
+                                                : (isTimeUp
+                                                    ? 'පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න'
+                                                    : 'වහාම Exam Room එකට පිවිසෙන්න')))
                                         : isEnded
                                             ? 'ස්තුතියි, සැසිය අවසන් කර ඇත.'
-                                            : (session.isWaiting
+                                            : (isWaiting
                                                 ? 'පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)'
                                                 : '$hours : $minutes : $seconds'),
                                     style: GoogleFonts.poppins(
-                                      fontSize: isLive || isEnded || session.isWaiting ? 13 : 18,
+                                      fontSize: isLive || isEnded || isWaiting ? 13 : 18,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: (isLive && !isPackageOpening) || isEnded || session.isWaiting ? 0 : 2,
+                                      letterSpacing: (isLive && !isPackageOpening) || isEnded || isWaiting ? 0 : 2,
                                       color: isLive
-                                          ? (isPackageOpening ? const Color(0xFFF59E0B) : const Color(0xFF4ADE80))
+                                          ? (isPackageOpening
+                                              ? const Color(0xFFF59E0B)
+                                              : (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF4ADE80)))
                                           : isEnded
                                               ? const Color(0xFF94A3B8)
-                                              : (session.isWaiting ? const Color(0xFF818CF8) : const Color(0xFFF59E0B)),
+                                              : (isWaiting ? const Color(0xFF818CF8) : const Color(0xFFF59E0B)),
                                     ),
                                   ),
                                 ],
@@ -610,7 +624,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           backgroundColor: selectedSlotId == null
                               ? const Color(0xFF334155)
                               : isLive
-                                  ? const Color(0xFF22C55E)
+                                  ? (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF22C55E))
                                   : isUpcoming
                                       ? const Color(0xFF6366F1)
                                       : const Color(0xFF334155),
@@ -644,7 +658,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           children: [
                             Icon(
                               isLive
-                                  ? Icons.videocam
+                                  ? (isTimeUp ? Icons.document_scanner : Icons.videocam)
                                   : isUpcoming
                                       ? Icons.meeting_room
                                       : Icons.check_circle_outline,

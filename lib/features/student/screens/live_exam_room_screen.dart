@@ -38,6 +38,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   Timer? _heartbeatTimer;
   Timer? _examCountdownTimer;
   DateTime _now = DateTime.now();
+  final DateTime _enteredRoomAt = DateTime.now().subtract(const Duration(seconds: 10));
+  bool _isCurrentlyWaiting = true;
 
   StreamSubscription<List<ProctorAlert>>? _alertSubscription;
   final Set<String> _shownAlertIds = {};
@@ -170,7 +172,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       if (user == null) return;
 
       String? snapshotBase64;
-      if (isActive && _cameraController != null && _cameraController!.value.isInitialized) {
+      // Only capture heavy camera photo snapshots during live active exam phases, NOT while in the waiting room
+      if (isActive && !_isCurrentlyWaiting && _cameraController != null && _cameraController!.value.isInitialized) {
         try {
           final image = await _cameraController!.takePicture();
           final bytes = await image.readAsBytes();
@@ -207,17 +210,75 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         for (final alert in alerts) {
           if (!alert.isRead && !_shownAlertIds.contains(alert.id)) {
             _shownAlertIds.add(alert.id);
-            _showProctorAlertDialog(alert);
+            // Skip old historical alerts that occurred before student entered room
+            if (alert.createdAt.isBefore(_enteredRoomAt)) {
+              continue;
+            }
+            if (alert.studentId == 'ALL') {
+              _showBroadcastAlertNotification(alert);
+            } else {
+              _showProctorAlertDialog(alert);
+            }
           }
         }
       });
     }
   }
 
+  void _showBroadcastAlertNotification(ProctorAlert alert) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 75),
+        backgroundColor: alert.type == 'urgent'
+            ? const Color(0xFFEF4444)
+            : const Color(0xFF6366F1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        duration: const Duration(seconds: 5),
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                alert.type == 'urgent' ? Icons.warning_amber_rounded : Icons.campaign_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    alert.senderName.isNotEmpty ? alert.senderName : 'Examiner Notice (විභාග පරීක්ෂක)',
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    alert.message,
+                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showProctorAlertDialog(ProctorAlert alert) {
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -339,6 +400,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         final bool isWaiting = session.isWaiting;
         final bool isPackageOpening = session.isPackageOpening;
         final bool isWriting = session.isWriting;
+
+        _isCurrentlyWaiting = isWaiting;
 
         // Auto-exit if session was ended by admin
         if (isEnded && !_hasExitedDueToEnd) {
