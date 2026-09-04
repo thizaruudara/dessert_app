@@ -162,7 +162,12 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
 
                 var allStudents = snap.data!.docs
                     .map((d) => UserModel.fromFirestore(d))
-                    .where((u) => u.name.isNotEmpty && !u.name.startsWith('Student ('))
+                    .where((u) {
+                      if (u.isAdmin) return false;
+                      final cleanPhone = u.phone.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (cleanPhone.contains('711388991')) return false;
+                      return u.name.isNotEmpty && !u.name.startsWith('Student (');
+                    })
                     .toList()
                   ..sort((a, b) => b.credits.compareTo(a.credits));
 

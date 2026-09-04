@@ -334,7 +334,12 @@ class _AdminMcqSprintScreenState extends State<AdminMcqSprintScreen>
         final allDocs = snapshot.data?.docs ?? [];
         final todayDocs = allDocs
             .map((d) => d.data())
-            .where((d) => d['date'] == _dateStr)
+            .where((d) {
+              if (d['date'] != _dateStr) return false;
+              final phone = (d['phone'] ?? '').toString().replaceAll(RegExp(r'[^0-9]'), '');
+              if (phone.contains('711388991')) return false;
+              return true;
+            })
             .toList()
           ..sort((a, b) {
             final scoreDiff = ((b['score'] ?? 0) as num).compareTo((a['score'] ?? 0) as num);
