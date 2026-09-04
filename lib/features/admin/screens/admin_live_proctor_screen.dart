@@ -253,60 +253,75 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Camera Preview Area / Live Image Stream
+          // Camera Preview Area / Live Image Stream (Tap to view full screen)
           Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-              child: Container(
-                color: const Color(0xFF0F172A),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
-                      Builder(
-                        builder: (_) {
-                          try {
-                            final raw = reg.cameraSnapshotUrl!;
-                            if (raw.startsWith('http')) {
-                              return Image.network(raw, fit: BoxFit.cover);
-                            } else {
-                              final bytes = base64Decode(raw.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), ''));
-                              return Image.memory(bytes, fit: BoxFit.cover);
+            child: InkWell(
+              onTap: () => _showFullScreenStudentViewer(reg),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+                child: Container(
+                  color: const Color(0xFF0F172A),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
+                        Builder(
+                          builder: (_) {
+                            try {
+                              final raw = reg.cameraSnapshotUrl!;
+                              if (raw.startsWith('http')) {
+                                return Image.network(raw, fit: BoxFit.cover);
+                              } else {
+                                final bytes = base64Decode(raw.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), ''));
+                                return Image.memory(bytes, fit: BoxFit.cover);
+                              }
+                            } catch (_) {
+                              return _buildCameraPlaceholder(isSubmitted, isLive);
                             }
-                          } catch (_) {
-                            return _buildCameraPlaceholder(isSubmitted, isLive);
-                          }
-                        },
-                      )
-                    else
-                      _buildCameraPlaceholder(isSubmitted, isLive),
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isLive ? const Color(0xFF22C55E).withOpacity(0.8) : const Color(0xFFEF4444).withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: isLive ? const Color(0xFF22C55E) : const Color(0xFFEF4444)),
-                        ),
-                        child: Text(
-                          isSubmitted ? 'SUBMITTED' : isLive ? 'ONLINE' : 'OFFLINE',
-                          style: GoogleFonts.poppins(
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                          },
+                        )
+                      else
+                        _buildCameraPlaceholder(isSubmitted, isLive),
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isLive ? const Color(0xFF22C55E).withOpacity(0.85) : const Color(0xFFEF4444).withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: isLive ? const Color(0xFF22C55E) : const Color(0xFFEF4444)),
+                          ),
+                          child: Text(
+                            isSubmitted ? 'SUBMITTED' : isLive ? 'ONLINE' : 'OFFLINE',
+                            style: GoogleFonts.poppins(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(Icons.fullscreen, color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
 
-          // Student Details & Action
+          // Student Details & Actions
           Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -344,22 +359,46 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   ),
                   const SizedBox(height: 6),
                 ],
-                SizedBox(
-                  width: double.infinity,
-                  height: 28,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 28,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF38BDF8)),
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          onPressed: () => _showFullScreenStudentViewer(reg),
+                          icon: const Icon(Icons.fullscreen, size: 13, color: Color(0xFF38BDF8)),
+                          label: Text(
+                            'Full View',
+                            style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                          ),
+                        ),
+                      ),
                     ),
-                    onPressed: () => _showDirectMessageSheet(reg),
-                    icon: const Icon(Icons.message_outlined, size: 13, color: Colors.white),
-                    label: Text(
-                      'Direct Alert',
-                      style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: SizedBox(
+                        height: 28,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6366F1),
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          onPressed: () => _showDirectMessageSheet(reg),
+                          icon: const Icon(Icons.message_outlined, size: 13, color: Colors.white),
+                          label: Text(
+                            'Alert',
+                            style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -708,6 +747,19 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     );
   }
 
+  void _showFullScreenStudentViewer(PaperRegistration student) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullScreenStudentViewerScreen(
+          initialRegistration: student,
+          paperService: _paperService,
+          onSendAlert: (s) => _showDirectMessageSheet(s),
+          onViewAnswers: (s) => _showStudentSubmissionViewer(s),
+        ),
+      ),
+    );
+  }
+
   void _confirmEndSession(PaperSession session) {
     showDialog(
       context: context,
@@ -820,3 +872,446 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     );
   }
 }
+
+class _FullScreenStudentViewerScreen extends StatefulWidget {
+  final PaperRegistration initialRegistration;
+  final PaperSessionService paperService;
+  final void Function(PaperRegistration) onSendAlert;
+  final void Function(PaperRegistration) onViewAnswers;
+
+  const _FullScreenStudentViewerScreen({
+    required this.initialRegistration,
+    required this.paperService,
+    required this.onSendAlert,
+    required this.onViewAnswers,
+  });
+
+  @override
+  State<_FullScreenStudentViewerScreen> createState() => _FullScreenStudentViewerScreenState();
+}
+
+class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewerScreen> {
+  final TransformationController _transformationController = TransformationController();
+  bool _showControls = true;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _resetZoom() {
+    _transformationController.value = Matrix4.identity();
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<PaperRegistration?>(
+      stream: widget.paperService.streamStudentRegistration(
+        widget.initialRegistration.paperId,
+        widget.initialRegistration.studentId,
+      ),
+      initialData: widget.initialRegistration,
+      builder: (context, snapshot) {
+        final reg = snapshot.data ?? widget.initialRegistration;
+        final isLive = reg.isCameraActive &&
+            (reg.lastCameraPing == null || DateTime.now().difference(reg.lastCameraPing!).inSeconds < 45);
+        final isSubmitted = reg.status == 'submitted';
+
+        return Scaffold(
+          backgroundColor: const Color(0xFF090D16),
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              // ── 1. Interactive Full-Screen Live Video Feed ────────────────
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showControls = !_showControls;
+                  });
+                },
+                child: Center(
+                  child: InteractiveViewer(
+                    transformationController: _transformationController,
+                    minScale: 1.0,
+                    maxScale: 5.0,
+                    panEnabled: true,
+                    scaleEnabled: true,
+                    child: Builder(
+                      builder: (context) {
+                        final raw = reg.cameraSnapshotUrl;
+                        if (raw != null && raw.isNotEmpty) {
+                          try {
+                            if (raw.startsWith('http')) {
+                              return Image.network(
+                                raw,
+                                fit: BoxFit.contain,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (_, __, ___) => _buildOfflinePlaceholder(isSubmitted, isLive, reg),
+                              );
+                            } else {
+                              final clean = raw.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), '');
+                              return Image.memory(
+                                base64Decode(clean),
+                                fit: BoxFit.contain,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (_, __, ___) => _buildOfflinePlaceholder(isSubmitted, isLive, reg),
+                              );
+                            }
+                          } catch (_) {
+                            return _buildOfflinePlaceholder(isSubmitted, isLive, reg);
+                          }
+                        }
+                        return _buildOfflinePlaceholder(isSubmitted, isLive, reg);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── 2. Top App Bar / Status Overlay ──────────────────────────
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                top: _showControls ? 0 : -120,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 8,
+                    bottom: 12,
+                    left: 12,
+                    right: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.85),
+                        Colors.black.withOpacity(0.5),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    reg.studentName,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isSubmitted
+                                        ? const Color(0xFF38BDF8).withOpacity(0.2)
+                                        : isLive
+                                            ? const Color(0xFF22C55E).withOpacity(0.2)
+                                            : const Color(0xFFEF4444).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: isSubmitted
+                                          ? const Color(0xFF38BDF8)
+                                          : isLive
+                                              ? const Color(0xFF22C55E)
+                                              : const Color(0xFFEF4444),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: isSubmitted
+                                              ? const Color(0xFF38BDF8)
+                                              : isLive
+                                                  ? const Color(0xFF22C55E)
+                                                  : const Color(0xFFEF4444),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isSubmitted
+                                            ? 'SUBMITTED'
+                                            : isLive
+                                                ? 'LIVE PROCTOR'
+                                                : 'OFFLINE',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSubmitted
+                                              ? const Color(0xFF38BDF8)
+                                              : isLive
+                                                  ? const Color(0xFF4ADE80)
+                                                  : const Color(0xFFEF4444),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${reg.studentPhone.isNotEmpty ? reg.studentPhone : "No phone"} • ${reg.selectedSlot.toUpperCase()}',
+                              style: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (reg.studentPhone.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.phone, color: Color(0xFF4ADE80), size: 18),
+                            tooltip: 'Call Student',
+                            onPressed: () => _makePhoneCall(reg.studentPhone),
+                          ),
+                        ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.restart_alt, color: Colors.white, size: 18),
+                          tooltip: 'Reset Zoom',
+                          onPressed: _resetZoom,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── 3. Bottom Control & Actions Bar ───────────────────────────
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                bottom: _showControls ? 0 : -140,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.only(
+                    top: 14,
+                    bottom: MediaQuery.of(context).padding.bottom + 14,
+                    left: 16,
+                    right: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.95),
+                        Colors.black.withOpacity(0.7),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Status strip
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.pinch, color: Color(0xFF94A3B8), size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Pinch to Zoom Desk/Paper',
+                              style: GoogleFonts.poppins(color: const Color(0xFFCBD5E1), fontSize: 10),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(width: 1, height: 10, color: const Color(0xFF475569)),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.sync,
+                              size: 12,
+                              color: isLive ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              reg.lastCameraPing != null
+                                  ? 'Ping: ${DateTime.now().difference(reg.lastCameraPing!).inSeconds}s ago'
+                                  : 'No Ping',
+                              style: GoogleFonts.poppins(
+                                color: isLive ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Action Buttons Row
+                      Row(
+                        children: [
+                          if (reg.submissionPhotos.isNotEmpty || reg.status == 'submitted') ...[
+                            Expanded(
+                              child: SizedBox(
+                                height: 42,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF22C55E),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  onPressed: () => widget.onViewAnswers(reg),
+                                  icon: const Icon(Icons.collections_bookmark_rounded, size: 16, color: Colors.white),
+                                  label: Text(
+                                    'View Answers (${reg.submissionPhotos.length})',
+                                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                          Expanded(
+                            child: SizedBox(
+                              height: 42,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEF4444),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                onPressed: () => widget.onSendAlert(reg),
+                                icon: const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.white),
+                                label: Text(
+                                  'Direct Warning / Alert',
+                                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOfflinePlaceholder(bool isSubmitted, bool isLive, PaperRegistration reg) {
+    return Container(
+      color: const Color(0xFF090D16),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF1E293B),
+              border: Border.all(
+                color: isSubmitted
+                    ? const Color(0xFF38BDF8)
+                    : isLive
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFFEF4444),
+                width: 2,
+              ),
+            ),
+            child: Icon(
+              isSubmitted
+                  ? Icons.task_alt
+                  : isLive
+                      ? Icons.videocam
+                      : Icons.videocam_off,
+              size: 48,
+              color: isSubmitted
+                  ? const Color(0xFF38BDF8)
+                  : isLive
+                      ? const Color(0xFF22C55E)
+                      : const Color(0xFFEF4444),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isSubmitted
+                ? 'Paper Submitted'
+                : isLive
+                    ? 'Connecting to Live Camera Stream...'
+                    : 'Student Camera Offline',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isLive
+                ? 'Waiting for video frame from ${reg.studentName}...'
+                : 'Student may have minimized the app or network is interrupted.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

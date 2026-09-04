@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/paper_session_model.dart';
 import '../../../core/services/paper_session_service.dart';
+import '../../../core/services/screen_keep_on_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class LiveExamRoomScreen extends StatefulWidget {
@@ -48,6 +49,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   @override
   void initState() {
     super.initState();
+    ScreenKeepOnService.setKeepScreenOn(true);
     _ensureStudentRegistered();
     _initCamera();
     _startTimers();
@@ -97,9 +99,12 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   }
 
   Future<void> _startCameraController(CameraDescription camera) async {
+    // Use ResolutionPreset.low for invigilator snapshots:
+    // Super lightweight (~20-30 KB), prevents Wi-Fi network congestion,
+    // avoids Firestore 1MB document limit, and uploads in milliseconds!
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.medium,
+      ResolutionPreset.low,
       enableAudio: false,
     );
 
@@ -151,6 +156,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
           final image = await _cameraController!.takePicture();
           final bytes = await image.readAsBytes();
           snapshotBase64 = base64Encode(bytes);
+          try {
+            File(image.path).delete().catchError((_) => image as FileSystemEntity);
+          } catch (_) {}
         } catch (e) {
           debugPrint('Snapshot capture error: $e');
         }
@@ -282,6 +290,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
 
   @override
   void dispose() {
+    ScreenKeepOnService.setKeepScreenOn(false);
     _sendHeartbeat(false);
     _heartbeatTimer?.cancel();
     _examCountdownTimer?.cancel();
