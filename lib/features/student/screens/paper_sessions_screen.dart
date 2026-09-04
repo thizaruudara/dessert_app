@@ -466,6 +466,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                 );
                               }
                             : () {
+                                final auth = context.read<AuthProvider>().userModel;
+                                if (auth != null && selectedSlotId != null) {
+                                  _paperService.registerStudentSlot(
+                                    paperId: session.id,
+                                    studentId: auth.id,
+                                    studentName: auth.name,
+                                    studentPhone: auth.phone,
+                                    slotId: selectedSlotId,
+                                  ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
+                                }
                                 context.push('/student/papers/exam/${session.id}?slot=$selectedSlotId');
                               },
                         child: Row(

@@ -131,6 +131,9 @@ class PaperSessionService {
     required String paperId,
     required String studentId,
     required bool isCameraActive,
+    String? studentName,
+    String? studentPhone,
+    String? slotId,
     String? cameraSnapshotUrl,
     String? status,
     List<String>? submissionPhotos,
@@ -138,9 +141,20 @@ class PaperSessionService {
     await _ensureAuth();
     final regDocId = '${paperId}_$studentId';
     final Map<String, dynamic> updates = {
+      'paperId': paperId,
+      'studentId': studentId,
       'isCameraActive': isCameraActive,
       'lastCameraPing': FieldValue.serverTimestamp(),
     };
+    if (studentName != null && studentName.trim().isNotEmpty) {
+      updates['studentName'] = studentName.trim();
+    }
+    if (studentPhone != null && studentPhone.trim().isNotEmpty) {
+      updates['studentPhone'] = studentPhone.trim();
+    }
+    if (slotId != null && slotId.trim().isNotEmpty) {
+      updates['selectedSlot'] = slotId.trim();
+    }
     if (cameraSnapshotUrl != null) {
       updates['cameraSnapshotUrl'] = cameraSnapshotUrl;
     }
@@ -162,12 +176,18 @@ class PaperSessionService {
 
   // ── 8. Stream All Students in a Session / Slot (For Admin Invigilator Grid) ─
   Stream<List<PaperRegistration>> streamSlotRegistrations(String paperId, String? slotId) {
-    Query query = _firestore.collection('paper_registrations').where('paperId', isEqualTo: paperId);
-    if (slotId != null && slotId.isNotEmpty) {
-      query = query.where('selectedSlot', isEqualTo: slotId);
-    }
-    return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => PaperRegistration.fromFirestore(doc)).toList();
+    return _firestore
+        .collection('paper_registrations')
+        .where(FieldPath.documentId, isGreaterThanOrEqualTo: '${paperId}_')
+        .where(FieldPath.documentId, isLessThanOrEqualTo: '${paperId}_\uf8ff')
+        .snapshots()
+        .map((snapshot) {
+      final all = snapshot.docs.map((doc) => PaperRegistration.fromFirestore(doc)).toList();
+      if (slotId == null || slotId.isEmpty) return all;
+      return all.where((reg) {
+        final regSlot = (reg.selectedSlot.isEmpty || reg.selectedSlot == 'null') ? 'slot1' : reg.selectedSlot;
+        return regSlot == slotId;
+      }).toList();
     });
   }
 

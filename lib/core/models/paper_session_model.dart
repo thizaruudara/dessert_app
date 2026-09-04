@@ -181,13 +181,31 @@ class PaperRegistration {
         ? rawPhotos.map((e) => e.toString()).toList()
         : (data['submissionUrl'] != null ? [data['submissionUrl'].toString()] : []);
 
+    final idParts = doc.id.split('_');
+    final fallbackPaperId = idParts.isNotEmpty ? idParts[0] : '';
+    final fallbackStudentId = idParts.length > 1 ? idParts.sublist(1).join('_') : '';
+
+    final String parsedPaperId = (data['paperId'] != null && data['paperId'].toString().trim().isNotEmpty)
+        ? data['paperId'].toString().trim()
+        : fallbackPaperId;
+
+    final String parsedStudentId = (data['studentId'] != null && data['studentId'].toString().trim().isNotEmpty)
+        ? data['studentId'].toString().trim()
+        : fallbackStudentId;
+
+    final String parsedSlot = (data['selectedSlot'] != null && data['selectedSlot'].toString().trim().isNotEmpty && data['selectedSlot'] != 'null')
+        ? data['selectedSlot'].toString().trim()
+        : 'slot1';
+
     return PaperRegistration(
       id: doc.id,
-      paperId: data['paperId'] ?? '',
-      studentId: data['studentId'] ?? '',
-      studentName: data['studentName'] ?? 'Student',
+      paperId: parsedPaperId,
+      studentId: parsedStudentId,
+      studentName: data['studentName'] != null && data['studentName'].toString().trim().isNotEmpty
+          ? data['studentName'].toString().trim()
+          : 'Student',
       studentPhone: data['studentPhone'] ?? '',
-      selectedSlot: data['selectedSlot'] ?? 'slot1',
+      selectedSlot: parsedSlot,
       status: data['status'] ?? 'registered',
       registeredAt: parseTime(data['registeredAt']) ?? DateTime.now(),
       joinedAt: parseTime(data['joinedAt']),

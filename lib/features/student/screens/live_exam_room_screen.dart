@@ -48,9 +48,26 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   @override
   void initState() {
     super.initState();
+    _ensureStudentRegistered();
     _initCamera();
     _startTimers();
     _listenForProctorAlerts();
+  }
+
+  Future<void> _ensureStudentRegistered() async {
+    final user = context.read<AuthProvider>().userModel;
+    if (user == null) return;
+    try {
+      await _paperService.registerStudentSlot(
+        paperId: widget.paperId,
+        studentId: user.id,
+        studentName: user.name,
+        studentPhone: user.phone,
+        slotId: widget.slotId.isNotEmpty ? widget.slotId : 'slot1',
+      );
+    } catch (e) {
+      debugPrint('Auto-registration ensure: $e');
+    }
   }
 
   Future<void> _initCamera() async {
@@ -142,6 +159,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
       await _paperService.updateCameraHeartbeat(
         paperId: widget.paperId,
         studentId: user.id,
+        studentName: user.name,
+        studentPhone: user.phone,
+        slotId: widget.slotId.isNotEmpty ? widget.slotId : 'slot1',
         isCameraActive: isActive,
         cameraSnapshotUrl: snapshotBase64,
         status: 'in_exam',

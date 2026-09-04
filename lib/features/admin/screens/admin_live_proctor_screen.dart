@@ -131,9 +131,9 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.wb_sunny_outlined, size: 16),
-                      SizedBox(width: 6),
-                      Text('Slot 1 (Morning)'),
+                      const Icon(Icons.wb_sunny_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      Text(session?.slot2 != null ? 'Slot 1 (Morning)' : 'Exam Session (විභාග සැසිය)'),
                     ],
                   ),
                 ),
@@ -141,9 +141,9 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.nights_stay_outlined, size: 16),
-                      SizedBox(width: 6),
-                      Text('Slot 2 (Evening)'),
+                      const Icon(Icons.nights_stay_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      Text(session?.slot2 != null ? 'Slot 2 (Evening)' : 'Slot 2 (None)'),
                     ],
                   ),
                 ),
