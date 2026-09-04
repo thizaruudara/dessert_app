@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,9 +44,9 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
   late AnimationController _flashAnimController;
   late Animation<double> _flashAnimation;
 
-  final List<String> _scannedBase64 = [];
   final List<File> _scannedFiles = [];
   final TextEditingController _driveLinkCtrl = TextEditingController();
+  String _submissionProgress = '';
 
   @override
   void initState() {
@@ -135,13 +136,10 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
       _flashAnimController.forward().then((_) => _flashAnimController.reverse());
 
       final XFile photo = await _cameraController!.takePicture();
-      final bytes = await File(photo.path).readAsBytes();
-      final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
       if (mounted) {
         setState(() {
           _scannedFiles.add(File(photo.path));
-          _scannedBase64.add(base64String);
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -184,10 +182,7 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
       );
       if (photos.isNotEmpty) {
         for (final photo in photos) {
-          final bytes = await File(photo.path).readAsBytes();
-          final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
           _scannedFiles.add(File(photo.path));
-          _scannedBase64.add(base64String);
         }
         if (mounted) setState(() {});
       }
@@ -229,7 +224,6 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
                       Navigator.of(ctx).pop();
                       setState(() {
                         _scannedFiles.removeAt(index);
-                        _scannedBase64.removeAt(index);
                       });
                     },
                   ),
@@ -267,10 +261,11 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
   }
 
   Future<void> _submitAllAnswers() async {
-    if (_scannedBase64.isEmpty) {
+    final driveLink = _driveLinkCtrl.text.trim();
+    if (_scannedFiles.isEmpty && driveLink.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('කරුණාකර අවම වශයෙන් එක් පිළිතුරු පත්‍රයක්වත් Scan කරන්න.'),
+          content: Text('කරුණාකර අවම වශයෙන් එක් පිළිතුරු පත්‍රයක්වත් Scan කරන්න හෝ Drive Link එකක් ඇතුලත් කරන්න.'),
           backgroundColor: Color(0xFFEF4444),
         ),
       );
@@ -299,7 +294,7 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'ඔබ විසින් Scan කරන ලද පිටු ${_scannedBase64.length} ක් ගුරුභවතුන් වෙත භාරදීමට සූදානම්ද?',
+              'ඔබ විසින් Scan කරන ලද පිටු ${_scannedFiles.length} ක් ගුරුභවතුන් වෙත භාරදීමට සූදානම්ද?',
               style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFFE2E8F0)),
             ),
             const SizedBox(height: 12),
@@ -315,7 +310,7 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
                   const Icon(Icons.check_circle_outline, color: Color(0xFF22C55E), size: 16),
                   const SizedBox(width: 8),
                   Text(
-                    '${_scannedBase64.length} Pages Verified & Ready',
+                    '${_scannedFiles.length} Pages Verified & Ready',
                     style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF4ADE80)),
                   ),
                 ],
@@ -344,18 +339,54 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
 
     setState(() {
       _isSubmitting = true;
+      _submissionProgress = _scannedFiles.isNotEmpty
+          ? 'Uploading page 1 of ${_scannedFiles.length} to Cloud...'
+          : 'Submitting answers...';
     });
 
     try {
       final user = context.read<AuthProvider>().userModel;
       if (user == null) throw Exception('Student not authenticated');
 
-      final List<String> allSubmissions = List.from(_scannedBase64);
-      final driveLink = _driveLinkCtrl.text.trim();
-      if (driveLink.isNotEmpty) {
-        allSubmissions.add(driveLink);
+      final List<String> uploadedUrls = [];
+
+      // 1. Upload scanned files to Firebase Storage with progress tracking
+      for (int i = 0; i < _scannedFiles.length; i++) {
+        if (mounted) {
+          setState(() {
+            _submissionProgress = 'Uploading page ${i + 1} of ${_scannedFiles.length}...';
+          });
+        }
+
+        final file = _scannedFiles[i];
+        final filename = 'p${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('paper_submissions')
+            .child(widget.paperId)
+            .child(user.id)
+            .child(filename);
+
+        final uploadTask = await storageRef.putFile(
+          file,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+        final downloadUrl = await uploadTask.ref.getDownloadURL();
+        uploadedUrls.add(downloadUrl);
       }
 
+      // 2. Attach Google Drive link if provided
+      if (driveLink.isNotEmpty) {
+        uploadedUrls.add(driveLink);
+      }
+
+      if (mounted) {
+        setState(() {
+          _submissionProgress = 'Saving submission records...';
+        });
+      }
+
+      // 3. Save clean HTTP URLs to Firestore (takes < 1KB, instant & error-free!)
       await _paperService.updateCameraHeartbeat(
         paperId: widget.paperId,
         studentId: user.id,
@@ -364,13 +395,13 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
         slotId: widget.slotId.isNotEmpty ? widget.slotId : 'slot1',
         isCameraActive: false,
         status: 'submitted',
-        submissionPhotos: allSubmissions,
+        submissionPhotos: uploadedUrls,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('🎉 පිළිතුරු පත්‍ර (${allSubmissions.length} Pages) සාර්ථකව භාරදෙන ලදී!'),
+            content: Text('🎉 පිළිතුරු පත්‍ර (${uploadedUrls.length} Pages) සාර්ථකව භාරදෙන ලදී!'),
             backgroundColor: const Color(0xFF22C55E),
           ),
         );
@@ -443,28 +474,30 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
           // 6. Loading Overlay when Submitting
           if (_isSubmitting)
             Container(
-              color: Colors.black.withOpacity(0.75),
+              color: Colors.black.withOpacity(0.8),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const CircularProgressIndicator(color: Color(0xFF22C55E), strokeWidth: 3),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 18),
                       Text(
                         'පිළිතුරු පත්‍ර Upload වෙමින් පවතී...',
-                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
-                        'Uploading ${_scannedBase64.length} high-resolution pages',
-                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                        _submissionProgress.isNotEmpty
+                            ? _submissionProgress
+                            : 'Uploading ${_scannedFiles.length} pages to Cloud...',
+                        style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF38BDF8), fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -786,9 +819,8 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _scannedFiles.removeAt(index);
-                                  _scannedBase64.removeAt(index);
-                                });
+                                _scannedFiles.removeAt(index);
+                              });
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(2),

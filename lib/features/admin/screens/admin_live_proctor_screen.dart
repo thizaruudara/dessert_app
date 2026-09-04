@@ -702,100 +702,186 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   ),
                 ] else ...[
                   for (int i = 0; i < photos.length; i++) ...[
-                    if (photos[i].startsWith('http://') || photos[i].startsWith('https://')) ...[
-                      // Drive / Web Link
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 14),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.link, color: Color(0xFF38BDF8), size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Attached Document / Drive Link',
-                                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                  ),
-                                  Text(
-                                    photos[i],
-                                    style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF38BDF8)),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
+                    Builder(
+                      builder: (_) {
+                        final photo = photos[i];
+                        final isHttp = photo.startsWith('http://') || photo.startsWith('https://');
+                        final isStorageImage = isHttp &&
+                            (photo.contains('firebasestorage') ||
+                                photo.contains('.jpg') ||
+                                photo.contains('.jpeg') ||
+                                photo.contains('.png') ||
+                                photo.contains('.webp'));
+
+                        if (isStorageImage) {
+                          // Firebase Cloud Storage Answer Sheet Image (with Zoom)
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFF334155)),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8), size: 18),
-                              onPressed: () async {
-                                final uri = Uri.tryParse(photos[i]);
-                                if (uri != null && await canLaunchUrl(uri)) {
-                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ] else ...[
-                      // Base64 Answer Sheet Image
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF6366F1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'Page ${i + 1}',
-                                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF22C55E),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'Page ${i + 1}',
+                                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      const Icon(Icons.zoom_in, color: Color(0xFF94A3B8), size: 16),
+                                    ],
                                   ),
-                                  const Spacer(),
-                                  const Icon(Icons.zoom_in, color: Color(0xFF94A3B8), size: 16),
-                                ],
-                              ),
-                            ),
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
-                              child: InteractiveViewer(
-                                panEnabled: true,
-                                minScale: 0.8,
-                                maxScale: 4.0,
-                                child: Image.memory(
-                                  base64Decode(
-                                    photos[i].contains(',') ? photos[i].split(',')[1] : photos[i],
-                                  ),
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
                                 ),
-                              ),
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                                  child: InteractiveViewer(
+                                    panEnabled: true,
+                                    minScale: 0.8,
+                                    maxScale: 4.0,
+                                    child: Image.network(
+                                      photo,
+                                      fit: BoxFit.contain,
+                                      width: double.infinity,
+                                      loadingBuilder: (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return Container(
+                                          height: 250,
+                                          alignment: Alignment.center,
+                                          child: CircularProgressIndicator(
+                                            value: progress.expectedTotalBytes != null
+                                                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                                : null,
+                                            color: const Color(0xFF22C55E),
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (_, __, ___) => Container(
+                                        height: 120,
+                                        alignment: Alignment.center,
+                                        child: const Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.broken_image, color: Color(0xFFEF4444), size: 28),
+                                            SizedBox(height: 6),
+                                            Text('Failed to load image', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
+                          );
+                        } else if (isHttp) {
+                          // Drive / Web Link
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.link, color: Color(0xFF38BDF8), size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Attached Document / Drive Link',
+                                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                      Text(
+                                        photo,
+                                        style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF38BDF8)),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8), size: 18),
+                                  onPressed: () async {
+                                    final uri = Uri.tryParse(photo);
+                                    if (uri != null && await canLaunchUrl(uri)) {
+                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          // Base64 Answer Sheet Image (legacy fallback)
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF6366F1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'Page ${i + 1}',
+                                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      const Icon(Icons.zoom_in, color: Color(0xFF94A3B8), size: 16),
+                                    ],
+                                  ),
+                                ),
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                                  child: InteractiveViewer(
+                                    panEnabled: true,
+                                    minScale: 0.8,
+                                    maxScale: 4.0,
+                                    child: Image.memory(
+                                      base64Decode(
+                                        photo.contains(',') ? photo.split(',')[1] : photo,
+                                      ),
+                                      fit: BoxFit.contain,
+                                      width: double.infinity,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   ],
                 ],
               ],
@@ -1490,7 +1576,15 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   itemCount: photos.length,
                   itemBuilder: (context, pIdx) {
                     final photoItem = photos[pIdx];
-                    final isLink = photoItem.startsWith('http');
+                    final isHttp = photoItem.startsWith('http://') || photoItem.startsWith('https://');
+                    final isStorageImage = isHttp &&
+                        (photoItem.contains('firebasestorage') ||
+                            photoItem.contains('.jpg') ||
+                            photoItem.contains('.jpeg') ||
+                            photoItem.contains('.png') ||
+                            photoItem.contains('.webp'));
+                    final isLink = isHttp && !isStorageImage;
+
                     return Container(
                       width: 60,
                       height: 60,
@@ -1502,24 +1596,32 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(7),
-                        child: isLink
-                            ? const Center(child: Icon(Icons.link, color: Color(0xFF38BDF8), size: 22))
-                            : Builder(
-                                builder: (_) {
-                                  try {
-                                    final clean = photoItem.contains(',') ? photoItem.split(',')[1] : photoItem;
-                                    return Image.memory(
-                                      base64Decode(clean),
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Center(
-                                        child: Icon(Icons.image, color: Color(0xFF64748B), size: 20),
-                                      ),
-                                    );
-                                  } catch (_) {
-                                    return const Center(child: Icon(Icons.broken_image, color: Color(0xFFEF4444), size: 20));
-                                  }
-                                },
-                              ),
+                        child: isStorageImage
+                            ? Image.network(
+                                photoItem,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(Icons.broken_image, color: Color(0xFFEF4444), size: 20),
+                                ),
+                              )
+                            : isLink
+                                ? const Center(child: Icon(Icons.link, color: Color(0xFF38BDF8), size: 22))
+                                : Builder(
+                                    builder: (_) {
+                                      try {
+                                        final clean = photoItem.contains(',') ? photoItem.split(',')[1] : photoItem;
+                                        return Image.memory(
+                                          base64Decode(clean),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Center(
+                                            child: Icon(Icons.image, color: Color(0xFF64748B), size: 20),
+                                          ),
+                                        );
+                                      } catch (_) {
+                                        return const Center(child: Icon(Icons.broken_image, color: Color(0xFFEF4444), size: 20));
+                                      }
+                                    },
+                                  ),
                       ),
                     );
                   },

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:camera/camera.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1363,10 +1364,10 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
 
   void _showSubmissionDialog() {
     final ImagePicker picker = ImagePicker();
-    final List<String> capturedPhotosBase64 = [];
     final List<File> localPhotoFiles = [];
     final pdfLinkCtrl = TextEditingController();
     bool isUploading = false;
+    String uploadStatus = '';
 
     showModalBottomSheet(
       context: context,
@@ -1382,32 +1383,27 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               if (source == ImageSource.camera) {
                 final XFile? photo = await picker.pickImage(
                   source: ImageSource.camera,
-                  maxWidth: 1200,
-                  maxHeight: 1600,
-                  imageQuality: 80,
+                  maxWidth: 1600,
+                  maxHeight: 2000,
+                  imageQuality: 85,
                 );
                 if (photo != null) {
-                  final bytes = await File(photo.path).readAsBytes();
-                  final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
                   setSheetState(() {
                     localPhotoFiles.add(File(photo.path));
-                    capturedPhotosBase64.add(base64);
                   });
                 }
               } else {
                 final List<XFile> photos = await picker.pickMultiImage(
-                  maxWidth: 1200,
-                  maxHeight: 1600,
-                  imageQuality: 80,
+                  maxWidth: 1600,
+                  maxHeight: 2000,
+                  imageQuality: 85,
                 );
                 if (photos.isNotEmpty) {
-                  for (final photo in photos) {
-                    final bytes = await File(photo.path).readAsBytes();
-                    final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-                    localPhotoFiles.add(File(photo.path));
-                    capturedPhotosBase64.add(base64);
-                  }
-                  setSheetState(() {});
+                  setSheetState(() {
+                    for (final photo in photos) {
+                      localPhotoFiles.add(File(photo.path));
+                    }
+                  });
                 }
               }
             } catch (e) {
@@ -1558,7 +1554,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                                         : () {
                                             setSheetState(() {
                                               localPhotoFiles.removeAt(index);
-                                              capturedPhotosBase64.removeAt(index);
                                             });
                                           },
                                     child: Container(
@@ -1598,6 +1593,35 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     ),
                   ),
 
+                  if (uploadStatus.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              uploadStatus,
+                              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF38BDF8), fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 20),
 
                   // Finalize Submit Button
@@ -1615,35 +1639,72 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                               final user = context.read<AuthProvider>().userModel;
                               if (user == null) return;
 
-                              setSheetState(() => isUploading = true);
-
-                              final List<String> allSubmissions = List.from(capturedPhotosBase64);
                               final driveLink = pdfLinkCtrl.text.trim();
-                              if (driveLink.isNotEmpty) {
-                                allSubmissions.add(driveLink);
+                              if (localPhotoFiles.isEmpty && driveLink.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('කරුණාකර අවම වශයෙන් එක් පිළිතුරු පිටුවක් හෝ Drive ලින්ක් එකක් ඇතුළත් කරන්න.'),
+                                    backgroundColor: Color(0xFFEF4444),
+                                  ),
+                                );
+                                return;
                               }
 
+                              setSheetState(() {
+                                isUploading = true;
+                                uploadStatus = 'Starting upload...';
+                              });
+
                               try {
+                                final storage = FirebaseStorage.instance;
+                                final List<String> uploadedUrls = [];
+
+                                for (int i = 0; i < localPhotoFiles.length; i++) {
+                                  setSheetState(() {
+                                    uploadStatus = 'Uploading page ${i + 1} of ${localPhotoFiles.length}...';
+                                  });
+                                  final file = localPhotoFiles[i];
+                                  final filename = 'p${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                                  final ref = storage.ref().child('paper_submissions/${widget.paperId}/${user.id}/$filename');
+                                  final uploadTask = await ref.putFile(
+                                    file,
+                                    SettableMetadata(contentType: 'image/jpeg'),
+                                  );
+                                  final downloadUrl = await uploadTask.ref.getDownloadURL();
+                                  uploadedUrls.add(downloadUrl);
+                                }
+
+                                if (driveLink.isNotEmpty) {
+                                  uploadedUrls.add(driveLink);
+                                }
+
+                                setSheetState(() {
+                                  uploadStatus = 'Saving submission records...';
+                                });
+
                                 await _paperService.updateCameraHeartbeat(
                                   paperId: widget.paperId,
                                   studentId: user.id,
                                   isCameraActive: false,
                                   status: 'submitted',
-                                  submissionPhotos: allSubmissions,
+                                  submissionPhotos: uploadedUrls,
                                 );
 
                                 if (ctx.mounted) Navigator.of(ctx).pop();
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('✅ පිළිතුරු පත්‍ර (${allSubmissions.length} Items) සාර්ථකව භාරදෙන ලදී!'),
+                                      content: Text('✅ පිළිතුරු පත්‍ර (${uploadedUrls.length} Items) සාර්ථකව භාරදෙන ලදී!'),
                                       backgroundColor: const Color(0xFF22C55E),
                                     ),
                                   );
                                   context.pop();
                                 }
                               } catch (e) {
-                                setSheetState(() => isUploading = false);
+                                setSheetState(() {
+                                  isUploading = false;
+                                  uploadStatus = '';
+                                });
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -1662,7 +1723,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                             )
                           : const Icon(Icons.check_circle_rounded, color: Colors.white),
                       label: Text(
-                        isUploading ? 'Submitting Answer Sheets...' : 'Submit & Finish Exam (විභාගය අවසන් කරන්න)',
+                        isUploading ? 'Uploading Answer Sheets...' : 'Submit & Finish Exam (විභාගය අවසන් කරන්න)',
                         style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
