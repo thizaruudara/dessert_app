@@ -45,6 +45,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   List<CameraDescription> _availableCameras = [];
   int _selectedCameraIndex = 0;
   bool _isSendingHeartbeat = false;
+  bool _hasExitedDueToEnd = false;
+  bool _hasPromptedTimeUp = false;
 
   @override
   void initState() {
@@ -315,8 +317,22 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         final slot = (widget.slotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
         final bool isEnded = session.isEnded;
+        final bool isTimeUp = session.isTimeUp;
         final bool isUpcoming = !isEnded && _now.isBefore(slot.startTime);
         final bool isLive = !isEnded && !isUpcoming;
+
+        // Auto-exit if session was ended by admin
+        if (isEnded && !_hasExitedDueToEnd) {
+          _hasExitedDueToEnd = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handleSessionEndedByAdmin();
+          });
+        } else if (isTimeUp && !_hasPromptedTimeUp && !isEnded) {
+          _hasPromptedTimeUp = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showTimeUpDialog();
+          });
+        }
 
         // 10-Minute Package Opening Phase (First 10 minutes of live session)
         final Duration elapsedSinceStart = isLive ? _now.difference(slot.startTime) : Duration.zero;
@@ -341,6 +357,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
           timerPrefix = 'Session Ended';
           timerColor = const Color(0xFFEF4444);
           timerIcon = Icons.cancel_outlined;
+        } else if (isTimeUp) {
+          durationToShow = Duration.zero;
+          timerPrefix = '⏰ TIME UP';
+          timerColor = const Color(0xFFEF4444);
+          timerIcon = Icons.alarm_on;
         } else if (isUpcoming) {
           durationToShow = slot.startTime.difference(_now);
           timerPrefix = 'Starts in: ';
@@ -371,9 +392,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         final seconds = (durationToShow.inSeconds % 60).toString().padLeft(2, '0');
         final String timerString = isEnded
             ? 'Ended'
-            : (durationToShow.inHours > 0
-                ? '$timerPrefix$hours:$minutes:$seconds'
-                : '$timerPrefix$minutes:$seconds');
+            : isTimeUp
+                ? '⏰ Time is Up'
+                : (durationToShow.inHours > 0
+                    ? '$timerPrefix$hours:$minutes:$seconds'
+                    : '$timerPrefix$minutes:$seconds');
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
@@ -438,7 +461,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
               // 1. Full Screen Camera View (NO PDF)
               _buildFullScreenCameraView(),
 
-              // 2. Top Phase Banner (Package Opening or Exam Writing)
+              // 2. Top Phase Banner (Package Opening, Exam Writing, or Time Up)
               Positioned(
                 top: 16,
                 left: 16,
@@ -448,6 +471,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
                   isUpcoming: isUpcoming,
                   isOvertime: isOvertime,
                   isEnded: isEnded,
+                  isTimeUp: isTimeUp,
                   packageSecsLeft: packageOpeningSecsLeft,
                 ),
               ),
@@ -457,7 +481,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
                 left: 16,
                 right: 16,
                 bottom: 24,
-                child: _buildBottomExamControlBar(isEnded),
+                child: _buildBottomExamControlBar(isEnded, isTimeUp),
               ),
             ],
           ),
@@ -528,13 +552,14 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
     required bool isUpcoming,
     required bool isOvertime,
     required bool isEnded,
+    required bool isTimeUp,
     required int packageSecsLeft,
   }) {
     if (isEnded) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withOpacity(0.9),
+          color: const Color(0xFFEF4444).withOpacity(0.95),
           borderRadius: BorderRadius.circular(14),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10)],
         ),
@@ -544,8 +569,54 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'මෙම විභාග සැසිය ගුරුභවතුන් විසින් අවසන් කර ඇත (Session ended by Admin).',
+                'මෙම විභාග සැසිය ගුරුභවතුන් විසින් අවසන් කරන ලදී (Session ended by Admin).',
                 style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isTimeUp) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withOpacity(0.95),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+          boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withOpacity(0.5), blurRadius: 12)],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.alarm_on, color: Colors.white, size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '⏰ වේලාව අවසන් විය! (TIME IS UP)',
+                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  Text(
+                    'ලිවීම නවතා පිළිතුරු පත්‍රවල ඡායාරූප ගෙන දැන්ම Submit කරන්න.',
+                    style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFFFEE2E2)),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showSubmissionDialog,
+              child: Text(
+                'Submit Now',
+                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
               ),
             ),
           ],
@@ -663,13 +734,16 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
     );
   }
 
-  Widget _buildBottomExamControlBar(bool isEnded) {
+  Widget _buildBottomExamControlBar(bool isEnded, bool isTimeUp) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B).withOpacity(0.92),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(
+          color: isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF334155),
+          width: isTimeUp ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.4),
@@ -683,10 +757,16 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF22C55E).withOpacity(0.2),
+              color: isTimeUp
+                  ? const Color(0xFFEF4444).withOpacity(0.2)
+                  : const Color(0xFF22C55E).withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.shield_outlined, color: Color(0xFF4ADE80), size: 18),
+            child: Icon(
+              isTimeUp ? Icons.alarm_on : Icons.shield_outlined,
+              color: isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF4ADE80),
+              size: 18,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -695,15 +775,15 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'කැමරා අධීක්ෂණය සක්‍රීයයි',
+                  isTimeUp ? 'වේලාව අවසන් කර ඇත' : 'කැමරා අධීක්ෂණය සක්‍රීයයි',
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: isTimeUp ? const Color(0xFFFCA5A5) : Colors.white,
                   ),
                 ),
                 Text(
-                  'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි',
+                  isTimeUp ? 'පිළිතුරු පත්‍ර Submit කරන්න' : 'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි',
                   style: GoogleFonts.poppins(
                     fontSize: 10,
                     color: const Color(0xFF94A3B8),
@@ -714,20 +794,142 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isEnded ? const Color(0xFF334155) : const Color(0xFF6366F1),
+              backgroundColor: isEnded
+                  ? const Color(0xFF334155)
+                  : isTimeUp
+                      ? const Color(0xFF22C55E)
+                      : const Color(0xFF6366F1),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
             onPressed: () {
               _showSubmissionDialog();
             },
-            icon: const Icon(Icons.upload_file, size: 16, color: Colors.white),
+            icon: Icon(
+              isTimeUp ? Icons.camera_alt_rounded : Icons.upload_file,
+              size: 16,
+              color: Colors.white,
+            ),
             label: Text(
-              'Submit Paper',
+              isTimeUp ? 'Submit Now' : 'Submit Paper',
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleSessionEndedByAdmin() {
+    ScreenKeepOnService.setKeepScreenOn(false);
+    _heartbeatTimer?.cancel();
+    _examCountdownTimer?.cancel();
+    _alertSubscription?.cancel();
+    _sendHeartbeat(false);
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 26),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'සැසිය අවසන් විය',
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'මෙම විභාග සැසිය ගුරුභවතුන් විසින් නිල වශයෙන් අවසන් කරන ලදී (Session ended by Admin). ඔබව විභාග ශාලාවෙන් ඉවත් කෙරේ.',
+          style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFFCBD5E1), height: 1.5),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              if (mounted) context.pop();
+            },
+            child: Text('හරි (Exit Room)', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTimeUpDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.alarm_on, color: Color(0xFFEF4444), size: 24),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '⏰ වේලාව අවසන් විය!',
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Time is Up! කරුණාකර ලිවීම නවත්වන්න.',
+              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFFCA5A5)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'ගුරුභවතුන් විසින් විභාගයේ වේලාව අවසන් කර ඇත. කරුණාකර ලිවීම නවත්වා ඔබගේ පිළිතුරු පත්‍රවල ඡායාරූප (Photos) ලබාගෙන App එක හරහා දැන්ම Submit කරන්න.',
+              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22C55E),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _showSubmissionDialog();
+              },
+              icon: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
+              label: Text(
+                '📸 Take Photos & Submit (පිළිතුරු පත්‍ර භාරදෙන්න)',
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ),

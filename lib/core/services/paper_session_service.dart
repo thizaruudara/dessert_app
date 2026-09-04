@@ -401,4 +401,28 @@ class PaperSessionService {
       'reopenedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  // ── 17. Trigger Time Up (Admin Only) ──────────────────────────────────────
+  Future<void> triggerTimeUp(String paperId) async {
+    await _ensureAuth();
+    await _firestore.collection('paper_sessions').doc(paperId).update({
+      'isTimeUp': true,
+      'timeUpAt': FieldValue.serverTimestamp(),
+    });
+    // Broadcast high-priority alert to all students
+    await broadcastProctorAlert(
+      paperId: paperId,
+      senderName: 'Admin / Examiner',
+      message: '⏰ වේලාව අවසන් විය! (Time is Up!) කරුණාකර ලිවීම නවතා ඔබගේ පිළිතුරු පත්‍රවල ඡායාරූප (Photos) ගෙන වහාම Submit කරන්න.',
+      type: 'urgent',
+    );
+  }
+
+  // ── 18. Reset Time Up (Admin Only) ────────────────────────────────────────
+  Future<void> resetTimeUp(String paperId) async {
+    await _ensureAuth();
+    await _firestore.collection('paper_sessions').doc(paperId).update({
+      'isTimeUp': false,
+    });
+  }
 }

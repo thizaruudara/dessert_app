@@ -24,17 +24,26 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   late final Stream<PaperSession?> _sessionStream = _paperService.streamPaperSession(widget.paperId);
   late final Stream<List<PaperRegistration>> _slot1Stream = _paperService.streamSlotRegistrations(widget.paperId, 'slot1');
   late final Stream<List<PaperRegistration>> _slot2Stream = _paperService.streamSlotRegistrations(widget.paperId, 'slot2');
+  late final Stream<List<PaperRegistration>> _allRegistrationsStream = _paperService.streamSlotRegistrations(widget.paperId, null);
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   @override
@@ -77,24 +86,43 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             ),
             actions: [
               if (session != null) ...[
-                if (!session.isEnded)
+                if (!session.isEnded) ...[
+                  // Trigger Time Up Button
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: session.isTimeUp ? const Color(0xFFEA580C) : const Color(0xFFF59E0B),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => _confirmTriggerTimeUp(session),
+                      icon: const Icon(Icons.alarm_on, size: 15, color: Colors.black),
+                      label: Text(
+                        session.isTimeUp ? 'Time Up (Sent)' : 'Time Up',
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                    ),
+                  ),
+
+                  // End Session Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onPressed: () => _confirmEndSession(session),
-                      icon: const Icon(Icons.stop_circle_outlined, size: 16, color: Colors.white),
+                      icon: const Icon(Icons.stop_circle_outlined, size: 15, color: Colors.white),
                       label: Text(
                         'End Session',
                         style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
-                  )
-                else
+                  ),
+                ] else
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     child: Container(
@@ -115,7 +143,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   ),
               ],
               IconButton(
-                icon: const Icon(Icons.campaign_outlined, color: Color(0xFFF59E0B), size: 24),
+                icon: const Icon(Icons.campaign_outlined, color: Color(0xFFF59E0B), size: 22),
                 tooltip: 'Broadcast Announcement to All Students',
                 onPressed: () => _showBroadcastDialog(),
               ),
@@ -131,9 +159,9 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.wb_sunny_outlined, size: 16),
-                      const SizedBox(width: 6),
-                      Text(session?.slot2 != null ? 'Slot 1 (Morning)' : 'Exam Session (විභාග සැසිය)'),
+                      const Icon(Icons.wb_sunny_outlined, size: 15),
+                      const SizedBox(width: 5),
+                      Text(session?.slot2 != null ? 'Slot 1' : 'Slot 1 (Live)'),
                     ],
                   ),
                 ),
@@ -141,10 +169,26 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.nights_stay_outlined, size: 16),
-                      const SizedBox(width: 6),
-                      Text(session?.slot2 != null ? 'Slot 2 (Evening)' : 'Slot 2 (None)'),
+                      const Icon(Icons.nights_stay_outlined, size: 15),
+                      const SizedBox(width: 5),
+                      Text(session?.slot2 != null ? 'Slot 2' : 'Slot 2 (None)'),
                     ],
+                  ),
+                ),
+                Tab(
+                  child: StreamBuilder<List<PaperRegistration>>(
+                    stream: _allRegistrationsStream,
+                    builder: (context, snap) {
+                      final submissionsCount = (snap.data ?? []).where((s) => s.status == 'submitted' || s.submissionPhotos.isNotEmpty).length;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.assignment_turned_in_rounded, size: 15, color: Color(0xFF4ADE80)),
+                          const SizedBox(width: 5),
+                          Text('Answers ($submissionsCount)'),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
@@ -155,6 +199,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             children: [
               _buildSlotProctorGrid('slot1', session),
               _buildSlotProctorGrid('slot2', session),
+              _buildSubmittedAnswersSection(session),
             ],
           ),
         );
@@ -866,6 +911,384 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
               }
             },
             child: Text('Broadcast Alert', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmTriggerTimeUp(PaperSession session) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.alarm_on, color: Color(0xFFF59E0B), size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Trigger Time Up (වේලාව අවසන් කරන්නද?)',
+                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'සියලුම සිසුන්ට ලිවීම නවත්වා, පිළිතුරු පත්‍රවල ඡායාරූප (Photos) ලබාගෙන App එක හරහා Submit කරන ලෙස Alert එකක් යැවීමට අවශ්‍ය බව සහතිකද?',
+          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await _paperService.triggerTimeUp(session.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⏰ Time Up Alert sent to all students!'),
+                      backgroundColor: Color(0xFFF59E0B),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              }
+            },
+            child: Text('Trigger Time Up (දන්වන්න)', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubmittedAnswersSection(PaperSession? session) {
+    return StreamBuilder<List<PaperRegistration>>(
+      stream: _allRegistrationsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+        }
+
+        final allStudents = snapshot.data ?? [];
+        final submittedStudents = allStudents.where((s) => s.status == 'submitted' || s.submissionPhotos.isNotEmpty).toList();
+        submittedStudents.sort((a, b) {
+          final aTime = a.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime = b.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bTime.compareTo(aTime);
+        });
+
+        return Column(
+          children: [
+            // Top Analytics Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E293B),
+                border: Border(bottom: BorderSide(color: Color(0xFF334155))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.assignment_turned_in, color: Color(0xFF4ADE80), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Submitted Answer Sheets (ලැබුණු පිළිතුරු පත්‍ර)',
+                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        Text(
+                          '${submittedStudents.length} of ${allStudents.length} Students Submitted',
+                          style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF22C55E)),
+                    ),
+                    child: Text(
+                      '${submittedStudents.length} Submitted',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF4ADE80)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Students Answer Sheet List
+            Expanded(
+              child: submittedStudents.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF1E293B),
+                                border: Border.all(color: const Color(0xFF334155)),
+                              ),
+                              child: const Icon(Icons.folder_open_rounded, size: 48, color: Color(0xFF64748B)),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'තවමත් පිළිතුරු පත්‍ර ලැබී නොමැත',
+                              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'සිසුන් පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කළ පසු ඒවා ශිෂ්‍ය නාමය සමඟ මෙහි සජීවීව දිස්වනු ඇත.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(14),
+                      itemCount: submittedStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = submittedStudents[index];
+                        return _buildSubmittedStudentItem(student, index + 1);
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSubmittedStudentItem(PaperRegistration student, int index) {
+    final photos = student.submissionPhotos;
+    final submittedTimeStr = student.submittedAt != null
+        ? '${student.submittedAt!.hour.toString().padLeft(2, '0')}:${student.submittedAt!.minute.toString().padLeft(2, '0')}'
+        : 'Submitted';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF334155)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Avatar, Name, Phone, Status badge
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF6366F1)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$index',
+                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF818CF8)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        student.studentName,
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${student.studentPhone.isNotEmpty ? student.studentPhone : "No phone"} • ${student.selectedSlot.toUpperCase()} • $submittedTimeStr',
+                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF22C55E)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle, color: Color(0xFF4ADE80), size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${photos.length} Pages',
+                        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF4ADE80)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Horizontal Thumbnail Preview Strip (if photos attached)
+          if (photos.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SizedBox(
+                height: 64,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: photos.length,
+                  itemBuilder: (context, pIdx) {
+                    final photoItem = photos[pIdx];
+                    final isLink = photoItem.startsWith('http');
+                    return Container(
+                      width: 60,
+                      height: 60,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF475569)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: isLink
+                            ? const Center(child: Icon(Icons.link, color: Color(0xFF38BDF8), size: 22))
+                            : Builder(
+                                builder: (_) {
+                                  try {
+                                    final clean = photoItem.contains(',') ? photoItem.split(',')[1] : photoItem;
+                                    return Image.memory(
+                                      base64Decode(clean),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Center(
+                                        child: Icon(Icons.image, color: Color(0xFF64748B), size: 20),
+                                      ),
+                                    );
+                                  } catch (_) {
+                                    return const Center(child: Icon(Icons.broken_image, color: Color(0xFFEF4444), size: 20));
+                                  }
+                                },
+                              ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // Footer Action Buttons
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF0F172A),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 34,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => _showStudentSubmissionViewer(student),
+                      icon: const Icon(Icons.zoom_in, size: 16, color: Colors.white),
+                      label: Text(
+                        'Inspect All Pages (${photos.length})',
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+                if (student.studentPhone.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 34,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF22C55E)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => _makePhoneCall(student.studentPhone),
+                      icon: const Icon(Icons.phone, size: 14, color: Color(0xFF4ADE80)),
+                      label: Text(
+                        'Call',
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF4ADE80)),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 34,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF6366F1)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _showDirectMessageSheet(student),
+                    icon: const Icon(Icons.message_outlined, size: 14, color: Color(0xFF818CF8)),
+                    label: Text(
+                      'Alert',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

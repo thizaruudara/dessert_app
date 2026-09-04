@@ -64,6 +64,7 @@ class PaperSession {
   final String? pdfUrl;
   final String? paperImageUrl;
   final String status; // 'upcoming', 'active', 'ended'
+  final bool isTimeUp;
   final PaperSlot slot1;
   final PaperSlot? slot2;
   final DateTime createdAt;
@@ -82,6 +83,7 @@ class PaperSession {
     this.pdfUrl,
     this.paperImageUrl,
     this.status = 'upcoming',
+    this.isTimeUp = false,
     required this.slot1,
     this.slot2,
     required this.createdAt,
@@ -120,6 +122,7 @@ class PaperSession {
       pdfUrl: data['pdfUrl']?.toString(),
       paperImageUrl: data['paperImageUrl']?.toString(),
       status: data['status']?.toString() ?? 'upcoming',
+      isTimeUp: data['isTimeUp'] == true || data['status'] == 'time_up',
       slot1: PaperSlot.fromMap('slot1', safeMap(data['slot1'])),
       slot2: (data['slot2'] is Map) ? PaperSlot.fromMap('slot2', safeMap(data['slot2'])) : null,
       createdAt: parseTime(data['createdAt']),
@@ -134,6 +137,7 @@ class PaperSession {
       'date': date,
       'durationMinutes': durationMinutes,
       'status': status,
+      'isTimeUp': isTimeUp,
       'slot1': slot1.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
     };
