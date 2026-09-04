@@ -41,8 +41,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _initAgoraMonitoring();
-    // Periodically update offline calculation every 4s
-    _statusTicker = Timer.periodic(const Duration(seconds: 4), (_) {
+    // Periodically update offline calculation every 2s for snappier presence display
+    _statusTicker = Timer.periodic(const Duration(seconds: 2), (_) {
       if (mounted) setState(() {});
     });
   }
@@ -75,6 +75,18 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             if (mounted) {
               setState(() {
                 _activeStreamingUids.remove(remoteUid);
+              });
+            }
+          },
+          onRemoteVideoStateChanged: (RtcConnection connection, int remoteUid, RemoteVideoState state, RemoteVideoStateReason reason, int elapsed) {
+            debugPrint('Agora Admin remote video state: $remoteUid -> $state');
+            if (mounted) {
+              setState(() {
+                if (state == RemoteVideoState.remoteVideoStateDecoding || state == RemoteVideoState.remoteVideoStateStarting) {
+                  _activeStreamingUids.add(remoteUid);
+                } else if (state == RemoteVideoState.remoteVideoStateStopped || state == RemoteVideoState.remoteVideoStateFailed) {
+                  _activeStreamingUids.remove(remoteUid);
+                }
               });
             }
           },
@@ -355,7 +367,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     final isLive = reg.isOnline;
     final isSubmitted = reg.status == 'submitted';
     final studentUid = reg.computedAgoraUid;
-    final bool isStreamingVideo = _isAgoraInitialized && _agoraEngine != null && _activeStreamingUids.contains(studentUid);
+    final bool canStreamVideo = (isLive || _activeStreamingUids.contains(studentUid)) && _isAgoraInitialized && _agoraEngine != null;
+    final bool isStreamingVideo = canStreamVideo;
 
     return Container(
       decoration: BoxDecoration(
@@ -386,17 +399,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (isStreamingVideo)
-                        AgoraVideoView(
-                          controller: VideoViewController.remote(
-                            rtcEngine: _agoraEngine!,
-                            canvas: VideoCanvas(uid: studentUid),
-                            connection: RtcConnection(
-                              channelId: AgoraRtcService.getChannelName(widget.paperId),
-                            ),
-                          ),
-                        )
-                      else if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
+                      // Base layer: placeholder or snapshot
+                      if (reg.cameraSnapshotUrl != null && reg.cameraSnapshotUrl!.isNotEmpty)
                         Builder(
                           builder: (_) {
                             try {
@@ -414,6 +418,18 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                         )
                       else
                         _buildCameraPlaceholder(isSubmitted, isLive),
+
+                      // Real-time Agora video stream on top when online
+                      if (canStreamVideo && !isSubmitted)
+                        AgoraVideoView(
+                          controller: VideoViewController.remote(
+                            rtcEngine: _agoraEngine!,
+                            canvas: VideoCanvas(uid: studentUid),
+                            connection: RtcConnection(
+                              channelId: AgoraRtcService.getChannelName(widget.paperId),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         top: 6,
                         left: 6,
@@ -1004,7 +1020,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 
   void _showFullScreenStudentViewer(PaperRegistration student) {
     final studentUid = student.computedAgoraUid;
-    final bool isStreaming = _isAgoraInitialized && _agoraEngine != null && _activeStreamingUids.contains(studentUid);
+    final bool isStreaming = _isAgoraInitialized && _agoraEngine != null && (_activeStreamingUids.contains(studentUid) || student.isOnline);
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1927,7 +1943,7 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
                     scaleEnabled: true,
                     child: Builder(
                       builder: (context) {
-                        if (widget.agoraEngine != null && widget.isAgoraStreaming) {
+                        if (widget.agoraEngine != null && (widget.isAgoraStreaming || isLive)) {
                           return SizedBox.expand(
                             child: AgoraVideoView(
                               controller: VideoViewController.remote(

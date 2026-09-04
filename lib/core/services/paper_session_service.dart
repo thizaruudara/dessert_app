@@ -446,6 +446,7 @@ class PaperSessionService {
       'currentPhase': 'writing',
       'isTimeUp': false,
       'reopenedAt': now,
+      'writingStartedAt': now,
     });
   }
 
@@ -470,9 +471,11 @@ class PaperSessionService {
   // ── 18. Reset Time Up (Admin Only) ────────────────────────────────────────
   Future<void> resetTimeUp(String paperId) async {
     await _ensureAuth();
+    final now = Timestamp.now();
     await _firestore.collection('paper_sessions').doc(paperId).update({
       'isTimeUp': false,
       'currentPhase': 'writing',
+      'writingStartedAt': now,
     });
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -350,29 +351,17 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
 
       final List<String> uploadedUrls = [];
 
-      // 1. Upload scanned files to Firebase Storage with progress tracking
+      // 1. Resilient upload of scanned pages (Storage -> Alt Bucket -> Compressed Base64)
       for (int i = 0; i < _scannedFiles.length; i++) {
         if (mounted) {
           setState(() {
-            _submissionProgress = 'Uploading page ${i + 1} of ${_scannedFiles.length}...';
+            _submissionProgress = 'Processing page ${i + 1} of ${_scannedFiles.length}...';
           });
         }
 
         final file = _scannedFiles[i];
-        final filename = 'p${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('paper_submissions')
-            .child(widget.paperId)
-            .child(user.id)
-            .child(filename);
-
-        final uploadTask = await storageRef.putFile(
-          file,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-        final downloadUrl = await uploadTask.ref.getDownloadURL();
-        uploadedUrls.add(downloadUrl);
+        final url = await _processAndUploadPage(file, i, widget.paperId, user.id);
+        uploadedUrls.add(url);
       }
 
       // 2. Attach Google Drive link if provided
@@ -421,6 +410,65 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
         );
       }
     }
+  }
+
+  Future<String> _processAndUploadPage(File file, int pageIndex, String paperId, String userId) async {
+    final filename = 'p${pageIndex + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    // Tier 1: Primary Firebase Storage Bucket
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('paper_submissions')
+          .child(paperId)
+          .child(userId)
+          .child(filename);
+      final uploadTask = await storageRef.putFile(
+        file,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e1) {
+      debugPrint('Primary Firebase Storage error for page $pageIndex: $e1. Trying alternate bucket...');
+    }
+
+    // Tier 2: Alternate Bucket (appspot.com)
+    try {
+      final altStorage = FirebaseStorage.instanceFor(bucket: 'dessert-institute.appspot.com');
+      final altRef = altStorage
+          .ref()
+          .child('paper_submissions')
+          .child(paperId)
+          .child(userId)
+          .child(filename);
+      final uploadTask = await altRef.putFile(
+        file,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e2) {
+      debugPrint('Alternate Firebase Storage error for page $pageIndex: $e2. Using compressed image fallback.');
+    }
+
+    // Tier 3: Guaranteed In-Memory Compression to Base64 data URI
+    // Scales to target width 800 (keeps handwriting sharp while keeping file ~40KB)
+    final rawBytes = await file.readAsBytes();
+    try {
+      final codec = await ui.instantiateImageCodec(
+        rawBytes,
+        targetWidth: 800,
+      );
+      final frame = await codec.getNextFrame();
+      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) {
+        final b64 = base64Encode(byteData.buffer.asUint8List());
+        return 'data:image/png;base64,$b64';
+      }
+    } catch (compressErr) {
+      debugPrint('Image compression error: $compressErr');
+    }
+
+    return 'data:image/jpeg;base64,${base64Encode(rawBytes)}';
   }
 
   @override

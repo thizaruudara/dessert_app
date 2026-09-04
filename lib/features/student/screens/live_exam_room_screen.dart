@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +47,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   DateTime _now = DateTime.now();
   final DateTime _enteredRoomAt = DateTime.now().subtract(const Duration(seconds: 10));
   bool _isCurrentlyWaiting = true;
+  String _currentStudentId = '';
+  DateTime? _localPackageOpeningStartTime;
+  DateTime? _localWritingStartTime;
 
   StreamSubscription<List<ProctorAlert>>? _alertSubscription;
   final Set<String> _shownAlertIds = {};
@@ -59,6 +63,10 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ScreenKeepOnService.setKeepScreenOn(true);
+    final user = context.read<AuthProvider>().userModel;
+    if (user != null) {
+      _currentStudentId = user.id;
+    }
     _ensureStudentRegistered();
     _initCamera();
     _startTimers();
@@ -85,12 +93,14 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   }
 
   Future<void> _setOfflineStatus() async {
+    final studentId = _currentStudentId.isNotEmpty
+        ? _currentStudentId
+        : (mounted ? context.read<AuthProvider>().userModel?.id ?? '' : '');
+    if (studentId.isEmpty) return;
     try {
-      final user = context.read<AuthProvider>().userModel;
-      if (user == null) return;
       await _paperService.updateCameraHeartbeat(
         paperId: widget.paperId,
-        studentId: user.id,
+        studentId: studentId,
         isCameraActive: false,
         agoraUid: _studentNumericUid,
       );
@@ -476,15 +486,25 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           });
         }
 
-        // Package Opening Countdown (10 Minutes from packageOpeningStartedAt)
+        // Package Opening Countdown (10 Minutes from packageOpeningStartedAt or local entry)
         int packageOpeningSecsLeft = 600;
-        if (session.packageOpeningStartedAt != null) {
-          final elapsed = _now.difference(session.packageOpeningStartedAt!).inSeconds;
+        if (isPackageOpening) {
+          final DateTime pkgStart = session.packageOpeningStartedAt ?? (_localPackageOpeningStartTime ??= _now);
+          final elapsed = _now.difference(pkgStart).inSeconds;
           packageOpeningSecsLeft = (600 - elapsed).clamp(0, 600);
+        } else {
+          _localPackageOpeningStartTime = null;
         }
 
-        // Real Exam Writing Phase
-        DateTime examStartTime = session.writingStartedAt ?? slot.startTime;
+        // Real Exam Writing Phase: Count from writingStartedAt or when student entered writing phase
+        // NEVER fall back to slot.startTime which was in the past and cuts duration!
+        DateTime examStartTime;
+        if (session.writingStartedAt != null) {
+          examStartTime = session.writingStartedAt!;
+        } else {
+          _localWritingStartTime ??= _now;
+          examStartTime = _localWritingStartTime!;
+        }
         DateTime examEndTime = examStartTime.add(Duration(minutes: session.durationMinutes));
         final bool isOvertime = isWriting && _now.isAfter(examEndTime);
         final Duration examWritingTimeLeft = isWriting && !isOvertime ? examEndTime.difference(_now) : Duration.zero;
@@ -1795,17 +1815,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
 
                                 for (int i = 0; i < localPhotoFiles.length; i++) {
                                   setSheetState(() {
-                                    uploadStatus = 'Uploading page ${i + 1} of ${localPhotoFiles.length}...';
+                                    uploadStatus = 'Processing page ${i + 1} of ${localPhotoFiles.length}...';
                                   });
                                   final file = localPhotoFiles[i];
-                                  final filename = 'p${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                                  final ref = storage.ref().child('paper_submissions/${widget.paperId}/${user.id}/$filename');
-                                  final uploadTask = await ref.putFile(
-                                    file,
-                                    SettableMetadata(contentType: 'image/jpeg'),
-                                  );
-                                  final downloadUrl = await uploadTask.ref.getDownloadURL();
-                                  uploadedUrls.add(downloadUrl);
+                                  final url = await _processAndUploadAnswerSheet(file, i, widget.paperId, user.id);
+                                  uploadedUrls.add(url);
                                 }
 
                                 if (driveLink.isNotEmpty) {
@@ -1870,6 +1884,64 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         },
       ),
     );
+  }
+
+  Future<String> _processAndUploadAnswerSheet(File file, int pageIndex, String paperId, String userId) async {
+    final filename = 'p${pageIndex + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    // Tier 1: Primary Firebase Storage Bucket
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('paper_submissions')
+          .child(paperId)
+          .child(userId)
+          .child(filename);
+      final uploadTask = await storageRef.putFile(
+        file,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e1) {
+      debugPrint('Primary Storage upload error (sheet): $e1. Trying alternate bucket...');
+    }
+
+    // Tier 2: Alternate Bucket (appspot.com)
+    try {
+      final altStorage = FirebaseStorage.instanceFor(bucket: 'dessert-institute.appspot.com');
+      final altRef = altStorage
+          .ref()
+          .child('paper_submissions')
+          .child(paperId)
+          .child(userId)
+          .child(filename);
+      final uploadTask = await altRef.putFile(
+        file,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e2) {
+      debugPrint('Alternate Storage upload error (sheet): $e2. Using compressed image fallback.');
+    }
+
+    // Tier 3: Guaranteed In-Memory Compression to Base64 data URI
+    final rawBytes = await file.readAsBytes();
+    try {
+      final codec = await ui.instantiateImageCodec(
+        rawBytes,
+        targetWidth: 800,
+      );
+      final frame = await codec.getNextFrame();
+      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) {
+        final b64 = base64Encode(byteData.buffer.asUint8List());
+        return 'data:image/png;base64,$b64';
+      }
+    } catch (compressErr) {
+      debugPrint('Image compression error (sheet): $compressErr');
+    }
+
+    return 'data:image/jpeg;base64,${base64Encode(rawBytes)}';
   }
 
   void _showExitWarningDialog() {
