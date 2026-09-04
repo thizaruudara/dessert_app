@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -47,7 +48,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
           renderMode: RenderModeType.renderModeHidden,
         ),
         connection: RtcConnection(channelId: channelId),
-        useFlutterTexture: true,
+        useFlutterTexture: !kIsWeb,
         useAndroidSurfaceView: false,
       ),
     );
@@ -1916,7 +1917,7 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
           renderMode: RenderModeType.renderModeHidden,
         ),
         connection: RtcConnection(channelId: widget.channelId),
-        useFlutterTexture: true,
+        useFlutterTexture: !kIsWeb,
         useAndroidSurfaceView: false,
       );
     }

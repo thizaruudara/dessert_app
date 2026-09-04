@@ -110,6 +110,7 @@ class AgoraRtcService {
   }) async {
     try {
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      await engine.enableLocalVideo(true);
       await engine.startPreview();
     } catch (e) {
       debugPrint('Agora startPreview warning: $e');
@@ -171,6 +172,8 @@ class AgoraRtcService {
   }) async {
     try {
       await engine.setClientRole(role: ClientRoleType.clientRoleAudience);
+      await engine.enableVideo();
+      await engine.muteAllRemoteVideoStreams(false);
     } catch (e) {
       debugPrint('Agora setClientRole audience warning: $e');
     }
