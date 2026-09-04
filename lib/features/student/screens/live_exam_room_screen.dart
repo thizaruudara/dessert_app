@@ -413,17 +413,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     );
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    ScreenKeepOnService.setKeepScreenOn(false);
-    _sendHeartbeat(false);
-    _heartbeatTimer?.cancel();
-    _examCountdownTimer?.cancel();
-    _alertSubscription?.cancel();
-    _cameraController?.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
