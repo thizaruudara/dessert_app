@@ -17,7 +17,7 @@ class PaperSlot {
     this.registeredCount = 0,
   });
 
-  factory PaperSlot.fromMap(String id, Map<String, dynamic> map) {
+  factory PaperSlot.fromMap(String id, Map<dynamic, dynamic> map) {
     DateTime parseTime(dynamic val, DateTime fallback) {
       if (val is Timestamp) return val.toDate();
       if (val is String) return DateTime.tryParse(val) ?? fallback;
@@ -27,11 +27,15 @@ class PaperSlot {
     final now = DateTime.now();
     return PaperSlot(
       id: id,
-      name: map['name'] ?? (id == 'slot1' ? 'Morning Session (උදෑසන සැසිය)' : 'Evening Session (සවස සැසිය)'),
+      name: map['name']?.toString() ?? (id == 'slot1' ? 'Morning Session (උදෑසන සැසිය)' : 'Evening Session (සවස සැසිය)'),
       startTime: parseTime(map['startTime'], now),
       endTime: parseTime(map['endTime'], now.add(const Duration(hours: 3))),
-      maxCapacity: map['maxCapacity'] ?? 200,
-      registeredCount: map['registeredCount'] ?? 0,
+      maxCapacity: (map['maxCapacity'] is num)
+          ? (map['maxCapacity'] as num).toInt()
+          : (int.tryParse(map['maxCapacity']?.toString() ?? '') ?? 200),
+      registeredCount: (map['registeredCount'] is num)
+          ? (map['registeredCount'] as num).toInt()
+          : (int.tryParse(map['registeredCount']?.toString() ?? '') ?? 0),
     );
   }
 
@@ -84,7 +88,10 @@ class PaperSession {
   });
 
   factory PaperSession.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final rawData = doc.data();
+    final Map<String, dynamic> data = (rawData is Map)
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
     final now = DateTime.now();
 
     DateTime parseTime(dynamic val) {
@@ -93,18 +100,28 @@ class PaperSession {
       return now;
     }
 
+    Map<dynamic, dynamic> safeMap(dynamic val) {
+      if (val is Map) return val;
+      return const {};
+    }
+
+    final rawDuration = data['durationMinutes'];
+    final int parsedDuration = (rawDuration is num)
+        ? rawDuration.toInt()
+        : (int.tryParse(rawDuration?.toString() ?? '') ?? 180);
+
     return PaperSession(
       id: doc.id,
-      title: data['title'] ?? 'A/L Examination Paper',
-      subject: data['subject'] ?? 'Combined Mathematics',
-      examYear: data['examYear'] ?? '2027 A/L',
-      date: data['date'] ?? now.toIso8601String().split('T')[0],
-      durationMinutes: data['durationMinutes'] ?? 180,
-      pdfUrl: data['pdfUrl'],
-      paperImageUrl: data['paperImageUrl'],
-      status: data['status'] ?? 'upcoming',
-      slot1: PaperSlot.fromMap('slot1', data['slot1'] as Map<String, dynamic>? ?? {}),
-      slot2: data['slot2'] != null ? PaperSlot.fromMap('slot2', data['slot2'] as Map<String, dynamic>) : null,
+      title: data['title']?.toString() ?? 'A/L Examination Paper',
+      subject: data['subject']?.toString() ?? 'Combined Mathematics',
+      examYear: data['examYear']?.toString() ?? '2027 A/L',
+      date: data['date']?.toString() ?? now.toIso8601String().split('T')[0],
+      durationMinutes: parsedDuration,
+      pdfUrl: data['pdfUrl']?.toString(),
+      paperImageUrl: data['paperImageUrl']?.toString(),
+      status: data['status']?.toString() ?? 'upcoming',
+      slot1: PaperSlot.fromMap('slot1', safeMap(data['slot1'])),
+      slot2: (data['slot2'] is Map) ? PaperSlot.fromMap('slot2', safeMap(data['slot2'])) : null,
       createdAt: parseTime(data['createdAt']),
     );
   }
@@ -169,7 +186,10 @@ class PaperRegistration {
   });
 
   factory PaperRegistration.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final rawData = doc.data();
+    final Map<String, dynamic> data = (rawData is Map)
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
     DateTime? parseTime(dynamic val) {
       if (val is Timestamp) return val.toDate();
       if (val is String) return DateTime.tryParse(val);
@@ -204,16 +224,16 @@ class PaperRegistration {
       studentName: data['studentName'] != null && data['studentName'].toString().trim().isNotEmpty
           ? data['studentName'].toString().trim()
           : 'Student',
-      studentPhone: data['studentPhone'] ?? '',
+      studentPhone: data['studentPhone']?.toString() ?? '',
       selectedSlot: parsedSlot,
-      status: data['status'] ?? 'registered',
+      status: data['status']?.toString() ?? 'registered',
       registeredAt: parseTime(data['registeredAt']) ?? DateTime.now(),
       joinedAt: parseTime(data['joinedAt']),
       submittedAt: parseTime(data['submittedAt']),
       lastCameraPing: parseTime(data['lastCameraPing']),
-      isCameraActive: data['isCameraActive'] ?? false,
-      cameraSnapshotUrl: data['cameraSnapshotUrl'],
-      submissionUrl: data['submissionUrl'],
+      isCameraActive: data['isCameraActive'] == true,
+      cameraSnapshotUrl: data['cameraSnapshotUrl']?.toString(),
+      submissionUrl: data['submissionUrl']?.toString(),
       submissionPhotos: photos,
     );
   }
@@ -260,7 +280,10 @@ class ProctorAlert {
   });
 
   factory ProctorAlert.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final rawData = doc.data();
+    final Map<String, dynamic> data = (rawData is Map)
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
     DateTime parseTime(dynamic val) {
       if (val is Timestamp) return val.toDate();
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
@@ -269,12 +292,12 @@ class ProctorAlert {
 
     return ProctorAlert(
       id: doc.id,
-      paperId: data['paperId'] ?? '',
-      studentId: data['studentId'] ?? '',
-      senderName: data['senderName'] ?? 'Proctor / Admin',
-      message: data['message'] ?? '',
-      type: data['type'] ?? 'warning',
-      isRead: data['isRead'] ?? false,
+      paperId: data['paperId']?.toString() ?? '',
+      studentId: data['studentId']?.toString() ?? '',
+      senderName: data['senderName']?.toString() ?? 'Proctor / Admin',
+      message: data['message']?.toString() ?? '',
+      type: data['type']?.toString() ?? 'warning',
+      isRead: data['isRead'] == true,
       createdAt: parseTime(data['createdAt']),
     );
   }

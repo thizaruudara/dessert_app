@@ -45,7 +45,7 @@ class _StudentShellState extends State<StudentShell> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final auth = context.watch<AuthProvider>();
+    final auth = context.read<AuthProvider>();
     final currentYear = auth.userModel?.examYear ?? '2027 A/L';
     if (currentYear != _lastListenedExamYear) {
       _setupPaperNotificationListener();
@@ -65,9 +65,14 @@ class _StudentShellState extends State<StudentShell> {
     _lastListenedExamYear = examYear;
 
     _paperSessionsSub?.cancel();
-    _paperSessionsSub = _paperService.streamSessions(examYear: examYear).listen((sessions) {
-      _checkForNewScheduledPapers(sessions, examYear);
-    });
+    _paperSessionsSub = _paperService.streamSessions(examYear: examYear).listen(
+      (sessions) {
+        _checkForNewScheduledPapers(sessions, examYear);
+      },
+      onError: (e) {
+        debugPrint('Paper sessions notification stream error: $e');
+      },
+    );
   }
 
   Future<void> _checkForNewScheduledPapers(List<PaperSession> sessions, String userExamYear) async {

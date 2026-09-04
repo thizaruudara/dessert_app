@@ -21,6 +21,10 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
   Stream<List<PaperSession>>? _sessionsStream;
+  String? _lastExamYear;
+  List<PaperSession>? _cachedSessions;
+  bool _initialFetchDone = false;
+  bool _showAllBatches = false;
 
   @override
   void initState() {
@@ -38,8 +42,30 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final user = context.read<AuthProvider>().userModel;
-    if (_sessionsStream == null) {
-      _sessionsStream = _paperService.streamSessions(examYear: user?.examYear);
+    final targetYear = _showAllBatches ? null : user?.examYear;
+    if (_sessionsStream == null || _lastExamYear != targetYear) {
+      _lastExamYear = targetYear;
+      _sessionsStream = _paperService.streamSessions(examYear: targetYear);
+      _loadInitialData(targetYear);
+    }
+  }
+
+  Future<void> _loadInitialData(String? examYear) async {
+    try {
+      final data = await _paperService.getSessions(examYear: examYear);
+      if (mounted) {
+        setState(() {
+          _cachedSessions = data;
+          _initialFetchDone = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading initial paper sessions: $e');
+      if (mounted) {
+        setState(() {
+          _initialFetchDone = true;
+        });
+      }
     }
   }
 
@@ -47,6 +73,17 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   void dispose() {
     _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  void _refreshSessions(String? examYear) async {
+    final targetYear = _showAllBatches ? null : examYear;
+    final data = await _paperService.getSessions(examYear: targetYear);
+    if (mounted) {
+      setState(() {
+        _cachedSessions = data;
+        _sessionsStream = _paperService.streamSessions(examYear: targetYear);
+      });
+    }
   }
 
   @override
@@ -70,91 +107,211 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
               child: const Icon(Icons.assignment_outlined, color: Color(0xFF818CF8), size: 20),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Paper Writing Sessions',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Paper Writing Sessions',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                Text(
-                  user?.examYear != null ? '${user!.examYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි' : 'සජීවී විභාග සහ අධීක්ෂණ සැසි',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: const Color(0xFF94A3B8),
+                  Text(
+                    _showAllBatches
+                        ? 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි'
+                        : (user?.examYear != null
+                            ? '${user!.examYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි'
+                            : 'සජීවී විභාග සහ අධීක්ෂණ සැසි'),
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            onPressed: () => _refreshSessions(user?.examYear),
+            icon: const Icon(Icons.refresh, color: Color(0xFF818CF8), size: 22),
+            tooltip: 'Refresh Sessions',
+          ),
+        ],
       ),
-      body: StreamBuilder<List<PaperSession>>(
-        stream: _sessionsStream ?? _paperService.streamSessions(examYear: user?.examYear),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
-          }
+      body: RefreshIndicator(
+        color: const Color(0xFF6366F1),
+        backgroundColor: const Color(0xFF1E293B),
+        onRefresh: () async => _refreshSessions(user?.examYear),
+        child: StreamBuilder<List<PaperSession>>(
+          stream: _sessionsStream,
+          initialData: _cachedSessions,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return _buildErrorState(snapshot.error.toString(), user?.examYear);
+            }
 
-          final sessions = snapshot.data ?? [];
-          if (sessions.isEmpty) {
-            return _buildEmptyState();
-          }
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData &&
+                !_initialFetchDone) {
+              return const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Color(0xFF6366F1)),
+                    SizedBox(height: 16),
+                    Text(
+                      'විභාග සැසි ලබාගනිමින් පවතී...',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    ),
+                  ],
+                ),
+              );
+            }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: sessions.length,
-            itemBuilder: (context, index) {
-              return _buildPaperSessionCard(sessions[index], user?.id ?? '');
-            },
-          );
-        },
+            final sessions = snapshot.data ?? _cachedSessions ?? [];
+            if (sessions.isEmpty) {
+              return _buildEmptyState(user?.examYear);
+            }
+
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: sessions.length,
+              itemBuilder: (context, index) {
+                return _buildPaperSessionCard(sessions[index], user?.id ?? '');
+              },
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: const Icon(Icons.menu_book_rounded, size: 48, color: Color(0xFF64748B)),
+  Widget _buildEmptyState(String? userExamYear) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(32),
+      children: [
+        const SizedBox(height: 60),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF334155)),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'නව Paper Sessions සූදානම් වෙමින් පවතී',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'ඉදිරි විභාග සැසි සහ වේලාවන් මෙහි දිස්වනු ඇත. ඔබගේ slot එක තෝරාගෙන සූදානම් වන්න!',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: const Color(0xFF94A3B8),
-              ),
-            ),
-          ],
+            child: const Icon(Icons.menu_book_rounded, size: 48, color: Color(0xFF64748B)),
+          ),
         ),
-      ),
+        const SizedBox(height: 20),
+        Text(
+          'නව Paper Sessions සූදානම් වෙමින් පවතී',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _showAllBatches
+              ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.'
+              : 'ඔබගේ කණ්ඩායම (${userExamYear ?? "2027 A/L"}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            color: const Color(0xFF94A3B8),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF6366F1)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              setState(() {
+                _showAllBatches = !_showAllBatches;
+                final target = _showAllBatches ? null : userExamYear;
+                _sessionsStream = _paperService.streamSessions(examYear: target);
+                _loadInitialData(target);
+              });
+            },
+            icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.all_inclusive, color: const Color(0xFF818CF8), size: 18),
+            label: Text(
+              _showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න',
+              style: GoogleFonts.poppins(color: const Color(0xFF818CF8), fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState(String error, String? userExamYear) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(32),
+      children: [
+        const SizedBox(height: 60),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF4444).withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+            ),
+            child: const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFFEF4444)),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'සැසි තොරතුරු ලබාගැනීමට නොහැකි විය',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'අන්තර්ජාල සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            color: const Color(0xFF94A3B8),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => _refreshSessions(userExamYear),
+            icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
+            label: Text(
+              'නැවත උත්සාහ කරන්න (Retry)',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
