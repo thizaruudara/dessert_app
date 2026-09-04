@@ -91,6 +91,14 @@ class AgoraRtcService {
       scenario: AudioScenarioType.audioScenarioDefault,
     );
 
+    // Enable Cloud Proxy: Automatic mode (noneProxy) attempts direct SD-RTN connection
+    // and automatically fails over to TLS 443 TCP proxy if blocked by VPN, firewall, or NAT
+    try {
+      await engine.setCloudProxy(CloudProxyType.noneProxy);
+    } catch (e) {
+      debugPrint('Agora setCloudProxy notice: $e');
+    }
+
     return engine;
   }
 
@@ -126,10 +134,17 @@ class AgoraRtcService {
       );
       debugPrint('Agora: Broadcaster joined channel $channelId with UID $uid');
     } catch (e) {
-      debugPrint('Agora joinChannel with token error: $e. Attempting fallback...');
+      debugPrint('Agora joinChannel with token error: $e. Attempting VPN/Firewall TCP proxy fallback...');
+      // If UDP is blocked by a VPN or restrictive firewall, switch to TLS 443 TCP Cloud Proxy
+      try {
+        await engine.setCloudProxy(CloudProxyType.noneProxy);
+        await engine.setCloudProxy(CloudProxyType.tcpProxy);
+      } catch (proxyError) {
+        debugPrint('Agora switch to TCP proxy error: $proxyError');
+      }
       try {
         await engine.joinChannel(
-          token: '',
+          token: token.isNotEmpty ? token : '',
           channelId: channelId,
           uid: uid,
           options: const ChannelMediaOptions(
@@ -141,7 +156,7 @@ class AgoraRtcService {
             autoSubscribeVideo: false,
           ),
         );
-        debugPrint('Agora fallback join succeeded');
+        debugPrint('Agora fallback join succeeded via Cloud Proxy');
       } catch (e2) {
         debugPrint('Agora fallback join also failed: $e2');
       }
@@ -179,10 +194,16 @@ class AgoraRtcService {
       );
       debugPrint('Agora: Admin joined channel $channelId with UID $uid');
     } catch (e) {
-      debugPrint('Agora admin join error: $e');
+      debugPrint('Agora admin join error: $e. Attempting VPN/Firewall TCP proxy fallback...');
+      try {
+        await engine.setCloudProxy(CloudProxyType.noneProxy);
+        await engine.setCloudProxy(CloudProxyType.tcpProxy);
+      } catch (proxyError) {
+        debugPrint('Agora admin switch to TCP proxy error: $proxyError');
+      }
       try {
         await engine.joinChannel(
-          token: '',
+          token: token.isNotEmpty ? token : '',
           channelId: channelId,
           uid: uid,
           options: const ChannelMediaOptions(

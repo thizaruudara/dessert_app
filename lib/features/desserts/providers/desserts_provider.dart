@@ -76,8 +76,15 @@ class DessertsProvider extends ChangeNotifier {
       return false;
     }
 
-    // 1. Instant one-time get for zero-delay initial load
-    _db.collection('desserts').get().then((snap) {
+    // 1. Instant one-time get with timeout & cache fallback for zero-delay initial load on VPN / Wi-Fi
+    _db
+        .collection('desserts')
+        .get(const GetOptions(source: Source.serverAndCache))
+        .timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => _db.collection('desserts').get(const GetOptions(source: Source.cache)),
+        )
+        .then((snap) {
       _desserts = snap.docs
           .map(DessertModel.fromFirestore)
           .where(matchesStudent)
@@ -116,7 +123,13 @@ class DessertsProvider extends ChangeNotifier {
     final last7 = rawPhone.length >= 7 ? rawPhone.substring(rawPhone.length - 7) : rawPhone;
 
     try {
-      final snap = await _db.collection('desserts').get();
+      final snap = await _db
+          .collection('desserts')
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(
+            const Duration(seconds: 4),
+            onTimeout: () => _db.collection('desserts').get(const GetOptions(source: Source.cache)),
+          );
       _desserts = snap.docs
           .map(DessertModel.fromFirestore)
           .where((d) {

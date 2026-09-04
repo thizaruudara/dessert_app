@@ -169,9 +169,25 @@ class AuthProvider extends ChangeNotifier {
     _currentExamYear = examYear;
 
     try {
-      // 1. Check if user already exists
-      final existing = await _db.collection('users').where('phone', isEqualTo: phone).limit(1).get();
-      if (existing.docs.isNotEmpty) {
+      // 1. Check if user already exists (with timeout and cache fallback to prevent hanging on slow VPNs)
+      QuerySnapshot<Map<String, dynamic>>? existing;
+      try {
+        existing = await _db
+            .collection('users')
+            .where('phone', isEqualTo: phone)
+            .limit(1)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 4));
+      } catch (_) {
+        try {
+          existing = await _db
+              .collection('users')
+              .where('phone', isEqualTo: phone)
+              .limit(1)
+              .get(const GetOptions(source: Source.cache));
+        } catch (_) {}
+      }
+      if (existing != null && existing.docs.isNotEmpty) {
         // User already exists, check if has password
         final existingData = existing.docs.first.data();
         if (existingData['password'] != null && existingData['password'].toString().isNotEmpty) {
@@ -476,10 +492,24 @@ class AuthProvider extends ChangeNotifier {
     try {
       bool isVerified = false;
 
-      // 1. Check WhatsApp OTP verification document in Firestore
+      // 1. Check WhatsApp OTP verification document in Firestore (with timeout)
       if (targetPhone.isNotEmpty) {
-        final doc = await _db.collection('otp_verifications').doc(targetPhone).get();
-        if (doc.exists) {
+        DocumentSnapshot<Map<String, dynamic>>? doc;
+        try {
+          doc = await _db
+              .collection('otp_verifications')
+              .doc(targetPhone)
+              .get(const GetOptions(source: Source.serverAndCache))
+              .timeout(const Duration(seconds: 4));
+        } catch (_) {
+          try {
+            doc = await _db
+                .collection('otp_verifications')
+                .doc(targetPhone)
+                .get(const GetOptions(source: Source.cache));
+          } catch (_) {}
+        }
+        if (doc != null && doc.exists) {
           final data = doc.data()!;
           final storedOtp = data['otp']?.toString();
           final expiresAt = data['expiresAt'] as int? ?? 0;
@@ -487,7 +517,7 @@ class AuthProvider extends ChangeNotifier {
           if (storedOtp == otp && DateTime.now().millisecondsSinceEpoch < expiresAt) {
             isVerified = true;
             // Clean up used OTP
-            await _db.collection('otp_verifications').doc(targetPhone).delete();
+            await _db.collection('otp_verifications').doc(targetPhone).delete().catchError((_) {});
           }
         }
       }
@@ -515,7 +545,7 @@ class AuthProvider extends ChangeNotifier {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) {
         try {
-          final anonResult = await _auth.signInAnonymously();
+          final anonResult = await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
           currentUser = anonResult.user;
         } catch (e) {
           debugPrint('Anonymous auth fallback notice: $e');
@@ -527,9 +557,25 @@ class AuthProvider extends ChangeNotifier {
       final bool isTargetAdmin = isPhoneAdmin(targetPhone);
 
       // Check or create user profile in Firestore
-      final userQuery = await _db.collection('users').where('phone', isEqualTo: targetPhone).limit(1).get();
+      QuerySnapshot<Map<String, dynamic>>? userQuery;
+      try {
+        userQuery = await _db
+            .collection('users')
+            .where('phone', isEqualTo: targetPhone)
+            .limit(1)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 4));
+      } catch (_) {
+        try {
+          userQuery = await _db
+              .collection('users')
+              .where('phone', isEqualTo: targetPhone)
+              .limit(1)
+              .get(const GetOptions(source: Source.cache));
+        } catch (_) {}
+      }
 
-      if (userQuery.docs.isNotEmpty) {
+      if (userQuery != null && userQuery.docs.isNotEmpty) {
         final existingDoc = userQuery.docs.first;
         final updates = <String, dynamic>{};
         if (targetName.isNotEmpty && (existingDoc.data()['name'] == null || existingDoc.data()['name'].toString().isEmpty || existingDoc.data()['name'].toString().startsWith('Student ('))) {
@@ -542,9 +588,16 @@ class AuthProvider extends ChangeNotifier {
           updates['role'] = 'admin';
         }
         if (updates.isNotEmpty) {
-          await existingDoc.reference.update(updates);
+          await existingDoc.reference.update(updates).catchError((_) {});
         }
-        final updatedDoc = await existingDoc.reference.get();
+        DocumentSnapshot<Map<String, dynamic>> updatedDoc;
+        try {
+          updatedDoc = await existingDoc.reference
+              .get(const GetOptions(source: Source.serverAndCache))
+              .timeout(const Duration(seconds: 4));
+        } catch (_) {
+          updatedDoc = await existingDoc.reference.get(const GetOptions(source: Source.cache));
+        }
         var u = UserModel.fromFirestore(updatedDoc);
         if (isTargetAdmin && !u.isAdmin) {
           u = u.copyWith(role: UserRole.admin);
@@ -552,8 +605,17 @@ class AuthProvider extends ChangeNotifier {
         _user = u;
       } else {
         final docRef = _db.collection('users').doc(uid);
-        final doc = await docRef.get();
-        if (doc.exists) {
+        DocumentSnapshot<Map<String, dynamic>>? doc;
+        try {
+          doc = await docRef
+              .get(const GetOptions(source: Source.serverAndCache))
+              .timeout(const Duration(seconds: 4));
+        } catch (_) {
+          try {
+            doc = await docRef.get(const GetOptions(source: Source.cache));
+          } catch (_) {}
+        }
+        if (doc != null && doc.exists) {
           var u = UserModel.fromFirestore(doc);
           if (isTargetAdmin && !u.isAdmin) {
             u = u.copyWith(role: UserRole.admin);
