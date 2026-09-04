@@ -187,6 +187,41 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: session.isEnded
+                            ? const Color(0xFFEF4444).withOpacity(0.2)
+                            : (session.isActive || DateTime.now().isAfter(session.slot1.startTime))
+                                ? const Color(0xFF22C55E).withOpacity(0.2)
+                                : const Color(0xFFF59E0B).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: session.isEnded
+                              ? const Color(0xFFEF4444)
+                              : (session.isActive || DateTime.now().isAfter(session.slot1.startTime))
+                                  ? const Color(0xFF22C55E)
+                                  : const Color(0xFFF59E0B),
+                        ),
+                      ),
+                      child: Text(
+                        session.isEnded
+                            ? '🔴 Ended'
+                            : (session.isActive || DateTime.now().isAfter(session.slot1.startTime))
+                                ? '🟢 Live'
+                                : '🟡 Upcoming',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: session.isEnded
+                              ? const Color(0xFFFCA5A5)
+                              : (session.isActive || DateTime.now().isAfter(session.slot1.startTime))
+                                  ? const Color(0xFF4ADE80)
+                                  : const Color(0xFFFCD34D),
+                        ),
+                      ),
+                    ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.edit_calendar_outlined, size: 20, color: Color(0xFF38BDF8)),
@@ -326,12 +361,177 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (!session.isEnded) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFEF4444)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _showEndSessionConfirmation(session),
+                          icon: const Icon(Icons.stop_circle_outlined, size: 16, color: Color(0xFFEF4444)),
+                          label: Text(
+                            'End Session (සැසිය අවසන් කරන්න)',
+                            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFEF4444)),
+                          ),
+                        ),
+                      ),
+                      if (!session.isActive && DateTime.now().isBefore(session.slot1.startTime)) ...[
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF22C55E)),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _startSessionNow(session),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 16, color: Color(0xFF22C55E)),
+                          label: Text(
+                            'Start Now',
+                            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF22C55E)),
+                          ),
+                        ),
+                      ],
+                    ] else ...[
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_circle_outline, size: 15, color: Color(0xFFFCA5A5)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'සැසිය අවසන් කර ඇත (Session Ended)',
+                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFFFCA5A5)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () => _reopenSession(session),
+                        icon: const Icon(Icons.refresh, size: 14, color: Color(0xFF38BDF8)),
+                        label: Text('Reopen', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF38BDF8))),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _showEndSessionConfirmation(PaperSession session) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'End Paper Session?',
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සිසුන්ට විභාග කාමරයට පිවිසීමට හෝ නව පිළිතුරු පත්‍ර Submit කිරීමට නොහැක.',
+          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await _paperService.endPaperSession(session.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Paper Session එක සාර්ථකව අවසන් කරන ලදී (Session Ended).'),
+                      backgroundColor: Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              }
+            },
+            child: Text('End Session (අවසන් කරන්න)', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startSessionNow(PaperSession session) async {
+    try {
+      await _paperService.startPaperSession(session.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🚀 සැසිය සක්‍රීය කරන ලදී (Session is now Live)!'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
+  }
+
+  void _reopenSession(PaperSession session) async {
+    try {
+      await _paperService.reopenPaperSession(session.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ සැසිය නැවත සක්‍රීය කරන ලදී (Session Re-opened).'),
+            backgroundColor: Color(0xFF38BDF8),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
   }
 
   void _showCreatePaperDialog() {
@@ -355,14 +555,23 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     ];
 
     final durationCtrl = TextEditingController(text: '180');
-    final pdfUrlCtrl = TextEditingController();
 
     int slotCount = 1; // Default: 1 Slot
     DateTime selectedDate = DateTime.now();
-    TimeOfDay slot1Start = const TimeOfDay(hour: 8, minute: 0);
-    TimeOfDay slot1End = const TimeOfDay(hour: 11, minute: 15);
+
+    // Helper to calculate end time from start time + duration + 10 mins package unboxing
+    TimeOfDay calcEnd(TimeOfDay start, int duration) {
+      final totalMins = start.hour * 60 + start.minute + duration + 10; // +10 min physical package unboxing
+      final h = (totalMins ~/ 60) % 24;
+      final m = totalMins % 60;
+      return TimeOfDay(hour: h, minute: m);
+    }
+
+    final initialNow = DateTime.now();
+    TimeOfDay slot1Start = TimeOfDay(hour: initialNow.hour, minute: ((initialNow.minute / 5).ceil() * 5) % 60);
+    TimeOfDay slot1End = calcEnd(slot1Start, 180);
     TimeOfDay slot2Start = const TimeOfDay(hour: 14, minute: 0);
-    TimeOfDay slot2End = const TimeOfDay(hour: 17, minute: 15);
+    TimeOfDay slot2End = calcEnd(const TimeOfDay(hour: 14, minute: 0), 180);
     bool isSubmitting = false;
     String? validationError;
 
@@ -466,11 +675,52 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(child: _buildTextField('Duration (Mins)', durationCtrl, '180')),
+                    Expanded(
+                      child: TextField(
+                        controller: durationCtrl,
+                        keyboardType: TextInputType.number,
+                        style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                        onChanged: (val) {
+                          final d = int.tryParse(val) ?? 180;
+                          setDlgState(() {
+                            slot1End = calcEnd(slot1Start, d);
+                            slot2End = calcEnd(slot2Start, d);
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Duration (Mins)',
+                          labelStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                          filled: true,
+                          fillColor: const Color(0xFF0F172A),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                _buildTextField('PDF URL (Optional)', pdfUrlCtrl, 'https://.../paper.pdf'),
+                const SizedBox(height: 12),
+                // Physical paper note (no PDF)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.markunread_mailbox_outlined, color: Color(0xFF818CF8), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '📦 Physical Paper Delivery: සිසුන්ගේ නිවෙස් වලට කුරියර් කර ඇති මුද්‍රිත ප්‍රශ්න පත්‍රය කැමරාව ඉදිරියේ විවෘත කිරීමට ප්‍රථම විනාඩි 10 ක කාලයක් ස්වයංක්‍රීයව හිමිවේ.',
+                          style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFFC7D2FE), height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 14),
                 Text(
                   '📅 Examination Date:',
@@ -579,7 +829,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                             ? null
                             : () async {
                                 final t = await showTimePicker(context: context, initialTime: slot1Start);
-                                if (t != null) setDlgState(() => slot1Start = t);
+                                if (t != null) {
+                                  final dur = int.tryParse(durationCtrl.text) ?? 180;
+                                  setDlgState(() {
+                                    slot1Start = t;
+                                    slot1End = calcEnd(t, dur);
+                                  });
+                                }
                               },
                         child: Text('Start: ${slot1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
                       ),
@@ -613,7 +869,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                               ? null
                               : () async {
                                   final t = await showTimePicker(context: context, initialTime: slot2Start);
-                                  if (t != null) setDlgState(() => slot2Start = t);
+                                  if (t != null) {
+                                    final dur = int.tryParse(durationCtrl.text) ?? 180;
+                                    setDlgState(() {
+                                      slot2Start = t;
+                                      slot2End = calcEnd(t, dur);
+                                    });
+                                  }
                                 },
                           child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
                         ),
@@ -633,6 +895,29 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     ],
                   ),
                 ],
+                const SizedBox(height: 12),
+                // Notice about manual ending
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '🛑 Manual Session End: විභාග සැසිය ස්වයංක්‍රීයව අවසන් නොවේ. විභාගය අවසන් වූ පසු Admin විසින් "End Session" බොත්තම ඔබා එය අවසන් කළ යුතුය.',
+                          style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFFFDE68A), height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -663,14 +948,36 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       try {
                         final dateStr = selectedDate.toIso8601String().split('T')[0];
                         final slot1StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1Start.hour, slot1Start.minute);
-                        final slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1End.hour, slot1End.minute);
+                        var slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot1End.hour, slot1End.minute);
+
+                        // Prevent 12:xx AM mistaken for 12:xx PM or end earlier than start
+                        if (slot1EndDt.isBefore(slot1StartDt)) {
+                          if (slot1End.hour == 0 && slot1Start.hour <= 12) {
+                            slot1EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12, slot1End.minute);
+                          }
+                          if (slot1EndDt.isBefore(slot1StartDt)) {
+                            slot1EndDt = slot1EndDt.add(const Duration(days: 1));
+                          }
+                        }
 
                         PaperSlot? slot2;
                         if (slotCount == 2) {
                           final slot2StartDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2Start.hour, slot2Start.minute);
-                          final slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
+                          var slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, slot2End.hour, slot2End.minute);
+                          if (slot2EndDt.isBefore(slot2StartDt)) {
+                            if (slot2End.hour == 0 && slot2Start.hour <= 12) {
+                              slot2EndDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12, slot2End.minute);
+                            }
+                            if (slot2EndDt.isBefore(slot2StartDt)) {
+                              slot2EndDt = slot2EndDt.add(const Duration(days: 1));
+                            }
+                          }
                           slot2 = PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt);
                         }
+
+                        final now = DateTime.now();
+                        // Session status: active if start time has reached, otherwise upcoming
+                        final initialStatus = now.isAfter(slot1StartDt) ? 'active' : 'upcoming';
 
                         final newSession = PaperSession(
                           id: '',
@@ -679,7 +986,8 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           examYear: selectedExamYear,
                           date: dateStr,
                           durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
-                          pdfUrl: pdfUrlCtrl.text.trim().isEmpty ? null : pdfUrlCtrl.text.trim(),
+                          pdfUrl: null, // Physical paper package sent home, no PDF
+                          status: initialStatus,
                           slot1: PaperSlot(
                             id: 'slot1',
                             name: slotCount == 2 ? 'Morning Session (උදෑසන සැසිය)' : 'Exam Session (විභාග සැසිය)',
@@ -822,22 +1130,44 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               onPressed: () async {
                 try {
                   final baseDate = session.slot1.startTime;
+                  final s1StartDt = DateTime(baseDate.year, baseDate.month, baseDate.day, s1Start.hour, s1Start.minute);
+                  var s1EndDt = DateTime(baseDate.year, baseDate.month, baseDate.day, s1End.hour, s1End.minute);
+                  if (s1EndDt.isBefore(s1StartDt)) {
+                    if (s1End.hour == 0 && s1Start.hour <= 12) {
+                      s1EndDt = DateTime(baseDate.year, baseDate.month, baseDate.day, 12, s1End.minute);
+                    }
+                    if (s1EndDt.isBefore(s1StartDt)) {
+                      s1EndDt = s1EndDt.add(const Duration(days: 1));
+                    }
+                  }
+
                   final updatedSlot1 = PaperSlot(
                     id: 'slot1',
                     name: session.slot1.name,
-                    startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1Start.hour, s1Start.minute),
-                    endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s1End.hour, s1End.minute),
+                    startTime: s1StartDt,
+                    endTime: s1EndDt,
                     maxCapacity: session.slot1.maxCapacity,
                     registeredCount: session.slot1.registeredCount,
                   );
 
                   PaperSlot? updatedSlot2;
                   if (session.slot2 != null) {
+                    final s2StartDt = DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute);
+                    var s2EndDt = DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute);
+                    if (s2EndDt.isBefore(s2StartDt)) {
+                      if (s2End.hour == 0 && s2Start.hour <= 12) {
+                        s2EndDt = DateTime(baseDate.year, baseDate.month, baseDate.day, 12, s2End.minute);
+                      }
+                      if (s2EndDt.isBefore(s2StartDt)) {
+                        s2EndDt = s2EndDt.add(const Duration(days: 1));
+                      }
+                    }
+
                     updatedSlot2 = PaperSlot(
                       id: 'slot2',
                       name: session.slot2!.name,
-                      startTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2Start.hour, s2Start.minute),
-                      endTime: DateTime(baseDate.year, baseDate.month, baseDate.day, s2End.hour, s2End.minute),
+                      startTime: s2StartDt,
+                      endTime: s2EndDt,
                       maxCapacity: session.slot2!.maxCapacity,
                       registeredCount: session.slot2!.registeredCount,
                     );

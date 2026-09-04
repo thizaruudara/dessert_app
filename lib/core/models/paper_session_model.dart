@@ -64,6 +64,10 @@ class PaperSession {
   final PaperSlot? slot2;
   final DateTime createdAt;
 
+  bool get isEnded => status == 'ended';
+  bool get isActive => status == 'active';
+  bool get isUpcoming => status == 'upcoming';
+
   PaperSession({
     required this.id,
     required this.title,

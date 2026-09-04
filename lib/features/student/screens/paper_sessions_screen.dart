@@ -171,9 +171,15 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
 
         // Calculate countdown to the selected slot or slot 1 fallback
         final targetSlot = selectedSlot;
-        final isLive = targetSlot.isLive(_now);
-        final isUpcoming = targetSlot.isUpcoming(_now);
-        final isEnded = targetSlot.isEnded(_now);
+        // Session ends ONLY if Admin manually ended it:
+        final bool isEnded = session.isEnded;
+        final bool isLive = !isEnded && (session.isActive || _now.isAfter(targetSlot.startTime));
+        final bool isUpcoming = !isEnded && !isLive;
+
+        // 10-Minute Package Opening Phase (First 10 minutes of live session)
+        final int elapsedSeconds = isLive ? _now.difference(targetSlot.startTime).inSeconds : 0;
+        final bool isPackageOpening = isLive && elapsedSeconds >= 0 && elapsedSeconds < 600;
+        final int packageRemainingSecs = isPackageOpening ? (600 - elapsedSeconds) : 0;
 
         Duration remaining = isUpcoming ? targetSlot.startTime.difference(_now) : Duration.zero;
         if (remaining.isNegative) remaining = Duration.zero;
@@ -393,7 +399,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                 children: [
                                   Text(
                                     isLive
-                                        ? 'විභාග සැසිය සක්‍රීයයි (Session is Live)!'
+                                        ? (isPackageOpening
+                                            ? '📦 පැකේජය විවෘත කිරීමේ කාලය (Package Opening)'
+                                            : 'විභාග සැසිය සක්‍රීයයි (Session is Live)!')
                                         : isEnded
                                             ? 'සැසිය අවසන් (Session Completed)'
                                             : '${targetSlot.name} ආරම්භ වීමට:',
@@ -406,16 +414,18 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     isLive
-                                        ? 'වහාම Exam Room එකට පිවිසෙන්න'
+                                        ? (isPackageOpening
+                                            ? 'කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (${(packageRemainingSecs ~/ 60).toString().padLeft(2, '0')}:${(packageRemainingSecs % 60).toString().padLeft(2, '0')})'
+                                            : 'වහාම Exam Room එකට පිවිසෙන්න')
                                         : isEnded
-                                            ? 'ස්තුතියි, ඔබගේ පිළිතුරු ලැබී ඇත.'
+                                            ? 'ස්තුතියි, සැසිය අවසන් කර ඇත.'
                                             : '$hours : $minutes : $seconds',
                                     style: GoogleFonts.poppins(
                                       fontSize: isLive || isEnded ? 13 : 18,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: isLive || isEnded ? 0 : 2,
+                                      letterSpacing: (isLive && !isPackageOpening) || isEnded ? 0 : 2,
                                       color: isLive
-                                          ? const Color(0xFF4ADE80)
+                                          ? (isPackageOpening ? const Color(0xFFF59E0B) : const Color(0xFF4ADE80))
                                           : isEnded
                                               ? const Color(0xFF94A3B8)
                                               : const Color(0xFFF59E0B),
@@ -475,7 +485,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                               selectedSlotId == null
                                   ? 'පළමුව සැසියක් (Slot) තෝරන්න'
                                   : isLive
-                                      ? 'Enter Live Exam Room (කැමරාව ON කරන්න)'
+                                      ? (isPackageOpening
+                                          ? 'Open Package in Camera Room (කැමරාව ON කරන්න)'
+                                          : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
                                       : isUpcoming
                                           ? 'Exam Room පූර්ව පරීක්ෂාව (Preview)'
                                           : 'View Paper / Submissions',

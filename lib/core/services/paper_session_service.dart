@@ -254,4 +254,31 @@ class PaperSessionService {
       }
     } catch (_) {}
   }
+
+  // ── 14. End Paper Session Manually (Admin Only) ───────────────────────────
+  Future<void> endPaperSession(String paperId) async {
+    await _ensureAuth();
+    await _firestore.collection('paper_sessions').doc(paperId).update({
+      'status': 'ended',
+      'endedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ── 15. Start / Set Active Paper Session Manually (Admin Only) ────────────
+  Future<void> startPaperSession(String paperId) async {
+    await _ensureAuth();
+    await _firestore.collection('paper_sessions').doc(paperId).update({
+      'status': 'active',
+      'startedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ── 16. Re-open Ended Session (Admin Only) ────────────────────────────────
+  Future<void> reopenPaperSession(String paperId) async {
+    await _ensureAuth();
+    await _firestore.collection('paper_sessions').doc(paperId).update({
+      'status': 'active',
+      'reopenedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }

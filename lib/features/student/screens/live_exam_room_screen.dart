@@ -40,8 +40,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   StreamSubscription<List<ProctorAlert>>? _alertSubscription;
   final Set<String> _shownAlertIds = {};
 
-  // Floating self preview position
-  Offset _previewPosition = const Offset(16, 80);
+  // Camera flip and availability
+  List<CameraDescription> _availableCameras = [];
+  int _selectedCameraIndex = 0;
 
   @override
   void initState() {
@@ -59,26 +60,14 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
       });
 
       try {
-        final cameras = await availableCameras();
-        // Prefer front camera for student proctoring
-        final frontCam = cameras.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.front,
-          orElse: () => cameras.first,
-        );
+        _availableCameras = await availableCameras();
+        if (_availableCameras.isEmpty) return;
 
-        _cameraController = CameraController(
-          frontCam,
-          ResolutionPreset.medium,
-          enableAudio: false,
-        );
+        // Prefer front camera for proctoring
+        final frontIndex = _availableCameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
+        _selectedCameraIndex = frontIndex != -1 ? frontIndex : 0;
 
-        await _cameraController!.initialize();
-        if (mounted) {
-          setState(() {
-            _isCameraInitialized = true;
-          });
-          _sendHeartbeat(true);
-        }
+        await _startCameraController(_availableCameras[_selectedCameraIndex]);
       } catch (e) {
         debugPrint('Camera init error: $e');
       }
@@ -87,6 +76,32 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         _isCameraPermissionGranted = false;
       });
     }
+  }
+
+  Future<void> _startCameraController(CameraDescription camera) async {
+    _cameraController = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+
+    await _cameraController!.initialize();
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = true;
+      });
+      _sendHeartbeat(true);
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    if (_availableCameras.length <= 1) return;
+    _selectedCameraIndex = (_selectedCameraIndex + 1) % _availableCameras.length;
+    await _cameraController?.dispose();
+    setState(() {
+      _isCameraInitialized = false;
+    });
+    await _startCameraController(_availableCameras[_selectedCameraIndex]);
   }
 
   void _startTimers() {
@@ -262,27 +277,54 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         final session = snapshot.data!;
         final slot = (widget.slotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
-        final bool isUpcoming = _now.isBefore(slot.startTime);
-        final bool isEnded = _now.isAfter(slot.endTime);
-        final bool isLive = !isUpcoming && !isEnded;
+        final bool isEnded = session.isEnded;
+        final bool isUpcoming = !isEnded && _now.isBefore(slot.startTime);
+        final bool isLive = !isEnded && !isUpcoming;
+
+        // 10-Minute Package Opening Phase (First 10 minutes of live session)
+        final Duration elapsedSinceStart = isLive ? _now.difference(slot.startTime) : Duration.zero;
+        final bool isPackageOpeningPhase = isLive && elapsedSinceStart.inSeconds >= 0 && elapsedSinceStart.inSeconds < 600;
+        final int packageOpeningSecsLeft = isPackageOpeningPhase ? (600 - elapsedSinceStart.inSeconds) : 0;
+
+        // Real Exam Writing Phase (starts 10 mins after slot.startTime)
+        final DateTime realExamStart = slot.startTime.add(const Duration(minutes: 10));
+        final DateTime realExamEnd = realExamStart.add(Duration(minutes: session.durationMinutes));
+        final bool isRealExamPhase = isLive && !isPackageOpeningPhase;
+        final bool isOvertime = isRealExamPhase && _now.isAfter(realExamEnd);
+        final Duration examWritingTimeLeft = isRealExamPhase && !isOvertime ? realExamEnd.difference(_now) : Duration.zero;
+        final Duration overtimeDuration = isOvertime ? _now.difference(realExamEnd) : Duration.zero;
 
         Duration durationToShow;
         String timerPrefix;
         Color timerColor;
+        IconData timerIcon;
 
-        if (isUpcoming) {
+        if (isEnded) {
+          durationToShow = Duration.zero;
+          timerPrefix = 'Session Ended';
+          timerColor = const Color(0xFFEF4444);
+          timerIcon = Icons.cancel_outlined;
+        } else if (isUpcoming) {
           durationToShow = slot.startTime.difference(_now);
           timerPrefix = 'Starts in: ';
           timerColor = const Color(0xFFF59E0B);
-        } else if (isLive) {
-          durationToShow = slot.endTime.difference(_now);
+          timerIcon = Icons.hourglass_top_rounded;
+        } else if (isPackageOpeningPhase) {
+          durationToShow = Duration(seconds: packageOpeningSecsLeft);
+          timerPrefix = '📦 Open: ';
+          timerColor = const Color(0xFFF59E0B);
+          timerIcon = Icons.inventory_2_outlined;
+        } else if (!isOvertime) {
+          durationToShow = examWritingTimeLeft;
           final bool isUrgent = durationToShow.inMinutes < 15;
-          timerPrefix = '';
+          timerPrefix = '📝 ';
           timerColor = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+          timerIcon = Icons.timer_outlined;
         } else {
-          durationToShow = Duration.zero;
-          timerPrefix = 'Time Over: ';
-          timerColor = const Color(0xFFEF4444);
+          durationToShow = overtimeDuration;
+          timerPrefix = '⏱️ Extra: +';
+          timerColor = const Color(0xFFF59E0B);
+          timerIcon = Icons.alarm_on;
         }
 
         if (durationToShow.isNegative) durationToShow = Duration.zero;
@@ -290,6 +332,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         final hours = durationToShow.inHours.toString().padLeft(2, '0');
         final minutes = (durationToShow.inMinutes % 60).toString().padLeft(2, '0');
         final seconds = (durationToShow.inSeconds % 60).toString().padLeft(2, '0');
+        final String timerString = isEnded
+            ? 'Ended'
+            : (durationToShow.inHours > 0
+                ? '$timerPrefix$hours:$minutes:$seconds'
+                : '$timerPrefix$minutes:$seconds');
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
@@ -310,37 +357,33 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
                   style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
                 ),
                 Text(
-                  '${slot.name} • අධීක්ෂණ සැසිය',
+                  '${slot.name} • සජීවී කැමරා විභාගය',
                   style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
                 ),
               ],
             ),
             actions: [
+              if (_availableCameras.length > 1)
+                IconButton(
+                  tooltip: 'Switch Camera (Flip)',
+                  icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 20),
+                  onPressed: _switchCamera,
+                ),
               // Live Timer Pill
               Container(
-                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: timerColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: timerColor,
-                  ),
+                  border: Border.all(color: timerColor),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      isEnded
-                          ? Icons.alarm_off_rounded
-                          : isUpcoming
-                              ? Icons.hourglass_top_rounded
-                              : Icons.timer_outlined,
-                      size: 14,
-                      color: timerColor,
-                    ),
+                    Icon(timerIcon, size: 14, color: timerColor),
                     const SizedBox(width: 6),
                     Text(
-                      '$timerPrefix$hours:$minutes:$seconds',
+                      timerString,
                       style: GoogleFonts.poppins(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -353,101 +396,31 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
             ],
           ),
           body: Stack(
+            fit: StackFit.expand,
             children: [
-              // Main Question Paper Viewer
-              Positioned.fill(
-                child: _buildPaperContent(session),
-              ),
+              // 1. Full Screen Camera View (NO PDF)
+              _buildFullScreenCameraView(),
 
-              // Floating Draggable Self Camera Preview (Privacy Safe: Only Self is Visible)
+              // 2. Top Phase Banner (Package Opening or Exam Writing)
               Positioned(
-                left: _previewPosition.dx,
-                top: _previewPosition.dy,
-                child: GestureDetector(
-                  onPanUpdate: (details) {
-                    setState(() {
-                      _previewPosition += details.delta;
-                    });
-                  },
-                  child: _buildFloatingSelfCamera(),
+                top: 16,
+                left: 16,
+                right: 16,
+                child: _buildPhaseNoticeBanner(
+                  isPackageOpening: isPackageOpeningPhase,
+                  isUpcoming: isUpcoming,
+                  isOvertime: isOvertime,
+                  isEnded: isEnded,
+                  packageSecsLeft: packageOpeningSecsLeft,
                 ),
               ),
 
-              // Bottom Submission Bar
+              // 3. Bottom Submission Bar
               Positioned(
                 left: 16,
                 right: 16,
-                bottom: 20,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B).withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF334155)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E).withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.shield_outlined, color: Color(0xFF4ADE80), size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'කැමරා අධීක්ෂණය සක්‍රීයයි',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                color: const Color(0xFF94A3B8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        ),
-                        onPressed: () {
-                          _showSubmissionDialog();
-                        },
-                        icon: const Icon(Icons.upload_file, size: 16, color: Colors.white),
-                        label: Text(
-                          'Submit Paper',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                bottom: 24,
+                child: _buildBottomExamControlBar(isEnded),
               ),
             ],
           ),
@@ -456,201 +429,269 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
     );
   }
 
-  Widget _buildFloatingSelfCamera() {
-    return Container(
-      width: 110,
-      height: 150,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF6366F1), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+  Widget _buildFullScreenCameraView() {
+    if (!_isCameraPermissionGranted) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.videocam_off, size: 64, color: Color(0xFFEF4444)),
+              const SizedBox(height: 16),
+              Text(
+                'කැමරා අවසරය අවශ්‍යයි',
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'විභාග අධීක්ෂණය සඳහා කරුණාකර කැමරා අවසරය ලබා දෙන්න.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _initCamera,
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+                child: const Text('Allow Camera (අවසර දෙන්න)', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
+        ),
+      );
+    }
+
+    if (!_isCameraInitialized || _cameraController == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_isCameraInitialized && _cameraController != null)
-              CameraPreview(_cameraController!)
-            else
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.videocam_off, color: Color(0xFFEF4444), size: 24),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Camera Off',
-                      style: GoogleFonts.poppins(fontSize: 9, color: const Color(0xFF94A3B8)),
-                    ),
-                  ],
-                ),
-              ),
-            Positioned(
-              top: 6,
-              left: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF22C55E),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'YOU (SELF)',
-                      style: GoogleFonts.poppins(
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            CircularProgressIndicator(color: Color(0xFF6366F1)),
+            SizedBox(height: 16),
+            Text('කැමරාව ආරම්භ වෙමින් පවතී...', style: TextStyle(color: Colors.white70)),
           ],
+        ),
+      );
+    }
+
+    return SizedBox.expand(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _cameraController!.value.previewSize?.height ?? 720,
+          height: _cameraController!.value.previewSize?.width ?? 1280,
+          child: CameraPreview(_cameraController!),
         ),
       ),
     );
   }
 
-  Widget _buildPaperContent(PaperSession session) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF334155)),
+  Widget _buildPhaseNoticeBanner({
+    required bool isPackageOpening,
+    required bool isUpcoming,
+    required bool isOvertime,
+    required bool isEnded,
+    required int packageSecsLeft,
+  }) {
+    if (isEnded) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withOpacity(0.9),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10)],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'මෙම විභාග සැසිය ගුරුභවතුන් විසින් අවසන් කර ඇත (Session ended by Admin).',
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.description_outlined, color: Color(0xFF818CF8), size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        session.title,
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+      );
+    }
+
+    if (isPackageOpening) {
+      final mins = (packageSecsLeft ~/ 60).toString().padLeft(2, '0');
+      final secs = (packageSecsLeft % 60).toString().padLeft(2, '0');
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A).withOpacity(0.9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF59E0B), width: 2),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 14)],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.inventory_2, color: Color(0xFFF59E0B), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
                     children: [
                       Text(
-                        '📌 විභාග උපදෙස් (Exam Instructions):',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFFF59E0B),
-                        ),
+                        '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම',
+                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B)),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '1. විභාගය අතරතුර කැමරාව ක්‍රියාත්මකව තබා ගන්න.\n'
-                        '2. වෙනත් tabs හෝ apps වෙත මාරු නොවන්න.\n'
-                        '3. නියමිත වේලාව අවසන් වූ පසු පිළිතුරු පත්‍රයේ ඡායාරූප Submit Button එකෙන් Upload කරන්න.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: const Color(0xFF94A3B8),
-                          height: 1.5,
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$mins:$secs',
+                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'නිවසට ලැබුණු මුද්‍රා තැබූ පාර්සලය කැමරාව ඉදිරියේ පමණක් විවෘත කරන්න.',
+                    style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFFE2E8F0)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isOvertime) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A).withOpacity(0.9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.alarm_on, color: Color(0xFFEF4444), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'නියමිත වේලාව අවසන්! කරුණාකර පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කරන්න.',
+                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFFCA5A5)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '✍️ පිළිතුරු ලිවීම සක්‍රීයයි - ලිවීම් මේසය සහ ඔබ කැමරාව ඉදිරියේ තබාගන්න.',
+              style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomExamControlBar(bool isEnded) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withOpacity(0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF22C55E).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.shield_outlined, color: Color(0xFF4ADE80), size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'කැමරා අධීක්ෂණය සක්‍රීයයි',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: const Color(0xFF94A3B8),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Question Paper Preview Box
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF334155)),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isEnded ? const Color(0xFF334155) : const Color(0xFF6366F1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
-            child: Column(
-              children: [
-                const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 48),
-                const SizedBox(height: 12),
-                Text(
-                  'Question Paper Document',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'ප්‍රශ්න පත්‍රය PDF ආකාරයෙන් බැලීමට පහත Button එක භාවිතා කරන්න',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
-                ),
-                const SizedBox(height: 14),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF334155),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    // Opens full PDF
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Opening Question Paper PDF...'),
-                        backgroundColor: Color(0xFF6366F1),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.visibility, size: 16, color: Colors.white),
-                  label: Text(
-                    'View / Download PDF Paper',
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-              ],
+            onPressed: () {
+              _showSubmissionDialog();
+            },
+            icon: const Icon(Icons.upload_file, size: 16, color: Colors.white),
+            label: Text(
+              'Submit Paper',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
