@@ -561,7 +561,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                             : 'විභාග සැසිය සක්‍රීයයි (Session is Live)!')
                                         : isEnded
                                             ? 'සැසිය අවසන් (Session Completed)'
-                                            : '${targetSlot.name} ආරම්භ වීමට:',
+                                            : (session.isWaiting
+                                                ? '⏳ විභාග පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)'
+                                                : '${targetSlot.name} ආරම්භ වීමට:'),
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
@@ -576,16 +578,18 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                             : 'වහාම Exam Room එකට පිවිසෙන්න')
                                         : isEnded
                                             ? 'ස්තුතියි, සැසිය අවසන් කර ඇත.'
-                                            : '$hours : $minutes : $seconds',
+                                            : (session.isWaiting
+                                                ? 'පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)'
+                                                : '$hours : $minutes : $seconds'),
                                     style: GoogleFonts.poppins(
-                                      fontSize: isLive || isEnded ? 13 : 18,
+                                      fontSize: isLive || isEnded || session.isWaiting ? 13 : 18,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: (isLive && !isPackageOpening) || isEnded ? 0 : 2,
+                                      letterSpacing: (isLive && !isPackageOpening) || isEnded || session.isWaiting ? 0 : 2,
                                       color: isLive
                                           ? (isPackageOpening ? const Color(0xFFF59E0B) : const Color(0xFF4ADE80))
                                           : isEnded
                                               ? const Color(0xFF94A3B8)
-                                              : const Color(0xFFF59E0B),
+                                              : (session.isWaiting ? const Color(0xFF818CF8) : const Color(0xFFF59E0B)),
                                     ),
                                   ),
                                 ],
@@ -656,7 +660,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                           ? 'Open Package in Camera Room (කැමරාව ON කරන්න)'
                                           : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
                                       : isUpcoming
-                                          ? 'Exam Room පූර්ව පරීක්ෂාව (Preview)'
+                                          ? 'Enter Waiting Room (පොරොත්තු ශාලාවට පිවිසෙන්න)'
                                           : 'View Paper / Submissions',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,

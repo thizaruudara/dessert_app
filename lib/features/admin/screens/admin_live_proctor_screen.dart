@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,15 +26,21 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   late final Stream<List<PaperRegistration>> _slot1Stream = _paperService.streamSlotRegistrations(widget.paperId, 'slot1');
   late final Stream<List<PaperRegistration>> _slot2Stream = _paperService.streamSlotRegistrations(widget.paperId, 'slot2');
   late final Stream<List<PaperRegistration>> _allRegistrationsStream = _paperService.streamSlotRegistrations(widget.paperId, null);
+  Timer? _statusTicker;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Periodically update offline calculation every 4s
+    _statusTicker = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _statusTicker?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -194,12 +201,19 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
               ],
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
+          body: Column(
             children: [
-              _buildSlotProctorGrid('slot1', session),
-              _buildSlotProctorGrid('slot2', session),
-              _buildSubmittedAnswersSection(session),
+              _buildSessionPhaseControlBar(session),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildSlotProctorGrid('slot1', session),
+                    _buildSlotProctorGrid('slot2', session),
+                    _buildSubmittedAnswersSection(session),
+                  ],
+                ),
+              ),
             ],
           ),
         );
@@ -216,7 +230,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
         }
 
         final students = snapshot.data ?? [];
-        final liveCount = students.where((s) => s.isCameraActive).length;
+        final liveCount = students.where((s) => s.isOnline).length;
         final submittedCount = students.where((s) => s.status == 'submitted').length;
 
         return Column(
@@ -279,7 +293,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   }
 
   Widget _buildStudentProctorCard(PaperRegistration reg) {
-    final isLive = reg.isCameraActive;
+    final isLive = reg.isOnline;
     final isSubmitted = reg.status == 'submitted';
 
     return Container(
@@ -792,6 +806,214 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     );
   }
 
+  Widget _buildSubmittedAnswersSection(PaperSession? session) {
+    return StreamBuilder<List<PaperRegistration>>(
+      stream: _allRegistrationsStream,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+          );
+        }
+
+        final all = snapshot.data ?? [];
+        final submittedStudents = all.where((s) => s.status == 'submitted' || s.submissionPhotos.isNotEmpty).toList();
+
+        if (submittedStudents.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF334155)),
+                    ),
+                    child: const Icon(Icons.assignment_turned_in_outlined, size: 48, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'තවම පිළිතුරු පත්‍ර භාරදී නොමැත',
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'සිසුන් විසින් විභාගය අවසන් කර App එක හරහා Scan කළ පිළිතුරු පත්‍ර Submit කළ පසු මෙහි දිස්වනු ඇත.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: submittedStudents.length,
+          itemBuilder: (context, index) {
+            final student = submittedStudents[index];
+            final photos = student.submissionPhotos;
+            final isSlot2 = student.selectedSlot == 'slot2';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF334155)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Student Header
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E).withOpacity(0.15),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF22C55E)),
+                          ),
+                          child: const Icon(Icons.person, color: Color(0xFF4ADE80), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                student.studentName,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    student.studentPhone,
+                                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: isSlot2 ? const Color(0xFF818CF8).withOpacity(0.2) : const Color(0xFFF59E0B).withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isSlot2 ? 'Slot 2' : 'Slot 1',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSlot2 ? const Color(0xFF818CF8) : const Color(0xFFF59E0B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22C55E),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _showStudentSubmissionViewer(student),
+                          icon: const Icon(Icons.fullscreen, size: 16, color: Colors.white),
+                          label: Text(
+                            'Inspect (${photos.length})',
+                            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Thumbnails row if available
+                  if (photos.isNotEmpty) ...[
+                    const Divider(height: 1, color: Color(0xFF334155)),
+                    SizedBox(
+                      height: 100,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        itemCount: photos.length,
+                        itemBuilder: (ctx, pIdx) {
+                          final p = photos[pIdx];
+                          return GestureDetector(
+                            onTap: () => _showStudentSubmissionViewer(student),
+                            child: Container(
+                              width: 75,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFF475569)),
+                              ),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(7),
+                                    child: p.startsWith('http')
+                                        ? const Center(child: Icon(Icons.link, color: Color(0xFF38BDF8)))
+                                        : Image.memory(
+                                            base64Decode(p.contains(',') ? p.split(',')[1] : p),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                                          ),
+                                  ),
+                                  Positioned(
+                                    bottom: 2,
+                                    left: 2,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.7),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'P${pIdx + 1}',
+                                        style: GoogleFonts.poppins(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showFullScreenStudentViewer(PaperRegistration student) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -970,6 +1192,296 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
               }
             },
             child: Text('Trigger Time Up (දන්වන්න)', style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionPhaseControlBar(PaperSession? session) {
+    if (session == null) return const SizedBox.shrink();
+
+    final phase = session.currentPhase;
+    Color phaseColor;
+    String phaseLabel;
+    IconData phaseIcon;
+
+    switch (phase) {
+      case 'package_opening':
+        phaseColor = const Color(0xFFF59E0B);
+        phaseLabel = '📦 Package Opening (10 Mins Active)';
+        phaseIcon = Icons.inventory_2_rounded;
+        break;
+      case 'writing':
+        phaseColor = const Color(0xFF22C55E);
+        phaseLabel = '✍️ Exam Writing In Progress';
+        phaseIcon = Icons.edit_note_rounded;
+        break;
+      case 'time_up':
+        phaseColor = const Color(0xFFEA580C);
+        phaseLabel = '⏰ Time is Up (Collecting Answers)';
+        phaseIcon = Icons.alarm_on_rounded;
+        break;
+      case 'ended':
+        phaseColor = const Color(0xFFEF4444);
+        phaseLabel = '🛑 Session Ended';
+        phaseIcon = Icons.cancel_outlined;
+        break;
+      case 'waiting':
+      default:
+        phaseColor = const Color(0xFF818CF8);
+        phaseLabel = '⏳ Waiting Room (Students Waiting)';
+        phaseIcon = Icons.hourglass_top_rounded;
+        break;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        border: Border(bottom: BorderSide(color: Color(0xFF334155))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: phaseColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: phaseColor),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(phaseIcon, size: 14, color: phaseColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      phaseLabel,
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: phaseColor),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Manual Phase Controls',
+                style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (phase == 'waiting') ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmSetPhase(
+                      session,
+                      'package_opening',
+                      'Start Package Opening (ප්‍රශ්න පත්‍ර විවෘත කිරීම)',
+                      'සිසුන්ට මුද්‍රා තැබූ ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට විනාඩි 10 ක කාලය ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
+                      const Color(0xFFF59E0B),
+                    ),
+                    icon: const Icon(Icons.inventory_2, size: 14, color: Colors.black),
+                    label: Text(
+                      'Start Package Opening (10m)',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF22C55E)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmSetPhase(
+                      session,
+                      'writing',
+                      'Directly Start Exam (විභාගය ආරම්භ කරන්න)',
+                      'Package Opening අදියර මගහැර කෙලින්ම පිළිතුරු ලිවීමේ අදියර ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
+                      const Color(0xFF22C55E),
+                    ),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 16, color: Color(0xFF22C55E)),
+                    label: Text(
+                      'Start Writing Direct',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF22C55E)),
+                    ),
+                  ),
+                ] else if (phase == 'package_opening') ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF22C55E),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmSetPhase(
+                      session,
+                      'writing',
+                      'Start Exam Writing (ලිවීම අරඹන්න)',
+                      'ප්‍රශ්න පත්‍ර පාර්සල් විවෘත කිරීම අවසන් කර සිසුන්ට පිළිතුරු ලිවීම ආරම්භ කිරීමට Alert එකක් යැවීමට අවශ්‍යද?',
+                      const Color(0xFF22C55E),
+                    ),
+                    icon: const Icon(Icons.edit, size: 14, color: Colors.white),
+                    label: Text(
+                      'Start Exam Writing (ලිවීම අරඹන්න)',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmEndSession(session),
+                    icon: const Icon(Icons.stop_circle_outlined, size: 14, color: Colors.white),
+                    label: Text(
+                      'End Session',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ] else if (phase == 'writing') ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmTriggerTimeUp(session),
+                    icon: const Icon(Icons.alarm_on, size: 14, color: Colors.black),
+                    label: Text(
+                      '⏰ Trigger Time Up (වේලාව අවසන්)',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmEndSession(session),
+                    icon: const Icon(Icons.stop_circle_outlined, size: 14, color: Colors.white),
+                    label: Text(
+                      'End Session',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ] else if (phase == 'time_up') ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmEndSession(session),
+                    icon: const Icon(Icons.stop_circle_outlined, size: 14, color: Colors.white),
+                    label: Text(
+                      'End Session (සැසිය අවසන් කරන්න)',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF38BDF8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmSetPhase(
+                      session,
+                      'writing',
+                      'Resume Exam Writing',
+                      'නැවතත් ලිවීමේ අදියර ක්‍රියාත්මක කිරීමට අවශ්‍යද?',
+                      const Color(0xFF38BDF8),
+                    ),
+                    icon: const Icon(Icons.replay, size: 14, color: Color(0xFF38BDF8)),
+                    label: Text(
+                      'Resume Writing',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                    ),
+                  ),
+                ] else if (phase == 'ended') ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmSetPhase(
+                      session,
+                      'writing',
+                      'Reopen Paper Session',
+                      'මෙම අවසන් වූ සැසිය නැවත විවෘත කිරීමට අවශ්‍ය බව සහතිකද?',
+                      const Color(0xFF6366F1),
+                    ),
+                    icon: const Icon(Icons.refresh, size: 14, color: Colors.white),
+                    label: Text(
+                      'Reopen Session (නැවත අරඹන්න)',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmSetPhase(PaperSession session, String targetPhase, String title, String description, Color color) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+        content: Text(description, style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await _paperService.setSessionPhase(session.id, targetPhase);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Phase updated to: $targetPhase'),
+                      backgroundColor: color,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              }
+            },
+            child: Text('Confirm', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1345,8 +1857,7 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
       initialData: widget.initialRegistration,
       builder: (context, snapshot) {
         final reg = snapshot.data ?? widget.initialRegistration;
-        final isLive = reg.isCameraActive &&
-            (reg.lastCameraPing == null || DateTime.now().difference(reg.lastCameraPing!).inSeconds < 45);
+        final isLive = reg.isOnline;
         final isSubmitted = reg.status == 'submitted';
 
         return Scaffold(

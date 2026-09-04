@@ -975,9 +975,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           slot2 = PaperSlot(id: 'slot2', name: 'Evening Session (සවස සැසිය)', startTime: slot2StartDt, endTime: slot2EndDt);
                         }
 
-                        final now = DateTime.now();
-                        // Session status: active if start time has reached, otherwise upcoming
-                        final initialStatus = now.isAfter(slot1StartDt) ? 'active' : 'upcoming';
+                        // Sessions ALWAYS start in 'upcoming' status and 'waiting' phase.
+                        // Admin manually triggers package opening or writing phases!
+                        const initialStatus = 'upcoming';
+                        const initialPhase = 'waiting';
 
                         final newSession = PaperSession(
                           id: '',
@@ -988,6 +989,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
                           pdfUrl: null, // Physical paper package sent home, no PDF
                           status: initialStatus,
+                          currentPhase: initialPhase,
                           slot1: PaperSlot(
                             id: 'slot1',
                             name: slotCount == 2 ? 'Morning Session (උදෑසන සැසිය)' : 'Exam Session (විභාග සැසිය)',

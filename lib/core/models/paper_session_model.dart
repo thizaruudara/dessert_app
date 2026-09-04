@@ -64,14 +64,20 @@ class PaperSession {
   final String? pdfUrl;
   final String? paperImageUrl;
   final String status; // 'upcoming', 'active', 'ended'
+  final String currentPhase; // 'waiting', 'package_opening', 'writing', 'time_up', 'ended'
   final bool isTimeUp;
   final PaperSlot slot1;
   final PaperSlot? slot2;
   final DateTime createdAt;
+  final DateTime? packageOpeningStartedAt;
+  final DateTime? writingStartedAt;
 
-  bool get isEnded => status == 'ended';
-  bool get isActive => status == 'active';
-  bool get isUpcoming => status == 'upcoming';
+  bool get isEnded => status == 'ended' || currentPhase == 'ended';
+  bool get isActive => status == 'active' && currentPhase != 'ended' && currentPhase != 'waiting';
+  bool get isUpcoming => status == 'upcoming' || currentPhase == 'waiting';
+  bool get isWaiting => currentPhase == 'waiting';
+  bool get isPackageOpening => currentPhase == 'package_opening';
+  bool get isWriting => currentPhase == 'writing';
 
   PaperSession({
     required this.id,
@@ -83,10 +89,13 @@ class PaperSession {
     this.pdfUrl,
     this.paperImageUrl,
     this.status = 'upcoming',
+    this.currentPhase = 'waiting',
     this.isTimeUp = false,
     required this.slot1,
     this.slot2,
     required this.createdAt,
+    this.packageOpeningStartedAt,
+    this.writingStartedAt,
   });
 
   factory PaperSession.fromFirestore(DocumentSnapshot doc) {
@@ -102,6 +111,12 @@ class PaperSession {
       return now;
     }
 
+    DateTime? parseOptionalTime(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val);
+      return null;
+    }
+
     Map<dynamic, dynamic> safeMap(dynamic val) {
       if (val is Map) return val;
       return const {};
@@ -112,6 +127,22 @@ class PaperSession {
         ? rawDuration.toInt()
         : (int.tryParse(rawDuration?.toString() ?? '') ?? 180);
 
+    final String rawStatus = data['status']?.toString() ?? 'upcoming';
+    final bool rawTimeUp = data['isTimeUp'] == true || rawStatus == 'time_up';
+
+    String parsedPhase = data['currentPhase']?.toString() ?? '';
+    if (parsedPhase.isEmpty) {
+      if (rawStatus == 'ended') {
+        parsedPhase = 'ended';
+      } else if (rawTimeUp) {
+        parsedPhase = 'time_up';
+      } else if (rawStatus == 'active') {
+        parsedPhase = 'writing';
+      } else {
+        parsedPhase = 'waiting';
+      }
+    }
+
     return PaperSession(
       id: doc.id,
       title: data['title']?.toString() ?? 'A/L Examination Paper',
@@ -121,11 +152,14 @@ class PaperSession {
       durationMinutes: parsedDuration,
       pdfUrl: data['pdfUrl']?.toString(),
       paperImageUrl: data['paperImageUrl']?.toString(),
-      status: data['status']?.toString() ?? 'upcoming',
-      isTimeUp: data['isTimeUp'] == true || data['status'] == 'time_up',
+      status: rawStatus,
+      currentPhase: parsedPhase,
+      isTimeUp: rawTimeUp,
       slot1: PaperSlot.fromMap('slot1', safeMap(data['slot1'])),
       slot2: (data['slot2'] is Map) ? PaperSlot.fromMap('slot2', safeMap(data['slot2'])) : null,
       createdAt: parseTime(data['createdAt']),
+      packageOpeningStartedAt: parseOptionalTime(data['packageOpeningStartedAt']),
+      writingStartedAt: parseOptionalTime(data['writingStartedAt']),
     );
   }
 
@@ -137,6 +171,7 @@ class PaperSession {
       'date': date,
       'durationMinutes': durationMinutes,
       'status': status,
+      'currentPhase': currentPhase,
       'isTimeUp': isTimeUp,
       'slot1': slot1.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
@@ -149,6 +184,12 @@ class PaperSession {
     }
     if (paperImageUrl != null && paperImageUrl!.trim().isNotEmpty) {
       map['paperImageUrl'] = paperImageUrl!.trim();
+    }
+    if (packageOpeningStartedAt != null) {
+      map['packageOpeningStartedAt'] = Timestamp.fromDate(packageOpeningStartedAt!);
+    }
+    if (writingStartedAt != null) {
+      map['writingStartedAt'] = Timestamp.fromDate(writingStartedAt!);
     }
     return map;
   }
@@ -170,6 +211,12 @@ class PaperRegistration {
   final String? cameraSnapshotUrl;
   final String? submissionUrl;
   final List<String> submissionPhotos;
+
+  bool get isOnline {
+    if (!isCameraActive) return false;
+    if (lastCameraPing == null) return false;
+    return DateTime.now().difference(lastCameraPing!).inSeconds < 15;
+  }
 
   PaperRegistration({
     required this.id,

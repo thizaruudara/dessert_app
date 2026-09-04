@@ -13,6 +13,7 @@ import '../../../core/models/paper_session_model.dart';
 import '../../../core/services/paper_session_service.dart';
 import '../../../core/services/screen_keep_on_service.dart';
 import '../../auth/providers/auth_provider.dart';
+import 'in_app_document_scanner_screen.dart';
 
 class LiveExamRoomScreen extends StatefulWidget {
   final String paperId;
@@ -28,7 +29,7 @@ class LiveExamRoomScreen extends StatefulWidget {
   State<LiveExamRoomScreen> createState() => _LiveExamRoomScreenState();
 }
 
-class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
+class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBindingObserver {
   final PaperSessionService _paperService = PaperSessionService();
   late final Stream<PaperSession?> _sessionStream = _paperService.streamPaperSession(widget.paperId);
   CameraController? _cameraController;
@@ -51,11 +52,27 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     ScreenKeepOnService.setKeepScreenOn(true);
     _ensureStudentRegistered();
     _initCamera();
     _startTimers();
     _listenForProctorAlerts();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      // Immediately report camera inactive when student leaves the app or turns off screen
+      _sendHeartbeat(false);
+    } else if (state == AppLifecycleState.resumed) {
+      if (_isCameraInitialized) {
+        _sendHeartbeat(true);
+      }
+    }
   }
 
   Future<void> _ensureStudentRegistered() async {
@@ -292,6 +309,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     ScreenKeepOnService.setKeepScreenOn(false);
     _sendHeartbeat(false);
     _heartbeatTimer?.cancel();
@@ -318,8 +336,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
 
         final bool isEnded = session.isEnded;
         final bool isTimeUp = session.isTimeUp;
-        final bool isUpcoming = !isEnded && _now.isBefore(slot.startTime);
-        final bool isLive = !isEnded && !isUpcoming;
+        final bool isWaiting = session.isWaiting;
+        final bool isPackageOpening = session.isPackageOpening;
+        final bool isWriting = session.isWriting;
 
         // Auto-exit if session was ended by admin
         if (isEnded && !_hasExitedDueToEnd) {
@@ -334,18 +353,19 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
           });
         }
 
-        // 10-Minute Package Opening Phase (First 10 minutes of live session)
-        final Duration elapsedSinceStart = isLive ? _now.difference(slot.startTime) : Duration.zero;
-        final bool isPackageOpeningPhase = isLive && elapsedSinceStart.inSeconds >= 0 && elapsedSinceStart.inSeconds < 600;
-        final int packageOpeningSecsLeft = isPackageOpeningPhase ? (600 - elapsedSinceStart.inSeconds) : 0;
+        // Package Opening Countdown (10 Minutes from packageOpeningStartedAt)
+        int packageOpeningSecsLeft = 600;
+        if (session.packageOpeningStartedAt != null) {
+          final elapsed = _now.difference(session.packageOpeningStartedAt!).inSeconds;
+          packageOpeningSecsLeft = (600 - elapsed).clamp(0, 600);
+        }
 
-        // Real Exam Writing Phase (starts 10 mins after slot.startTime)
-        final DateTime realExamStart = slot.startTime.add(const Duration(minutes: 10));
-        final DateTime realExamEnd = realExamStart.add(Duration(minutes: session.durationMinutes));
-        final bool isRealExamPhase = isLive && !isPackageOpeningPhase;
-        final bool isOvertime = isRealExamPhase && _now.isAfter(realExamEnd);
-        final Duration examWritingTimeLeft = isRealExamPhase && !isOvertime ? realExamEnd.difference(_now) : Duration.zero;
-        final Duration overtimeDuration = isOvertime ? _now.difference(realExamEnd) : Duration.zero;
+        // Real Exam Writing Phase
+        DateTime examStartTime = session.writingStartedAt ?? slot.startTime;
+        DateTime examEndTime = examStartTime.add(Duration(minutes: session.durationMinutes));
+        final bool isOvertime = isWriting && _now.isAfter(examEndTime);
+        final Duration examWritingTimeLeft = isWriting && !isOvertime ? examEndTime.difference(_now) : Duration.zero;
+        final Duration overtimeDuration = isOvertime ? _now.difference(examEndTime) : Duration.zero;
 
         Duration durationToShow;
         String timerPrefix;
@@ -362,12 +382,12 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
           timerPrefix = '⏰ TIME UP';
           timerColor = const Color(0xFFEF4444);
           timerIcon = Icons.alarm_on;
-        } else if (isUpcoming) {
-          durationToShow = slot.startTime.difference(_now);
-          timerPrefix = 'Starts in: ';
-          timerColor = const Color(0xFFF59E0B);
+        } else if (isWaiting) {
+          durationToShow = Duration.zero;
+          timerPrefix = '⏳ Waiting';
+          timerColor = const Color(0xFF818CF8);
           timerIcon = Icons.hourglass_top_rounded;
-        } else if (isPackageOpeningPhase) {
+        } else if (isPackageOpening) {
           durationToShow = Duration(seconds: packageOpeningSecsLeft);
           timerPrefix = '📦 Open: ';
           timerColor = const Color(0xFFF59E0B);
@@ -394,9 +414,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
             ? 'Ended'
             : isTimeUp
                 ? '⏰ Time is Up'
-                : (durationToShow.inHours > 0
-                    ? '$timerPrefix$hours:$minutes:$seconds'
-                    : '$timerPrefix$minutes:$seconds');
+                : isWaiting
+                    ? '⏳ Waiting for Examiner'
+                    : (durationToShow.inHours > 0
+                        ? '$timerPrefix$hours:$minutes:$seconds'
+                        : '$timerPrefix$minutes:$seconds');
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
@@ -417,13 +439,15 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
                   style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
                 ),
                 Text(
-                  '${slot.name} • සජීවී කැමරා විභාගය',
+                  isWaiting
+                      ? 'පොරොත්තු ශාලාව (Waiting Room)'
+                      : '${slot.name} • සජීවී කැමරා විභාගය',
                   style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
                 ),
               ],
             ),
             actions: [
-              if (_availableCameras.length > 1)
+              if (!isWaiting && _availableCameras.length > 1)
                 IconButton(
                   tooltip: 'Switch Camera (Flip)',
                   icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 20),
@@ -455,38 +479,319 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
               ),
             ],
           ),
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Full Screen Camera View (NO PDF)
-              _buildFullScreenCameraView(),
+          body: isWaiting
+              ? _buildWaitingRoomView(session, slot)
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 1. Full Screen Camera View (NO PDF)
+                    _buildFullScreenCameraView(),
 
-              // 2. Top Phase Banner (Package Opening, Exam Writing, or Time Up)
-              Positioned(
-                top: 16,
-                left: 16,
-                right: 16,
-                child: _buildPhaseNoticeBanner(
-                  isPackageOpening: isPackageOpeningPhase,
-                  isUpcoming: isUpcoming,
-                  isOvertime: isOvertime,
-                  isEnded: isEnded,
-                  isTimeUp: isTimeUp,
-                  packageSecsLeft: packageOpeningSecsLeft,
+                    // 2. Top Phase Banner (Package Opening, Exam Writing, or Time Up)
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      right: 16,
+                      child: _buildPhaseNoticeBanner(
+                        isPackageOpening: isPackageOpening,
+                        isWriting: isWriting,
+                        isOvertime: isOvertime,
+                        isEnded: isEnded,
+                        isTimeUp: isTimeUp,
+                        packageSecsLeft: packageOpeningSecsLeft,
+                      ),
+                    ),
+
+                    // 3. Bottom Submission Bar
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 24,
+                      child: _buildBottomExamControlBar(isEnded, isTimeUp),
+                    ),
+                  ],
                 ),
-              ),
+        );
+      },
+    );
+  }
 
-              // 3. Bottom Submission Bar
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 24,
-                child: _buildBottomExamControlBar(isEnded, isTimeUp),
+  Widget _buildWaitingRoomView(PaperSession session, PaperSlot slot) {
+    final startTimeStr = '${slot.startTime.hour.toString().padLeft(2, '0')}:${slot.startTime.minute.toString().padLeft(2, '0')}';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Top Waiting Notice Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF6366F1).withOpacity(0.25),
+                  const Color(0xFF0F172A),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.4)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.hourglass_top_rounded, color: Color(0xFFA5B4FC), size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'විභාග පොරොත්තු ශාලාව (Waiting Room)',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'නියමිත වේලාව: $startTimeStr (${slot.name})',
+                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'විභාගය නියමිත වේලාවට ස්වයංක්‍රීයව ආරම්භ නොවේ. විභාග පරීක්ෂක විසින් විභාගය ආරම්භ කරන තෙක් කරුණාකර මෙම තිරයේ රැඳී සිටින්න. ඔවුන් සැසිය ආරම්භ කළ වහාම තිරය සජීවී විභාගයට මාරු වේ.',
+                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFCBD5E1), height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 2. Camera Self-Check Box (Preview & Angle Guide)
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.videocam_outlined, color: Color(0xFF22C55E), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'කැමරා පූර්ව පරීක්ෂාව (Self-Check Preview)',
+                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _isCameraInitialized
+                              ? const Color(0xFF22C55E).withOpacity(0.2)
+                              : const Color(0xFFEF4444).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _isCameraInitialized ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                          ),
+                        ),
+                        child: Text(
+                          _isCameraInitialized ? '🟢 Online' : '🔴 Camera Offline',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _isCameraInitialized ? const Color(0xFF4ADE80) : const Color(0xFFFCA5A5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ClipRRect(
+                  child: Container(
+                    height: 220,
+                    width: double.infinity,
+                    color: Colors.black,
+                    child: _isCameraInitialized && _cameraController != null
+                        ? CameraPreview(_cameraController!)
+                        : Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CircularProgressIndicator(color: Color(0xFF6366F1), strokeWidth: 2),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'කැමරාව සක්‍රීය වෙමින් පවතී...',
+                                  style: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'ඔබගේ මුහුණ සහ විභාග මේසය පැහැදිලිව පෙනෙන සේ දුරකථනය ස්ථාවරව තබන්න.',
+                          style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                        ),
+                      ),
+                      if (_availableCameras.length > 1)
+                        TextButton.icon(
+                          onPressed: _switchCamera,
+                          icon: const Icon(Icons.flip_camera_ios, size: 14, color: Color(0xFF818CF8)),
+                          label: Text(
+                            'Flip',
+                            style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF818CF8)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3. Exam Preparations & Instructions Checklist
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.checklist_rounded, color: Color(0xFFF59E0B), size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      'විභාග උපදෙස් (Exam Checklist)',
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _buildWaitingChecklistRow(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'මුද්‍රා තැබූ ප්‍රශ්න පත්‍ර පාර්සලය මේසය මත තබාගන්න',
+                  subtitle: 'පරීක්ෂක විසින් විධානය දෙන තුරු කිසිසේත්ම විවෘත නොකරන්න.',
+                  color: const Color(0xFFF59E0B),
+                ),
+                const SizedBox(height: 10),
+                _buildWaitingChecklistRow(
+                  icon: Icons.cut,
+                  title: 'පාර්සලය විවෘත කිරීමට කතුරක්/බ්ලේඩයක් සූදානම් කරගන්න',
+                  subtitle: 'කැමරාව ඉදිරියේ පළමු මිනිත්තු 10 තුළ විවෘත කළ යුතුය.',
+                  color: const Color(0xFF38BDF8),
+                ),
+                const SizedBox(height: 10),
+                _buildWaitingChecklistRow(
+                  icon: Icons.lightbulb_outline,
+                  title: 'ප්‍රමාණවත් ආලෝකය සහ ස්ථාවර ආධාරකයක් භාවිතා කරන්න',
+                  subtitle: 'දුරකථනය නොසෙල්වෙන සේ මේසය මත රඳවා තබන්න.',
+                  color: const Color(0xFF22C55E),
+                ),
+                const SizedBox(height: 10),
+                _buildWaitingChecklistRow(
+                  icon: Icons.phonelink_lock,
+                  title: 'මෙම තිරයෙන් ඉවත් නොවන්න',
+                  subtitle: 'තිරය ස්වයංක්‍රීයව ක්‍රියා විරහිත නොවන පරිදි සකසා ඇත (Screen Keep On).',
+                  color: const Color(0xFFA5B4FC),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 4. Realtime Connection Pulse Status
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '📡 Examiner Connection: Active • Waiting to Start...',
+                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWaitingChecklistRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
               ),
             ],
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
@@ -549,7 +854,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
 
   Widget _buildPhaseNoticeBanner({
     required bool isPackageOpening,
-    required bool isUpcoming,
+    required bool isWriting,
     required bool isOvertime,
     required bool isEnded,
     required bool isTimeUp,
@@ -601,21 +906,22 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
                     style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   Text(
-                    'ලිවීම නවතා පිළිතුරු පත්‍රවල ඡායාරූප ගෙන දැන්ම Submit කරන්න.',
+                    'ලිවීම නවතා පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න.',
                     style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFFFEE2E2)),
                   ),
                 ],
               ),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: _showSubmissionDialog,
-              child: Text(
-                'Submit Now',
+              onPressed: _openDocumentScanner,
+              icon: const Icon(Icons.document_scanner, size: 14, color: Color(0xFFEF4444)),
+              label: Text(
+                'Scan & Submit',
                 style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
               ),
             ),
@@ -630,52 +936,70 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withOpacity(0.9),
+          color: const Color(0xFF0F172A).withOpacity(0.92),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFF59E0B), width: 2),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 14)],
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.inventory_2, color: Color(0xFFF59E0B), size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.inventory_2, color: Color(0xFFF59E0B), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම',
+                        '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)',
                         style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B)),
                       ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '$mins:$secs',
-                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
-                        ),
+                      Text(
+                        'කැමරාව ඉදිරියේ පමණක් පාර්සලය විවෘත කරන්න',
+                        style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFFE2E8F0)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'නිවසට ලැබුණු මුද්‍රා තැබූ පාර්සලය කැමරාව ඉදිරියේ පමණක් විවෘත කරන්න.',
-                    style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFFE2E8F0)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Text(
+                    '$mins:$secs',
+                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('1. 🏷️ මුද්‍රා තැබූ පාර්සලය කැමරාවට පෙන්වන්න (Show sealed parcel)', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white)),
+                  const SizedBox(height: 2),
+                  Text('2. ✂️ කැමරාව ඉදිරියේම කපා විවෘත කරන්න (Cut open on camera)', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white)),
+                  const SizedBox(height: 2),
+                  Text('3. 📄 පත්‍රය මේසය මත තබා ලිවීමට සූදානම් වන්න (Place on desk)', style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF4ADE80))),
                 ],
               ),
             ),
@@ -698,7 +1022,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'නියමිත වේලාව අවසන්! කරුණාකර පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කරන්න.',
+                'නියමිත වේලාව අවසන්! කරුණාකර පිළිතුරු පත්‍ර Scan කර Submit කරන්න.',
                 style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFFCA5A5)),
               ),
             ),
@@ -803,15 +1127,15 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
             onPressed: () {
-              _showSubmissionDialog();
+              _openDocumentScanner();
             },
             icon: Icon(
-              isTimeUp ? Icons.camera_alt_rounded : Icons.upload_file,
+              isTimeUp ? Icons.document_scanner : Icons.upload_file,
               size: 16,
               color: Colors.white,
             ),
             label: Text(
-              isTimeUp ? 'Submit Now' : 'Submit Paper',
+              isTimeUp ? 'Scan & Submit' : 'Submit Paper',
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -908,7 +1232,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'ගුරුභවතුන් විසින් විභාගයේ වේලාව අවසන් කර ඇත. කරුණාකර ලිවීම නවත්වා ඔබගේ පිළිතුරු පත්‍රවල ඡායාරූප (Photos) ලබාගෙන App එක හරහා දැන්ම Submit කරන්න.',
+              'ගුරුභවතුන් විසින් විභාගයේ වේලාව අවසන් කර ඇත. කරුණාකර ලිවීම නවත්වා ඔබගේ පිළිතුරු පත්‍ර In-App Document Scanner එක හරහා පැහැදිලිව Scan කර දැන්ම Submit කරන්න.',
               style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5),
             ),
           ],
@@ -924,11 +1248,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
               ),
               onPressed: () {
                 Navigator.of(ctx).pop();
-                _showSubmissionDialog();
+                _openDocumentScanner();
               },
-              icon: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
+              icon: const Icon(Icons.document_scanner, color: Colors.white, size: 18),
               label: Text(
-                '📸 Take Photos & Submit (පිළිතුරු පත්‍ර භාරදෙන්න)',
+                '📄 Scan Answers with Camera (ස්කෑන් කරන්න)',
                 style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
@@ -936,6 +1260,42 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openDocumentScanner() async {
+    // 1. Temporarily pause proctor heartbeat & release front proctor camera
+    // to prevent Android camera device contention when opening rear scanner
+    _heartbeatTimer?.cancel();
+    await _cameraController?.dispose();
+    _cameraController = null;
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
+
+    // 2. Open In-App Rear Document Scanner Screen
+    if (!mounted) return;
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (ctx) => InAppDocumentScannerScreen(
+          paperId: widget.paperId,
+          slotId: widget.slotId,
+        ),
+      ),
+    );
+
+    // 3. If submitted, exit exam room cleanly
+    if (submitted == true && mounted) {
+      context.pop();
+      return;
+    }
+
+    // 4. If cancelled or backed out without submitting, re-initialize proctor camera and timers
+    if (mounted) {
+      _initCamera();
+      _startTimers();
+    }
   }
 
   void _showSubmissionDialog() {

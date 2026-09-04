@@ -380,8 +380,15 @@ class PaperSessionService {
     await _ensureAuth();
     await _firestore.collection('paper_sessions').doc(paperId).update({
       'status': 'ended',
+      'currentPhase': 'ended',
       'endedAt': FieldValue.serverTimestamp(),
     });
+    await broadcastProctorAlert(
+      paperId: paperId,
+      senderName: 'Admin / Examiner',
+      message: '🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් විය. (Exam session ended by Admin)',
+      type: 'urgent',
+    );
   }
 
   // ── 15. Start / Set Active Paper Session Manually (Admin Only) ────────────
@@ -389,7 +396,9 @@ class PaperSessionService {
     await _ensureAuth();
     await _firestore.collection('paper_sessions').doc(paperId).update({
       'status': 'active',
+      'currentPhase': 'writing',
       'startedAt': FieldValue.serverTimestamp(),
+      'writingStartedAt': FieldValue.serverTimestamp(),
     });
   }
 
@@ -398,6 +407,8 @@ class PaperSessionService {
     await _ensureAuth();
     await _firestore.collection('paper_sessions').doc(paperId).update({
       'status': 'active',
+      'currentPhase': 'writing',
+      'isTimeUp': false,
       'reopenedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -407,6 +418,7 @@ class PaperSessionService {
     await _ensureAuth();
     await _firestore.collection('paper_sessions').doc(paperId).update({
       'isTimeUp': true,
+      'currentPhase': 'time_up',
       'timeUpAt': FieldValue.serverTimestamp(),
     });
     // Broadcast high-priority alert to all students
@@ -423,6 +435,61 @@ class PaperSessionService {
     await _ensureAuth();
     await _firestore.collection('paper_sessions').doc(paperId).update({
       'isTimeUp': false,
+      'currentPhase': 'writing',
     });
+  }
+
+  // ── 19. Set Session Phase Manually (Admin Only) ───────────────────────────
+  Future<void> setSessionPhase(String paperId, String phase) async {
+    await _ensureAuth();
+    final Map<String, dynamic> updates = {
+      'currentPhase': phase,
+    };
+
+    if (phase == 'waiting') {
+      updates['status'] = 'upcoming';
+      updates['isTimeUp'] = false;
+    } else if (phase == 'package_opening') {
+      updates['status'] = 'active';
+      updates['isTimeUp'] = false;
+      updates['packageOpeningStartedAt'] = FieldValue.serverTimestamp();
+      await broadcastProctorAlert(
+        paperId: paperId,
+        senderName: 'Admin / Examiner',
+        message: '📦 ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කරන්න! (Open your exam parcel in front of the camera now!)',
+        type: 'urgent',
+      );
+    } else if (phase == 'writing') {
+      updates['status'] = 'active';
+      updates['isTimeUp'] = false;
+      updates['writingStartedAt'] = FieldValue.serverTimestamp();
+      await broadcastProctorAlert(
+        paperId: paperId,
+        senderName: 'Admin / Examiner',
+        message: '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)',
+        type: 'info',
+      );
+    } else if (phase == 'time_up') {
+      updates['status'] = 'active';
+      updates['isTimeUp'] = true;
+      updates['timeUpAt'] = FieldValue.serverTimestamp();
+      await broadcastProctorAlert(
+        paperId: paperId,
+        senderName: 'Admin / Examiner',
+        message: '⏰ වේලාව අවසන් විය! ලිවීම නවතා ඔබගේ පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න. (Time is Up! Scan & submit answer sheets)',
+        type: 'urgent',
+      );
+    } else if (phase == 'ended') {
+      updates['status'] = 'ended';
+      updates['endedAt'] = FieldValue.serverTimestamp();
+      await broadcastProctorAlert(
+        paperId: paperId,
+        senderName: 'Admin / Examiner',
+        message: '🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් විය. (Session Ended by Examiner)',
+        type: 'urgent',
+      );
+    }
+
+    await _firestore.collection('paper_sessions').doc(paperId).update(updates);
   }
 }
