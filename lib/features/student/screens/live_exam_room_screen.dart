@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/paper_session_model.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/services/paper_session_service.dart';
 import '../../../core/services/screen_keep_on_service.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -321,6 +322,12 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   }
 
   void _showProctorAlertDialog(ProctorAlert alert) {
+    // Also trigger native lock screen & heads-up notification in case screen is locked or minimized
+    NotificationService.showNotification(
+      title: '⚠️ Proctor Alert: ${alert.title}',
+      body: alert.message,
+    );
+
     showDialog(
       context: context,
       barrierDismissible: true,

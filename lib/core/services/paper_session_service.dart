@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -19,11 +21,37 @@ class PaperSessionService {
   // ── 1. Create or Update Paper Session ──────────────────────────────────────
   Future<String> createOrUpdatePaperSession(PaperSession session) async {
     await _ensureAuth();
-    final docRef = session.id.isEmpty
+    final isNewSession = session.id.isEmpty;
+    final docRef = isNewSession
         ? _firestore.collection('paper_sessions').doc()
         : _firestore.collection('paper_sessions').doc(session.id);
 
     await docRef.set(session.toMap(), SetOptions(merge: true));
+
+    // Asynchronously dispatch FCM push notification to topic 'paper_sessions'
+    if (isNewSession) {
+      unawaited(() async {
+        try {
+          final client = HttpClient();
+          final request = await client.postUrl(
+            Uri.parse('https://edupeak-telegram-bot.vercel.app/api/paper-broadcast'),
+          );
+          request.headers.set('Content-Type', 'application/json');
+          request.add(utf8.encode(jsonEncode({
+            'title': session.title,
+            'subject': session.subject,
+            'examYear': session.examYear,
+            'date': session.date,
+            'durationMinutes': session.durationMinutes,
+          })));
+          await request.close();
+          client.close();
+        } catch (e) {
+          debugPrint('FCM paper broadcast request error: $e');
+        }
+      }());
+    }
+
     return docRef.id;
   }
 

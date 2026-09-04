@@ -30,6 +30,9 @@ void main() async {
   // Register background FCM handler
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+  // Initialize notification channels, permissions & topic subscriptions immediately
+  NotificationService().initialize();
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -62,7 +65,10 @@ class DessertApp extends StatelessWidget {
           final authProvider = context.read<AuthProvider>();
           final router = AppRouter(authProvider).router;
 
-          // Init notifications when auth state is available
+          // Init/sync notifications with user auth state once logged in
+          if (authProvider.isLoggedIn) {
+            NotificationService().initialize(isAdmin: authProvider.isAdmin);
+          }
           authProvider.addListener(() {
             if (authProvider.isLoggedIn) {
               NotificationService().initialize(isAdmin: authProvider.isAdmin);
