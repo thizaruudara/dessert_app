@@ -34,7 +34,24 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   // Real-time Agora Video Monitoring
   RtcEngine? _agoraEngine;
   final Set<int> _activeStreamingUids = {};
+  final Map<int, VideoViewController> _remoteVideoControllers = {};
   bool _isAgoraInitialized = false;
+
+  VideoViewController _getRemoteController(int uid, String channelId) {
+    return _remoteVideoControllers.putIfAbsent(
+      uid,
+      () => VideoViewController.remote(
+        rtcEngine: _agoraEngine!,
+        canvas: VideoCanvas(
+          uid: uid,
+          renderMode: RenderModeType.renderModeHidden,
+        ),
+        connection: RtcConnection(channelId: channelId),
+        useFlutterTexture: true,
+        useAndroidSurfaceView: false,
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -75,6 +92,8 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             if (mounted) {
               setState(() {
                 _activeStreamingUids.remove(remoteUid);
+                _remoteVideoControllers[remoteUid]?.dispose();
+                _remoteVideoControllers.remove(remoteUid);
               });
             }
           },
@@ -111,6 +130,12 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   void dispose() {
     _statusTicker?.cancel();
     _tabController.dispose();
+    for (final ctrl in _remoteVideoControllers.values) {
+      try {
+        ctrl.dispose();
+      } catch (_) {}
+    }
+    _remoteVideoControllers.clear();
     AgoraRtcService.leaveAndRelease(_agoraEngine);
     _agoraEngine = null;
     super.dispose();
@@ -301,7 +326,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
         }
 
         final students = snapshot.data ?? [];
-        final liveCount = students.where((s) => s.isOnline).length;
+        final liveCount = students.where((s) => s.isOnline || _activeStreamingUids.contains(s.computedAgoraUid)).length;
         final submittedCount = students.where((s) => s.status == 'submitted').length;
 
         return Column(
@@ -364,11 +389,11 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   }
 
   Widget _buildStudentProctorCard(PaperRegistration reg) {
-    final isLive = reg.isOnline;
-    final isSubmitted = reg.status == 'submitted';
     final studentUid = reg.computedAgoraUid;
-    final bool canStreamVideo = (isLive || _activeStreamingUids.contains(studentUid)) && _isAgoraInitialized && _agoraEngine != null;
-    final bool isStreamingVideo = canStreamVideo;
+    final bool isStreamingVideo = _isAgoraInitialized && _agoraEngine != null && (_activeStreamingUids.contains(studentUid) || reg.isOnline);
+    final bool isLive = reg.isOnline || isStreamingVideo || _activeStreamingUids.contains(studentUid);
+    final bool isSubmitted = reg.status == 'submitted';
+    final bool canStreamVideo = isStreamingVideo;
 
     return Container(
       decoration: BoxDecoration(
@@ -422,12 +447,9 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                       // Real-time Agora video stream on top when online
                       if (canStreamVideo && !isSubmitted)
                         AgoraVideoView(
-                          controller: VideoViewController.remote(
-                            rtcEngine: _agoraEngine!,
-                            canvas: VideoCanvas(uid: studentUid),
-                            connection: RtcConnection(
-                              channelId: AgoraRtcService.getChannelName(widget.paperId),
-                            ),
+                          controller: _getRemoteController(
+                            studentUid,
+                            AgoraRtcService.getChannelName(widget.paperId),
                           ),
                         ),
                       Positioned(
@@ -1881,10 +1903,23 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
   final TransformationController _transformationController = TransformationController();
   bool _showControls = true;
   Timer? _statusTicker;
+  VideoViewController? _remoteViewController;
 
   @override
   void initState() {
     super.initState();
+    if (widget.agoraEngine != null && widget.initialRegistration.computedAgoraUid > 0) {
+      _remoteViewController = VideoViewController.remote(
+        rtcEngine: widget.agoraEngine!,
+        canvas: VideoCanvas(
+          uid: widget.initialRegistration.computedAgoraUid,
+          renderMode: RenderModeType.renderModeHidden,
+        ),
+        connection: RtcConnection(channelId: widget.channelId),
+        useFlutterTexture: true,
+        useAndroidSurfaceView: false,
+      );
+    }
     _statusTicker = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) setState(() {});
     });
@@ -1893,6 +1928,7 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
   @override
   void dispose() {
     _statusTicker?.cancel();
+    _remoteViewController?.dispose();
     _transformationController.dispose();
     super.dispose();
   }
@@ -1919,7 +1955,9 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
       initialData: widget.initialRegistration,
       builder: (context, snapshot) {
         final reg = snapshot.data ?? widget.initialRegistration;
-        final isLive = reg.isOnline;
+        final bool isStreaming = widget.agoraEngine != null &&
+            (widget.isAgoraStreaming || reg.isOnline || reg.computedAgoraUid > 0);
+        final isLive = reg.isOnline || isStreaming;
         final isSubmitted = reg.status == 'submitted';
 
         return Scaffold(
@@ -1943,14 +1981,10 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
                     scaleEnabled: true,
                     child: Builder(
                       builder: (context) {
-                        if (widget.agoraEngine != null && (widget.isAgoraStreaming || isLive)) {
+                        if (_remoteViewController != null && (isStreaming || isLive)) {
                           return SizedBox.expand(
                             child: AgoraVideoView(
-                              controller: VideoViewController.remote(
-                                rtcEngine: widget.agoraEngine!,
-                                canvas: VideoCanvas(uid: reg.computedAgoraUid),
-                                connection: RtcConnection(channelId: widget.channelId),
-                              ),
+                              controller: _remoteViewController!,
                             ),
                           );
                         }

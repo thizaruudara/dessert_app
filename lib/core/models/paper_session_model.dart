@@ -234,7 +234,10 @@ class PaperRegistration {
   bool get isOnline {
     if (!isCameraActive) return false;
     if (lastCameraPing == null) return false;
-    return DateTime.now().difference(lastCameraPing!).inSeconds < 10;
+    final diff = DateTime.now().difference(lastCameraPing!).inSeconds;
+    // Allow for network jitter and device clock skew across mobile and admin devices.
+    // If student explicitly has isCameraActive = true in exam, consider online if ping is within a reasonable window.
+    return diff.abs() < 60 || (isCameraActive && status == 'in_exam' && diff < 180);
   }
 
   PaperRegistration({

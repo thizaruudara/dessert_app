@@ -49,7 +49,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   bool _isCurrentlyWaiting = true;
   String _currentStudentId = '';
   DateTime? _localPackageOpeningStartTime;
+  DateTime? _lastObservedPackageOpeningStartedAt;
   DateTime? _localWritingStartTime;
+  DateTime? _lastObservedWritingStartedAt;
 
   StreamSubscription<List<ProctorAlert>>? _alertSubscription;
   final Set<String> _shownAlertIds = {};
@@ -486,29 +488,51 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           });
         }
 
-        // Package Opening Countdown (10 Minutes from packageOpeningStartedAt or local entry)
+        // Package Opening Countdown (10 Minutes):
+        // Completely immune to device clock discrepancies. Counts down locally from 10:00.
+        // If the examiner triggers or restarts the 10m timer (packageOpeningStartedAt changes),
+        // we automatically reset the local reference time to restart the 10m countdown.
         int packageOpeningSecsLeft = 600;
         if (isPackageOpening) {
-          final DateTime pkgStart = session.packageOpeningStartedAt ?? (_localPackageOpeningStartTime ??= _now);
-          final elapsed = _now.difference(pkgStart).inSeconds;
+          if (_localPackageOpeningStartTime == null ||
+              (session.packageOpeningStartedAt != null &&
+                  session.packageOpeningStartedAt != _lastObservedPackageOpeningStartedAt)) {
+            _lastObservedPackageOpeningStartedAt = session.packageOpeningStartedAt;
+            _localPackageOpeningStartTime = DateTime.now();
+          }
+          final elapsed = _now.difference(_localPackageOpeningStartTime!).inSeconds;
           packageOpeningSecsLeft = (600 - elapsed).clamp(0, 600);
         } else {
           _localPackageOpeningStartTime = null;
+          _lastObservedPackageOpeningStartedAt = null;
         }
 
-        // Real Exam Writing Phase: Count from writingStartedAt or when student entered writing phase
-        // NEVER fall back to slot.startTime which was in the past and cuts duration!
-        DateTime examStartTime;
-        if (session.writingStartedAt != null) {
-          examStartTime = session.writingStartedAt!;
+        // Real Exam Writing Phase:
+        // Counts down the full durationMinutes set by examiner.
+        // Immune to past timestamps or clock skew between examiner and student.
+        if (isWriting) {
+          if (_localWritingStartTime == null ||
+              (session.writingStartedAt != null &&
+                  session.writingStartedAt != _lastObservedWritingStartedAt)) {
+            _lastObservedWritingStartedAt = session.writingStartedAt;
+            _localWritingStartTime = DateTime.now();
+          }
         } else {
-          _localWritingStartTime ??= _now;
-          examStartTime = _localWritingStartTime!;
+          _localWritingStartTime = null;
+          _lastObservedWritingStartedAt = null;
         }
-        DateTime examEndTime = examStartTime.add(Duration(minutes: session.durationMinutes));
-        final bool isOvertime = isWriting && _now.isAfter(examEndTime);
-        final Duration examWritingTimeLeft = isWriting && !isOvertime ? examEndTime.difference(_now) : Duration.zero;
-        final Duration overtimeDuration = isOvertime ? _now.difference(examEndTime) : Duration.zero;
+
+        final int totalWritingSeconds = session.durationMinutes * 60;
+        final int writingElapsed = _localWritingStartTime != null
+            ? _now.difference(_localWritingStartTime!).inSeconds
+            : 0;
+        final bool isOvertime = isWriting && writingElapsed > totalWritingSeconds;
+        final Duration examWritingTimeLeft = isWriting && !isOvertime
+            ? Duration(seconds: (totalWritingSeconds - writingElapsed).clamp(0, totalWritingSeconds))
+            : Duration.zero;
+        final Duration overtimeDuration = isOvertime
+            ? Duration(seconds: writingElapsed - totalWritingSeconds)
+            : Duration.zero;
 
         Duration durationToShow;
         String timerPrefix;

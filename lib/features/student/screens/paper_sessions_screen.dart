@@ -339,7 +339,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         int packageRemainingSecs = 600;
         if (session.packageOpeningStartedAt != null) {
           final elapsed = _now.difference(session.packageOpeningStartedAt!).inSeconds;
-          packageRemainingSecs = (600 - elapsed).clamp(0, 600);
+          if (elapsed >= 0 && elapsed <= 600) {
+            packageRemainingSecs = 600 - elapsed;
+          } else if (isPackageOpening) {
+            packageRemainingSecs = 600;
+          }
         }
 
         Duration remaining = isUpcoming ? targetSlot.startTime.difference(_now) : Duration.zero;
