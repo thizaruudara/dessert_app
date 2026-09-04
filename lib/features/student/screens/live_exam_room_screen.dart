@@ -36,9 +36,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   final PaperSessionService _paperService = PaperSessionService();
   late final Stream<PaperSession?> _sessionStream = _paperService.streamPaperSession(widget.paperId);
   RtcEngine? _agoraEngine;
+  VideoViewController? _localVideoViewController;
   int _studentNumericUid = 0;
   bool _isCameraInitialized = false;
   bool _isCameraPermissionGranted = false;
+  String? _cameraErrorMessage;
   Timer? _heartbeatTimer;
   Timer? _examCountdownTimer;
   DateTime _now = DateTime.now();
@@ -107,7 +109,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     _alertSubscription?.cancel();
     _alertSubscription = null;
 
-    // Leave Agora Channel & Clean up RTC Engine
+    // Dispose local controller and Agora engine
+    _localVideoViewController?.dispose();
+    _localVideoViewController = null;
     AgoraRtcService.leaveAndRelease(_agoraEngine);
     _agoraEngine = null;
 
@@ -143,6 +147,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       if (mounted) {
         setState(() {
           _isCameraPermissionGranted = true;
+          _cameraErrorMessage = null;
         });
       }
 
@@ -156,9 +161,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
             onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
               debugPrint('Agora Student joined: ${connection.channelId} (uid: $_studentNumericUid)');
               if (mounted) {
-                setState(() {
-                  _isCameraInitialized = true;
-                });
                 _sendHeartbeat(true);
               }
             },
@@ -168,14 +170,37 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           ),
         );
 
+        await _agoraEngine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+        await _agoraEngine!.startPreview();
+
+        _localVideoViewController?.dispose();
+        _localVideoViewController = VideoViewController(
+          rtcEngine: _agoraEngine!,
+          canvas: const VideoCanvas(uid: 0),
+        );
+
+        if (mounted) {
+          setState(() {
+            _isCameraInitialized = true;
+            _cameraErrorMessage = null;
+          });
+        }
+
         final channelName = AgoraRtcService.getChannelName(widget.paperId);
-        await AgoraRtcService.joinAsBroadcaster(
-          engine: _agoraEngine!,
-          channelId: channelName,
-          uid: _studentNumericUid,
+        unawaited(
+          AgoraRtcService.joinAsBroadcaster(
+            engine: _agoraEngine!,
+            channelId: channelName,
+            uid: _studentNumericUid,
+          ),
         );
       } catch (e) {
         debugPrint('Agora Camera init error: $e');
+        if (mounted) {
+          setState(() {
+            _cameraErrorMessage = e.toString();
+          });
+        }
       }
     } else {
       if (mounted) {
@@ -511,12 +536,14 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         final String timerString = isEnded
             ? 'Ended'
             : isTimeUp
-                ? '⏰ Time is Up'
+                ? '⏰ Time Up'
                 : isWaiting
-                    ? '⏳ Waiting for Examiner'
-                    : (durationToShow.inHours > 0
-                        ? '$timerPrefix$hours:$minutes:$seconds'
-                        : '$timerPrefix$minutes:$seconds');
+                    ? '⏳ Waiting'
+                    : isPackageOpening
+                        ? (packageOpeningSecsLeft <= 0 ? '📦 00:00' : '$timerPrefix$minutes:$seconds')
+                        : (durationToShow.inHours > 0
+                            ? '$timerPrefix$hours:$minutes:$seconds'
+                            : '$timerPrefix$minutes:$seconds');
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
@@ -526,21 +553,32 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
               onPressed: () {
-                _showExitWarningDialog();
+                if (isEnded) {
+                  context.go('/student/papers');
+                } else {
+                  _showExitWarningDialog();
+                }
               },
             ),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   session.title,
                   style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   isWaiting
-                      ? 'පොරොත්තු ශාලාව (Waiting Room)'
-                      : '${slot.name} • සජීවී කැමරා විභාගය',
+                      ? 'පොරොත්තු ශාලාව (Waiting)'
+                      : isPackageOpening
+                          ? 'පාර්සල් විවෘත කිරීම'
+                          : '${slot.name} • සජීවී විභාගය',
                   style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -548,26 +586,27 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               if (!isWaiting && _isCameraInitialized && _agoraEngine != null)
                 IconButton(
                   tooltip: 'Switch Camera (Flip)',
-                  icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 20),
+                  icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 18),
                   onPressed: _switchCamera,
                 ),
-              // Live Timer Pill
+              // Live Timer Pill (Compact, fits all screens)
               Container(
-                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: timerColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: timerColor),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(timerIcon, size: 14, color: timerColor),
-                    const SizedBox(width: 6),
+                    Icon(timerIcon, size: 13, color: timerColor),
+                    const SizedBox(width: 4),
                     Text(
                       timerString,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.bold,
                         color: timerColor,
                       ),
@@ -686,16 +725,19 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
                       const Icon(Icons.videocam_outlined, color: Color(0xFF22C55E), size: 18),
                       const SizedBox(width: 8),
-                      Text(
-                        'කැමරා පූර්ව පරීක්ෂාව (Self-Check Preview)',
-                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                      Expanded(
+                        child: Text(
+                          'කැමරා පූර්ව පරීක්ෂාව (Self-Check)',
+                          style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
@@ -708,7 +750,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                           ),
                         ),
                         child: Text(
-                          _isCameraInitialized ? '🟢 Online' : '🔴 Camera Offline',
+                          _isCameraInitialized ? '🟢 Online' : '🔴 Offline',
                           style: GoogleFonts.poppins(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -724,12 +766,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     height: 220,
                     width: double.infinity,
                     color: Colors.black,
-                    child: _isCameraInitialized && _agoraEngine != null
+                    child: _isCameraInitialized && _localVideoViewController != null
                         ? AgoraVideoView(
-                            controller: VideoViewController(
-                              rtcEngine: _agoraEngine!,
-                              canvas: const VideoCanvas(uid: 0),
-                            ),
+                            controller: _localVideoViewController!,
                           )
                         : Center(
                             child: Column(
@@ -738,9 +777,20 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                                 const CircularProgressIndicator(color: Color(0xFF6366F1), strokeWidth: 2),
                                 const SizedBox(height: 10),
                                 Text(
-                                  'කැමරාව සක්‍රීය වෙමින් පවතී...',
+                                  _cameraErrorMessage != null
+                                      ? 'කැමරා දෝෂයක්: $_cameraErrorMessage'
+                                      : 'කැමරාව සක්‍රීය වෙමින් පවතී...',
                                   style: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 11),
+                                  textAlign: TextAlign.center,
                                 ),
+                                if (_cameraErrorMessage != null) ...[
+                                  const SizedBox(height: 8),
+                                  TextButton.icon(
+                                    onPressed: _initCamera,
+                                    icon: const Icon(Icons.refresh, size: 14, color: Color(0xFF818CF8)),
+                                    label: const Text('නැවත උත්සාහ කරන්න (Retry)', style: TextStyle(color: Color(0xFF818CF8), fontSize: 11)),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -930,14 +980,29 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       );
     }
 
-    if (!_isCameraInitialized || _agoraEngine == null) {
-      return const Center(
+    if (!_isCameraInitialized || _localVideoViewController == null) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Color(0xFF6366F1)),
-            SizedBox(height: 16),
-            Text('කැමරාව ආරම්භ වෙමින් පවතී...', style: TextStyle(color: Colors.white70)),
+            const CircularProgressIndicator(color: Color(0xFF6366F1)),
+            const SizedBox(height: 16),
+            Text(
+              _cameraErrorMessage != null
+                  ? 'කැමරා දෝෂයක්: $_cameraErrorMessage'
+                  : 'කැමරාව ආරම්භ වෙමින් පවතී...',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            if (_cameraErrorMessage != null) ...[
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _initCamera,
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+                icon: const Icon(Icons.refresh, size: 16, color: Colors.white),
+                label: const Text('නැවත උත්සාහ කරන්න (Retry)', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ],
         ),
       );
@@ -945,10 +1010,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
 
     return SizedBox.expand(
       child: AgoraVideoView(
-        controller: VideoViewController(
-          rtcEngine: _agoraEngine!,
-          canvas: const VideoCanvas(uid: 0),
-        ),
+        controller: _localVideoViewController!,
       ),
     );
   }
@@ -1034,12 +1096,17 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     if (isPackageOpening) {
       final mins = (packageSecsLeft ~/ 60).toString().padLeft(2, '0');
       final secs = (packageSecsLeft % 60).toString().padLeft(2, '0');
+      final isFrozenAtZero = packageSecsLeft <= 0;
+
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withOpacity(0.92),
+          color: const Color(0xFF0F172A).withOpacity(0.95),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF59E0B), width: 2),
+          border: Border.all(
+            color: isFrozenAtZero ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
+            width: 2,
+          ),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 14)],
         ),
         child: Column(
@@ -1051,10 +1118,14 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withOpacity(0.2),
+                    color: (isFrozenAtZero ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)).withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.inventory_2, color: Color(0xFFF59E0B), size: 20),
+                  child: Icon(
+                    isFrozenAtZero ? Icons.timer_off_rounded : Icons.inventory_2,
+                    color: isFrozenAtZero ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1062,25 +1133,38 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)',
-                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B)),
+                        isFrozenAtZero
+                            ? '⏱️ විනාඩි 10 අවසන් (Time Stopped)'
+                            : '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: isFrozenAtZero ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
+                        ),
                       ),
                       Text(
-                        'කැමරාව ඉදිරියේ පමණක් පාර්සලය විවෘත කරන්න',
+                        isFrozenAtZero
+                            ? 'පරීක්ෂකවරයා විභාගය ආරම්භ කරන තෙක් රැඳී සිටින්න (Frozen at 00:00)'
+                            : 'කැමරාව ඉදිරියේ පමණක් පාර්සලය විවෘත කරන්න',
                         style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFFE2E8F0)),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B),
+                    color: isFrozenAtZero ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '$mins:$secs',
-                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isFrozenAtZero ? Colors.white : Colors.black,
+                    ),
                   ),
                 ),
               ],
@@ -1100,7 +1184,16 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                   const SizedBox(height: 2),
                   Text('2. ✂️ කැමරාව ඉදිරියේම කපා විවෘත කරන්න (Cut open on camera)', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white)),
                   const SizedBox(height: 2),
-                  Text('3. 📄 පත්‍රය මේසය මත තබා ලිවීමට සූදානම් වන්න (Place on desk)', style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF4ADE80))),
+                  Text(
+                    isFrozenAtZero
+                        ? '3. ⏳ විභාගය ආරම්භ කරන තෙක් පත්‍රය මේසය මත තබා සූදානම්ව සිටින්න'
+                        : '3. 📄 පත්‍රය මේසය මත තබා ලිවීමට සූදානම් වන්න (Place on desk)',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      color: isFrozenAtZero ? const Color(0xFFFBBF24) : const Color(0xFF4ADE80),
+                      fontWeight: isFrozenAtZero ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1287,7 +1380,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
             ),
             onPressed: () {
               Navigator.of(ctx).pop();
-              if (mounted) context.pop();
+              if (mounted) {
+                context.go('/student/papers');
+              }
             },
             child: Text('හරි (Exit Room)', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -1367,6 +1462,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     // 1. Temporarily pause proctor heartbeat & release front proctor camera
     // to prevent Android camera device contention when opening rear scanner
     _heartbeatTimer?.cancel();
+    _localVideoViewController?.dispose();
+    _localVideoViewController = null;
     await AgoraRtcService.leaveAndRelease(_agoraEngine);
     _agoraEngine = null;
     if (mounted) {
@@ -1388,7 +1485,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
 
     // 3. If submitted, exit exam room cleanly
     if (submitted == true && mounted) {
-      context.pop();
+      context.go('/student/papers');
       return;
     }
 
@@ -1735,7 +1832,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                                       backgroundColor: const Color(0xFF22C55E),
                                     ),
                                   );
-                                  context.pop();
+                                  context.go('/student/papers');
                                 }
                               } catch (e) {
                                 setSheetState(() {
@@ -1797,7 +1894,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.pop();
+              if (mounted) {
+                context.go('/student/papers');
+              }
             },
             child: Text('පිටවෙන්න (Exit)', style: GoogleFonts.poppins(color: Colors.white)),
           ),

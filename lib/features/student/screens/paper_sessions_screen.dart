@@ -620,63 +620,78 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedSlotId == null
-                              ? const Color(0xFF334155)
-                              : isLive
-                                  ? (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF22C55E))
-                                  : isUpcoming
-                                      ? const Color(0xFF6366F1)
-                                      : const Color(0xFF334155),
+                          backgroundColor: session.isEnded
+                              ? const Color(0xFF475569)
+                              : selectedSlotId == null
+                                  ? const Color(0xFF334155)
+                                  : isLive
+                                      ? (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF22C55E))
+                                      : isUpcoming
+                                          ? const Color(0xFF6366F1)
+                                          : const Color(0xFF334155),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: isLive ? 4 : 0,
+                          elevation: (isLive && !session.isEnded) ? 4 : 0,
                         ),
-                        onPressed: selectedSlotId == null
+                        onPressed: session.isEnded
                             ? () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('කරුණාකර ඉහතින් Morning හෝ Evening සැසියක් තෝරන්න.'),
+                                    content: Text('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත. නැවත ඇතුල් විය නොහැක (Session Ended).'),
                                     backgroundColor: Color(0xFFEF4444),
                                   ),
                                 );
                               }
-                            : () {
-                                final auth = context.read<AuthProvider>().userModel;
-                                if (auth != null && selectedSlotId != null) {
-                                  _paperService.registerStudentSlot(
-                                    paperId: session.id,
-                                    studentId: auth.id,
-                                    studentName: auth.name,
-                                    studentPhone: auth.phone,
-                                    slotId: selectedSlotId,
-                                  ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
-                                }
-                                context.push('/student/papers/exam/${session.id}?slot=$selectedSlotId');
-                              },
+                            : selectedSlotId == null
+                                ? () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('කරුණාකර ඉහතින් Morning හෝ Evening සැසියක් තෝරන්න.'),
+                                        backgroundColor: Color(0xFFEF4444),
+                                      ),
+                                    );
+                                  }
+                                : () {
+                                    final auth = context.read<AuthProvider>().userModel;
+                                    if (auth != null && selectedSlotId != null) {
+                                      _paperService.registerStudentSlot(
+                                        paperId: session.id,
+                                        studentId: auth.id,
+                                        studentName: auth.name,
+                                        studentPhone: auth.phone,
+                                        slotId: selectedSlotId,
+                                      ).catchError((e) => debugPrint('Auto slot reg on enter: $e'));
+                                    }
+                                    context.push('/student/papers/exam/${session.id}?slot=$selectedSlotId');
+                                  },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              isLive
-                                  ? (isTimeUp ? Icons.document_scanner : Icons.videocam)
-                                  : isUpcoming
-                                      ? Icons.meeting_room
-                                      : Icons.check_circle_outline,
+                              session.isEnded
+                                  ? Icons.cancel_outlined
+                                  : isLive
+                                      ? (isTimeUp ? Icons.document_scanner : Icons.videocam)
+                                      : isUpcoming
+                                          ? Icons.meeting_room
+                                          : Icons.check_circle_outline,
                               size: 20,
                               color: Colors.white,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                selectedSlotId == null
-                                    ? 'පළමුව සැසියක් (Slot) තෝරන්න'
-                                    : isLive
-                                        ? (isPackageOpening
-                                            ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
-                                            : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
-                                        : isUpcoming
-                                            ? 'Enter Waiting Room (පොරොත්තු ශාලාව)'
-                                            : 'View Paper / Submissions',
+                                session.isEnded
+                                    ? '🛑 විභාග සැසිය අවසන් විය (Ended)'
+                                    : selectedSlotId == null
+                                        ? 'පළමුව සැසියක් (Slot) තෝරන්න'
+                                        : isLive
+                                            ? (isPackageOpening
+                                                ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
+                                                : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
+                                            : isUpcoming
+                                                ? 'Enter Waiting Room (පොරොත්තු ශාලාව)'
+                                                : 'View Paper / Submissions',
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,

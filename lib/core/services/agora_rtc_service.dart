@@ -100,26 +100,52 @@ class AgoraRtcService {
     required String channelId,
     required int uid,
   }) async {
-    await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-    await engine.startPreview();
+    try {
+      await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      await engine.startPreview();
+    } catch (e) {
+      debugPrint('Agora startPreview warning: $e');
+    }
 
     // Generate secure token using Primary Certificate
     final token = generateRtcToken(channelName: channelId, uid: uid);
 
-    await engine.joinChannel(
-      token: token,
-      channelId: channelId,
-      uid: uid,
-      options: const ChannelMediaOptions(
-        channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
-        clientRoleType: ClientRoleType.clientRoleBroadcaster,
-        publishCameraTrack: true,
-        publishMicrophoneTrack: false, // keep mic muted for quiet exams
-        autoSubscribeAudio: false,
-        autoSubscribeVideo: false,
-      ),
-    );
-    debugPrint('Agora: Broadcaster joined channel $channelId with UID $uid');
+    try {
+      await engine.joinChannel(
+        token: token,
+        channelId: channelId,
+        uid: uid,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          publishCameraTrack: true,
+          publishMicrophoneTrack: false, // keep mic muted for quiet exams
+          autoSubscribeAudio: false,
+          autoSubscribeVideo: false,
+        ),
+      );
+      debugPrint('Agora: Broadcaster joined channel $channelId with UID $uid');
+    } catch (e) {
+      debugPrint('Agora joinChannel with token error: $e. Attempting fallback...');
+      try {
+        await engine.joinChannel(
+          token: '',
+          channelId: channelId,
+          uid: uid,
+          options: const ChannelMediaOptions(
+            channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+            clientRoleType: ClientRoleType.clientRoleBroadcaster,
+            publishCameraTrack: true,
+            publishMicrophoneTrack: false,
+            autoSubscribeAudio: false,
+            autoSubscribeVideo: false,
+          ),
+        );
+        debugPrint('Agora fallback join succeeded');
+      } catch (e2) {
+        debugPrint('Agora fallback join also failed: $e2');
+      }
+    }
   }
 
   /// Admin Joins as Monitor / Audience (receives all student video streams)
@@ -128,25 +154,48 @@ class AgoraRtcService {
     required String channelId,
     int uid = 1,
   }) async {
-    await engine.setClientRole(role: ClientRoleType.clientRoleAudience);
+    try {
+      await engine.setClientRole(role: ClientRoleType.clientRoleAudience);
+    } catch (e) {
+      debugPrint('Agora setClientRole audience warning: $e');
+    }
 
     // Generate secure token for Admin monitor
     final token = generateRtcToken(channelName: channelId, uid: uid);
 
-    await engine.joinChannel(
-      token: token,
-      channelId: channelId,
-      uid: uid,
-      options: const ChannelMediaOptions(
-        channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
-        clientRoleType: ClientRoleType.clientRoleAudience,
-        publishCameraTrack: false,
-        publishMicrophoneTrack: false,
-        autoSubscribeAudio: false,
-        autoSubscribeVideo: true, // receive all student streams
-      ),
-    );
-    debugPrint('Agora: Admin joined channel $channelId with UID $uid');
+    try {
+      await engine.joinChannel(
+        token: token,
+        channelId: channelId,
+        uid: uid,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+          clientRoleType: ClientRoleType.clientRoleAudience,
+          publishCameraTrack: false,
+          publishMicrophoneTrack: false,
+          autoSubscribeAudio: false,
+          autoSubscribeVideo: true, // receive all student streams
+        ),
+      );
+      debugPrint('Agora: Admin joined channel $channelId with UID $uid');
+    } catch (e) {
+      debugPrint('Agora admin join error: $e');
+      try {
+        await engine.joinChannel(
+          token: '',
+          channelId: channelId,
+          uid: uid,
+          options: const ChannelMediaOptions(
+            channelProfile: ChannelProfileType.channelProfileLiveBroadcasting,
+            clientRoleType: ClientRoleType.clientRoleAudience,
+            publishCameraTrack: false,
+            publishMicrophoneTrack: false,
+            autoSubscribeAudio: false,
+            autoSubscribeVideo: true,
+          ),
+        );
+      } catch (_) {}
+    }
   }
 
   /// Leave channel and clean up engine

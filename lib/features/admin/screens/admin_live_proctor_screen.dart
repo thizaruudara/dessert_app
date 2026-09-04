@@ -1335,6 +1335,26 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _confirmSetPhase(
+                      session,
+                      'package_opening',
+                      'Restart 10m Timer (කාලය නැවත අරඹන්න)',
+                      'ප්‍රශ්න පත්‍ර විවෘත කිරීමේ විනාඩි 10 ක කාලය නැවත 10:00 සිට ආරම්භ කිරීමට අවශ්‍යද?',
+                      const Color(0xFFF59E0B),
+                    ),
+                    icon: const Icon(Icons.replay_rounded, size: 14, color: Colors.black),
+                    label: Text(
+                      'Restart 10m Timer',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFEF4444),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

@@ -54,12 +54,15 @@ CustomTransitionPage<void> _buildSmoothPage({
   );
 }
 
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 class AppRouter {
   final AuthProvider authProvider;
 
   AppRouter(this.authProvider);
 
   late final GoRouter router = GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     refreshListenable: authProvider,
     redirect: (context, state) {
@@ -133,6 +136,7 @@ class AppRouter {
             builder: (_, __) => const PaperSessionsScreen(),
           ),
           GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
             path: '/student/papers/exam/:id',
             pageBuilder: (context, state) => _buildSmoothPage(
               key: state.pageKey,
@@ -183,6 +187,7 @@ class AppRouter {
             builder: (_, __) => const AdminPaperSessionsScreen(),
           ),
           GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
             path: '/admin/papers/proctor/:id',
             pageBuilder: (context, state) => _buildSmoothPage(
               key: state.pageKey,
