@@ -212,11 +212,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(6),
                       child: ClipOval(
                         child: Image.asset(
-                          'assets/images/logo.png',
-                          fit: BoxFit.cover,
+                          'assets/images/edupeak_logo.png',
+                          fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.cake_rounded,
                             size: 40,
