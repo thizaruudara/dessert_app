@@ -86,7 +86,7 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
 
       _cameraController = CameraController(
         rearCamera,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -383,21 +383,115 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
         setState(() {
           _isSubmitting = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Submission Error: $e'),
-            backgroundColor: const Color(0xFFEF4444),
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.cloud_off_rounded, color: Color(0xFFEF4444)),
+                const SizedBox(width: 8),
+                Text(
+                  'Upload Interrupted',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              'පිටු Upload කිරීමේදී ගැටලුවක් මතු විය: ${e.toString().replaceAll('Exception:', '')}\n\nකරුණාකර අන්තර්ජාල සම්බන්ධතාවය පරීක්ෂා කරන්න, නැතහොත් ඔබගේ Google Drive Link එක ඇතුළත් කර Submit කරන්න.',
+              style: GoogleFonts.poppins(color: const Color(0xFFCBD5E1), fontSize: 13),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('හරි (OK)', style: GoogleFonts.poppins(color: const Color(0xFF818CF8), fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         );
       }
     }
   }
 
-  Future<String> _processAndUploadPage(File file, int pageIndex, String paperId, String userId) async {
-    final filename = 'p${pageIndex + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  Future<String?> _uploadToTelegram(File file, int pageIndex, String paperId, String userId) async {
+    const token = '8837234143:AAEFLrgpMuTa4bxwIxl-SDqAuOy4P_o7vtI';
+    const chatId = '6516172480';
 
-    // Tier 1: Primary Firebase Storage Bucket
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 25);
+
     try {
+      final uri = Uri.parse('https://api.telegram.org/bot$token/sendDocument');
+      final request = await client.postUrl(uri);
+
+      final boundary = '----Boundary${DateTime.now().millisecondsSinceEpoch}';
+      request.headers.set('content-type', 'multipart/form-data; boundary=$boundary');
+
+      final fileBytes = await file.readAsBytes();
+      final fileName = 'p${pageIndex + 1}_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final caption = '📄 Exam Paper: $paperId | Student: $userId | Page: ${pageIndex + 1}';
+
+      final header = '--$boundary\r\n'
+          'Content-Disposition: form-data; name="chat_id"\r\n\r\n'
+          '$chatId\r\n'
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="caption"\r\n\r\n'
+          '$caption\r\n'
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="document"; filename="$fileName"\r\n'
+          'Content-Type: image/jpeg\r\n\r\n';
+
+      final footer = '\r\n--$boundary--\r\n';
+
+      request.add(utf8.encode(header));
+      request.add(fileBytes);
+      request.add(utf8.encode(footer));
+
+      final response = await request.close().timeout(const Duration(seconds: 25));
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(responseBody);
+        if (json['ok'] == true) {
+          final doc = json['result']['document'];
+          final fileId = doc['file_id'];
+
+          final getFileUri = Uri.parse('https://api.telegram.org/bot$token/getFile?file_id=$fileId');
+          final getFileReq = await client.getUrl(getFileUri);
+          final getFileRes = await getFileReq.close().timeout(const Duration(seconds: 15));
+          final getFileBody = await getFileRes.transform(utf8.decoder).join();
+          final getFileJson = jsonDecode(getFileBody);
+
+          if (getFileJson['ok'] == true) {
+            final filePath = getFileJson['result']['file_path'];
+            return 'https://api.telegram.org/file/bot$token/$filePath';
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Telegram upload error on page $pageIndex: $e');
+    } finally {
+      client.close();
+    }
+    return null;
+  }
+
+  Future<String> _processAndUploadPage(File file, int pageIndex, String paperId, String userId) async {
+    // Tier 1: Direct Telegram CDN Upload (free, high-speed, permanent HTTPS URL)
+    try {
+      final tgUrl = await _uploadToTelegram(file, pageIndex, paperId, userId);
+      if (tgUrl != null && tgUrl.startsWith('http')) {
+        debugPrint('Page ${pageIndex + 1} uploaded to Telegram CDN: $tgUrl');
+        return tgUrl;
+      }
+    } catch (eTg) {
+      debugPrint('Telegram upload error: $eTg');
+    }
+
+    // Tier 2: Primary Firebase Storage Bucket (if active)
+    try {
+      final filename = 'p${pageIndex + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('paper_submissions')
@@ -407,49 +501,19 @@ class _InAppDocumentScannerScreenState extends State<InAppDocumentScannerScreen>
       final uploadTask = await storageRef.putFile(
         file,
         SettableMetadata(contentType: 'image/jpeg'),
-      );
+      ).timeout(const Duration(seconds: 8));
       return await uploadTask.ref.getDownloadURL();
     } catch (e1) {
-      debugPrint('Primary Firebase Storage error for page $pageIndex: $e1. Trying alternate bucket...');
+      debugPrint('Storage error for page $pageIndex: $e1');
     }
 
-    // Tier 2: Alternate Bucket (appspot.com)
-    try {
-      final altStorage = FirebaseStorage.instanceFor(bucket: 'dessert-institute.appspot.com');
-      final altRef = altStorage
-          .ref()
-          .child('paper_submissions')
-          .child(paperId)
-          .child(userId)
-          .child(filename);
-      final uploadTask = await altRef.putFile(
-        file,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-      return await uploadTask.ref.getDownloadURL();
-    } catch (e2) {
-      debugPrint('Alternate Firebase Storage error for page $pageIndex: $e2. Using compressed image fallback.');
+    // Tier 3: If student provided a Google Drive link, use it
+    final drive = _driveLinkCtrl.text.trim();
+    if (drive.isNotEmpty && (drive.startsWith('http://') || drive.startsWith('https://'))) {
+      return drive;
     }
 
-    // Tier 3: Guaranteed In-Memory Compression to Base64 data URI
-    // Scales to target width 800 (keeps handwriting sharp while keeping file ~40KB)
-    final rawBytes = await file.readAsBytes();
-    try {
-      final codec = await ui.instantiateImageCodec(
-        rawBytes,
-        targetWidth: 800,
-      );
-      final frame = await codec.getNextFrame();
-      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData != null) {
-        final b64 = base64Encode(byteData.buffer.asUint8List());
-        return 'data:image/png;base64,$b64';
-      }
-    } catch (compressErr) {
-      debugPrint('Image compression error: $compressErr');
-    }
-
-    return 'data:image/jpeg;base64,${base64Encode(rawBytes)}';
+    throw Exception('Page ${pageIndex + 1} upload failed. Please check your internet or attach a Google Drive link.');
   }
 
   @override

@@ -274,9 +274,21 @@ class PaperRegistration {
     }
 
     final rawPhotos = data['submissionPhotos'];
-    final List<String> photos = rawPhotos is List
-        ? rawPhotos.map((e) => e.toString()).toList()
-        : (data['submissionUrl'] != null ? [data['submissionUrl'].toString()] : []);
+    final List<String> photos = [];
+    if (rawPhotos is List) {
+      for (final p in rawPhotos) {
+        final str = p?.toString().trim() ?? '';
+        // Guard against corrupt/massive Base64 payloads (must be < 2000 chars)
+        if (str.isNotEmpty && str.length < 2000) {
+          photos.add(str);
+        }
+      }
+    } else if (data['submissionUrl'] != null) {
+      final str = data['submissionUrl'].toString().trim();
+      if (str.isNotEmpty && str.length < 2000) {
+        photos.add(str);
+      }
+    }
 
     final idParts = doc.id.split('_');
     final fallbackPaperId = idParts.isNotEmpty ? idParts[0] : '';
@@ -294,6 +306,14 @@ class PaperRegistration {
         ? data['selectedSlot'].toString().trim()
         : 'slot1';
 
+    final rawCamera = data['cameraSnapshotUrl']?.toString().trim();
+    final safeCamera = (rawCamera != null && rawCamera.length < 2000) ? rawCamera : null;
+
+    final rawSub = data['submissionUrl']?.toString().trim();
+    final safeSub = (rawSub != null && rawSub.length < 2000)
+        ? rawSub
+        : (photos.isNotEmpty ? photos.first : null);
+
     return PaperRegistration(
       id: doc.id,
       paperId: parsedPaperId,
@@ -309,8 +329,8 @@ class PaperRegistration {
       submittedAt: parseTime(data['submittedAt']),
       lastCameraPing: parseTime(data['lastCameraPing']),
       isCameraActive: data['isCameraActive'] == true,
-      cameraSnapshotUrl: data['cameraSnapshotUrl']?.toString(),
-      submissionUrl: data['submissionUrl']?.toString(),
+      cameraSnapshotUrl: safeCamera,
+      submissionUrl: safeSub,
       submissionPhotos: photos,
       agoraUid: data['agoraUid'] is num ? (data['agoraUid'] as num).toInt() : null,
     );

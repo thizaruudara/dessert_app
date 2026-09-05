@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/paper_session_model.dart';
 import '../../../core/services/agora_rtc_service.dart';
@@ -52,6 +53,10 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   DateTime? _localWritingStartTime;
   DateTime? _lastObservedWritingStartedAt;
 
+  PaperSession? _latestSession;
+  Timer? _sessionSyncTimer;
+  Set<String> _dismissedAlertIds = {};
+
   StreamSubscription<List<ProctorAlert>>? _alertSubscription;
   final Set<String> _shownAlertIds = {};
 
@@ -70,11 +75,67 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     }
     _ensureStudentRegistered();
     _initCamera();
+    _loadDismissedAlerts();
     _startTimers();
     _listenForProctorAlerts();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkIfAlreadySubmitted();
     });
+  }
+
+  Future<void> _loadDismissedAlerts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('dismissed_proctor_alerts') ?? [];
+      if (mounted) {
+        setState(() {
+          _dismissedAlertIds = list.toSet();
+        });
+      } else {
+        _dismissedAlertIds = list.toSet();
+      }
+    } catch (e) {
+      debugPrint('Error loading dismissed alerts: $e');
+    }
+  }
+
+  Future<void> _recordAlertDismissed(String alertId) async {
+    _dismissedAlertIds.add(alertId);
+    _shownAlertIds.add(alertId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('dismissed_proctor_alerts') ?? [];
+      if (!list.contains(alertId)) {
+        list.add(alertId);
+        if (list.length > 200) {
+          list.removeRange(0, list.length - 200);
+        }
+        await prefs.setStringList('dismissed_proctor_alerts', list);
+      }
+    } catch (e) {
+      debugPrint('Error saving dismissed alert: $e');
+    }
+  }
+
+  Future<void> _syncSession() async {
+    try {
+      final s = await _paperService.getSession(widget.paperId);
+      if (s != null && mounted) {
+        final current = _latestSession;
+        if (current == null ||
+            current.currentPhase != s.currentPhase ||
+            current.status != s.status ||
+            current.isTimeUp != s.isTimeUp ||
+            current.writingStartedAt != s.writingStartedAt ||
+            current.packageOpeningStartedAt != s.packageOpeningStartedAt) {
+          setState(() {
+            _latestSession = s;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Sync session error: $e');
+    }
   }
 
   Future<void> _checkIfAlreadySubmitted() async {
@@ -178,6 +239,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     _heartbeatTimer = null;
     _examCountdownTimer?.cancel();
     _examCountdownTimer = null;
+    _sessionSyncTimer?.cancel();
+    _sessionSyncTimer = null;
     _alertSubscription?.cancel();
     _alertSubscription = null;
 
@@ -310,6 +373,13 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       _sendHeartbeat(_isCameraInitialized);
     });
+
+    // Active session polling every 3 seconds to guarantee immediate phase change sync
+    _sessionSyncTimer?.cancel();
+    _sessionSyncTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _syncSession();
+    });
+    _syncSession();
   }
 
   Future<void> _sendHeartbeat(bool isActive) async {
@@ -349,7 +419,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     }
   }
 
-  void _listenForProctorAlerts() {
+  Future<void> _listenForProctorAlerts() async {
+    await _loadDismissedAlerts();
     final user = context.read<AuthProvider>().userModel;
     if (user != null) {
       _alertSubscription?.cancel();
@@ -361,7 +432,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           )
           .listen((alerts) {
         for (final alert in alerts) {
-          if (!alert.isRead && !_shownAlertIds.contains(alert.id)) {
+          if (!alert.isRead &&
+              !_shownAlertIds.contains(alert.id) &&
+              !_dismissedAlertIds.contains(alert.id)) {
             _shownAlertIds.add(alert.id);
             if (alert.studentId == 'ALL') {
               _showBroadcastAlertNotification(alert);
@@ -376,6 +449,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
 
   void _showBroadcastAlertNotification(ProctorAlert alert) {
     if (!mounted) return;
+    _recordAlertDismissed(alert.id);
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -516,6 +590,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () {
+                _recordAlertDismissed(alert.id);
                 _paperService.markAlertRead(alert.id);
                 Navigator.of(ctx).pop();
               },
@@ -540,14 +615,24 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     return StreamBuilder<PaperSession?>(
       stream: _sessionStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (!snapshot.hasData && _latestSession == null) {
           return const Scaffold(
             backgroundColor: Color(0xFF0F172A),
             body: Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
           );
         }
 
-        final session = snapshot.data!;
+        if (snapshot.hasData && snapshot.data != null) {
+          final s = snapshot.data!;
+          if (_latestSession == null ||
+              _latestSession!.currentPhase != s.currentPhase ||
+              _latestSession!.status != s.status ||
+              _latestSession!.isTimeUp != s.isTimeUp) {
+            _latestSession = s;
+          }
+        }
+
+        final session = _latestSession ?? snapshot.data!;
         final slot = (widget.slotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
         final bool isEnded = session.isEnded;
@@ -637,22 +722,29 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           timerPrefix = '⏳ Waiting';
           timerColor = const Color(0xFF818CF8);
           timerIcon = Icons.hourglass_top_rounded;
+        } else if (isWriting) {
+          if (!isOvertime) {
+            durationToShow = examWritingTimeLeft;
+            final bool isUrgent = durationToShow.inMinutes < 15;
+            timerPrefix = '📝 ';
+            timerColor = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
+            timerIcon = Icons.timer_outlined;
+          } else {
+            durationToShow = overtimeDuration;
+            timerPrefix = '⏱️ Extra: +';
+            timerColor = const Color(0xFFF59E0B);
+            timerIcon = Icons.alarm_on;
+          }
         } else if (isPackageOpening) {
           durationToShow = Duration(seconds: packageOpeningSecsLeft);
           timerPrefix = '📦 Open: ';
           timerColor = const Color(0xFFF59E0B);
           timerIcon = Icons.inventory_2_outlined;
-        } else if (!isOvertime) {
-          durationToShow = examWritingTimeLeft;
-          final bool isUrgent = durationToShow.inMinutes < 15;
-          timerPrefix = '📝 ';
-          timerColor = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF22C55E);
-          timerIcon = Icons.timer_outlined;
         } else {
-          durationToShow = overtimeDuration;
-          timerPrefix = '⏱️ Extra: +';
-          timerColor = const Color(0xFFF59E0B);
-          timerIcon = Icons.alarm_on;
+          durationToShow = examWritingTimeLeft;
+          timerPrefix = '📝 ';
+          timerColor = const Color(0xFF22C55E);
+          timerIcon = Icons.timer_outlined;
         }
 
         if (durationToShow.isNegative) durationToShow = Duration.zero;
@@ -666,11 +758,15 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                 ? '⏰ Time Up'
                 : isWaiting
                     ? '⏳ Waiting'
-                    : isPackageOpening
-                        ? (packageOpeningSecsLeft <= 0 ? '📦 00:00' : '$timerPrefix$minutes:$seconds')
-                        : (durationToShow.inHours > 0
+                    : isWriting
+                        ? (durationToShow.inHours > 0
                             ? '$timerPrefix$hours:$minutes:$seconds'
-                            : '$timerPrefix$minutes:$seconds');
+                            : '$timerPrefix$minutes:$seconds')
+                        : isPackageOpening
+                            ? (packageOpeningSecsLeft <= 0 ? '📦 00:00' : '$timerPrefix$minutes:$seconds')
+                            : (durationToShow.inHours > 0
+                                ? '$timerPrefix$hours:$minutes:$seconds'
+                                : '$timerPrefix$minutes:$seconds');
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
@@ -700,9 +796,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                 Text(
                   isWaiting
                       ? 'පොරොත්තු ශාලාව (Waiting)'
-                      : isPackageOpening
-                          ? 'පාර්සල් විවෘත කිරීම'
-                          : '${slot.name} • සජීවී විභාගය',
+                      : isWriting
+                          ? '${slot.name} • සජීවී විභාගය'
+                          : isPackageOpening
+                              ? 'පාර්සල් විවෘත කිරීම'
+                              : '${slot.name} • සජීවී විභාගය',
                   style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1220,6 +1318,57 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       );
     }
 
+    if (isWriting) {
+      if (isOvertime) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withOpacity(0.9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.alarm_on, color: Color(0xFFEF4444), size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'නියමිත වේලාව අවසන්! කරුණාකර පිළිතුරු පත්‍ර Scan කර Submit කරන්න.',
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFFCA5A5)),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A).withOpacity(0.8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '✍️ පිළිතුරු ලිවීම සක්‍රීයයි - ලිවීම් මේසය සහ ඔබ කැමරාව ඉදිරියේ තබාගන්න.',
+                style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (isPackageOpening) {
       final mins = (packageSecsLeft ~/ 60).toString().padLeft(2, '0');
       final secs = (packageSecsLeft % 60).toString().padLeft(2, '0');
@@ -1329,54 +1478,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       );
     }
 
-    if (isOvertime) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withOpacity(0.9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.alarm_on, color: Color(0xFFEF4444), size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'නියමිත වේලාව අවසන්! කරුණාකර පිළිතුරු පත්‍ර Scan කර Submit කරන්න.',
-                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFFCA5A5)),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withOpacity(0.8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '✍️ පිළිතුරු ලිවීම සක්‍රීයයි - ලිවීම් මේසය සහ ඔබ කැමරාව ඉදිරියේ තබාගන්න.',
-              style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildBottomExamControlBar(bool isEnded, bool isTimeUp) {

@@ -73,7 +73,7 @@ class PaperSessionService {
 
   // ── 3. Stream Upcoming & Active Sessions ──────────────────────────────────
   Stream<List<PaperSession>> streamSessions({String? examYear}) {
-    return _firestore.collection('paper_sessions').snapshots(includeMetadataChanges: true).map((snapshot) {
+    return _firestore.collection('paper_sessions').snapshots().map((snapshot) {
       final list = <PaperSession>[];
       for (final doc in snapshot.docs) {
         try {
@@ -146,10 +146,33 @@ class PaperSessionService {
     }
   }
 
+  // ── 3c. One-shot Fetch for Single Paper Session ────────────────────────────
+  Future<PaperSession?> getSession(String paperId) async {
+    if (paperId.isEmpty) return null;
+    try {
+      final doc = await _firestore
+          .collection('paper_sessions')
+          .doc(paperId)
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(const Duration(seconds: 3));
+      if (!doc.exists) return null;
+      return PaperSession.fromFirestore(doc);
+    } catch (_) {
+      try {
+        final doc = await _firestore.collection('paper_sessions').doc(paperId).get();
+        if (!doc.exists) return null;
+        return PaperSession.fromFirestore(doc);
+      } catch (e) {
+        debugPrint('Error in getSession $paperId: $e');
+        return null;
+      }
+    }
+  }
+
   // ── 4. Stream Single Paper Session ─────────────────────────────────────────
   Stream<PaperSession?> streamPaperSession(String paperId) {
     if (paperId.isEmpty) return Stream.value(null);
-    return _firestore.collection('paper_sessions').doc(paperId).snapshots(includeMetadataChanges: true).map((doc) {
+    return _firestore.collection('paper_sessions').doc(paperId).snapshots().map((doc) {
       if (!doc.exists) return null;
       try {
         return PaperSession.fromFirestore(doc);
@@ -291,12 +314,21 @@ class PaperSessionService {
     if (slotId != null && slotId.trim().isNotEmpty) {
       updates['selectedSlot'] = slotId.trim();
     }
-    if (cameraSnapshotUrl != null) {
-      updates['cameraSnapshotUrl'] = cameraSnapshotUrl;
+    if (cameraSnapshotUrl != null && cameraSnapshotUrl.trim().isNotEmpty) {
+      final trimmed = cameraSnapshotUrl.trim();
+      if (trimmed.length < 2000) {
+        updates['cameraSnapshotUrl'] = trimmed;
+      }
     }
     if (submissionPhotos != null && submissionPhotos.isNotEmpty) {
-      updates['submissionPhotos'] = submissionPhotos;
-      updates['submissionUrl'] = submissionPhotos.first;
+      final safePhotos = submissionPhotos
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty && p.length < 2000)
+          .toList();
+      if (safePhotos.isNotEmpty) {
+        updates['submissionPhotos'] = safePhotos;
+        updates['submissionUrl'] = safePhotos.first;
+      }
     }
     if (status != null) {
       updates['status'] = status;
@@ -434,8 +466,12 @@ class PaperSessionService {
 
   // ── 12. Mark Alert as Read ────────────────────────────────────────────────
   Future<void> markAlertRead(String alertId) async {
-    await _ensureAuth();
-    await _firestore.collection('proctor_alerts').doc(alertId).update({'isRead': true});
+    try {
+      await _ensureAuth();
+      await _firestore.collection('proctor_alerts').doc(alertId).update({'isRead': true});
+    } catch (e) {
+      debugPrint('markAlertRead error: $e');
+    }
   }
 
   // ── 13. Delete Paper Session & Associated Registrations / Alerts ───────────
@@ -553,6 +589,7 @@ class PaperSessionService {
       updates['status'] = 'active';
       updates['isTimeUp'] = false;
       updates['writingStartedAt'] = nowTimestamp;
+      updates['packageOpeningEndedAt'] = nowTimestamp;
       alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
       alertType = 'info';
     } else if (phase == 'time_up') {

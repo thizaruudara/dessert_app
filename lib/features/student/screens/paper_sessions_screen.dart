@@ -331,10 +331,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     return StreamBuilder<PaperRegistration?>(
       stream: _paperService.streamStudentRegistration(session.id, studentId),
       builder: (context, regSnap) {
-        final registration = regSnap.data;
-        final bool isSubmitted = registration?.isSubmitted == true || registration?.status == 'submitted';
-        final selectedSlotId = registration?.selectedSlot ?? (session.slot2 == null ? 'slot1' : null);
-        final selectedSlot = (selectedSlotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
+        try {
+          final registration = regSnap.data;
+          final bool isSubmitted = registration?.isSubmitted == true || registration?.status == 'submitted';
+          final selectedSlotId = registration?.selectedSlot ?? (session.slot2 == null ? 'slot1' : null);
+          final selectedSlot = (selectedSlotId == 'slot2' && session.slot2 != null) ? session.slot2! : session.slot1;
 
         final targetSlot = selectedSlot;
         final bool isEnded = session.isEnded;
@@ -647,10 +648,10 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                 children: [
                                   Text(
                                     isLive
-                                        ? (isPackageOpening
-                                            ? '📦 පැකේජය විවෘත කිරීමේ කාලය (Package Opening)'
-                                            : (isWriting
-                                                ? '✍️ විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)'
+                                        ? (isWriting
+                                            ? '✍️ විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)'
+                                            : (isPackageOpening
+                                                ? '📦 පැකේජය විවෘත කිරීමේ කාලය (Package Opening)'
                                                 : (isTimeUp
                                                     ? '⏰ වේලාව අවසන් (Time Up - Scan Answers)'
                                                     : 'විභාග සැසිය සක්‍රීයයි (Session is Live)!')))
@@ -668,10 +669,10 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     isLive
-                                        ? (isPackageOpening
-                                            ? 'කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (${(packageRemainingSecs ~/ 60).toString().padLeft(2, '0')}:${(packageRemainingSecs % 60).toString().padLeft(2, '0')})'
-                                            : (isWriting
-                                                ? 'දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)'
+                                        ? (isWriting
+                                            ? 'දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)'
+                                            : (isPackageOpening
+                                                ? 'කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (${(packageRemainingSecs ~/ 60).toString().padLeft(2, '0')}:${(packageRemainingSecs % 60).toString().padLeft(2, '0')})'
                                                 : (isTimeUp
                                                     ? 'පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න'
                                                     : 'වහාම Exam Room එකට පිවිසෙන්න')))
@@ -685,9 +686,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: (isLive && !isPackageOpening) || isEnded || isWaiting ? 0 : 2,
                                       color: isLive
-                                          ? (isPackageOpening
-                                              ? const Color(0xFFF59E0B)
-                                              : (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF4ADE80)))
+                                          ? (isWriting
+                                              ? const Color(0xFF4ADE80)
+                                              : (isPackageOpening
+                                                  ? const Color(0xFFF59E0B)
+                                                  : (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF4ADE80))))
                                           : isEnded
                                               ? const Color(0xFF94A3B8)
                                               : (isWaiting ? const Color(0xFF818CF8) : const Color(0xFFF59E0B)),
@@ -800,9 +803,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                       : selectedSlotId == null
                                           ? 'පළමුව සැසියක් (Slot) තෝරන්න'
                                           : isLive
-                                              ? (isPackageOpening
-                                                  ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
-                                                  : 'Enter Live Exam Room (කැමරාව ON කරන්න)')
+                                              ? (isWriting
+                                                  ? 'Enter Live Exam Room (කැමරාව ON කරන්න)'
+                                                  : (isPackageOpening
+                                                      ? 'Open Package in Camera Room (පාර්සලය විවෘත කරන්න)'
+                                                      : 'Enter Live Exam Room (කැමරාව ON කරන්න)'))
                                               : isUpcoming
                                                   ? 'Enter Waiting Room (පොරොත්තු ශාලාව)'
                                                   : 'View Paper / Submissions',
@@ -827,6 +832,10 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
             ],
           ),
         );
+        } catch (e, stack) {
+          debugPrint('Error building paper session card: $e\n$stack');
+          return _buildFallbackCard(session);
+        }
       },
     );
   }

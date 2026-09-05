@@ -448,11 +448,17 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 
                       // Real-time Agora video stream on top when online
                       if (canStreamVideo && !isSubmitted)
-                        AgoraVideoView(
-                          controller: _getRemoteController(
-                            studentUid,
-                            AgoraRtcService.getChannelName(widget.paperId),
-                          ),
+                        Builder(
+                          builder: (context) {
+                            final ctrl = _getRemoteController(
+                              studentUid,
+                              AgoraRtcService.getChannelName(widget.paperId),
+                            );
+                            return AgoraVideoView(
+                              key: ObjectKey(ctrl),
+                              controller: ctrl,
+                            );
+                          },
                         ),
                       Positioned(
                         top: 6,
@@ -1043,11 +1049,20 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   }
 
 
-  void _showFullScreenStudentViewer(PaperRegistration student) {
+  Future<void> _showFullScreenStudentViewer(PaperRegistration student) async {
     final studentUid = student.computedAgoraUid;
-    final bool isStreaming = _isAgoraInitialized && _agoraEngine != null && (_activeStreamingUids.contains(studentUid) || student.isOnline);
+    final bool isStreaming = _isAgoraInitialized &&
+        _agoraEngine != null &&
+        (_activeStreamingUids.contains(studentUid) || student.isOnline);
 
-    Navigator.of(context).push(
+    // 1. Release grid view controller so full screen viewer can attach exclusively to Agora texture
+    if (_remoteVideoControllers.containsKey(studentUid)) {
+      _remoteVideoControllers[studentUid]?.dispose();
+      _remoteVideoControllers.remove(studentUid);
+      if (mounted) setState(() {});
+    }
+
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => _FullScreenStudentViewerScreen(
           initialRegistration: student,
@@ -1060,6 +1075,17 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
         ),
       ),
     );
+
+    // 2. Returning from full screen:
+    // Full screen viewer disposed its controller. Clear grid controller and trigger rebuild
+    // so AgoraVideoView creates and binds a brand new VideoViewController and texture!
+    if (_remoteVideoControllers.containsKey(studentUid)) {
+      _remoteVideoControllers[studentUid]?.dispose();
+      _remoteVideoControllers.remove(studentUid);
+    }
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _confirmEndSession(PaperSession session) {
@@ -1987,6 +2013,7 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
                         if (_remoteViewController != null && (isStreaming || isLive)) {
                           return SizedBox.expand(
                             child: AgoraVideoView(
+                              key: ObjectKey(_remoteViewController),
                               controller: _remoteViewController!,
                             ),
                           );
