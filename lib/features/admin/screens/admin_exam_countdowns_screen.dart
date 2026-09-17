@@ -150,7 +150,18 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
   }
 
   void _addNewBatchDialog() {
-    final yearCtrl = TextEditingController(text: '2029 A/L');
+    final batchOptions = const [
+      '2024 A/L',
+      '2025 A/L',
+      '2026 A/L',
+      '2027 A/L',
+      '2028 A/L',
+      '2029 A/L',
+      '2030 A/L',
+      '2031 A/L',
+      '2032 A/L',
+    ];
+    String selectedBatch = '2029 A/L';
     DateTime selectedDate = DateTime(2029, 11, 25, 8, 30);
     bool isVisible = true;
 
@@ -178,14 +189,45 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
                 children: [
                   const Text('Exam Batch Name:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
                   const SizedBox(height: 6),
-                  TextField(
-                    controller: yearCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 2029 A/L',
-                      filled: true,
-                      fillColor: const Color(0xFF0F172A),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF334155)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedBatch,
+                        isExpanded: true,
+                        dropdownColor: const Color(0xFF1E293B),
+                        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 20),
+                        items: batchOptions.map((batch) {
+                          return DropdownMenuItem(
+                            value: batch,
+                            child: Text(
+                              batch,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13.5,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              selectedBatch = val;
+                              final yearNum = int.tryParse(val.replaceAll(RegExp(r'[^0-9]'), ''));
+                              if (yearNum != null && yearNum >= 2024 && yearNum <= 2035) {
+                                selectedDate = DateTime(yearNum, 11, 25, selectedDate.hour, selectedDate.minute);
+                              }
+                            });
+                          }
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -253,15 +295,13 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
                 onPressed: () async {
-                  final batchName = yearCtrl.text.trim();
-                  if (batchName.isEmpty) return;
                   await _service.saveConfig(
                     ExamCountdownConfig(
-                      id: ExamCountdownConfig.normalizeDocId(batchName),
-                      examYear: batchName,
+                      id: ExamCountdownConfig.normalizeDocId(selectedBatch),
+                      examYear: selectedBatch,
                       targetDate: selectedDate,
                       isEnabled: isVisible,
-                      customTitle: '$batchName Physics Target',
+                      customTitle: '$selectedBatch Physics Target',
                     ),
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
