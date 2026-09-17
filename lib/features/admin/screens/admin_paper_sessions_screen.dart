@@ -1701,7 +1701,21 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     if (!examYearOptions.contains(selectedExamYear)) {
       selectedExamYear = '2027 A/L';
     }
-    final structureCtrl = TextEditingController(text: existing?.paperStructure ?? 'Part A (10 Questions) + Part B (4 Questions)');
+    final paperStructureOptions = const [
+      'Part I',
+      'Part II',
+      'Part I + Part II',
+    ];
+    String selectedPaperStructure = existing?.paperStructure ?? 'Part I + Part II';
+    if (!paperStructureOptions.contains(selectedPaperStructure)) {
+      if (selectedPaperStructure.contains('Part I') && !selectedPaperStructure.contains('Part II')) {
+        selectedPaperStructure = 'Part I';
+      } else if (selectedPaperStructure.contains('Part II') && !selectedPaperStructure.contains('Part I')) {
+        selectedPaperStructure = 'Part II';
+      } else {
+        selectedPaperStructure = 'Part I + Part II';
+      }
+    }
     final durationCtrl = TextEditingController(text: existing?.durationMinutes.toString() ?? '180');
     final topicsCtrl = TextEditingController(text: existing?.syllabusTopics.join(', ') ?? '');
     final hintsCtrl = TextEditingController(text: existing?.hints ?? '');
@@ -1826,7 +1840,48 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: _buildTextField('Paper Structure', structureCtrl, 'e.g. Part A + Part B'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Paper Structure', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF334155)),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: selectedPaperStructure,
+                                      isExpanded: true,
+                                      dropdownColor: const Color(0xFF1E293B),
+                                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 18),
+                                      items: paperStructureOptions.map((opt) {
+                                        return DropdownMenuItem(
+                                          value: opt,
+                                          child: Text(
+                                            opt,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 12.5,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setDialogState(() => selectedPaperStructure = val);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1976,7 +2031,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       examYear: selectedExamYear,
                       scheduledDate: selectedDate,
                       durationMinutes: int.tryParse(durationCtrl.text.trim()) ?? 180,
-                      paperStructure: structureCtrl.text.trim(),
+                      paperStructure: selectedPaperStructure,
                       syllabusTopics: topicsList,
                       hints: hintsCtrl.text.trim(),
                       instructions: instructionsCtrl.text.trim(),
