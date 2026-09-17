@@ -79,12 +79,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                             TextButton.icon(
                               style: TextButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.15),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => context.push('/admin/countdowns'),
+                              icon: const Icon(Icons.timer_outlined, size: 14, color: Colors.white),
+                              label: const Text('Exam Dates ⏳',
+                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ),
+                            const SizedBox(width: 6),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.15),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                               onPressed: () => context.go('/admin/papers'),
                               icon: const Icon(Icons.military_tech_outlined, size: 14, color: Colors.white),
-                              label: const Text('Papers & Leaderboard ➔',
+                              label: const Text('Papers ➔',
                                   style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                             ),
                           ],
@@ -101,6 +113,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
               ),
             ),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.timer_outlined, color: Colors.white),
+                tooltip: 'A/L Exam Target Dates & Countdowns',
+                onPressed: () => context.push('/admin/countdowns'),
+              ),
               IconButton(
                 icon: const Icon(Icons.school_outlined, color: Colors.white),
                 tooltip: 'Switch to Student View',

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/models/exam_countdown_model.dart';
+import '../../../core/services/exam_countdown_service.dart';
 
 class ExamCountdownWidget extends StatefulWidget {
   final String examYear;
@@ -15,16 +17,19 @@ class ExamCountdownWidget extends StatefulWidget {
 }
 
 class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
+  final ExamCountdownService _service = ExamCountdownService();
   Timer? _timer;
   late Duration _remaining;
-
-  // Approximate target date: November 25th of the exam year
   late DateTime _targetDate;
+  String _displayTitle = '';
+  bool _isEnabled = true;
+  StreamSubscription<ExamCountdownConfig?>? _configSubscription;
 
   @override
   void initState() {
     super.initState();
-    _initTargetDate();
+    _initDefaultTargetDate();
+    _subscribeToConfig();
     _calculateRemaining();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
@@ -33,10 +38,28 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
     });
   }
 
-  void _initTargetDate() {
+  void _initDefaultTargetDate() {
     final match = RegExp(r'\d{4}').firstMatch(widget.examYear);
     int year = match != null ? int.parse(match.group(0)!) : 2027;
     _targetDate = DateTime(year, 11, 25, 8, 30);
+    _displayTitle = '${widget.examYear} Final Countdown';
+  }
+
+  void _subscribeToConfig() {
+    _configSubscription?.cancel();
+    _configSubscription = _service.streamConfigForYear(widget.examYear).listen((config) {
+      if (!mounted) return;
+      if (config != null) {
+        setState(() {
+          _isEnabled = config.isEnabled;
+          _targetDate = config.targetDate;
+          _displayTitle = config.customTitle.isNotEmpty
+              ? config.customTitle
+              : '${widget.examYear} Final Countdown';
+          _calculateRemaining();
+        });
+      }
+    });
   }
 
   void _calculateRemaining() {
@@ -49,7 +72,8 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
   void didUpdateWidget(covariant ExamCountdownWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.examYear != widget.examYear) {
-      _initTargetDate();
+      _initDefaultTargetDate();
+      _subscribeToConfig();
       _calculateRemaining();
     }
   }
@@ -57,11 +81,17 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
   @override
   void dispose() {
     _timer?.cancel();
+    _configSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // If the admin has disabled the countdown for this specific exam year, hide completely
+    if (!_isEnabled) {
+      return const SizedBox.shrink();
+    }
+
     final days = _remaining.inDays;
     final hours = _remaining.inHours % 24;
     final mins = _remaining.inMinutes % 60;
@@ -114,7 +144,7 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${widget.examYear} Final Countdown',
+                    _displayTitle,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,

@@ -60,6 +60,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
         ),
         actions: [
           IconButton(
+            onPressed: () => context.push('/admin/countdowns'),
+            icon: const Icon(Icons.timer_outlined, color: Color(0xFF38BDF8), size: 24),
+            tooltip: 'A/L Exam Target Dates & Countdowns',
+          ),
+          IconButton(
             onPressed: () {
               if (_selectedAdminTab == 0) {
                 _showCreatePaperDialog();
