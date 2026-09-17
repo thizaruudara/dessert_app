@@ -84,7 +84,7 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
 
     try {
       await _service.updateTargetDateTime(
-        examYear: config.examYear,
+        idOrExamYear: config.id.isNotEmpty ? config.id : config.examYear,
         targetDate: newTarget,
       );
       HapticFeedbackService.success();
@@ -103,6 +103,56 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
         );
       }
     }
+  }
+
+  void _confirmDeleteBatch(ExamCountdownConfig config) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_forever, color: Color(0xFFEF4444)),
+            const SizedBox(width: 8),
+            Text(
+              'Delete Countdown Batch',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete ${config.examYear} (${config.customTitle})?\n\nStudents will no longer see this exam countdown.',
+          style: GoogleFonts.poppins(color: const Color(0xFFCBD5E1), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              HapticFeedbackService.heavy();
+              final effectiveId = config.id.isNotEmpty
+                  ? config.id
+                  : ExamCountdownConfig.normalizeDocId(config.examYear);
+              await _service.deleteConfig(effectiveId);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('🗑️ ${config.examYear} deleted successfully'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _editCustomTitle(ExamCountdownConfig config) {
@@ -472,7 +522,10 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
                     activeColor: const Color(0xFF10B981),
                     onChanged: (newVal) async {
                       HapticFeedbackService.light();
-                      await _service.toggleVisibility(config.examYear, newVal);
+                      await _service.toggleVisibility(
+                        config.id.isNotEmpty ? config.id : config.examYear,
+                        newVal,
+                      );
                     },
                   ),
                 ],
@@ -482,7 +535,7 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
 
           const SizedBox(height: 12),
 
-          // Custom Title & Edit Action
+          // Custom Title & Edit / Delete Actions
           Row(
             children: [
               Expanded(
@@ -501,6 +554,11 @@ class _AdminExamCountdownsScreenState extends State<AdminExamCountdownsScreen> {
                 icon: const Icon(Icons.edit_outlined, color: Color(0xFF818CF8), size: 18),
                 tooltip: 'Edit Title',
                 onPressed: () => _editCustomTitle(config),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 19),
+                tooltip: 'Delete Countdown Batch',
+                onPressed: () => _confirmDeleteBatch(config),
               ),
             ],
           ),

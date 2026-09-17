@@ -65,11 +65,12 @@ class ExamCountdownService {
   }
 
   /// One-tap toggle whether students of this exam year can see the countdown
-  Future<void> toggleVisibility(String examYear, bool isEnabled) async {
-    final docId = ExamCountdownConfig.normalizeDocId(examYear);
+  Future<void> toggleVisibility(String idOrExamYear, bool isEnabled) async {
+    final docId = idOrExamYear.contains(' ')
+        ? ExamCountdownConfig.normalizeDocId(idOrExamYear)
+        : idOrExamYear;
     await _countdownsRef.doc(docId).set(
       {
-        'examYear': examYear,
         'isEnabled': isEnabled,
         'updatedAt': Timestamp.now(),
       },
@@ -79,13 +80,14 @@ class ExamCountdownService {
 
   /// Update the exact target exam date and time
   Future<void> updateTargetDateTime({
-    required String examYear,
+    required String idOrExamYear,
     required DateTime targetDate,
     String? customTitle,
   }) async {
-    final docId = ExamCountdownConfig.normalizeDocId(examYear);
+    final docId = idOrExamYear.contains(' ')
+        ? ExamCountdownConfig.normalizeDocId(idOrExamYear)
+        : idOrExamYear;
     final data = <String, dynamic>{
-      'examYear': examYear,
       'targetDate': Timestamp.fromDate(targetDate),
       'updatedAt': Timestamp.now(),
     };
