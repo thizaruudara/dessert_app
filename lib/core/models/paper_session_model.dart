@@ -146,7 +146,7 @@ class PaperSession {
     return PaperSession(
       id: doc.id,
       title: data['title']?.toString() ?? 'A/L Examination Paper',
-      subject: data['subject']?.toString() ?? 'Combined Mathematics',
+      subject: data['subject']?.toString() ?? 'Physics',
       examYear: data['examYear']?.toString() ?? '2027 A/L',
       date: data['date']?.toString() ?? now.toIso8601String().split('T')[0],
       durationMinutes: parsedDuration,

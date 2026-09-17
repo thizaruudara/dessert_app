@@ -315,7 +315,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                       controller: _titleCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Announcement Title',
-                        hintText: 'e.g. Combined Maths Past Paper 2025 Discussion',
+                        hintText: 'e.g. Physics Past Paper 2025 Discussion',
                         prefixIcon: Icon(Icons.title_rounded, color: AppColors.textMuted),
                       ),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a title' : null,

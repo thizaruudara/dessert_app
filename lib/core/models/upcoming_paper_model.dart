@@ -67,7 +67,7 @@ class UpcomingPaper {
     return UpcomingPaper(
       id: doc.id,
       title: data['title']?.toString() ?? 'Upcoming Exam Paper',
-      subject: data['subject']?.toString() ?? 'Combined Mathematics',
+      subject: data['subject']?.toString() ?? 'Physics',
       examYear: data['examYear']?.toString() ?? '2027 A/L',
       scheduledDate: parseTime(data['scheduledDate']),
       durationMinutes: parsedDuration,

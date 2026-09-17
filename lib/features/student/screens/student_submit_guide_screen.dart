@@ -37,7 +37,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
   final ImagePicker _picker = ImagePicker();
 
   // Form State
-  String _selectedSubject = 'Combined Maths';
+  String _selectedSubject = 'Physics';
   final TextEditingController _captionController = TextEditingController();
   final List<File> _selectedPhotos = [];
 
@@ -47,8 +47,8 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
   bool _showTelegramGuide = false;
 
   final List<String> _subjectOptions = [
-    'Combined Maths',
     'Physics',
+    'Combined Maths',
     'Chemistry',
     'Biology',
     'ICT',
@@ -57,8 +57,8 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
   ];
 
   final Map<String, String> _subjectIcons = {
-    'Combined Maths': '📐',
     'Physics': '⚡',
+    'Combined Maths': '📐',
     'Chemistry': '🧪',
     'Biology': '🧬',
     'ICT': '💻',
@@ -171,7 +171,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
     setState(() {
       _captionController.clear();
       _selectedPhotos.clear();
-      _selectedSubject = 'Combined Maths';
+      _selectedSubject = 'Physics';
       _isUploading = false;
       _uploadStatusMessage = '';
     });

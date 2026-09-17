@@ -677,18 +677,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
 
   void _showCreatePaperDialog() {
     final titleCtrl = TextEditingController();
-    String selectedSubject = 'Combined Mathematics';
+    String selectedSubject = 'Physics';
     final List<String> subjectOptions = [
-      'Combined Mathematics',
       'Physics',
-      'Chemistry',
-      'Biology',
-      'ICT',
-      'General / Other',
     ];
 
     String selectedExamYear = '2027 A/L';
     final List<String> examYearOptions = [
+      '2024 A/L',
+      '2025 A/L',
+      '2026 A/L',
       '2027 A/L',
       '2028 A/L',
       '2029 A/L',
@@ -1684,8 +1682,20 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   void _showUpcomingPaperDialog([UpcomingPaper? existing]) {
     final isEdit = existing != null;
     final titleCtrl = TextEditingController(text: existing?.title ?? '');
-    final subjectCtrl = TextEditingController(text: existing?.subject ?? 'Combined Mathematics');
-    final examYearCtrl = TextEditingController(text: existing?.examYear ?? '2027 A/L');
+    const String lockedSubject = 'Physics';
+    String selectedExamYear = existing?.examYear ?? '2027 A/L';
+    final List<String> examYearOptions = [
+      '2024 A/L',
+      '2025 A/L',
+      '2026 A/L',
+      '2027 A/L',
+      '2028 A/L',
+      '2029 A/L',
+      'All Batches',
+    ];
+    if (!examYearOptions.contains(selectedExamYear)) {
+      selectedExamYear = '2027 A/L';
+    }
     final structureCtrl = TextEditingController(text: existing?.paperStructure ?? 'Part A (10 Questions) + Part B (4 Questions)');
     final durationCtrl = TextEditingController(text: existing?.durationMinutes.toString() ?? '180');
     final topicsCtrl = TextEditingController(text: existing?.syllabusTopics.join(', ') ?? '');
@@ -1727,16 +1737,79 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildTextField('Paper Title', titleCtrl, 'e.g. Pure Mathematics Model Paper 03'),
+                      _buildTextField('Paper Title', titleCtrl, 'e.g. Physics Model Paper 03 - Mechanics'),
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField('Subject', subjectCtrl, 'e.g. Combined Mathematics'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF334155)),
+                                  ),
+                                  alignment: Alignment.centerLeft,
+                                  child: Row(
+                                    children: [
+                                      const Text('⚡', style: TextStyle(fontSize: 14)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Physics',
+                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8)),
+                                      ),
+                                      const Spacer(),
+                                      const Icon(Icons.lock, size: 13, color: Color(0xFF64748B)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: _buildTextField('Exam Batch / Year', examYearCtrl, 'e.g. 2027 A/L'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Exam Batch / Year', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF334155)),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: selectedExamYear,
+                                      isExpanded: true,
+                                      dropdownColor: const Color(0xFF1E293B),
+                                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 18),
+                                      items: examYearOptions.map((year) {
+                                        return DropdownMenuItem(
+                                          value: year,
+                                          child: Text(
+                                            year,
+                                            style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) setDialogState(() => selectedExamYear = val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1894,8 +1967,8 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     final newPaper = UpcomingPaper(
                       id: existing?.id ?? '',
                       title: title,
-                      subject: subjectCtrl.text.trim().isNotEmpty ? subjectCtrl.text.trim() : 'Combined Mathematics',
-                      examYear: examYearCtrl.text.trim().isNotEmpty ? examYearCtrl.text.trim() : '2027 A/L',
+                      subject: lockedSubject,
+                      examYear: selectedExamYear,
                       scheduledDate: selectedDate,
                       durationMinutes: int.tryParse(durationCtrl.text.trim()) ?? 180,
                       paperStructure: structureCtrl.text.trim(),
@@ -2158,349 +2231,23 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   }
 
   void _showPaperLeaderboardEditorDialog([PaperLeaderboard? existing]) {
-    final isEdit = existing != null;
-    final titleCtrl = TextEditingController(text: existing?.paperTitle ?? '');
-    final subjectCtrl = TextEditingController(text: existing?.subject ?? 'Combined Mathematics');
-    final examYearCtrl = TextEditingController(text: existing?.examYear ?? '2027 A/L');
-    final totalMarksCtrl = TextEditingController(text: existing?.totalMarks.toInt().toString() ?? '100');
-
-    // Candidate entries list
-    List<PaperLeaderboardEntry> entries = existing != null ? List.from(existing.entries) : [];
-
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setEditorState) {
-            void sortEntries() {
-              entries.sort((a, b) => b.marks.compareTo(a.marks));
-              // Reassign ranks
-              for (int i = 0; i < entries.length; i++) {
-                entries[i] = entries[i].copyWith(rank: i + 1);
-              }
-            }
-
-            void addStudentRow() {
-              final newRank = entries.length + 1;
-              entries.add(
-                PaperLeaderboardEntry(
-                  rank: newRank,
-                  studentName: '',
-                  marks: 0.0,
-                  grade: 'A',
-                  remarks: '',
-                ),
-              );
-            }
-
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E293B),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.emoji_events, color: Color(0xFFFBBF24), size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      isEdit ? 'Edit Paper Leaderboard' : 'Create Paper Leaderboard',
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ),
-                ],
+      builder: (ctx) => _PaperLeaderboardEditorDialog(
+        existing: existing,
+        onSave: (newBoard) async {
+          await _leaderboardService.savePaperLeaderboard(newBoard);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(existing != null ? '✅ Paper leaderboard updated!' : '🏆 New Paper Leaderboard published!'),
+                backgroundColor: const Color(0xFF10B981),
               ),
-              content: SizedBox(
-                width: 580,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTextField('Paper Title', titleCtrl, 'e.g. Model Paper 03 - Pure Mathematics'),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField('Subject', subjectCtrl, 'Combined Mathematics'),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildTextField('Exam Year / Batch', examYearCtrl, '2027 A/L'),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildTextField('Total Marks', totalMarksCtrl, '100'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Candidates header + Actions
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Ranked Candidates (${entries.length})',
-                            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          Row(
-                            children: [
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0xFF6366F1)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                ),
-                                onPressed: () {
-                                  setEditorState(() {
-                                    sortEntries();
-                                  });
-                                },
-                                icon: const Icon(Icons.sort, size: 14, color: Color(0xFF818CF8)),
-                                label: Text('Auto-Rank', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF6366F1),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                ),
-                                onPressed: () {
-                                  setEditorState(() {
-                                    addStudentRow();
-                                  });
-                                },
-                                icon: const Icon(Icons.add, size: 14, color: Colors.white),
-                                label: Text('+ Add Student', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      if (entries.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF334155)),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Click "+ Add Student" above to start entering candidate scores and ranks.',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
-                            ),
-                          ),
-                        )
-                      else
-                        ...List.generate(entries.length, (idx) {
-                          final e = entries[idx];
-                          final nameCtrl = TextEditingController(text: e.studentName);
-                          final marksCtrl = TextEditingController(text: e.marks > 0 ? e.marks.toString() : '');
-                          final remarksCtrl = TextEditingController(text: e.remarks);
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF334155)),
-                            ),
-                            child: Row(
-                              children: [
-                                // Rank Badge
-                                Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF1E293B),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '${e.rank}',
-                                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24)),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-
-                                // Student Name
-                                Expanded(
-                                  flex: 3,
-                                  child: TextField(
-                                    controller: nameCtrl,
-                                    onChanged: (val) {
-                                      entries[idx] = entries[idx].copyWith(studentName: val);
-                                    },
-                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
-                                    decoration: InputDecoration(
-                                      hintText: 'Student Name',
-                                      hintStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-
-                                // Marks
-                                SizedBox(
-                                  width: 65,
-                                  child: TextField(
-                                    controller: marksCtrl,
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (val) {
-                                      final score = double.tryParse(val) ?? 0.0;
-                                      // Auto assign grade
-                                      String grade = 'A';
-                                      if (score >= 75) grade = 'A';
-                                      else if (score >= 65) grade = 'B';
-                                      else if (score >= 50) grade = 'C';
-                                      else if (score >= 35) grade = 'S';
-                                      else grade = 'F';
-
-                                      entries[idx] = entries[idx].copyWith(marks: score, grade: grade);
-                                      setEditorState(() {});
-                                    },
-                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
-                                    decoration: InputDecoration(
-                                      hintText: 'Marks',
-                                      hintStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-
-                                // Grade Dropdown
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E293B),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFF334155)),
-                                  ),
-                                  child: DropdownButton<String>(
-                                    value: e.grade,
-                                    underline: const SizedBox(),
-                                    dropdownColor: const Color(0xFF1E293B),
-                                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                    items: ['A', 'B', 'C', 'S', 'F'].map((g) {
-                                      return DropdownMenuItem(value: g, child: Text(g));
-                                    }).toList(),
-                                    onChanged: (g) {
-                                      if (g != null) {
-                                        setEditorState(() {
-                                          entries[idx] = entries[idx].copyWith(grade: g);
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-
-                                // Remarks
-                                Expanded(
-                                  flex: 2,
-                                  child: TextField(
-                                    controller: remarksCtrl,
-                                    onChanged: (val) {
-                                      entries[idx] = entries[idx].copyWith(remarks: val);
-                                    },
-                                    style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
-                                    decoration: InputDecoration(
-                                      hintText: 'Accolade/Note',
-                                      hintStyle: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF64748B)),
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-
-                                // Delete Row
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 16, color: Color(0xFFEF4444)),
-                                  onPressed: () {
-                                    setEditorState(() {
-                                      entries.removeAt(idx);
-                                      sortEntries();
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () async {
-                    final title = titleCtrl.text.trim();
-                    if (title.isEmpty) return;
-
-                    sortEntries();
-
-                    final total = double.tryParse(totalMarksCtrl.text.trim()) ?? 100.0;
-                    final newBoard = PaperLeaderboard(
-                      id: existing?.id ?? '',
-                      paperTitle: title,
-                      subject: subjectCtrl.text.trim().isNotEmpty ? subjectCtrl.text.trim() : 'Combined Mathematics',
-                      examYear: examYearCtrl.text.trim().isNotEmpty ? examYearCtrl.text.trim() : '2027 A/L',
-                      paperDate: DateFormat('yyyy-MM-dd').format(DateTime.now()),
-                      totalMarks: total,
-                      publishedAt: existing?.publishedAt ?? DateTime.now(),
-                      entries: entries,
-                    );
-
-                    Navigator.pop(ctx);
-                    await _leaderboardService.savePaperLeaderboard(newBoard);
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(isEdit ? '✅ Paper leaderboard updated!' : '🏆 New Paper Leaderboard published!'),
-                          backgroundColor: const Color(0xFF10B981),
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    isEdit ? 'Save Changes' : 'Publish Leaderboard',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                ),
-              ],
             );
-          },
-        );
-      },
+          }
+        },
+      ),
     );
   }
 
@@ -2529,6 +2276,661 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// HIGH-CONTRAST PAPER LEADERBOARD EDITOR (PHYSICS ONLY & PERSISTENT INPUTS)
+// ══════════════════════════════════════════════════════════════════════════
+
+class _CandidateRowController {
+  final TextEditingController nameCtrl;
+  final TextEditingController marksCtrl;
+  final TextEditingController remarksCtrl;
+  String grade;
+  int rank;
+
+  _CandidateRowController({
+    required String name,
+    required double marks,
+    required this.grade,
+    required String remarks,
+    required this.rank,
+  })  : nameCtrl = TextEditingController(text: name),
+        marksCtrl = TextEditingController(
+          text: marks > 0 ? (marks % 1 == 0 ? marks.toInt().toString() : marks.toString()) : '',
+        ),
+        remarksCtrl = TextEditingController(text: remarks);
+
+  void dispose() {
+    nameCtrl.dispose();
+    marksCtrl.dispose();
+    remarksCtrl.dispose();
+  }
+}
+
+class _PaperLeaderboardEditorDialog extends StatefulWidget {
+  final PaperLeaderboard? existing;
+  final Function(PaperLeaderboard) onSave;
+
+  const _PaperLeaderboardEditorDialog({this.existing, required this.onSave});
+
+  @override
+  State<_PaperLeaderboardEditorDialog> createState() => _PaperLeaderboardEditorDialogState();
+}
+
+class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDialog> {
+  late TextEditingController _titleCtrl;
+  late TextEditingController _totalMarksCtrl;
+
+  // Locked exclusively to Physics for physics teacher
+  static const String _lockedSubject = 'Physics';
+
+  late String _selectedExamYear;
+  final List<String> _examYearOptions = [
+    '2024 A/L',
+    '2025 A/L',
+    '2026 A/L',
+    '2027 A/L',
+    '2028 A/L',
+    '2029 A/L',
+    'All Batches',
+  ];
+
+  late List<_CandidateRowController> _rows;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.existing?.paperTitle ?? '');
+    _totalMarksCtrl = TextEditingController(
+      text: widget.existing != null
+          ? (widget.existing!.totalMarks % 1 == 0
+              ? widget.existing!.totalMarks.toInt().toString()
+              : widget.existing!.totalMarks.toString())
+          : '100',
+    );
+
+    _selectedExamYear = widget.existing?.examYear ?? '2027 A/L';
+    if (!_examYearOptions.contains(_selectedExamYear)) {
+      _selectedExamYear = '2027 A/L';
+    }
+
+    _rows = (widget.existing?.entries ?? []).map((e) {
+      return _CandidateRowController(
+        name: e.studentName,
+        marks: e.marks,
+        grade: e.grade,
+        remarks: e.remarks,
+        rank: e.rank,
+      );
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _totalMarksCtrl.dispose();
+    for (final r in _rows) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addStudentRow() {
+    setState(() {
+      _rows.add(
+        _CandidateRowController(
+          name: '',
+          marks: 0.0,
+          grade: 'A',
+          remarks: '',
+          rank: _rows.length + 1,
+        ),
+      );
+    });
+  }
+
+  void _autoRank() {
+    setState(() {
+      _rows.sort((a, b) {
+        final mA = double.tryParse(a.marksCtrl.text.trim()) ?? 0.0;
+        final mB = double.tryParse(b.marksCtrl.text.trim()) ?? 0.0;
+        return mB.compareTo(mA);
+      });
+      for (int i = 0; i < _rows.length; i++) {
+        _rows[i].rank = i + 1;
+      }
+    });
+  }
+
+  void _onMarksChanged(_CandidateRowController row) {
+    final text = row.marksCtrl.text.trim();
+    final score = double.tryParse(text) ?? 0.0;
+    String newGrade = 'A';
+    if (score >= 75) {
+      newGrade = 'A';
+    } else if (score >= 65) {
+      newGrade = 'B';
+    } else if (score >= 50) {
+      newGrade = 'C';
+    } else if (score >= 35) {
+      newGrade = 'S';
+    } else {
+      newGrade = 'F';
+    }
+
+    if (row.grade != newGrade) {
+      setState(() {
+        row.grade = newGrade;
+      });
+    }
+  }
+
+  Color _getGradeColor(String grade) {
+    switch (grade) {
+      case 'A':
+        return const Color(0xFF10B981);
+      case 'B':
+        return const Color(0xFF3B82F6);
+      case 'C':
+        return const Color(0xFFF59E0B);
+      case 'S':
+        return const Color(0xFFA855F7);
+      default:
+        return const Color(0xFFEF4444);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.existing != null;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.emoji_events, color: Color(0xFFFBBF24), size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              isEdit ? 'Edit Paper Leaderboard' : 'Create Paper Leaderboard',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: screenWidth > 640 ? 620 : double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Paper Title
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Paper Title', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _titleCtrl,
+                    style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Physics Model Paper 03 - Mechanics',
+                      hintStyle: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+                      filled: true,
+                      fillColor: const Color(0xFF0F172A),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Subject (Locked to Physics) + Exam Year (Dropdown) + Total Marks
+              Row(
+                children: [
+                  // Locked Subject
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 4),
+                        Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            children: [
+                              const Text('⚡', style: TextStyle(fontSize: 14)),
+                              const SizedBox(width: 8),
+                              Text(
+                                _lockedSubject,
+                                style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8)),
+                              ),
+                              const Spacer(),
+                              const Icon(Icons.lock_rounded, size: 14, color: Color(0xFF64748B)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Exam Year / Batch Dropdown
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Exam Year / Batch', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 4),
+                        Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedExamYear,
+                              isExpanded: true,
+                              dropdownColor: const Color(0xFF1E293B),
+                              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 18),
+                              items: _examYearOptions.map((year) {
+                                return DropdownMenuItem(
+                                  value: year,
+                                  child: Text(
+                                    year,
+                                    style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _selectedExamYear = val);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Total Marks
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Total Marks', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 44,
+                          child: TextField(
+                            controller: _totalMarksCtrl,
+                            keyboardType: TextInputType.number,
+                            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFF0F172A),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Candidates header + Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Ranked Candidates (${_rows.length})',
+                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF6366F1)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: _autoRank,
+                        icon: const Icon(Icons.sort, size: 14, color: Color(0xFF818CF8)),
+                        label: Text('Auto-Rank', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: _addStudentRow,
+                        icon: const Icon(Icons.add, size: 14, color: Colors.white),
+                        label: Text('+ Add Student', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              if (_rows.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        const Icon(Icons.group_add_outlined, color: Color(0xFF64748B), size: 32),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Click "+ Add Student" above to start entering candidate scores and ranks.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                // Column Labels Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 32,
+                        child: Text('#', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 4,
+                        child: Text('Student Name', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 72,
+                        child: Text('Marks', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 58,
+                        child: Text('Grade', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
+                        child: Text('Accolade / Note', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                      ),
+                      const SizedBox(width: 32),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Candidate Rows with Crystal Clear Contrast
+                ...List.generate(_rows.length, (idx) {
+                  final r = _rows[idx];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF334155)),
+                    ),
+                    child: Row(
+                      children: [
+                        // Rank Badge
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: r.rank == 1
+                                ? const Color(0xFFF59E0B).withOpacity(0.2)
+                                : (r.rank == 2
+                                    ? const Color(0xFF94A3B8).withOpacity(0.2)
+                                    : (r.rank == 3
+                                        ? const Color(0xFFB45309).withOpacity(0.2)
+                                        : const Color(0xFF1E293B))),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: r.rank <= 3 ? const Color(0xFFF59E0B) : const Color(0xFF334155),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              r.rank == 1 ? '🥇' : (r.rank == 2 ? '🥈' : (r.rank == 3 ? '🥉' : '${r.rank}')),
+                              style: GoogleFonts.poppins(fontSize: r.rank <= 3 ? 14 : 11, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Student Name (Dark Background, White Text)
+                        Expanded(
+                          flex: 4,
+                          child: SizedBox(
+                            height: 42,
+                            child: TextField(
+                              controller: r.nameCtrl,
+                              style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                              decoration: InputDecoration(
+                                hintText: 'Student Name',
+                                hintStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                                filled: true,
+                                fillColor: const Color(0xFF1E293B),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Marks Input (FIXED: Never converts 10 to 1.0 or 80 to 8.0)
+                        SizedBox(
+                          width: 72,
+                          height: 42,
+                          child: TextField(
+                            controller: r.marksCtrl,
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) => _onMarksChanged(r),
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF38BDF8), fontWeight: FontWeight.bold),
+                            decoration: InputDecoration(
+                              hintText: '0-100',
+                              hintStyle: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF64748B)),
+                              filled: true,
+                              fillColor: const Color(0xFF1E293B),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.5)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Grade Dropdown
+                        Container(
+                          height: 42,
+                          width: 58,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: _getGradeColor(r.grade).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _getGradeColor(r.grade)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: r.grade,
+                              dropdownColor: const Color(0xFF1E293B),
+                              icon: const SizedBox.shrink(),
+                              alignment: Alignment.center,
+                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: _getGradeColor(r.grade)),
+                              items: ['A', 'B', 'C', 'S', 'F'].map((g) {
+                                return DropdownMenuItem(
+                                  value: g,
+                                  child: Center(
+                                    child: Text(g, style: TextStyle(color: _getGradeColor(g), fontWeight: FontWeight.bold)),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (g) {
+                                if (g != null) setState(() => r.grade = g);
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Accolade / Note
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 42,
+                            child: TextField(
+                              controller: r.remarksCtrl,
+                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
+                              decoration: InputDecoration(
+                                hintText: 'Accolade / Note',
+                                hintStyle: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF64748B)),
+                                filled: true,
+                                fillColor: const Color(0xFF1E293B),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+
+                        // Delete Row Button
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16, color: Color(0xFFEF4444)),
+                          splashRadius: 16,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          onPressed: () {
+                            setState(() {
+                              final removed = _rows.removeAt(idx);
+                              removed.dispose();
+                              for (int i = 0; i < _rows.length; i++) {
+                                _rows[i].rank = i + 1;
+                              }
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6366F1),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () {
+            final title = _titleCtrl.text.trim();
+            if (title.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter a paper title'), backgroundColor: Color(0xFFEF4444)),
+              );
+              return;
+            }
+
+            _autoRank();
+
+            final total = double.tryParse(_totalMarksCtrl.text.trim()) ?? 100.0;
+            final entries = _rows.map((r) {
+              return PaperLeaderboardEntry(
+                rank: r.rank,
+                studentName: r.nameCtrl.text.trim().isNotEmpty ? r.nameCtrl.text.trim() : 'Candidate ${r.rank}',
+                marks: double.tryParse(r.marksCtrl.text.trim()) ?? 0.0,
+                grade: r.grade,
+                remarks: r.remarksCtrl.text.trim(),
+              );
+            }).toList();
+
+            final newBoard = PaperLeaderboard(
+              id: widget.existing?.id ?? '',
+              paperTitle: title,
+              subject: _lockedSubject,
+              examYear: _selectedExamYear,
+              paperDate: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+              totalMarks: total,
+              publishedAt: widget.existing?.publishedAt ?? DateTime.now(),
+              entries: entries,
+            );
+
+            Navigator.pop(context);
+            widget.onSave(newBoard);
+          },
+          child: Text(
+            isEdit ? 'Save Changes' : 'Publish Leaderboard',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 }

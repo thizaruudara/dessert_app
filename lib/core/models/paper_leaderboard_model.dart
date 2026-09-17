@@ -141,7 +141,7 @@ class PaperLeaderboard {
     return PaperLeaderboard(
       id: doc.id,
       paperTitle: data['paperTitle']?.toString() ?? 'Paper Evaluation Leaderboard',
-      subject: data['subject']?.toString() ?? 'Combined Mathematics',
+      subject: data['subject']?.toString() ?? 'Physics',
       examYear: data['examYear']?.toString() ?? '2027 A/L',
       paperDate: data['paperDate']?.toString() ?? '',
       totalMarks: parseTotal(data['totalMarks']),
