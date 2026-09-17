@@ -165,6 +165,46 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     );
   }
 
+  Future<void> _confirmDeleteAnnouncement(String docId, String title) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Announcement?'),
+        content: Text('Are you sure you want to delete "$title" from the announcement history?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true && mounted) {
+      try {
+        await FirebaseFirestore.instance.collection('announcements').doc(docId).delete();
+        HapticFeedbackService.light();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Announcement deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: $e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -571,6 +611,14 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                       Text(
                         '✈️ $sent delivered',
                         style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Delete Announcement',
+                        onPressed: () => _confirmDeleteAnnouncement(docs[index].id, title),
                       ),
                     ],
                   ),
