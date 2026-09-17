@@ -75,6 +75,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                               child: const Text('👑 Admin',
                                   style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.w600)),
                             ),
+                            const Spacer(),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.15),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => context.go('/admin/papers'),
+                              icon: const Icon(Icons.military_tech_outlined, size: 14, color: Colors.white),
+                              label: const Text('Papers & Leaderboard ➔',
+                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),

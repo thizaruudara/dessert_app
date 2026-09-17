@@ -6,7 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/paper_session_model.dart';
+import '../../../core/models/upcoming_paper_model.dart';
 import '../../../core/services/paper_session_service.dart';
+import '../../../core/services/paper_leaderboard_service.dart';
+import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class PaperSessionsScreen extends StatefulWidget {
@@ -18,6 +21,8 @@ class PaperSessionsScreen extends StatefulWidget {
 
 class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   final PaperSessionService _paperService = PaperSessionService();
+  final PaperLeaderboardService _leaderboardService = PaperLeaderboardService();
+  int _selectedViewTab = 0; // 0: Live Sessions, 1: Upcoming Papers & Hints
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
   Stream<List<PaperSession>>? _sessionsStream;
@@ -145,52 +150,705 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: const Color(0xFF6366F1),
-        backgroundColor: const Color(0xFF1E293B),
-        onRefresh: () async => _refreshSessions(user?.examYear),
-        child: StreamBuilder<List<PaperSession>>(
-          stream: _sessionsStream,
-          initialData: _cachedSessions,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _buildErrorState(snapshot.error.toString(), user?.examYear);
-            }
+      body: Column(
+        children: [
+          // View Switcher: Live Sessions vs Upcoming Papers & Hints
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildSessionTab(
+                    index: 0,
+                    title: '📝 Live Exam Sessions',
+                    subtitle: 'Active & Scheduled',
+                    isSelected: _selectedViewTab == 0,
+                  ),
+                ),
+                Expanded(
+                  child: _buildSessionTab(
+                    index: 1,
+                    title: '🔮 Upcoming Papers & Hints',
+                    subtitle: 'Scope, Tips & Hints',
+                    isSelected: _selectedViewTab == 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData &&
-                !_initialFetchDone) {
-              return const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+          Expanded(
+            child: _selectedViewTab == 0
+                ? RefreshIndicator(
+                    color: const Color(0xFF6366F1),
+                    backgroundColor: const Color(0xFF1E293B),
+                    onRefresh: () async => _refreshSessions(user?.examYear),
+                    child: StreamBuilder<List<PaperSession>>(
+                      stream: _sessionsStream,
+                      initialData: _cachedSessions,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return _buildErrorState(snapshot.error.toString(), user?.examYear);
+                        }
+
+                        if (snapshot.connectionState == ConnectionState.waiting &&
+                            !snapshot.hasData &&
+                            !_initialFetchDone) {
+                          return const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircularProgressIndicator(color: Color(0xFF6366F1)),
+                                SizedBox(height: 16),
+                                Text(
+                                  'විභාග සැසි ලබාගනිමින් පවතී...',
+                                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        final sessions = snapshot.data ?? _cachedSessions ?? [];
+                        if (sessions.isEmpty) {
+                          return _buildEmptyState(user?.examYear);
+                        }
+
+                        return ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: sessions.length,
+                          itemBuilder: (context, index) {
+                            return _buildPaperSessionCard(sessions[index], user?.id ?? '');
+                          },
+                        );
+                      },
+                    ),
+                  )
+                : _buildUpcomingPapersView(user?.examYear),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionTab({
+    required int index,
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedbackService.selection();
+        setState(() => _selectedViewTab = index);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6366F1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.poppins(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white70 : const Color(0xFF64748B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpcomingPapersView(String? userExamYear) {
+    return StreamBuilder<List<UpcomingPaper>>(
+      stream: _leaderboardService.streamUpcomingPapers(
+        examYear: _showAllBatches ? null : userExamYear,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Color(0xFF94A3B8))),
+          );
+        }
+
+        final upcomingList = snapshot.data ?? [];
+        if (upcomingList.isEmpty) {
+          return ListView(
+            padding: const EdgeInsets.all(32),
+            children: [
+              const SizedBox(height: 60),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: const Icon(Icons.auto_stories_outlined, size: 48, color: Color(0xFF818CF8)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'No Upcoming Papers Scheduled Yet',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _showAllBatches
+                    ? 'Check back soon for new exam papers, scopes, and preparation hints.'
+                    : 'Upcoming papers and hints for ${userExamYear ?? "your batch"} will be announced here.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF6366F1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showAllBatches = !_showAllBatches;
+                    });
+                  },
+                  icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.visibility, size: 16, color: const Color(0xFF818CF8)),
+                  label: Text(
+                    _showAllBatches ? 'Show My Batch Only' : 'Show All Batches',
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          itemCount: upcomingList.length,
+          itemBuilder: (context, index) {
+            return _buildUpcomingPaperCard(upcomingList[index]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUpcomingPaperCard(UpcomingPaper paper) {
+    final dateFormat = DateFormat('yyyy MMMM dd (EEEE)');
+    final timeFormat = DateFormat('hh:mm a');
+    final formattedDate = dateFormat.format(paper.scheduledDate);
+    final formattedTime = timeFormat.format(paper.scheduledDate);
+
+    final remaining = paper.timeRemaining;
+    String countdownStr = '';
+    if (paper.isUpcoming) {
+      if (remaining.inDays > 0) {
+        countdownStr = '${remaining.inDays}d ${remaining.inHours % 24}h ${remaining.inMinutes % 60}m';
+      } else if (remaining.inHours > 0) {
+        countdownStr = '${remaining.inHours}h ${remaining.inMinutes % 60}m ${remaining.inSeconds % 60}s';
+      } else {
+        countdownStr = '${remaining.inMinutes}m ${remaining.inSeconds % 60}s';
+      }
+    } else {
+      countdownStr = 'Paper In Progress / Scheduled';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF334155)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0C000000), blurRadius: 16, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card Header Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF312E81), Color(0xFF1E293B)],
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.5)),
+                  ),
+                  child: Text(
+                    paper.subject,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFA5B4FC),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    paper.examYear,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 12, color: Color(0xFF34D399)),
+                      const SizedBox(width: 4),
+                      Text(
+                        countdownStr,
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF34D399),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                Text(
+                  paper.title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Date & Duration Row
+                Row(
                   children: [
-                    CircularProgressIndicator(color: Color(0xFF6366F1)),
-                    SizedBox(height: 16),
+                    const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 6),
                     Text(
-                      'විභාග සැසි ලබාගනිමින් පවතී...',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      '$formattedDate at $formattedTime',
+                      style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1)),
                     ),
                   ],
                 ),
-              );
-            }
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.hourglass_bottom_outlined, size: 14, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${paper.durationMinutes} Minutes (${(paper.durationMinutes / 60).toStringAsFixed(1)} Hours)',
+                      style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1)),
+                    ),
+                    if (paper.paperStructure.isNotEmpty) ...[
+                      const Text(' • ', style: TextStyle(color: Color(0xFF64748B))),
+                      Flexible(
+                        child: Text(
+                          paper.paperStructure,
+                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
 
-            final sessions = snapshot.data ?? _cachedSessions ?? [];
-            if (sessions.isEmpty) {
-              return _buildEmptyState(user?.examYear);
-            }
+                // Syllabus Topics Chips
+                if (paper.syllabusTopics.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Syllabus & Tested Topics:',
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8)),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: paper.syllabusTopics.map((topic) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle_outline, size: 12, color: Color(0xFF10B981)),
+                            const SizedBox(width: 5),
+                            Text(
+                              topic,
+                              style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
 
-            return ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              itemCount: sessions.length,
-              itemBuilder: (context, index) {
-                return _buildPaperSessionCard(sessions[index], user?.id ?? '');
-              },
-            );
-          },
-        ),
+                // ── EXCLUSIVE HINTS & TIPS (Highlight Box) ───────────────
+                if (paper.hints.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFF59E0B).withOpacity(0.12),
+                          const Color(0xFFB45309).withOpacity(0.06),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('💡', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Special Paper Hints & Guidance',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFFFBBF24),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          paper.hints,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.5,
+                            color: const Color(0xFFFEF3C7),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Instructions (if any)
+                if (paper.instructions.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          paper.instructions,
+                          style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 14),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _showUpcomingPaperDetailsModal(paper),
+                        icon: const Icon(Icons.visibility_outlined, size: 16, color: Colors.white),
+                        label: Text(
+                          'View Full Scope & Hints',
+                          style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  void _showUpcomingPaperDetailsModal(UpcomingPaper paper) {
+    final dateFormat = DateFormat('yyyy MMMM dd (EEEE)');
+    final timeFormat = DateFormat('hh:mm a');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Color(0xFF0F172A),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF334155),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            paper.subject,
+                            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF818CF8)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            paper.examYear,
+                            style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      paper.title,
+                      style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Date card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.event, color: Color(0xFF818CF8), size: 18),
+                              const SizedBox(width: 10),
+                              Text(
+                                dateFormat.format(paper.scheduledDate),
+                                style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.schedule, color: Color(0xFF818CF8), size: 18),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${timeFormat.format(paper.scheduledDate)} (${paper.durationMinutes} Minutes)',
+                                style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFFCBD5E1)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (paper.syllabusTopics.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Target Syllabus Topics',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 10),
+                      ...paper.syllabusTopics.map((topic) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle, size: 16, color: Color(0xFF10B981)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(topic, style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFFE2E8F0))),
+                                ),
+                              ],
+                            ),
+                          )),
+                    ],
+
+                    if (paper.hints.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        '💡 Preparation Hints & Insights',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24)),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                        ),
+                        child: Text(
+                          paper.hints,
+                          style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFFFEF3C7), height: 1.5),
+                        ),
+                      ),
+                    ],
+
+                    if (paper.instructions.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Instructions & Rules',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        paper.instructions,
+                        style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF94A3B8), height: 1.4),
+                      ),
+                    ],
+
+                    const SizedBox(height: 30),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Close Scope & Hints',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

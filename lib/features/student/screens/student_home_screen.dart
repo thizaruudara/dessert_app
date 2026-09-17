@@ -15,6 +15,8 @@ import '../widgets/student_progress_chart.dart';
 import '../widgets/exam_countdown_widget.dart';
 import '../widgets/daily_quests_widget.dart';
 import '../widgets/trophy_room_sheet.dart';
+import '../../../core/models/upcoming_paper_model.dart';
+import '../../../core/services/paper_leaderboard_service.dart';
 
 class StudentHomeScreen extends StatefulWidget {
   const StudentHomeScreen({super.key});
@@ -445,6 +447,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
+                  // ── Upcoming Papers & Hints Spotlight ───────────────
+                  _buildUpcomingPaperSpotlight(examYear),
+                  const SizedBox(height: 12),
+
                   // ── Learning Progress & Line Chart ──────────────────
                   StudentProgressChart(
                     desserts: desserts.desserts,
@@ -539,6 +545,157 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildUpcomingPaperSpotlight(String examYear) {
+    return StreamBuilder<List<UpcomingPaper>>(
+      stream: PaperLeaderboardService().streamUpcomingPapers(examYear: examYear),
+      builder: (context, snapshot) {
+        final papers = snapshot.data ?? [];
+        if (papers.isEmpty) return const SizedBox.shrink();
+        final paper = papers.first;
+        final hasHints = paper.hints.isNotEmpty;
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1E1B4B), Color(0xFF0F172A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6366F1).withOpacity(0.15),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () {
+                HapticFeedbackService.light();
+                context.go('/student/papers');
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('🔮', style: TextStyle(fontSize: 12)),
+                              SizedBox(width: 4),
+                              Text(
+                                'UPCOMING PAPER',
+                                style: TextStyle(
+                                  color: Color(0xFFA5B4FC),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            paper.subject,
+                            style: const TextStyle(
+                              color: Color(0xFF34D399),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      paper.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${paper.examYear} • ${paper.durationMinutes} Minutes Exam',
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    ),
+                    if (hasHints) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Text('💡', style: TextStyle(fontSize: 13)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Hint: ${paper.hints}',
+                                style: const TextStyle(
+                                  color: Color(0xFFFDE68A),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: const [
+                        Text(
+                          'View Scope & All Hints ➔',
+                          style: TextStyle(
+                            color: Color(0xFF818CF8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
