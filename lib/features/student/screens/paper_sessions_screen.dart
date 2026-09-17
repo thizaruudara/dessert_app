@@ -10,6 +10,7 @@ import '../../../core/models/upcoming_paper_model.dart';
 import '../../../core/services/paper_session_service.dart';
 import '../../../core/services/paper_leaderboard_service.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class PaperSessionsScreen extends StatefulWidget {
@@ -97,19 +98,19 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     final user = authProvider.userModel;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Colors.white,
         elevation: 0,
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.2),
+                color: AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.assignment_outlined, color: Color(0xFF818CF8), size: 20),
+              child: const Icon(Icons.assignment_outlined, color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -121,7 +122,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   Text(
@@ -132,7 +133,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                             : 'සජීවී විභාග සහ අධීක්ෂණ සැසි'),
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      color: const Color(0xFF94A3B8),
+                      color: AppColors.textMuted,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -145,7 +146,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         actions: [
           IconButton(
             onPressed: () => _refreshSessions(user?.examYear),
-            icon: const Icon(Icons.refresh, color: Color(0xFF818CF8), size: 22),
+            icon: const Icon(Icons.refresh, color: AppColors.primary, size: 22),
             tooltip: 'Refresh Sessions',
           ),
         ],
@@ -157,9 +158,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
             margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: AppColors.backgroundSoft,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF334155)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -253,14 +254,14 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6366F1) : Colors.transparent,
+          color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           boxShadow: isSelected
               ? [
-                  BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                  const BoxShadow(
+                    color: Color(0x0A0F172A),
                     blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    offset: Offset(0, 2),
                   ),
                 ]
               : null,
@@ -272,7 +273,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                color: isSelected ? AppColors.primary : AppColors.textMuted,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -283,7 +284,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.white70 : const Color(0xFF64748B),
+                color: isSelected ? AppColors.textSecondary : AppColors.textMuted,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -404,11 +405,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
-          BoxShadow(color: Color(0x0C000000), blurRadius: 16, offset: Offset(0, 4)),
+          BoxShadow(color: Color(0x060F172A), blurRadius: 14, offset: Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -418,9 +419,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF312E81), Color(0xFF1E293B)],
-              ),
+              color: AppColors.backgroundSoft,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(20),
@@ -431,16 +430,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.5)),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                   ),
                   child: Text(
                     paper.subject,
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFFA5B4FC),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -448,15 +447,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Text(
                     paper.examYear,
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white70,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -464,21 +464,21 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.2),
+                    color: AppColors.success.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                    border: Border.all(color: AppColors.success.withOpacity(0.4)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.timer_outlined, size: 12, color: Color(0xFF34D399)),
+                      const Icon(Icons.timer_outlined, size: 12, color: AppColors.success),
                       const SizedBox(width: 4),
                       Text(
                         countdownStr,
                         style: GoogleFonts.poppins(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFF34D399),
+                          color: AppColors.success,
                         ),
                       ),
                     ],
@@ -499,7 +499,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -507,29 +507,29 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 // Date & Duration Row
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF94A3B8)),
+                    const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textMuted),
                     const SizedBox(width: 6),
                     Text(
                       '$formattedDate at $formattedTime',
-                      style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1)),
+                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.hourglass_bottom_outlined, size: 14, color: Color(0xFF94A3B8)),
+                    const Icon(Icons.hourglass_bottom_outlined, size: 14, color: AppColors.textMuted),
                     const SizedBox(width: 6),
                     Text(
                       '${paper.durationMinutes} Minutes (${(paper.durationMinutes / 60).toStringAsFixed(1)} Hours)',
-                      style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1)),
+                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                     ),
                     if (paper.paperStructure.isNotEmpty) ...[
-                      const Text(' • ', style: TextStyle(color: Color(0xFF64748B))),
+                      const Text(' • ', style: TextStyle(color: AppColors.textMuted)),
                       Flexible(
                         child: Text(
                           paper.paperStructure,
-                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -543,7 +543,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                   const SizedBox(height: 14),
                   Text(
                     'Syllabus & Tested Topics:',
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8)),
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
@@ -580,14 +580,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFF59E0B).withOpacity(0.12),
-                          const Color(0xFFB45309).withOpacity(0.06),
-                        ],
-                      ),
+                      color: const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,7 +596,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: const Color(0xFFFBBF24),
+                                color: const Color(0xFFB45309),
                               ),
                             ),
                           ],
@@ -611,7 +606,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           paper.hints,
                           style: GoogleFonts.poppins(
                             fontSize: 12.5,
-                            color: const Color(0xFFFEF3C7),
+                            color: const Color(0xFF78350F),
                             height: 1.4,
                           ),
                         ),
@@ -626,12 +621,12 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, size: 14, color: Color(0xFF64748B)),
+                      const Icon(Icons.info_outline, size: 14, color: AppColors.textMuted),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           paper.instructions,
-                          style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textSecondary),
                         ),
                       ),
                     ],
@@ -1025,20 +1020,26 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         return Container(
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSubmitted
-                  ? const Color(0xFF22C55E)
-                  : (isLive ? const Color(0xFF22C55E) : const Color(0xFF334155)),
+                  ? AppColors.success
+                  : (isLive ? AppColors.success : AppColors.border),
               width: (isSubmitted || isLive) ? 1.5 : 1,
             ),
             boxShadow: [
               if (isLive || isSubmitted)
                 BoxShadow(
-                  color: const Color(0xFF22C55E).withOpacity(0.15),
+                  color: AppColors.success.withOpacity(0.15),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
+                )
+              else
+                const BoxShadow(
+                  color: Color(0x060F172A),
+                  blurRadius: 12,
+                  offset: Offset(0, 3),
                 ),
             ],
           ),
@@ -1048,9 +1049,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
               // Header
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withOpacity(0.6),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                decoration: const BoxDecoration(
+                  color: AppColors.backgroundSoft,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1060,16 +1061,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF6366F1).withOpacity(0.2),
+                            color: AppColors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.5)),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                           ),
                           child: Text(
                             session.subject,
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFFA5B4FC),
+                              color: AppColors.primary,
                             ),
                           ),
                         ),
@@ -1077,15 +1078,16 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF334155),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Text(
                             session.examYear,
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: const Color(0xFF94A3B8),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -1094,21 +1096,21 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E).withOpacity(0.2),
+                              color: AppColors.success.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF22C55E)),
+                              border: Border.all(color: AppColors.success.withOpacity(0.4)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 12),
+                                const Icon(Icons.check_circle, color: AppColors.success, size: 12),
                                 const SizedBox(width: 4),
                                 Text(
                                   'SUBMITTED',
                                   style: GoogleFonts.poppins(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF4ADE80),
+                                    color: AppColors.success,
                                   ),
                                 ),
                               ],
@@ -1118,9 +1120,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF22C55E).withOpacity(0.2),
+                              color: AppColors.success.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF22C55E)),
+                              border: Border.all(color: AppColors.success.withOpacity(0.4)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1129,7 +1131,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   width: 8,
                                   height: 8,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFF22C55E),
+                                    color: AppColors.success,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -1139,7 +1141,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF4ADE80),
+                                    color: AppColors.success,
                                   ),
                                 ),
                               ],
@@ -1153,24 +1155,24 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.calendar_today, size: 14, color: Color(0xFF64748B)),
+                        const Icon(Icons.calendar_today, size: 14, color: AppColors.textMuted),
                         const SizedBox(width: 6),
                         Text(
                           dateFormat.format(DateTime.tryParse(session.date) ?? DateTime.now()),
-                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
                         ),
                         const SizedBox(width: 16),
-                        const Icon(Icons.timer_outlined, size: 14, color: Color(0xFF64748B)),
+                        const Icon(Icons.timer_outlined, size: 14, color: AppColors.textMuted),
                         const SizedBox(width: 6),
                         Text(
                           '${session.durationMinutes} Minutes',
-                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
                         ),
                       ],
                     ),
@@ -1190,8 +1192,8 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                           : 'විභාග සැසිය (Exam Session):',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFFCBD5E1),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1283,20 +1285,22 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
                           color: isLive
-                              ? const Color(0xFF22C55E).withOpacity(0.1)
-                              : const Color(0xFF0F172A),
+                              ? AppColors.success.withOpacity(0.08)
+                              : (isEnded ? AppColors.backgroundSoft : const Color(0xFFFFFBEB)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isLive
-                                ? const Color(0xFF22C55E).withOpacity(0.5)
-                                : const Color(0xFF334155),
+                                ? AppColors.success.withOpacity(0.4)
+                                : (isEnded ? AppColors.border : const Color(0xFFFDE68A)),
                           ),
                         ),
                         child: Row(
                           children: [
                             Icon(
-                              isLive ? Icons.sensors : Icons.access_time_filled,
-                              color: isLive ? const Color(0xFF4ADE80) : const Color(0xFFF59E0B),
+                              isLive ? Icons.sensors : (isEnded ? Icons.history_toggle_off_rounded : Icons.access_time_filled),
+                              color: isLive
+                                  ? AppColors.success
+                                  : (isEnded ? AppColors.textMuted : const Color(0xFFD97706)),
                               size: 22,
                             ),
                             const SizedBox(width: 12),
@@ -1321,7 +1325,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
-                                      color: const Color(0xFF94A3B8),
+                                      color: AppColors.textMuted,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -1345,13 +1349,13 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                       letterSpacing: (isLive && !isPackageOpening) || isEnded || isWaiting ? 0 : 2,
                                       color: isLive
                                           ? (isWriting
-                                              ? const Color(0xFF4ADE80)
+                                              ? AppColors.success
                                               : (isPackageOpening
-                                                  ? const Color(0xFFF59E0B)
-                                                  : (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF4ADE80))))
+                                                  ? const Color(0xFFD97706)
+                                                  : (isTimeUp ? AppColors.error : AppColors.success)))
                                           : isEnded
-                                              ? const Color(0xFF94A3B8)
-                                              : (isWaiting ? const Color(0xFF818CF8) : const Color(0xFFF59E0B)),
+                                              ? AppColors.textPrimary
+                                              : (isWaiting ? AppColors.primary : const Color(0xFFD97706)),
                                     ),
                                   ),
                                 ],
@@ -1398,24 +1402,25 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: session.isEnded
-                                ? const Color(0xFF475569)
+                                ? const Color(0xFFF1F5F9)
                                 : selectedSlotId == null
-                                    ? const Color(0xFF334155)
+                                    ? const Color(0xFFE2E8F0)
                                     : isLive
-                                        ? (isTimeUp ? const Color(0xFFEF4444) : const Color(0xFF22C55E))
+                                        ? (isTimeUp ? AppColors.error : AppColors.success)
                                         : isUpcoming
-                                            ? const Color(0xFF6366F1)
-                                            : const Color(0xFF334155),
+                                            ? AppColors.primary
+                                            : const Color(0xFFE2E8F0),
+                            side: session.isEnded ? const BorderSide(color: AppColors.border) : null,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: (isLive && !session.isEnded) ? 4 : 0,
+                            elevation: (isLive && !session.isEnded) ? 3 : 0,
                           ),
                           onPressed: session.isEnded
                               ? () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත. නැවත ඇතුල් විය නොහැක (Session Ended).'),
-                                      backgroundColor: Color(0xFFEF4444),
+                                      backgroundColor: AppColors.error,
                                     ),
                                   );
                                 }
@@ -1451,7 +1456,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                             ? Icons.meeting_room
                                             : Icons.check_circle_outline,
                                 size: 20,
-                                color: Colors.white,
+                                color: session.isEnded
+                                    ? AppColors.textMuted
+                                    : (selectedSlotId == null ? AppColors.textSecondary : Colors.white),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -1475,7 +1482,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                    color: session.isEnded
+                                        ? AppColors.textMuted
+                                        : (selectedSlotId == null ? AppColors.textSecondary : Colors.white),
                                     height: 1.25,
                                   ),
                                 ),
@@ -1633,12 +1642,12 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF6366F1).withOpacity(0.15)
-              : const Color(0xFF0F172A),
+              ? AppColors.primary.withOpacity(0.08)
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF6366F1) : const Color(0xFF334155),
-            width: isSelected ? 2 : 1,
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Column(
@@ -1649,7 +1658,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 Icon(
                   slotId == 'slot1' ? Icons.wb_sunny_outlined : Icons.nights_stay_outlined,
                   size: 16,
-                  color: isSelected ? const Color(0xFF818CF8) : const Color(0xFF94A3B8),
+                  color: isSelected ? AppColors.primary : AppColors.textMuted,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -1658,14 +1667,14 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? const Color(0xFF818CF8) : Colors.white,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (isSelected)
-                  const Icon(Icons.check_circle, size: 16, color: Color(0xFF6366F1)),
+                  const Icon(Icons.check_circle, size: 16, color: AppColors.primary),
               ],
             ),
             const SizedBox(height: 8),
@@ -1674,7 +1683,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFFE2E8F0),
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 6),
