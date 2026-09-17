@@ -147,6 +147,8 @@ class DessertsProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Refresh error: $e');
     }
+  }
+
   /// Student: submit a new homework/dessert directly in-app
   Future<DessertModel> submitDessert({
     required String studentId,

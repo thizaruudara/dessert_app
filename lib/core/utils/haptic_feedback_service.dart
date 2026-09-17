@@ -13,6 +13,18 @@ class HapticFeedbackService {
     } catch (_) {}
   }
 
+  static void heavy() {
+    try {
+      HapticFeedback.heavyImpact();
+    } catch (_) {}
+  }
+
+  static void warning() {
+    try {
+      HapticFeedback.mediumImpact();
+    } catch (_) {}
+  }
+
   static void selection() {
     try {
       HapticFeedback.selectionClick();
