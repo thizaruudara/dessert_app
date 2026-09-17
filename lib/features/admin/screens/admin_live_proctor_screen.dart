@@ -2368,6 +2368,8 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
         );
       },
     );
+  },
+);
   }
 
   Widget _buildOfflinePlaceholder(bool isSubmitted, bool isLive, PaperRegistration reg) {
