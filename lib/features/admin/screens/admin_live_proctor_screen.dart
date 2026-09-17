@@ -35,8 +35,10 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   // Real-time Agora Video Monitoring
   RtcEngine? _agoraEngine;
   final Set<int> _activeStreamingUids = {};
+  final ValueNotifier<Set<int>> _activeStreamingUidsNotifier = ValueNotifier<Set<int>>({});
   final Map<int, VideoViewController> _remoteVideoControllers = {};
   bool _isAgoraInitialized = false;
+  int? _fullScreenStudentUid;
 
   VideoViewController _getRemoteController(int uid, String channelId) {
     return _remoteVideoControllers.putIfAbsent(
@@ -85,6 +87,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             if (mounted) {
               setState(() {
                 _activeStreamingUids.add(remoteUid);
+                _activeStreamingUidsNotifier.value = Set.from(_activeStreamingUids);
               });
             }
           },
@@ -93,8 +96,11 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             if (mounted) {
               setState(() {
                 _activeStreamingUids.remove(remoteUid);
-                _remoteVideoControllers[remoteUid]?.dispose();
-                _remoteVideoControllers.remove(remoteUid);
+                _activeStreamingUidsNotifier.value = Set.from(_activeStreamingUids);
+                if (_fullScreenStudentUid != remoteUid) {
+                  _remoteVideoControllers[remoteUid]?.dispose();
+                  _remoteVideoControllers.remove(remoteUid);
+                }
               });
             }
           },
@@ -107,6 +113,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                 } else if (state == RemoteVideoState.remoteVideoStateStopped || state == RemoteVideoState.remoteVideoStateFailed) {
                   _activeStreamingUids.remove(remoteUid);
                 }
+                _activeStreamingUidsNotifier.value = Set.from(_activeStreamingUids);
               });
             }
           },
@@ -123,7 +130,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
         uid: 1, // Admin monitor UID
       );
     } catch (e) {
-      debugPrint('Agora Admin monitor init error: $e');
+      debugPrint('Error initializing Agora monitoring: $e');
     }
   }
 
@@ -131,6 +138,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   void dispose() {
     _statusTicker?.cancel();
     _tabController.dispose();
+    _activeStreamingUidsNotifier.dispose();
     for (final ctrl in _remoteVideoControllers.values) {
       try {
         ctrl.dispose();
@@ -392,10 +400,11 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
   Widget _buildStudentProctorCard(PaperRegistration reg) {
     final studentUid = reg.computedAgoraUid;
     final bool isSubmitted = reg.isSubmitted;
+    final bool isBeingViewedInFullScreen = _fullScreenStudentUid == studentUid;
     final bool hasAgoraStream = _isAgoraInitialized && _agoraEngine != null && _activeStreamingUids.contains(studentUid);
     final bool isStreamingVideo = hasAgoraStream && !isSubmitted;
     final bool isLive = (isStreamingVideo || reg.isOnline) && !isSubmitted;
-    final bool canStreamVideo = isStreamingVideo;
+    final bool canStreamVideo = isStreamingVideo && !isBeingViewedInFullScreen;
 
     return Container(
       decoration: BoxDecoration(
@@ -459,6 +468,27 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                               controller: ctrl,
                             );
                           },
+                        )
+                      else if (isBeingViewedInFullScreen)
+                        Container(
+                          color: const Color(0xFF0F172A).withOpacity(0.9),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.fullscreen_rounded, color: Color(0xFF38BDF8), size: 28),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Viewing Fullscreen 🔍',
+                                  style: GoogleFonts.poppins(
+                                    color: const Color(0xFF38BDF8),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       Positioned(
                         top: 6,
@@ -1051,40 +1081,41 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
 
   Future<void> _showFullScreenStudentViewer(PaperRegistration student) async {
     final studentUid = student.computedAgoraUid;
-    final bool isStreaming = _isAgoraInitialized &&
-        _agoraEngine != null &&
-        (_activeStreamingUids.contains(studentUid) || student.isOnline);
+    final channelName = AgoraRtcService.getChannelName(widget.paperId);
 
-    // 1. Release grid view controller so full screen viewer can attach exclusively to Agora texture
-    if (_remoteVideoControllers.containsKey(studentUid)) {
-      _remoteVideoControllers[studentUid]?.dispose();
-      _remoteVideoControllers.remove(studentUid);
-      if (mounted) setState(() {});
+    // 1. Get or create the single authoritative VideoViewController for this student
+    VideoViewController? ctrl;
+    if (_agoraEngine != null && studentUid > 0) {
+      ctrl = _getRemoteController(studentUid, channelName);
     }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => _FullScreenStudentViewerScreen(
-          initialRegistration: student,
-          paperService: _paperService,
-          agoraEngine: _agoraEngine,
-          isAgoraStreaming: isStreaming,
-          channelId: AgoraRtcService.getChannelName(widget.paperId),
-          onSendAlert: (s) => _showDirectMessageSheet(s),
-          onViewAnswers: (s) => _showStudentSubmissionViewer(s),
+    // 2. Lock fullscreen state so the background grid unmounts AgoraVideoView for this student
+    setState(() {
+      _fullScreenStudentUid = studentUid;
+    });
+
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => _FullScreenStudentViewerScreen(
+            initialRegistration: student,
+            paperService: _paperService,
+            agoraEngine: _agoraEngine,
+            channelId: channelName,
+            videoController: ctrl,
+            activeStreamingUidsNotifier: _activeStreamingUidsNotifier,
+            onSendAlert: (s) => _showDirectMessageSheet(s),
+            onViewAnswers: (s) => _showStudentSubmissionViewer(s),
+          ),
         ),
-      ),
-    );
-
-    // 2. Returning from full screen:
-    // Full screen viewer disposed its controller. Clear grid controller and trigger rebuild
-    // so AgoraVideoView creates and binds a brand new VideoViewController and texture!
-    if (_remoteVideoControllers.containsKey(studentUid)) {
-      _remoteVideoControllers[studentUid]?.dispose();
-      _remoteVideoControllers.remove(studentUid);
-    }
-    if (mounted) {
-      setState(() {});
+      );
+    } finally {
+      // 3. Returning from full screen: release full screen lock so grid view re-attaches seamlessly
+      if (mounted) {
+        setState(() {
+          _fullScreenStudentUid = null;
+        });
+      }
     }
   }
 
@@ -1909,8 +1940,9 @@ class _FullScreenStudentViewerScreen extends StatefulWidget {
   final PaperRegistration initialRegistration;
   final PaperSessionService paperService;
   final RtcEngine? agoraEngine;
-  final bool isAgoraStreaming;
   final String channelId;
+  final VideoViewController? videoController;
+  final ValueNotifier<Set<int>> activeStreamingUidsNotifier;
   final void Function(PaperRegistration) onSendAlert;
   final void Function(PaperRegistration) onViewAnswers;
 
@@ -1918,8 +1950,9 @@ class _FullScreenStudentViewerScreen extends StatefulWidget {
     required this.initialRegistration,
     required this.paperService,
     this.agoraEngine,
-    this.isAgoraStreaming = false,
     this.channelId = '',
+    this.videoController,
+    required this.activeStreamingUidsNotifier,
     required this.onSendAlert,
     required this.onViewAnswers,
   });
@@ -1932,23 +1965,10 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
   final TransformationController _transformationController = TransformationController();
   bool _showControls = true;
   Timer? _statusTicker;
-  VideoViewController? _remoteViewController;
 
   @override
   void initState() {
     super.initState();
-    if (widget.agoraEngine != null && widget.initialRegistration.computedAgoraUid > 0) {
-      _remoteViewController = VideoViewController.remote(
-        rtcEngine: widget.agoraEngine!,
-        canvas: VideoCanvas(
-          uid: widget.initialRegistration.computedAgoraUid,
-          renderMode: RenderModeType.renderModeHidden,
-        ),
-        connection: RtcConnection(channelId: widget.channelId),
-        useFlutterTexture: !kIsWeb,
-        useAndroidSurfaceView: false,
-      );
-    }
     _statusTicker = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted) setState(() {});
     });
@@ -1957,7 +1977,7 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
   @override
   void dispose() {
     _statusTicker?.cancel();
-    _remoteViewController?.dispose();
+    // Do NOT dispose widget.videoController as it belongs to the parent screen and grid!
     _transformationController.dispose();
     super.dispose();
   }
@@ -1984,342 +2004,365 @@ class _FullScreenStudentViewerScreenState extends State<_FullScreenStudentViewer
       initialData: widget.initialRegistration,
       builder: (context, snapshot) {
         final reg = snapshot.data ?? widget.initialRegistration;
-        final bool isStreaming = widget.agoraEngine != null &&
-            (widget.isAgoraStreaming || reg.isOnline || reg.computedAgoraUid > 0);
-        final isLive = reg.isOnline || isStreaming;
+        final studentUid = reg.computedAgoraUid;
         final isSubmitted = reg.status == 'submitted';
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF090D16),
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              // ── 1. Interactive Full-Screen Live Video Feed ────────────────
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showControls = !_showControls;
-                  });
-                },
-                child: Center(
-                  child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    minScale: 1.0,
-                    maxScale: 5.0,
-                    panEnabled: true,
-                    scaleEnabled: true,
-                    child: Builder(
-                      builder: (context) {
-                        if (_remoteViewController != null && (isStreaming || isLive)) {
-                          return SizedBox.expand(
-                            child: AgoraVideoView(
-                              key: ObjectKey(_remoteViewController),
-                              controller: _remoteViewController!,
-                            ),
-                          );
-                        }
-                        final raw = reg.cameraSnapshotUrl;
-                        if (raw != null && raw.isNotEmpty) {
-                          try {
-                            if (raw.startsWith('http')) {
-                              return Image.network(
-                                raw,
-                                fit: BoxFit.contain,
-                                width: double.infinity,
-                                height: double.infinity,
-                                errorBuilder: (_, __, ___) => _buildOfflinePlaceholder(isSubmitted, isLive, reg),
-                              );
-                            } else {
-                              final clean = raw.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), '');
-                              return Image.memory(
-                                base64Decode(clean),
-                                fit: BoxFit.contain,
-                                width: double.infinity,
-                                height: double.infinity,
-                                errorBuilder: (_, __, ___) => _buildOfflinePlaceholder(isSubmitted, isLive, reg),
+        return ValueListenableBuilder<Set<int>>(
+          valueListenable: widget.activeStreamingUidsNotifier,
+          builder: (context, activeUids, _) {
+            final bool hasAgoraStream = widget.agoraEngine != null &&
+                widget.videoController != null &&
+                activeUids.contains(studentUid);
+            final bool isStreamingVideo = hasAgoraStream && !isSubmitted;
+            final bool isLive = (isStreamingVideo || reg.isOnline) && !isSubmitted;
+
+            return Scaffold(
+              backgroundColor: const Color(0xFF090D16),
+              body: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── 1. Interactive Full-Screen Live Video Feed ────────────────
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _showControls = !_showControls;
+                      });
+                    },
+                    child: Center(
+                      child: InteractiveViewer(
+                        transformationController: _transformationController,
+                        minScale: 1.0,
+                        maxScale: 5.0,
+                        panEnabled: true,
+                        scaleEnabled: true,
+                        child: Builder(
+                          builder: (context) {
+                            if (isStreamingVideo && widget.videoController != null) {
+                              return SizedBox.expand(
+                                child: AgoraVideoView(
+                                  key: ObjectKey(widget.videoController),
+                                  controller: widget.videoController!,
+                                ),
                               );
                             }
-                          } catch (_) {
+                            final raw = reg.cameraSnapshotUrl;
+                            if (raw != null && raw.isNotEmpty) {
+                              try {
+                                if (raw.startsWith('http')) {
+                                  return Image.network(
+                                    raw,
+                                    fit: BoxFit.contain,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    errorBuilder: (_, __, ___) => _buildOfflinePlaceholder(isSubmitted, isLive, reg),
+                                  );
+                                } else {
+                                  final clean = raw.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), '');
+                                  return Image.memory(
+                                    base64Decode(clean),
+                                    fit: BoxFit.contain,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    errorBuilder: (_, __, ___) => _buildOfflinePlaceholder(isSubmitted, isLive, reg),
+                                  );
+                                }
+                              } catch (_) {
+                                return _buildOfflinePlaceholder(isSubmitted, isLive, reg);
+                              }
+                            }
                             return _buildOfflinePlaceholder(isSubmitted, isLive, reg);
-                          }
-                        }
-                        return _buildOfflinePlaceholder(isSubmitted, isLive, reg);
-                      },
-                    ),
-                  ),
-                ),
-              ),
-
-              // ── 2. Top App Bar / Status Overlay ──────────────────────────
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                top: _showControls ? 0 : -120,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: EdgeInsets.only(
-                    top: MediaQuery.of(context).padding.top + 8,
-                    bottom: 12,
-                    left: 12,
-                    right: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.85),
-                        Colors.black.withOpacity(0.5),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                          onPressed: () => Navigator.of(context).pop(),
+                          },
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
+                    ),
+                  ),
+
+                  // ── 2. Top App Bar / Status Overlay ──────────────────────────
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 250),
+                    top: _showControls ? 0 : -120,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: EdgeInsets.only(
+                        top: MediaQuery.of(context).padding.top + 8,
+                        bottom: 12,
+                        left: 12,
+                        right: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.85),
+                            Colors.black.withOpacity(0.5),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B).withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    reg.studentName,
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isSubmitted
-                                        ? const Color(0xFF38BDF8).withOpacity(0.2)
-                                        : widget.isAgoraStreaming
-                                            ? const Color(0xFF22C55E).withOpacity(0.2)
-                                            : isLive
-                                                ? const Color(0xFF3B82F6).withOpacity(0.2)
-                                                : const Color(0xFFEF4444).withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: isSubmitted
-                                          ? const Color(0xFF38BDF8)
-                                          : widget.isAgoraStreaming
-                                              ? const Color(0xFF22C55E)
-                                              : isLive
-                                                  ? const Color(0xFF3B82F6)
-                                                  : const Color(0xFFEF4444),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: isSubmitted
-                                              ? const Color(0xFF38BDF8)
-                                              : isLive
-                                                  ? const Color(0xFF22C55E)
-                                                  : const Color(0xFFEF4444),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        isSubmitted
-                                            ? 'SUBMITTED'
-                                            : isLive
-                                                ? 'LIVE PROCTOR'
-                                                : 'OFFLINE',
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        reg.studentName,
                                         style: GoogleFonts.poppins(
-                                          fontSize: 9,
+                                          color: Colors.white,
+                                          fontSize: 15,
                                           fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isSubmitted
+                                            ? const Color(0xFF38BDF8).withOpacity(0.2)
+                                            : isStreamingVideo
+                                                ? const Color(0xFF22C55E).withOpacity(0.2)
+                                                : isLive
+                                                    ? const Color(0xFF3B82F6).withOpacity(0.2)
+                                                    : const Color(0xFFEF4444).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
                                           color: isSubmitted
                                               ? const Color(0xFF38BDF8)
-                                              : isLive
-                                                  ? const Color(0xFF4ADE80)
-                                                  : const Color(0xFFEF4444),
+                                              : isStreamingVideo
+                                                  ? const Color(0xFF22C55E)
+                                                  : isLive
+                                                      ? const Color(0xFF3B82F6)
+                                                      : const Color(0xFFEF4444),
+                                          width: 1,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: isSubmitted
+                                                  ? const Color(0xFF38BDF8)
+                                                  : isStreamingVideo
+                                                      ? const Color(0xFF22C55E)
+                                                      : isLive
+                                                          ? const Color(0xFF3B82F6)
+                                                          : const Color(0xFFEF4444),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            isSubmitted
+                                                ? 'SUBMITTED'
+                                                : isStreamingVideo
+                                                    ? 'LIVE HD STREAM'
+                                                    : isLive
+                                                        ? 'CONNECTING...'
+                                                        : 'OFFLINE',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: isSubmitted
+                                                  ? const Color(0xFF38BDF8)
+                                                  : isStreamingVideo
+                                                      ? const Color(0xFF4ADE80)
+                                                      : isLive
+                                                          ? const Color(0xFF60A5FA)
+                                                          : const Color(0xFFEF4444),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${reg.studentPhone.isNotEmpty ? reg.studentPhone : "No phone"} • ${reg.selectedSlot.toUpperCase()}',
+                                  style: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 11),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${reg.studentPhone.isNotEmpty ? reg.studentPhone : "No phone"} • ${reg.selectedSlot.toUpperCase()}',
-                              style: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (reg.studentPhone.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22C55E).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
                           ),
-                          child: IconButton(
-                            icon: const Icon(Icons.phone, color: Color(0xFF4ADE80), size: 18),
-                            tooltip: 'Call Student',
-                            onPressed: () => _makePhoneCall(reg.studentPhone),
-                          ),
-                        ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.restart_alt, color: Colors.white, size: 18),
-                          tooltip: 'Reset Zoom',
-                          onPressed: _resetZoom,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── 3. Bottom Control & Actions Bar ───────────────────────────
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                bottom: _showControls ? 0 : -140,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: EdgeInsets.only(
-                    top: 14,
-                    bottom: MediaQuery.of(context).padding.bottom + 14,
-                    left: 16,
-                    right: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.95),
-                        Colors.black.withOpacity(0.7),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Status strip
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.pinch, color: Color(0xFF94A3B8), size: 14),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Pinch to Zoom Desk/Paper',
-                              style: GoogleFonts.poppins(color: const Color(0xFFCBD5E1), fontSize: 10),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(width: 1, height: 10, color: const Color(0xFF475569)),
-                            const SizedBox(width: 12),
-                            Icon(
-                              Icons.sync,
-                              size: 12,
-                              color: isLive ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              reg.lastCameraPing != null
-                                  ? 'Ping: ${DateTime.now().difference(reg.lastCameraPing!).inSeconds}s ago'
-                                  : 'No Ping',
-                              style: GoogleFonts.poppins(
-                                color: isLive ? const Color(0xFF4ADE80) : const Color(0xFF94A3B8),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                          if (reg.studentPhone.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF22C55E).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.phone, color: Color(0xFF4ADE80), size: 18),
+                                tooltip: 'Call Student',
+                                onPressed: () => _makePhoneCall(reg.studentPhone),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Action Buttons Row
-                      Row(
-                        children: [
-                          if (reg.submissionPhotos.isNotEmpty || reg.status == 'submitted') ...[
-                            Expanded(
-                              child: SizedBox(
-                                height: 42,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF22C55E),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                  onPressed: () => widget.onViewAnswers(reg),
-                                  icon: const Icon(Icons.collections_bookmark_rounded, size: 16, color: Colors.white),
-                                  label: Text(
-                                    'View Answers (${reg.submissionPhotos.length})',
-                                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                  ),
-                                ),
-                              ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B).withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF334155)),
                             ),
-                            const SizedBox(width: 10),
-                          ],
-                          Expanded(
-                            child: SizedBox(
-                              height: 42,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFEF4444),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                                onPressed: () => widget.onSendAlert(reg),
-                                icon: const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.white),
-                                label: Text(
-                                  'Direct Warning / Alert',
-                                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ),
+                            child: IconButton(
+                              icon: const Icon(Icons.restart_alt, color: Colors.white, size: 18),
+                              tooltip: 'Reset Zoom',
+                              onPressed: _resetZoom,
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+
+                  // ── 3. Bottom Control & Actions Bar ───────────────────────────
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 250),
+                    bottom: _showControls ? 0 : -140,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: EdgeInsets.only(
+                        top: 14,
+                        bottom: MediaQuery.of(context).padding.bottom + 14,
+                        left: 16,
+                        right: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.95),
+                            Colors.black.withOpacity(0.7),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Status strip
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B).withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.pinch, color: Color(0xFF94A3B8), size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Pinch to Zoom Desk/Paper',
+                                  style: GoogleFonts.poppins(color: const Color(0xFFCBD5E1), fontSize: 10),
+                                ),
+                                const SizedBox(width: 12),
+                                Container(width: 1, height: 10, color: const Color(0xFF475569)),
+                                const SizedBox(width: 12),
+                                Icon(
+                                  isStreamingVideo ? Icons.videocam_rounded : Icons.sync,
+                                  size: 13,
+                                  color: isStreamingVideo
+                                      ? const Color(0xFF4ADE80)
+                                      : isLive
+                                          ? const Color(0xFF38BDF8)
+                                          : const Color(0xFF94A3B8),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isStreamingVideo
+                                      ? 'Real-Time HD Active'
+                                      : reg.lastCameraPing != null
+                                          ? 'Ping: ${DateTime.now().difference(reg.lastCameraPing!).inSeconds}s ago'
+                                          : 'No Ping',
+                                  style: GoogleFonts.poppins(
+                                    color: isStreamingVideo
+                                        ? const Color(0xFF4ADE80)
+                                        : isLive
+                                            ? const Color(0xFF4ADE80)
+                                            : const Color(0xFF94A3B8),
+                                    fontSize: 10,
+                                    fontWeight: isStreamingVideo ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Action Buttons Row
+                          Row(
+                            children: [
+                              if (reg.submissionPhotos.isNotEmpty || reg.status == 'submitted') ...[
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 42,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF22C55E),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      onPressed: () => widget.onViewAnswers(reg),
+                                      icon: const Icon(Icons.collections_bookmark_rounded, size: 16, color: Colors.white),
+                                      label: Text(
+                                        'View Answers (${reg.submissionPhotos.length})',
+                                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              Expanded(
+                                child: SizedBox(
+                                  height: 42,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFEF4444),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () => widget.onSendAlert(reg),
+                                    icon: const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.white),
+                                    label: Text(
+                                      'Direct Warning / Alert',
+                                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
             ],
           ),
         );
