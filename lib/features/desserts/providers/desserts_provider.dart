@@ -147,9 +147,51 @@ class DessertsProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Refresh error: $e');
     }
+  /// Student: submit a new homework/dessert directly in-app
+  Future<DessertModel> submitDessert({
+    required String studentId,
+    required String studentName,
+    required String studentPhone,
+    required String subject,
+    required String caption,
+    required List<String> mediaUrls,
+    DessertType type = DessertType.image,
+  }) async {
+    _setLoading(true);
+    try {
+      final docRef = _db.collection('desserts').doc();
+      final newDessert = DessertModel(
+        id: docRef.id,
+        studentId: studentId,
+        studentName: studentName,
+        studentPhone: studentPhone,
+        subject: subject.isNotEmpty ? subject : null,
+        caption: caption.isNotEmpty ? caption : null,
+        mediaUrls: mediaUrls,
+        type: type,
+        status: DessertStatus.pending,
+        creditsAwarded: 0,
+        submittedAt: DateTime.now(),
+        whatsappMessageId: 'app_sub_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      await docRef.set(newDessert.toFirestore());
+
+      // Optimistically prepend to student's list
+      if (!_desserts.any((d) => d.id == docRef.id)) {
+        _desserts.insert(0, newDessert);
+      }
+      _error = null;
+      notifyListeners();
+      return newDessert;
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
   }
 
-  /// Admin: approve a dessert and award credits
   Future<void> approveDessert({
     required DessertModel dessert,
     required UserModel admin,
