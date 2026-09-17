@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/dessert_model.dart';
@@ -398,23 +400,37 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   // ── Quick Study Power-Ups ──────────────────────────
                   Row(
                     children: [
+                      // Daily MCQ Sprint
+                      Expanded(
+                        child: _buildActionTile(
+                          icon: Icons.bolt_rounded,
+                          title: 'Daily MCQ',
+                          subtitle: '5 Sprints 🔥',
+                          gradient: const [Color(0xFFEA580C), Color(0xFFC2410C)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.push('/student/sprint');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       // Ask AI Tutor
                       Expanded(
                         child: _buildActionTile(
                           icon: Icons.chat_bubble_outline_rounded,
                           title: 'AI Tutor',
-                          subtitle: 'Instant Help 💬',
+                          subtitle: 'Instant 💬',
                           gradient: const [Color(0xFF7C3AED), Color(0xFF6D28D9)],
                           onTap: _openWhatsAppTutor,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       // Drop Homework
                       Expanded(
                         child: _buildActionTile(
                           icon: Icons.camera_alt_outlined,
                           title: 'Submit HW',
-                          subtitle: 'Earn Credits 🚀',
+                          subtitle: 'Earn XP 🚀',
                           gradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
                           onTap: () {
                             HapticFeedbackService.light();
@@ -422,13 +438,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       // Leaderboard
                       Expanded(
                         child: _buildActionTile(
                           icon: Icons.emoji_events_outlined,
-                          title: 'Rankings',
-                          subtitle: 'Top Podium 👑',
+                          title: 'Ranks',
+                          subtitle: 'Podium 👑',
                           gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
                           onTap: () {
                             HapticFeedbackService.light();
@@ -438,6 +454,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+
+                  // ── Daily 5-MCQ Sprint Spotlight Card ───────────────
+                  _buildDailyMcqSprintSpotlight(user?.uid ?? ''),
                   const SizedBox(height: 12),
 
                   // ── Daily Quests & Mystery Reward Box ───────────────
@@ -545,6 +565,234 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDailyMcqSprintSpotlight(String studentUid) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('daily_sprints')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final docs = (snapshot.data?.docs ?? []).toList()
+          ..sort((a, b) {
+            final aDate = a.data()['targetDate']?.toString() ?? '';
+            final bDate = b.data()['targetDate']?.toString() ?? '';
+            return bDate.compareTo(aDate);
+          });
+
+        if (docs.isEmpty) return const SizedBox.shrink();
+
+        final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        // Match today's sprint, or show the latest available sprint
+        final activeDoc = docs.firstWhere(
+          (d) => d.data()['targetDate'] == todayStr,
+          orElse: () => docs.first,
+        );
+
+        final data = activeDoc.data();
+        final targetDate = data['targetDate']?.toString() ?? todayStr;
+        final title = data['title']?.toString() ?? 'Daily MCQ Sprint';
+        final unit = data['unit']?.toString() ?? 'General Physics';
+        final questions = (data['questions'] as List<dynamic>?) ?? [];
+        final isToday = targetDate == todayStr;
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('sprint_attempts')
+              .where('date', isEqualTo: targetDate)
+              .where('studentId', isEqualTo: studentUid)
+              .limit(1)
+              .snapshots(),
+          builder: (context, attemptSnap) {
+            final attempts = attemptSnap.data?.docs ?? [];
+            final hasAttempted = attempts.isNotEmpty;
+            final attemptData = hasAttempted ? attempts.first.data() : null;
+            final score = attemptData?['score'] ?? 0;
+            final total = attemptData?['totalQuestions'] ?? (questions.isNotEmpty ? questions.length : 5);
+            final xpEarned = attemptData?['xpEarned'] ?? (score * 10);
+
+            return Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF1E293B),
+                    Color(0xFF0F172A),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: hasAttempted
+                      ? const Color(0xFF10B981).withOpacity(0.5)
+                      : const Color(0xFFF59E0B).withOpacity(0.6),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (hasAttempted ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: () {
+                    HapticFeedbackService.light();
+                    context.push('/student/sprint?date=$targetDate');
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top Header Row
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('🔥', style: TextStyle(fontSize: 12)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isToday ? 'TODAY\'S 5-MCQ SPRINT' : 'DAILY MCQ SPRINT',
+                                    style: const TextStyle(
+                                      color: Color(0xFFFBBF24),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                targetDate,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Sprint Title
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+
+                        // Subtitle
+                        Text(
+                          '⚡ ${questions.length} Quick Questions • Unit: $unit',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Action / Status Area
+                        if (hasAttempted)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Completed! Score: $score / $total (+$xpEarned XP)',
+                                    style: const TextStyle(
+                                      color: Color(0xFF34D399),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                ),
+                                const Text(
+                                  'Review ➔',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFF59E0B).withOpacity(0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.flash_on_rounded, color: Colors.white, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Start Daily MCQ Sprint (+50 XP) ➔',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
