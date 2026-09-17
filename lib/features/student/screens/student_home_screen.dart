@@ -418,7 +418,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                           gradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
                           onTap: () {
                             HapticFeedbackService.light();
-                            context.go('/student/submit');
+                            context.go('/student/desserts');
                           },
                         ),
                       ),
@@ -521,7 +521,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                   child: _EmptyState(
-                    onSubmit: () => context.go('/student/submit'),
+                    onSubmit: () => context.go('/student/desserts'),
                   ),
                 ),
               )

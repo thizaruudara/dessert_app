@@ -645,12 +645,8 @@ class _CreateSprintSheetState extends State<_CreateSprintSheet> {
                             decoration: const InputDecoration(labelText: 'Subject'),
                             items: const [
                               DropdownMenuItem(value: 'Physics', child: Text('Physics (භෞතික විද්‍යාව)')),
-                              DropdownMenuItem(value: 'Combined Maths', child: Text('Combined Maths (සංයුක්ත ගණිතය)')),
-                              DropdownMenuItem(value: 'Chemistry', child: Text('Chemistry (රසායන විද්‍යාව)')),
-                              DropdownMenuItem(value: 'Biology', child: Text('Biology (ජීව විද්‍යාව)')),
-                              DropdownMenuItem(value: 'ICT', child: Text('ICT')),
                             ],
-                            onChanged: (v) => setState(() => _subject = v ?? 'Physics'),
+                            onChanged: (v) => setState(() => _subject = 'Physics'),
                           ),
                         ),
                         const SizedBox(width: 12),

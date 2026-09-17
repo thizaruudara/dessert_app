@@ -46,24 +46,12 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
   String _selectedFilter = 'All'; // 'All', 'Pending', 'Approved', 'Rejected'
   bool _showTelegramGuide = false;
 
-  final List<String> _subjectOptions = [
+  final List<String> _subjectOptions = const [
     'Physics',
-    'Combined Maths',
-    'Chemistry',
-    'Biology',
-    'ICT',
-    'General English',
-    'Other',
   ];
 
-  final Map<String, String> _subjectIcons = {
+  final Map<String, String> _subjectIcons = const {
     'Physics': '⚡',
-    'Combined Maths': '📐',
-    'Chemistry': '🧪',
-    'Biology': '🧬',
-    'ICT': '💻',
-    'General English': '🇬🇧',
-    'Other': '✍️',
   };
 
   @override
@@ -403,6 +391,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
       backgroundColor: AppColors.darkBg,
       appBar: AppBar(
         title: const Text('Homework & Desserts 🍰'),
+        automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: AppColors.darkCard,
         bottom: PreferredSize(
@@ -538,68 +527,85 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
             ),
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 18),
 
-          // 1. Subject Selector
-          Text(
-            '1. Select Subject',
-            style: GoogleFonts.poppins(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+          // Subject Badge (Dedicated exclusively to Physics)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF334155)),
             ),
-          ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
             child: Row(
-              children: _subjectOptions.map((sub) {
-                final isSelected = _selectedSubject == sub;
-                final icon = _subjectIcons[sub] ?? '📚';
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(icon, style: const TextStyle(fontSize: 15)),
-                        const SizedBox(width: 6),
-                        Text(sub),
-                      ],
-                    ),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        HapticFeedbackService.selection();
-                        setState(() => _selectedSubject = sub);
-                      }
-                    },
-                    selectedColor: const Color(0xFF2563EB),
-                    backgroundColor: AppColors.darkCard,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.textSecondary,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: isSelected ? const Color(0xFF3B82F6) : AppColors.darkBorder,
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
                   ),
-                );
-              }).toList(),
+                  child: const Center(
+                    child: Text('⚡', style: TextStyle(fontSize: 18)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Physics (A/L)',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35)),
+                            ),
+                            child: Text(
+                              'Exclusive',
+                              style: GoogleFonts.poppins(
+                                color: const Color(0xFF10B981),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'This portal is dedicated exclusively for Physics submissions',
+                        style: GoogleFonts.poppins(
+                          color: const Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
           const SizedBox(height: 22),
 
-          // 2. Question notes / Caption
+          // 1. Question notes / Caption
           Text(
-            '2. Question Details & Notes',
+            '1. Question Details & Notes',
             style: GoogleFonts.poppins(
               color: AppColors.textPrimary,
               fontSize: 15,
@@ -612,7 +618,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
             maxLines: 3,
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'e.g., 2023 Paper Part B Q4, or Newton\'s Laws Problem #3...',
+              hintText: 'e.g., 2024 Unit Test, Newton\'s Laws Problem #3, Wave Optics...',
               hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
               filled: true,
               fillColor: AppColors.darkCard,
@@ -634,12 +640,12 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
 
           const SizedBox(height: 22),
 
-          // 3. Attach Photos of Work
+          // 2. Attach Photos of Work
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '3. Attach Photos of Work',
+                '2. Attach Photos of Work',
                 style: GoogleFonts.poppins(
                   color: AppColors.textPrimary,
                   fontSize: 15,

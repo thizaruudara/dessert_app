@@ -235,7 +235,7 @@ class _DailyQuestsWidgetState extends State<DailyQuestsWidget> {
             isDark: isDark,
             onTap: () {
               HapticFeedbackService.light();
-              context.go('/student/submit');
+              context.go('/student/desserts');
             },
           ),
           const SizedBox(height: 8),

@@ -162,11 +162,14 @@ class AppRouter {
           ),
           GoRoute(
             path: '/student/desserts',
-            builder: (_, __) => const StudentDessertsScreen(),
+            builder: (context, state) {
+              final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
+              return StudentSubmitGuideScreen(initialTabIndex: tab);
+            },
           ),
           GoRoute(
             path: '/student/submit',
-            builder: (_, __) => const StudentSubmitGuideScreen(),
+            redirect: (_, __) => '/student/desserts',
           ),
           GoRoute(
             path: '/student/dessert/:id',
