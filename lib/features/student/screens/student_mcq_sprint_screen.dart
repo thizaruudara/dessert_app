@@ -209,10 +209,14 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
         final effectiveDocs = matchingDocs.isNotEmpty ? matchingDocs : docs;
 
         // Try exact match on _dateStr first, else fallback to latest available
-        final activeDoc = effectiveDocs.firstWhere(
-          (d) => d.data()['targetDate'] == _dateStr,
-          orElse: () => effectiveDocs.first,
-        );
+        QueryDocumentSnapshot<Map<String, dynamic>>? activeDoc;
+        for (final d in effectiveDocs) {
+          if (d.data()['targetDate'] == _dateStr) {
+            activeDoc = d;
+            break;
+          }
+        }
+        activeDoc ??= effectiveDocs.first;
 
         final sprintData = activeDoc.data();
         final effectiveSprintDate = sprintData['targetDate']?.toString() ?? _dateStr;

@@ -597,10 +597,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
 
           final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
           // Match today's sprint, or show the latest available sprint
-          final activeDoc = docs.firstWhere(
-            (d) => d.data()['targetDate'] == todayStr,
-            orElse: () => docs.first,
-          );
+          QueryDocumentSnapshot<Map<String, dynamic>>? activeDoc;
+          for (final d in docs) {
+            if (d.data()['targetDate'] == todayStr) {
+              activeDoc = d;
+              break;
+            }
+          }
+          activeDoc ??= docs.first;
 
           final data = activeDoc.data();
           final targetDate = data['targetDate']?.toString() ?? todayStr;
