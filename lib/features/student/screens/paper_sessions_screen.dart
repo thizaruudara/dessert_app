@@ -321,11 +321,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: const Color(0xFFEEF2FF),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(color: const Color(0xFFC7D2FE)),
                   ),
-                  child: const Icon(Icons.auto_stories_outlined, size: 48, color: Color(0xFF818CF8)),
+                  child: const Icon(Icons.auto_stories_outlined, size: 48, color: Color(0xFF6366F1)),
                 ),
               ),
               const SizedBox(height: 20),
@@ -335,7 +335,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -344,13 +344,14 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     ? 'Check back soon for new exam papers, scopes, and preparation hints.'
                     : 'Upcoming papers and hints for ${userExamYear ?? "your batch"} will be announced here.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF94A3B8)),
+                style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF64748B)),
               ),
               const SizedBox(height: 20),
               Center(
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF6366F1)),
+                    backgroundColor: const Color(0xFFEEF2FF).withOpacity(0.5),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -359,10 +360,10 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                       _showAllBatches = !_showAllBatches;
                     });
                   },
-                  icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.visibility, size: 16, color: const Color(0xFF818CF8)),
+                  icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.visibility, size: 16, color: const Color(0xFF6366F1)),
                   label: Text(
                     _showAllBatches ? 'Show My Batch Only' : 'Show All Batches',
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF6366F1)),
                   ),
                 ),
               ),
@@ -857,11 +858,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: const Color(0xFFEEF2FF),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF334155)),
+              border: Border.all(color: const Color(0xFFC7D2FE)),
             ),
-            child: const Icon(Icons.menu_book_rounded, size: 48, color: Color(0xFF64748B)),
+            child: const Icon(Icons.menu_book_rounded, size: 48, color: Color(0xFF6366F1)),
           ),
         ),
         const SizedBox(height: 20),
@@ -871,7 +872,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -882,7 +883,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
             fontSize: 13,
-            color: const Color(0xFF94A3B8),
+            color: const Color(0xFF64748B),
           ),
         ),
         const SizedBox(height: 24),
@@ -890,6 +891,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
           child: OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFF6366F1)),
+              backgroundColor: const Color(0xFFEEF2FF).withOpacity(0.5),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -901,10 +903,10 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                 _loadInitialData(target);
               });
             },
-            icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.all_inclusive, color: const Color(0xFF818CF8), size: 18),
+            icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.all_inclusive, color: const Color(0xFF6366F1), size: 18),
             label: Text(
               _showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න',
-              style: GoogleFonts.poppins(color: const Color(0xFF818CF8), fontSize: 13, fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(color: const Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
         ),

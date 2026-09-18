@@ -175,23 +175,47 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
 
   // ── Tab 1: Quiz Experience ───────────────────────────────────────────────
   Widget _buildQuizTab(String studentUid) {
-    // 1. Listen to sprint document for selected date
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    final auth = context.watch<AuthProvider>();
+    final studentExamYear = auth.user?.examYear;
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('daily_sprints')
-          .doc(_dateStr)
           .snapshots(),
       builder: (context, sprintSnap) {
         if (sprintSnap.connectionState == ConnectionState.waiting && !sprintSnap.hasData) {
           return const Center(child: CircularProgressIndicator(color: AppColors.accent));
         }
 
-        final sprintData = sprintSnap.data?.data();
-        if (sprintData == null) {
-          // If today has no direct doc, search for latest active sprint
+        final docs = (sprintSnap.data?.docs ?? []).toList()
+          ..sort((a, b) {
+            final aDate = a.data()['targetDate']?.toString() ?? '';
+            final bDate = b.data()['targetDate']?.toString() ?? '';
+            return bDate.compareTo(aDate);
+          });
+
+        if (docs.isEmpty) {
           return _buildNoSprintFallback();
         }
 
+        // Filter for sprints matching student's exam year or All Batches
+        final matchingDocs = docs.where((doc) {
+          final dYear = doc.data()['examYear']?.toString();
+          if (dYear == null || dYear.isEmpty || dYear == 'All Batches') return true;
+          if (studentExamYear == null || studentExamYear.isEmpty) return true;
+          return dYear.toLowerCase().trim() == studentExamYear.toLowerCase().trim();
+        }).toList();
+
+        final effectiveDocs = matchingDocs.isNotEmpty ? matchingDocs : docs;
+
+        // Try exact match on _dateStr first, else fallback to latest available
+        final activeDoc = effectiveDocs.firstWhere(
+          (d) => d.data()['targetDate'] == _dateStr,
+          orElse: () => effectiveDocs.first,
+        );
+
+        final sprintData = activeDoc.data();
+        final effectiveSprintDate = sprintData['targetDate']?.toString() ?? _dateStr;
         final sprintTitle = sprintData['title'] ?? 'Daily MCQ Sprint';
         final unit = sprintData['unit'] ?? 'General Physics';
         final questions = (sprintData['questions'] as List<dynamic>?) ?? [];
@@ -204,7 +228,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
               .collection('sprint_attempts')
-              .where('date', isEqualTo: _dateStr)
+              .where('date', isEqualTo: effectiveSprintDate)
               .where('studentId', isEqualTo: studentUid)
               .limit(1)
               .snapshots(),
@@ -222,7 +246,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
 
             // Student hasn't completed yet -> Interactive Quiz Mode!
             _startTimerIfNotRunning();
-            return _buildActiveQuizView(sprintTitle, unit, questions);
+            return _buildActiveQuizView(sprintTitle, unit, questions, effectiveSprintDate);
           },
         );
       },
@@ -234,6 +258,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
     String sprintTitle,
     String unit,
     List<dynamic> questions,
+    String sprintDate,
   ) {
     if (_currentQuestionIndex >= questions.length) {
       _currentQuestionIndex = 0;
@@ -582,7 +607,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
                           _isSubmitting ? 'Submitting...' : 'Finish & Submit Sprint 🚀',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                         ),
-                        onPressed: _isSubmitting ? null : () => _confirmSubmitSprint(questions),
+                        onPressed: _isSubmitting ? null : () => _confirmSubmitSprint(questions, sprintDate),
                       ),
               ),
             ],
@@ -593,7 +618,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
   }
 
   // ── Confirmation & Submission ─────────────────────────────────────────────
-  Future<void> _confirmSubmitSprint(List<dynamic> questions) async {
+  Future<void> _confirmSubmitSprint(List<dynamic> questions, String sprintDate) async {
     final unanswered = questions.length - _selectedAnswers.length;
     if (unanswered > 0) {
       final proceed = await showDialog<bool>(
@@ -624,10 +649,10 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
       if (proceed != true) return;
     }
 
-    _submitSprint(questions);
+    _submitSprint(questions, sprintDate);
   }
 
-  Future<void> _submitSprint(List<dynamic> questions) async {
+  Future<void> _submitSprint(List<dynamic> questions, String sprintDate) async {
     final auth = context.read<AuthProvider>();
     final user = auth.user;
     if (user == null) return;
@@ -656,7 +681,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
       'studentName': user.name.isNotEmpty ? user.name : 'Student',
       'phone': user.phone,
       'examYear': user.examYear ?? '2027 A/L',
-      'date': _dateStr,
+      'date': sprintDate,
       'score': score,
       'totalQuestions': questions.length,
       'timeTakenSeconds': _elapsedSeconds,

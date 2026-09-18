@@ -457,7 +457,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   const SizedBox(height: 12),
 
                   // ── Daily 5-MCQ Sprint Spotlight Card ───────────────
-                  _buildDailyMcqSprintSpotlight(user?.uid ?? ''),
+                  _buildDailyMcqSprintSpotlight(user?.uid ?? '', examYear),
                   const SizedBox(height: 12),
 
                   // ── Daily Quests & Mystery Reward Box ───────────────
@@ -568,20 +568,31 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     );
   }
 
-  Widget _buildDailyMcqSprintSpotlight(String studentUid) {
+  Widget _buildDailyMcqSprintSpotlight(String studentUid, String studentExamYear) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('daily_sprints')
           .snapshots(),
       builder: (context, snapshot) {
-        final docs = (snapshot.data?.docs ?? []).toList()
+        if (snapshot.hasError) return const SizedBox.shrink();
+        final allDocs = (snapshot.data?.docs ?? []).toList()
           ..sort((a, b) {
             final aDate = a.data()['targetDate']?.toString() ?? '';
             final bDate = b.data()['targetDate']?.toString() ?? '';
             return bDate.compareTo(aDate);
           });
 
-        if (docs.isEmpty) return const SizedBox.shrink();
+        if (allDocs.isEmpty) return const SizedBox.shrink();
+
+        // Filter matching student exam year
+        final matchingDocs = allDocs.where((d) {
+          final docExamYear = d.data()['examYear']?.toString();
+          if (docExamYear == null || docExamYear.isEmpty || docExamYear == 'All Batches') return true;
+          if (studentExamYear.isEmpty) return true;
+          return docExamYear.toLowerCase().trim() == studentExamYear.toLowerCase().trim();
+        }).toList();
+
+        final docs = matchingDocs.isNotEmpty ? matchingDocs : allDocs;
 
         final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
         // Match today's sprint, or show the latest available sprint
@@ -608,9 +619,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             final attempts = attemptSnap.data?.docs ?? [];
             final hasAttempted = attempts.isNotEmpty;
             final attemptData = hasAttempted ? attempts.first.data() : null;
-            final score = attemptData?['score'] ?? 0;
-            final total = attemptData?['totalQuestions'] ?? (questions.isNotEmpty ? questions.length : 5);
-            final xpEarned = attemptData?['xpEarned'] ?? (score * 10);
+            final score = (attemptData?['score'] as num?)?.toInt() ?? 0;
+            final total = (attemptData?['totalQuestions'] as num?)?.toInt() ?? (questions.isNotEmpty ? questions.length : 5);
+            final xpEarned = (attemptData?['xpEarned'] as num?)?.toInt() ?? (score * 10);
 
             return Container(
               decoration: BoxDecoration(

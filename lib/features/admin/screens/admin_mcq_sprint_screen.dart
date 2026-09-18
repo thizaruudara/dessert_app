@@ -186,6 +186,7 @@ class _AdminMcqSprintScreenState extends State<AdminMcqSprintScreen>
     final subject = data['subject'] ?? 'Physics';
     final unit = data['unit'] ?? 'General';
     final targetDate = data['targetDate'] ?? '';
+    final examYear = data['examYear']?.toString() ?? 'All Batches';
     final questions = (data['questions'] as List<dynamic>?) ?? [];
     final isToday = targetDate == _dateStr;
 
@@ -217,7 +218,20 @@ class _AdminMcqSprintScreenState extends State<AdminMcqSprintScreen>
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
               ),
             ),
-            if (isToday)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+              ),
+              child: Text(
+                examYear,
+                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF6366F1)),
+              ),
+            ),
+            if (isToday) ...[
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -226,6 +240,7 @@ class _AdminMcqSprintScreenState extends State<AdminMcqSprintScreen>
                 ),
                 child: const Text('TODAY', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
+            ],
           ],
         ),
         subtitle: Text(
@@ -565,6 +580,7 @@ class _CreateSprintSheetState extends State<_CreateSprintSheet> {
   final _formKey = GlobalKey<FormState>();
   late DateTime _targetDate;
   String _subject = 'Physics';
+  String _examYear = 'All Batches';
   final _unitCtrl = TextEditingController(text: 'යාන්ත්‍ර විද්‍යාව (Mechanics)');
   final _titleCtrl = TextEditingController(text: '🔥 දවසේ MCQ 5');
 
@@ -636,6 +652,25 @@ class _CreateSprintSheetState extends State<_CreateSprintSheet> {
               Expanded(
                 child: ListView(
                   children: [
+                    // Exam Year Target Selector
+                    DropdownButtonFormField<String>(
+                      value: _examYear,
+                      decoration: const InputDecoration(
+                        labelText: 'Target Exam Year / Batch (කණ්ඩායම)',
+                        prefixIcon: Icon(Icons.school_rounded, color: AppColors.accent),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'All Batches', child: Text('All Batches (සියලු කණ්ඩායම්)')),
+                        DropdownMenuItem(value: '2026 A/L', child: Text('2026 A/L Batch')),
+                        DropdownMenuItem(value: '2027 A/L', child: Text('2027 A/L Batch')),
+                        DropdownMenuItem(value: '2028 A/L', child: Text('2028 A/L Batch')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => _examYear = v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
                     // Date & Subject Row
                     Row(
                       children: [
@@ -799,18 +834,23 @@ class _CreateSprintSheetState extends State<_CreateSprintSheet> {
       };
     });
 
+    final docId = _examYear == 'All Batches'
+        ? targetDateStr
+        : '${targetDateStr}_${_examYear.replaceAll(' ', '_').replaceAll('/', '_')}';
+
     final payload = {
       'title': '🔥 ${_titleCtrl.text.trim()} - ${_unitCtrl.text.trim()}',
       'subject': _subject,
       'unit': _unitCtrl.text.trim(),
       'targetDate': targetDateStr,
+      'examYear': _examYear,
       'xpPerQuestion': 10,
       'questions': questionsData,
       'createdAt': FieldValue.serverTimestamp(),
     };
 
     try {
-      await FirebaseFirestore.instance.collection('daily_sprints').doc(targetDateStr).set(payload);
+      await FirebaseFirestore.instance.collection('daily_sprints').doc(docId).set(payload);
       HapticFeedbackService.success();
       widget.onCreated();
     } catch (e) {

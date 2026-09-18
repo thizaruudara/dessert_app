@@ -221,20 +221,34 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
   }
 
   Widget _buildWeeklyLineChart(List<String> dayNames, List<int> counts) {
-    return CustomPaint(
-      size: const Size(double.infinity, 160),
-      painter: _ActivityLineChartPainter(
-        dayNames: dayNames,
-        counts: counts,
-        todayWeekday: (DateTime.now().weekday - 1) % 7,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : 300.0;
+        return CustomPaint(
+          size: Size(w, 160),
+          painter: _ActivityLineChartPainter(
+            dayNames: dayNames,
+            counts: counts,
+            todayWeekday: (DateTime.now().weekday - 1) % 7,
+          ),
+        );
+      },
     );
   }
 
   Widget _buildCreditGrowthCurve() {
-    return CustomPaint(
-      size: const Size(double.infinity, 160),
-      painter: _GrowthCurvePainter(totalCredits: widget.totalCredits),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : 300.0;
+        return CustomPaint(
+          size: Size(w, 160),
+          painter: _GrowthCurvePainter(totalCredits: widget.totalCredits),
+        );
+      },
     );
   }
 }
@@ -252,8 +266,10 @@ class _ActivityLineChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!size.width.isFinite || size.width <= 0 || !size.height.isFinite || size.height <= 0) return;
     final w = size.width;
     final chartHeight = size.height - 30; // Reserve 30px for X-axis labels
+    if (chartHeight <= 0) return;
     final maxCount = counts.reduce(math.max);
     final highestVal = maxCount > 0 ? (maxCount + 1) : 4;
 
@@ -384,8 +400,10 @@ class _GrowthCurvePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!size.width.isFinite || size.width <= 0 || !size.height.isFinite || size.height <= 0) return;
     final w = size.width;
     final h = size.height - 20;
+    if (h <= 0) return;
 
     final gridPaint = Paint()
       ..color = AppColors.border.withOpacity(0.5)
