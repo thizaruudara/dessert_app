@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/dessert_model.dart';
 
@@ -18,29 +19,93 @@ class StudentProgressChart extends StatefulWidget {
 }
 
 class _StudentProgressChartState extends State<StudentProgressChart> {
-  int _selectedTab = 0; // 0 = Activity Line Chart, 1 = Credit Growth
+  int _selectedTab = 0; // 0 = Weekly, 1 = Monthly, 2 = All-Time
 
   @override
   Widget build(BuildContext context) {
     try {
-      // Compute last 7 days submissions (Mon to Sun)
       final now = DateTime.now();
-      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      final counts = List.filled(7, 0);
 
-      for (final d in widget.desserts) {
-        final diff = now.difference(d.submittedAt).inDays;
-        if (diff >= 0 && diff < 7) {
+      List<String> labels;
+      List<int> counts;
+      int activeIndex; // Current day/week/month to highlight
+      int periodSubmissions;
+      int periodApproved;
+      String periodSubLabel;
+
+      if (_selectedTab == 0) {
+        // ── WEEKLY FILTER (Mon to Sun of current week) ──
+        labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        counts = List.filled(7, 0);
+        activeIndex = (now.weekday - 1) % 7;
+        periodSubLabel = 'This Week';
+
+        // Current calendar week (Monday 00:00:00 to end of Sunday)
+        final currentMonday = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+        final nextMonday = currentMonday.add(const Duration(days: 7));
+
+        final weeklyDesserts = widget.desserts.where((d) {
+          return d.submittedAt.isAfter(currentMonday.subtract(const Duration(seconds: 1))) &&
+              d.submittedAt.isBefore(nextMonday);
+        }).toList();
+
+        for (final d in weeklyDesserts) {
           final weekdayIndex = (d.submittedAt.weekday - 1) % 7;
           counts[weekdayIndex]++;
         }
+
+        periodSubmissions = weeklyDesserts.length;
+        periodApproved = weeklyDesserts.where((d) => d.isApproved).length;
+      } else if (_selectedTab == 1) {
+        // ── MONTHLY FILTER (Weeks of current month) ──
+        labels = ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5'];
+        counts = List.filled(5, 0);
+        activeIndex = ((now.day - 1) ~/ 7).clamp(0, 4);
+        periodSubLabel = 'This Month';
+
+        final monthlyDesserts = widget.desserts.where((d) {
+          return d.submittedAt.year == now.year && d.submittedAt.month == now.month;
+        }).toList();
+
+        for (final d in monthlyDesserts) {
+          final weekIndex = ((d.submittedAt.day - 1) ~/ 7).clamp(0, 4);
+          counts[weekIndex]++;
+        }
+
+        periodSubmissions = monthlyDesserts.length;
+        periodApproved = monthlyDesserts.where((d) => d.isApproved).length;
+      } else {
+        // ── ALL-TIME FILTER (Past 6 Months) ──
+        final monthKeys = <DateTime>[];
+        labels = [];
+        for (int i = 5; i >= 0; i--) {
+          final mDate = DateTime(now.year, now.month - i, 1);
+          monthKeys.add(mDate);
+          labels.add(DateFormat('MMM').format(mDate));
+        }
+        counts = List.filled(6, 0);
+        activeIndex = 5; // Current month
+        periodSubLabel = 'All Time';
+
+        for (final d in widget.desserts) {
+          for (int i = 0; i < monthKeys.length; i++) {
+            final m = monthKeys[i];
+            if (d.submittedAt.year == m.year && d.submittedAt.month == m.month) {
+              counts[i]++;
+              break;
+            }
+          }
+        }
+
+        periodSubmissions = widget.desserts.length;
+        periodApproved = widget.desserts.where((d) => d.isApproved).length;
       }
 
-      final approvedCount = widget.desserts.where((d) => d.isApproved).length;
-      final totalSubmissions = widget.desserts.length;
-      final successRate = totalSubmissions > 0
-          ? ((approvedCount / totalSubmissions) * 100).toInt()
-          : 100;
+      final successRate = periodSubmissions > 0
+          ? ((periodApproved / periodSubmissions) * 100).toInt()
+          : (widget.desserts.isNotEmpty
+              ? ((widget.desserts.where((d) => d.isApproved).length / widget.desserts.length) * 100).toInt()
+              : 100);
 
       return Container(
         width: double.infinity,
@@ -94,7 +159,7 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
                     ),
                   ],
                 ),
-                // Segmented Toggle
+                // Segmented Toggle (Weekly, Monthly, All-Time)
                 Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
@@ -103,8 +168,9 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
                   ),
                   child: Row(
                     children: [
-                      _buildTabBtn('Activity', 0),
-                      _buildTabBtn('Growth', 1),
+                      _buildTabBtn('Weekly', 0),
+                      _buildTabBtn('Monthly', 1),
+                      _buildTabBtn('All-Time', 2),
                     ],
                   ),
                 ),
@@ -123,8 +189,8 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
                 ),
                 const SizedBox(width: 12),
                 _buildMiniStat(
-                  label: 'Submissions',
-                  value: '$totalSubmissions',
+                  label: periodSubLabel,
+                  value: '$periodSubmissions',
                   icon: Icons.auto_awesome_rounded,
                   color: AppColors.primary,
                 ),
@@ -142,9 +208,7 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
             // Line Chart Display
             SizedBox(
               height: 160,
-              child: _selectedTab == 0
-                  ? _buildWeeklyLineChart(dayNames, counts)
-                  : _buildCreditGrowthCurve(),
+              child: _buildProgressLineChart(labels, counts, activeIndex),
             ),
           ],
         ),
@@ -171,7 +235,7 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected ? AppColors.primary : AppColors.textMuted,
           ),
@@ -225,7 +289,7 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
     );
   }
 
-  Widget _buildWeeklyLineChart(List<String> dayNames, List<int> counts) {
+  Widget _buildProgressLineChart(List<String> labels, List<int> counts, int activeIndex) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final w = constraints.maxWidth.isFinite && constraints.maxWidth > 0
@@ -234,24 +298,10 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
         return CustomPaint(
           size: Size(w, 160),
           painter: _ActivityLineChartPainter(
-            dayNames: dayNames,
+            dayNames: labels,
             counts: counts,
-            todayWeekday: (DateTime.now().weekday - 1) % 7,
+            todayWeekday: activeIndex,
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCreditGrowthCurve() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth.isFinite && constraints.maxWidth > 0
-            ? constraints.maxWidth
-            : 300.0;
-        return CustomPaint(
-          size: Size(w, 160),
-          painter: _GrowthCurvePainter(totalCredits: widget.totalCredits),
         );
       },
     );
@@ -289,11 +339,12 @@ class _ActivityLineChartPainter extends CustomPainter {
         canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
       }
 
-      // Compute coordinate points for each of the 7 days
+      // Compute coordinate points dynamically according to dayNames count
+      final numPoints = dayNames.length;
       final points = <Offset>[];
-      final stepX = w / 6;
+      final stepX = numPoints > 1 ? w / (numPoints - 1) : w;
 
-      for (int i = 0; i < 7; i++) {
+      for (int i = 0; i < numPoints; i++) {
         final x = i * stepX;
         final val = i < counts.length ? counts[i] : 0;
         final y = chartHeight - (val / highestVal) * (chartHeight - 20) - 10;
@@ -339,7 +390,7 @@ class _ActivityLineChartPainter extends CustomPainter {
       canvas.drawPath(path, linePaint);
 
       // Draw Data Points, Values & X-Axis Labels
-      for (int i = 0; i < 7; i++) {
+      for (int i = 0; i < numPoints; i++) {
         final pt = points[i];
         final count = i < counts.length ? counts[i] : 0;
         final isToday = i == todayWeekday;
@@ -387,7 +438,7 @@ class _ActivityLineChartPainter extends CustomPainter {
           }
         }
 
-        // X-Axis Day Label (Mon, Tue, ...)
+        // X-Axis Label (Mon/Tue... or Wk 1... or Jan/Feb...)
         if (i < dayNames.length) {
           final tpLabel = TextPainter(
             text: TextSpan(
@@ -411,104 +462,4 @@ class _ActivityLineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ActivityLineChartPainter oldDelegate) => true;
-}
-
-class _GrowthCurvePainter extends CustomPainter {
-  final int totalCredits;
-
-  _GrowthCurvePainter({required this.totalCredits});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    try {
-      if (!size.width.isFinite || size.width <= 0 || !size.height.isFinite || size.height <= 0) return;
-      final w = size.width;
-      final h = size.height - 20;
-      if (h <= 0) return;
-
-      final gridPaint = Paint()
-        ..color = AppColors.border.withOpacity(0.5)
-        ..strokeWidth = 1;
-
-      for (int i = 1; i <= 3; i++) {
-        final y = (h / 4) * i;
-        canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
-      }
-
-      final points = [
-        Offset(0, h * 0.85),
-        Offset(w * 0.2, h * 0.70),
-        Offset(w * 0.4, h * 0.65),
-        Offset(w * 0.6, h * 0.45),
-        Offset(w * 0.8, h * 0.30),
-        Offset(w, h * 0.15),
-      ];
-
-      final path = Path()..moveTo(points[0].dx, points[0].dy);
-      for (int i = 0; i < points.length - 1; i++) {
-        final p0 = points[i];
-        final p1 = points[i + 1];
-        final cx = (p0.dx + p1.dx) / 2;
-        path.cubicTo(cx, p0.dy, cx, p1.dy, p1.dx, p1.dy);
-      }
-
-      final fillPath = Path.from(path)
-        ..lineTo(w, h)
-        ..lineTo(0, h)
-        ..close();
-
-      final fillPaint = Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0x35227AFF),
-            Color(0x02227AFF),
-          ],
-        ).createShader(Rect.fromLTWH(0, 0, w, h));
-
-      canvas.drawPath(fillPath, fillPaint);
-
-      final strokePaint = Paint()
-        ..shader = const LinearGradient(
-          colors: [AppColors.primaryLight, AppColors.primary, AppColors.primaryDark],
-        ).createShader(Rect.fromLTWH(0, 0, w, h))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round;
-
-      canvas.drawPath(path, strokePaint);
-
-      final lastPt = points.last;
-      final glowPaint = Paint()
-        ..color = AppColors.primary.withOpacity(0.35);
-      canvas.drawCircle(lastPt, 8, glowPaint);
-
-      final dotPaint = Paint()..color = AppColors.primary;
-      canvas.drawCircle(lastPt, 5, dotPaint);
-
-      final innerDot = Paint()..color = Colors.white;
-      canvas.drawCircle(lastPt, 2.5, innerDot);
-
-      // Label on curve
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '$totalCredits pts',
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(lastPt.dx - tp.width - 8, lastPt.dy - 18));
-    } catch (e, stack) {
-      debugPrint('Error in _GrowthCurvePainter: $e\n$stack');
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _GrowthCurvePainter oldDelegate) =>
-      oldDelegate.totalCredits != totalCredits;
 }
