@@ -93,7 +93,8 @@ class _DailyQuestsWidgetState extends State<DailyQuestsWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    try {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final bool quest1 = widget.totalSubmissions > 0;
     final bool quest2 = _askedAiTutor;
@@ -263,6 +264,10 @@ class _DailyQuestsWidgetState extends State<DailyQuestsWidget> {
         ],
       ),
     );
+    } catch (e, stack) {
+      debugPrint('Error in DailyQuestsWidget.build: $e\n$stack');
+      return const SizedBox.shrink();
+    }
   }
 
   Widget _buildQuestTile({

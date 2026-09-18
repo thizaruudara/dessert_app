@@ -569,59 +569,116 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   Widget _buildDailyMcqSprintSpotlight(String studentUid, String studentExamYear) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('daily_sprints')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return const SizedBox.shrink();
-        final allDocs = (snapshot.data?.docs ?? []).toList()
-          ..sort((a, b) {
-            final aDate = a.data()['targetDate']?.toString() ?? '';
-            final bDate = b.data()['targetDate']?.toString() ?? '';
-            return bDate.compareTo(aDate);
-          });
+    try {
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('daily_sprints')
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const SizedBox.shrink();
+          final allDocs = (snapshot.data?.docs ?? []).toList()
+            ..sort((a, b) {
+              final aDate = a.data()['targetDate']?.toString() ?? '';
+              final bDate = b.data()['targetDate']?.toString() ?? '';
+              return bDate.compareTo(aDate);
+            });
 
-        if (allDocs.isEmpty) return const SizedBox.shrink();
+          if (allDocs.isEmpty) return const SizedBox.shrink();
 
-        // Filter matching student exam year
-        final matchingDocs = allDocs.where((d) {
-          final docExamYear = d.data()['examYear']?.toString();
-          if (docExamYear == null || docExamYear.isEmpty || docExamYear == 'All Batches') return true;
-          if (studentExamYear.isEmpty) return true;
-          return docExamYear.toLowerCase().trim() == studentExamYear.toLowerCase().trim();
-        }).toList();
+          // Filter matching student exam year
+          final matchingDocs = allDocs.where((d) {
+            final docExamYear = d.data()['examYear']?.toString();
+            if (docExamYear == null || docExamYear.isEmpty || docExamYear == 'All Batches') return true;
+            if (studentExamYear.isEmpty) return true;
+            return docExamYear.toLowerCase().trim() == studentExamYear.toLowerCase().trim();
+          }).toList();
 
-        final docs = matchingDocs.isNotEmpty ? matchingDocs : allDocs;
+          final docs = matchingDocs.isNotEmpty ? matchingDocs : allDocs;
 
-        final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-        // Match today's sprint, or show the latest available sprint
-        final activeDoc = docs.firstWhere(
-          (d) => d.data()['targetDate'] == todayStr,
-          orElse: () => docs.first,
-        );
+          final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+          // Match today's sprint, or show the latest available sprint
+          final activeDoc = docs.firstWhere(
+            (d) => d.data()['targetDate'] == todayStr,
+            orElse: () => docs.first,
+          );
 
-        final data = activeDoc.data();
-        final targetDate = data['targetDate']?.toString() ?? todayStr;
-        final title = data['title']?.toString() ?? 'Daily MCQ Sprint';
-        final unit = data['unit']?.toString() ?? 'General Physics';
-        final questions = (data['questions'] as List<dynamic>?) ?? [];
-        final isToday = targetDate == todayStr;
+          final data = activeDoc.data();
+          final targetDate = data['targetDate']?.toString() ?? todayStr;
+          final title = data['title']?.toString() ?? 'Daily MCQ Sprint';
+          final unit = data['unit']?.toString() ?? 'General Physics';
+          final rawQuestions = data['questions'];
+          final List<dynamic> questions = rawQuestions is List
+              ? rawQuestions
+              : (rawQuestions is Map ? rawQuestions.values.toList() : []);
+          final isToday = targetDate == todayStr;
 
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('sprint_attempts')
-              .where('date', isEqualTo: targetDate)
-              .where('studentId', isEqualTo: studentUid)
-              .limit(1)
-              .snapshots(),
-          builder: (context, attemptSnap) {
-            final attempts = attemptSnap.data?.docs ?? [];
-            final hasAttempted = attempts.isNotEmpty;
-            final attemptData = hasAttempted ? attempts.first.data() : null;
-            final score = (attemptData?['score'] as num?)?.toInt() ?? 0;
-            final total = (attemptData?['totalQuestions'] as num?)?.toInt() ?? (questions.isNotEmpty ? questions.length : 5);
-            final xpEarned = (attemptData?['xpEarned'] as num?)?.toInt() ?? (score * 10);
+          int parseNum(dynamic val, int fallback) {
+            if (val is num) return val.toInt();
+            if (val is String) return int.tryParse(val) ?? fallback;
+            return fallback;
+          }
+
+          if (studentUid.isEmpty) {
+            return _buildSprintSpotlightCard(
+              targetDate: targetDate,
+              title: title,
+              unit: unit,
+              questionsCount: questions.length,
+              isToday: isToday,
+              hasAttempted: false,
+              score: 0,
+              total: questions.isNotEmpty ? questions.length : 5,
+              xpEarned: 0,
+            );
+          }
+
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('sprint_attempts')
+                .where('date', isEqualTo: targetDate)
+                .where('studentId', isEqualTo: studentUid)
+                .limit(1)
+                .snapshots(),
+            builder: (context, attemptSnap) {
+              final attempts = attemptSnap.data?.docs ?? [];
+              final hasAttempted = attempts.isNotEmpty;
+              final attemptData = hasAttempted ? attempts.first.data() : null;
+              final score = parseNum(attemptData?['score'], 0);
+              final total = parseNum(attemptData?['totalQuestions'], questions.isNotEmpty ? questions.length : 5);
+              final xpEarned = parseNum(attemptData?['xpEarned'], score * 10);
+
+              return _buildSprintSpotlightCard(
+                targetDate: targetDate,
+                title: title,
+                unit: unit,
+                questionsCount: questions.length,
+                isToday: isToday,
+                hasAttempted: hasAttempted,
+                score: score,
+                total: total,
+                xpEarned: xpEarned,
+              );
+            },
+          );
+        },
+      );
+    } catch (e, stack) {
+      debugPrint('Error in _buildDailyMcqSprintSpotlight: $e\n$stack');
+      return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildSprintSpotlightCard({
+    required String targetDate,
+    required String title,
+    required String unit,
+    required int questionsCount,
+    required bool isToday,
+    required bool hasAttempted,
+    required int score,
+    required int total,
+    required int xpEarned,
+  }) {
 
             return Container(
               decoration: BoxDecoration(
@@ -723,7 +780,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
 
                         // Subtitle
                         Text(
-                          '⚡ ${questions.length} Quick Questions • Unit: $unit',
+                          '⚡ $questionsCount Quick Questions • Unit: $unit',
                           style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                         ),
                         const SizedBox(height: 14),
@@ -801,18 +858,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 ),
               ),
             );
-          },
-        );
-      },
-    );
   }
 
   Widget _buildUpcomingPaperSpotlight(String examYear) {
-    return StreamBuilder<List<UpcomingPaper>>(
-      stream: PaperLeaderboardService().streamUpcomingPapers(examYear: examYear),
-      builder: (context, snapshot) {
-        final papers = snapshot.data ?? [];
-        if (papers.isEmpty) return const SizedBox.shrink();
+    try {
+      return StreamBuilder<List<UpcomingPaper>>(
+        stream: PaperLeaderboardService().streamUpcomingPapers(examYear: examYear),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const SizedBox.shrink();
+          final papers = snapshot.data ?? [];
+          if (papers.isEmpty) return const SizedBox.shrink();
         final paper = papers.first;
         final hasHints = paper.hints.isNotEmpty;
 
@@ -956,6 +1011,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         );
       },
     );
+    } catch (e, stack) {
+      debugPrint('Error in _buildUpcomingPaperSpotlight: $e\n$stack');
+      return const SizedBox.shrink();
+    }
   }
 
   Widget _buildActionTile({
