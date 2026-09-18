@@ -9,6 +9,7 @@ import '../../../core/models/upcoming_paper_model.dart';
 import '../../../core/models/paper_leaderboard_model.dart';
 import '../../../core/services/paper_session_service.dart';
 import '../../../core/services/paper_leaderboard_service.dart';
+import '../../../core/theme/app_theme.dart';
 
 class AdminPaperSessionsScreen extends StatefulWidget {
   const AdminPaperSessionsScreen({super.key});
@@ -26,19 +27,20 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Colors.white,
         elevation: 0,
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.2),
+                color: AppColors.backgroundSoft,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
               ),
-              child: const Icon(Icons.assignment_turned_in, color: Color(0xFF818CF8), size: 20),
+              child: const Icon(Icons.assignment_turned_in, color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 12),
             Column(
@@ -46,13 +48,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               children: [
                 Text(
                   'Paper Examination Hub',
-                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
+                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                 ),
                 Text(
                   _selectedAdminTab == 0
                       ? 'සජීවී විභාග සැසි සහ කැමරා අධීක්ෂණය'
                       : (_selectedAdminTab == 1 ? 'ඉදිරි විභාග සහ Hints කළමනාකරණය' : 'Paper ප්‍රතිඵල සහ Leaderboard නිර්මාණය'),
-                  style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                  style: GoogleFonts.poppins(fontSize: 10.5, color: AppColors.textMuted),
                 ),
               ],
             ),
@@ -61,7 +63,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
         actions: [
           IconButton(
             onPressed: () => context.push('/admin/countdowns'),
-            icon: const Icon(Icons.timer_outlined, color: Color(0xFF38BDF8), size: 24),
+            icon: const Icon(Icons.timer_outlined, color: AppColors.primary, size: 24),
             tooltip: 'A/L Exam Target Dates & Countdowns',
           ),
           IconButton(
@@ -74,7 +76,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 _showPaperLeaderboardEditorDialog();
               }
             },
-            icon: const Icon(Icons.add_circle, color: Color(0xFF6366F1), size: 28),
+            icon: const Icon(Icons.add_circle, color: AppColors.primary, size: 28),
             tooltip: _selectedAdminTab == 0
                 ? 'Create New Live Session'
                 : (_selectedAdminTab == 1 ? 'Add Upcoming Paper & Hints' : 'Create Paper Leaderboard'),
@@ -85,12 +87,19 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
         children: [
           // ── Admin 3-Tab Segmented Selector ───────────────────
           Container(
-            margin: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 10),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF334155)),
+              border: Border.all(color: AppColors.border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x060F172A),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -144,14 +153,14 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6366F1) : Colors.transparent,
+          color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.35),
+                    color: AppColors.primary.withOpacity(0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -164,7 +173,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           style: GoogleFonts.poppins(
             fontSize: 11.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+            color: isSelected ? Colors.white : AppColors.textMuted,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -176,7 +185,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   Widget? _buildAdminFab() {
     if (_selectedAdminTab == 0) {
       return FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF6366F1),
+        backgroundColor: AppColors.primary,
         onPressed: () => _showCreatePaperDialog(),
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
@@ -186,7 +195,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       );
     } else if (_selectedAdminTab == 1) {
       return FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF6366F1),
+        backgroundColor: AppColors.primary,
         onPressed: () => _showUpcomingPaperDialog(),
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
@@ -196,7 +205,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       );
     } else {
       return FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF6366F1),
+        backgroundColor: AppColors.primary,
         onPressed: () => _showPaperLeaderboardEditorDialog(),
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
@@ -241,27 +250,27 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: AppColors.backgroundSoft,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(color: AppColors.border),
               ),
-              child: const Icon(Icons.note_add_outlined, size: 48, color: Color(0xFF64748B)),
+              child: const Icon(Icons.note_add_outlined, size: 48, color: AppColors.primary),
             ),
             const SizedBox(height: 20),
             Text(
               'තවම Paper Sessions නිර්මාණය කර නොමැත',
-              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
               'නව විභාග සැසියක් නිර්මාණය කර Slot 1 සහ Slot 2 වේලාවන් සකසන්න.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF94A3B8)),
+              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
+                backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -285,9 +294,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,9 +311,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           // Top Badges & Actions
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A).withOpacity(0.6),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            decoration: const BoxDecoration(
+              color: AppColors.backgroundSoft,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,24 +324,25 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6366F1).withOpacity(0.2),
+                        color: AppColors.primary.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         session.subject,
-                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFA5B4FC)),
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF334155),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: Text(
                         session.examYear,
-                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                        style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -332,10 +350,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: session.isEnded
-                            ? const Color(0xFFEF4444).withOpacity(0.2)
+                            ? const Color(0xFFEF4444).withOpacity(0.12)
                             : (session.isActive || DateTime.now().isAfter(session.slot1.startTime))
-                                ? const Color(0xFF22C55E).withOpacity(0.2)
-                                : const Color(0xFFF59E0B).withOpacity(0.2),
+                                ? const Color(0xFF22C55E).withOpacity(0.12)
+                                : const Color(0xFFF59E0B).withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: session.isEnded
@@ -355,16 +373,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: session.isEnded
-                              ? const Color(0xFFFCA5A5)
+                              ? const Color(0xFFDC2626)
                               : (session.isActive || DateTime.now().isAfter(session.slot1.startTime))
-                                  ? const Color(0xFF4ADE80)
-                                  : const Color(0xFFFCD34D),
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFD97706),
                         ),
                       ),
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.edit_calendar_outlined, size: 20, color: Color(0xFF38BDF8)),
+                      icon: const Icon(Icons.edit_calendar_outlined, size: 20, color: AppColors.primary),
                       tooltip: 'Change Session Times (Slot 1 / Slot 2)',
                       onPressed: () => _showEditTimesDialog(session),
                     ),
@@ -378,23 +396,23 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 const SizedBox(height: 8),
                 Text(
                   session.title,
-                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 13, color: Color(0xFF64748B)),
+                    const Icon(Icons.calendar_today, size: 13, color: AppColors.textMuted),
                     const SizedBox(width: 6),
                     Text(
                       dateFormat.format(DateTime.tryParse(session.date) ?? DateTime.now()),
-                      style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
                     ),
                     const SizedBox(width: 14),
-                    const Icon(Icons.timer_outlined, size: 13, color: Color(0xFF64748B)),
+                    const Icon(Icons.timer_outlined, size: 13, color: AppColors.textMuted),
                     const SizedBox(width: 6),
                     Text(
                       '${session.durationMinutes} Mins',
-                      style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
                     ),
                   ],
                 ),
@@ -411,9 +429,9 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: AppColors.backgroundSoft,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: AppColors.border),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,19 +442,19 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                 const SizedBox(width: 6),
                                 Text(
                                   session.slot2 != null ? 'Slot 1 (Morning)' : 'Exam Session Time',
-                                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
                               '${timeFormat.format(session.slot1.startTime)} - ${timeFormat.format(session.slot1.endTime)}',
-                              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '👥 ${session.slot1.registeredCount} Registered',
-                              style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8)),
+                              style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                             ),
                           ],
                         ),
@@ -448,32 +466,32 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                            color: AppColors.backgroundSoft,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF334155)),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.nights_stay_outlined, size: 15, color: Color(0xFF818CF8)),
+                                  const Icon(Icons.nights_stay_outlined, size: 15, color: AppColors.primary),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Slot 2 (Evening)',
-                                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 '${timeFormat.format(session.slot2!.startTime)} - ${timeFormat.format(session.slot2!.endTime)}',
-                                style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '👥 ${session.slot2!.registeredCount} Registered',
-                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF818CF8)),
+                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                               ),
                             ],
                           ),
@@ -488,7 +506,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   height: 46,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
@@ -547,18 +565,18 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withOpacity(0.12),
+                            color: const Color(0xFFEF4444).withOpacity(0.08),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.check_circle_outline, size: 15, color: Color(0xFFFCA5A5)),
+                              const Icon(Icons.check_circle_outline, size: 15, color: Color(0xFFDC2626)),
                               const SizedBox(width: 6),
                               Text(
                                 'සැසිය අවසන් කර ඇත (Session Ended)',
-                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFFFCA5A5)),
+                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFFDC2626)),
                               ),
                             ],
                           ),
@@ -567,8 +585,8 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       const SizedBox(width: 8),
                       TextButton.icon(
                         onPressed: () => _reopenSession(session),
-                        icon: const Icon(Icons.refresh, size: 14, color: Color(0xFF38BDF8)),
-                        label: Text('Reopen', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF38BDF8))),
+                        icon: const Icon(Icons.refresh, size: 14, color: AppColors.primary),
+                        label: Text('Reopen', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.primary)),
                       ),
                     ],
                   ],
@@ -585,7 +603,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -594,19 +612,19 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             Expanded(
               child: Text(
                 'End Paper Session?',
-                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ),
           ],
         ),
         content: Text(
           'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සිසුන්ට විභාග කාමරයට පිවිසීමට හෝ නව පිළිතුරු පත්‍ර Submit කිරීමට නොහැක.',
-          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFFCBD5E1), height: 1.5),
+          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -726,11 +744,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             'New Paper Writing Session',
-            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -746,26 +764,27 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ),
                 ],
                 const SizedBox(height: 10),
-                Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: AppColors.backgroundSoft,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: selectedSubject,
                       isExpanded: true,
-                      dropdownColor: const Color(0xFF1E293B),
-                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8)),
+                      dropdownColor: Colors.white,
+                      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
                       items: subjectOptions.map((sub) {
                         return DropdownMenuItem<String>(
                           value: sub,
                           child: Text(
                             sub,
-                            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
                           ),
                         );
                       }).toList(),
@@ -784,26 +803,27 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Exam Year', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                          Text('Exam Year', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                           const SizedBox(height: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
+                              color: AppColors.backgroundSoft,
                               borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 value: selectedExamYear,
                                 isExpanded: true,
-                                dropdownColor: const Color(0xFF1E293B),
-                                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8)),
+                                dropdownColor: Colors.white,
+                                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
                                 items: examYearOptions.map((yr) {
                                   return DropdownMenuItem<String>(
                                     value: yr,
                                     child: Text(
                                       yr,
-                                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                                      style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
                                     ),
                                   );
                                 }).toList(),
@@ -823,7 +843,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       child: TextField(
                         controller: durationCtrl,
                         keyboardType: TextInputType.number,
-                        style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                        style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
                         onChanged: (val) {
                           final d = int.tryParse(val) ?? 180;
                           setDlgState(() {
@@ -833,11 +853,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         },
                         decoration: InputDecoration(
                           labelText: 'Duration (Mins)',
-                          labelStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                          labelStyle: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                           filled: true,
-                          fillColor: const Color(0xFF0F172A),
+                          fillColor: AppColors.backgroundSoft,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                         ),
                       ),
                     ),
@@ -848,18 +870,18 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6366F1).withOpacity(0.1),
+                    color: AppColors.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.markunread_mailbox_outlined, color: Color(0xFF818CF8), size: 20),
+                      const Icon(Icons.markunread_mailbox_outlined, color: AppColors.primary, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '📦 Physical Paper Delivery: සිසුන්ගේ නිවෙස් වලට කුරියර් කර ඇති මුද්‍රිත ප්‍රශ්න පත්‍රය කැමරාව ඉදිරියේ විවෘත කිරීමට ප්‍රථම විනාඩි 10 ක කාලයක් ස්වයංක්‍රීයව හිමිවේ.',
-                          style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFFC7D2FE), height: 1.4),
+                          style: GoogleFonts.poppins(fontSize: 10.5, color: AppColors.textPrimary, height: 1.4),
                         ),
                       ),
                     ],
@@ -868,7 +890,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 const SizedBox(height: 14),
                 Text(
                   '📅 Examination Date:',
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 SizedBox(
@@ -876,7 +898,8 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      side: const BorderSide(color: Color(0xFF38BDF8)),
+                      side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     onPressed: isSubmitting
                         ? null
@@ -889,17 +912,17 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                             );
                             if (d != null) setDlgState(() => selectedDate = d);
                           },
-                    icon: const Icon(Icons.calendar_today, size: 16, color: Color(0xFF38BDF8)),
+                    icon: const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
                     label: Text(
                       dateFormat.format(selectedDate),
-                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     ),
                   ),
                 ),
                 const SizedBox(height: 14),
                 Text(
                   '⚡ Session Format (සැසි ගණන):',
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFA5B4FC)),
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -910,10 +933,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
-                            color: slotCount == 1 ? const Color(0xFF6366F1).withOpacity(0.3) : const Color(0xFF0F172A),
+                            color: slotCount == 1 ? AppColors.primary.withOpacity(0.12) : AppColors.backgroundSoft,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: slotCount == 1 ? const Color(0xFF6366F1) : const Color(0xFF334155),
+                              color: slotCount == 1 ? AppColors.primary : AppColors.border,
                               width: 1.5,
                             ),
                           ),
@@ -923,7 +946,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: slotCount == 1 ? FontWeight.bold : FontWeight.w500,
-                                color: slotCount == 1 ? Colors.white : const Color(0xFF94A3B8),
+                                color: slotCount == 1 ? AppColors.primary : AppColors.textMuted,
                               ),
                             ),
                           ),
@@ -937,10 +960,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
-                            color: slotCount == 2 ? const Color(0xFF6366F1).withOpacity(0.3) : const Color(0xFF0F172A),
+                            color: slotCount == 2 ? AppColors.primary.withOpacity(0.12) : AppColors.backgroundSoft,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: slotCount == 2 ? const Color(0xFF6366F1) : const Color(0xFF334155),
+                              color: slotCount == 2 ? AppColors.primary : AppColors.border,
                               width: 1.5,
                             ),
                           ),
@@ -950,7 +973,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: slotCount == 2 ? FontWeight.bold : FontWeight.w500,
-                                color: slotCount == 2 ? Colors.white : const Color(0xFF94A3B8),
+                                color: slotCount == 2 ? AppColors.primary : AppColors.textMuted,
                               ),
                             ),
                           ),
@@ -962,13 +985,17 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 const SizedBox(height: 14),
                 Text(
                   slotCount == 1 ? '⏰ Examination Time (විභාග වේලාව):' : '⏰ Slot 1 (Morning Session Times):',
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
+                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFD97706)),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                         onPressed: isSubmitting
                             ? null
                             : () async {
@@ -981,19 +1008,23 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                   });
                                 }
                               },
-                        child: Text('Start: ${slot1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                        child: Text('Start: ${slot1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                         onPressed: isSubmitting
                             ? null
                             : () async {
                                 final t = await showTimePicker(context: context, initialTime: slot1End);
                                 if (t != null) setDlgState(() => slot1End = t);
                               },
-                        child: Text('End: ${slot1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                        child: Text('End: ${slot1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                       ),
                     ),
                   ],
@@ -1002,13 +1033,17 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   const SizedBox(height: 12),
                   Text(
                     '🌙 Slot 2 (Evening Session Times):',
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
                           onPressed: isSubmitting
                               ? null
                               : () async {
@@ -1021,19 +1056,23 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                     });
                                   }
                                 },
-                          child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                          child: Text('Start: ${slot2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
                           onPressed: isSubmitting
                               ? null
                               : () async {
                                   final t = await showTimePicker(context: context, initialTime: slot2End);
                                   if (t != null) setDlgState(() => slot2End = t);
                                 },
-                          child: Text('End: ${slot2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                          child: Text('End: ${slot2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                         ),
                       ),
                     ],
@@ -1044,19 +1083,19 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withOpacity(0.1),
+                    color: AppColors.gold.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                    border: Border.all(color: AppColors.gold.withOpacity(0.3)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 16),
+                      const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '🛑 Manual Session End: විභාග සැසිය ස්වයංක්‍රීයව අවසන් නොවේ. විභාගය අවසන් වූ පසු Admin විසින් "End Session" බොත්තම ඔබා එය අවසන් කළ යුතුය.',
-                          style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFFFDE68A), height: 1.4),
+                          style: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF92400E), height: 1.4),
                         ),
                       ),
                     ],
@@ -1068,11 +1107,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           actions: [
             TextButton(
               onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
+                backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               onPressed: isSubmitting
@@ -1195,11 +1234,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             'Change Session Times (වේලාවන් වෙනස් කිරීම)',
-            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1207,28 +1246,36 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             children: [
               Text(
                 session.slot2 != null ? 'Slot 1 (Morning Session):' : 'Exam Session Times:',
-                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B)),
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFD97706)),
               ),
               const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                       onPressed: () async {
                         final t = await showTimePicker(context: context, initialTime: s1Start);
                         if (t != null) setDlgState(() => s1Start = t);
                       },
-                      child: Text('Start: ${s1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      child: Text('Start: ${s1Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                       onPressed: () async {
                         final t = await showTimePicker(context: context, initialTime: s1End);
                         if (t != null) setDlgState(() => s1End = t);
                       },
-                      child: Text('End: ${s1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                      child: Text('End: ${s1End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                     ),
                   ),
                 ],
@@ -1237,28 +1284,36 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 const SizedBox(height: 14),
                 Text(
                   'Slot 2 (Evening Session):',
-                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF818CF8)),
+                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                         onPressed: () async {
                           final t = await showTimePicker(context: context, initialTime: s2Start);
                           if (t != null) setDlgState(() => s2Start = t);
                         },
-                        child: Text('Start: ${s2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                        child: Text('Start: ${s2Start.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                         onPressed: () async {
                           final t = await showTimePicker(context: context, initialTime: s2End);
                           if (t != null) setDlgState(() => s2End = t);
                         },
-                        child: Text('End: ${s2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white)),
+                        child: Text('End: ${s2End.format(context)}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary)),
                       ),
                     ),
                   ],
@@ -1269,7 +1324,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF22C55E)),
@@ -1346,7 +1401,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -1361,7 +1416,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             const SizedBox(width: 10),
             Text(
               'Delete Session?',
-              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
           ],
         ),
@@ -1371,28 +1426,28 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           children: [
             Text(
               'Are you sure you want to delete this paper session?',
-              style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70),
+              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
+                color: AppColors.backgroundSoft,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(color: AppColors.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     session.title,
-                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${session.subject} • ${session.examYear}',
-                    style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -1400,14 +1455,14 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
             const SizedBox(height: 10),
             Text(
               'මෙම සැසිය සහ ඊට අදාළ සියලුම ශිෂ්‍ය ලියාපදිංචි දත්ත මකා දැමෙනු ඇත.',
-              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFF87171)),
+              style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFDC2626)),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1451,18 +1506,20 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+        Text(label, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
         const SizedBox(height: 4),
         TextField(
           controller: ctrl,
-          style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+          style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+            hintStyle: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
             filled: true,
-            fillColor: const Color(0xFF0F172A),
+            fillColor: AppColors.backgroundSoft,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
           ),
         ),
       ],
@@ -1478,7 +1535,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       stream: _leaderboardService.streamUpcomingPapers(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
         }
 
         final papers = snapshot.data ?? [];
@@ -1492,27 +1549,27 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
+                      color: AppColors.backgroundSoft,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF334155)),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(Icons.auto_stories_outlined, size: 48, color: Color(0xFF818CF8)),
+                    child: const Icon(Icons.auto_stories_outlined, size: 48, color: AppColors.primary),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No Upcoming Papers Added Yet',
-                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Add upcoming exam papers to provide students with syllabus scopes and hints.',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(fontSize: 12.5, color: const Color(0xFF94A3B8)),
+                    style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -1547,9 +1604,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1558,33 +1622,34 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
-              color: Color(0xFF26334D),
+              color: AppColors.backgroundSoft,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    color: AppColors.primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     paper.subject,
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFA5B4FC)),
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   paper.examYear,
-                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF818CF8)),
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
                   tooltip: 'Edit Paper',
                   onPressed: () => _showUpcomingPaperDialog(paper),
                 ),
@@ -1604,16 +1669,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               children: [
                 Text(
                   paper.title,
-                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF94A3B8)),
+                    const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.textMuted),
                     const SizedBox(width: 6),
                     Text(
                       '${dateFormat.format(paper.scheduledDate)} at ${timeFormat.format(paper.scheduledDate)} (${paper.durationMinutes} mins)',
-                      style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFFCBD5E1)),
+                      style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textMuted),
                     ),
                   ],
                 ),
@@ -1621,11 +1686,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.assignment_outlined, size: 13, color: Color(0xFF94A3B8)),
+                      const Icon(Icons.assignment_outlined, size: 13, color: AppColors.textMuted),
                       const SizedBox(width: 6),
                       Text(
                         paper.paperStructure,
-                        style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                        style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textMuted),
                       ),
                     ],
                   ),
@@ -1639,13 +1704,13 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: AppColors.backgroundSoft,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: AppColors.border),
                         ),
                         child: Text(
                           topic,
-                          style: GoogleFonts.poppins(fontSize: 10.5, color: Colors.white70),
+                          style: GoogleFonts.poppins(fontSize: 10.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                         ),
                       );
                     }).toList(),
@@ -1657,9 +1722,9 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withOpacity(0.1),
+                      color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1669,7 +1734,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                         Expanded(
                           child: Text(
                             paper.hints,
-                            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFFFEF3C7)),
+                            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF92400E), height: 1.4),
                           ),
                         ),
                       ],
@@ -1731,22 +1796,22 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF1E293B),
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.2),
+                      color: AppColors.primary.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.auto_stories, color: Color(0xFF818CF8), size: 20),
+                    child: const Icon(Icons.auto_stories, color: AppColors.primary, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     isEdit ? 'Edit Upcoming Paper' : 'Add Upcoming Paper & Hints',
-                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                 ],
               ),
@@ -1764,15 +1829,15 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                                 const SizedBox(height: 4),
                                 Container(
                                   height: 44,
                                   padding: const EdgeInsets.symmetric(horizontal: 12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0F172A),
+                                    color: AppColors.backgroundSoft,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFF334155)),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   alignment: Alignment.centerLeft,
                                   child: Row(
@@ -1781,10 +1846,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                       const SizedBox(width: 8),
                                       Text(
                                         'Physics',
-                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8)),
+                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
                                       ),
                                       const Spacer(),
-                                      const Icon(Icons.lock, size: 13, color: Color(0xFF64748B)),
+                                      const Icon(Icons.lock, size: 13, color: AppColors.textMuted),
                                     ],
                                   ),
                                 ),
@@ -1796,28 +1861,28 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Exam Batch / Year', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                Text('Exam Batch / Year', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                                 const SizedBox(height: 4),
                                 Container(
                                   height: 44,
                                   padding: const EdgeInsets.symmetric(horizontal: 10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0F172A),
+                                    color: AppColors.backgroundSoft,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFF334155)),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
                                       value: selectedExamYear,
                                       isExpanded: true,
-                                      dropdownColor: const Color(0xFF1E293B),
-                                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 18),
+                                      dropdownColor: Colors.white,
+                                      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary, size: 18),
                                       items: examYearOptions.map((year) {
                                         return DropdownMenuItem(
                                           value: year,
                                           child: Text(
                                             year,
-                                            style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                                            style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                                           ),
                                         );
                                       }).toList(),
@@ -1843,22 +1908,22 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Paper Structure', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                Text('Paper Structure', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                                 const SizedBox(height: 4),
                                 Container(
                                   height: 44,
                                   padding: const EdgeInsets.symmetric(horizontal: 10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0F172A),
+                                    color: AppColors.backgroundSoft,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFF334155)),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
                                       value: selectedPaperStructure,
                                       isExpanded: true,
-                                      dropdownColor: const Color(0xFF1E293B),
-                                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 18),
+                                      dropdownColor: Colors.white,
+                                      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary, size: 18),
                                       items: paperStructureOptions.map((opt) {
                                         return DropdownMenuItem(
                                           value: opt,
@@ -1866,7 +1931,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                             opt,
                                             style: GoogleFonts.poppins(
                                               fontSize: 12.5,
-                                              color: Colors.white,
+                                              color: AppColors.textPrimary,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -1893,7 +1958,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFF334155)),
+                                side: const BorderSide(color: AppColors.border),
                                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
@@ -1916,10 +1981,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                   });
                                 }
                               },
-                              icon: const Icon(Icons.calendar_today, size: 14, color: Color(0xFF818CF8)),
+                              icon: const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
                               label: Text(
                                 DateFormat('yyyy-MM-dd').format(selectedDate),
-                                style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
+                                style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary),
                               ),
                             ),
                           ),
@@ -1927,7 +1992,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFF334155)),
+                                side: const BorderSide(color: AppColors.border),
                                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
@@ -1949,10 +2014,10 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                                   });
                                 }
                               },
-                              icon: const Icon(Icons.access_time, size: 14, color: Color(0xFF818CF8)),
+                              icon: const Icon(Icons.access_time, size: 14, color: AppColors.primary),
                               label: Text(
                                 selectedTime.format(context),
-                                style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
+                                style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textPrimary),
                               ),
                             ),
                           ),
@@ -1977,7 +2042,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                               const SizedBox(width: 6),
                               Text(
                                 'Exam Preparation Hints & Clues',
-                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24)),
+                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFD97706)),
                               ),
                             ],
                           ),
@@ -1985,14 +2050,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           TextField(
                             controller: hintsCtrl,
                             maxLines: 3,
-                            style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white),
+                            style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textPrimary),
                             decoration: InputDecoration(
                               hintText: 'Share special hints, tricky sections, or key formulas to review...',
-                              hintStyle: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+                              hintStyle: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
                               filled: true,
-                              fillColor: const Color(0xFF0F172A),
+                              fillColor: AppColors.backgroundSoft,
                               contentPadding: const EdgeInsets.all(12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                             ),
                           ),
                         ],
@@ -2007,11 +2074,11 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+                  child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
+                    backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () async {
@@ -2068,12 +2135,12 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Upcoming Paper?', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
-        content: Text('Are you sure you want to remove this upcoming paper and its hints?', style: GoogleFonts.poppins(color: Colors.white70)),
+        title: Text('Delete Upcoming Paper?', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        content: Text('Are you sure you want to remove this upcoming paper and its hints?', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8)))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () async {
@@ -2101,7 +2168,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
       stream: _leaderboardService.streamPaperLeaderboards(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
         }
 
         final leaderboards = snapshot.data ?? [];
@@ -2115,27 +2182,27 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
+                      color: AppColors.backgroundSoft,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF334155)),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(Icons.emoji_events_outlined, size: 48, color: Color(0xFFF59E0B)),
+                    child: const Icon(Icons.emoji_events_outlined, size: 48, color: AppColors.gold),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No Paper Leaderboards Created Yet',
-                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'After evaluating a paper, create a leaderboard here to rank candidates and publish marks.',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(fontSize: 12.5, color: const Color(0xFF94A3B8)),
+                    style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -2169,9 +2236,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 12,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2180,33 +2254,34 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
-              color: Color(0xFF26334D),
+              color: AppColors.backgroundSoft,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withOpacity(0.25),
+                    color: AppColors.gold.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     '🏆 Leaderboard',
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24)),
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFD97706)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${board.subject} • ${board.examYear}',
-                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF818CF8)),
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
                   tooltip: 'Edit Leaderboard & Marks',
                   onPressed: () => _showPaperLeaderboardEditorDialog(board),
                 ),
@@ -2226,25 +2301,25 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
               children: [
                 Text(
                   board.paperTitle,
-                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Text(
                       'Published: ${dateFormat.format(board.publishedAt)} • Max: ${board.totalMarks.toInt()} Marks',
-                      style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFFCBD5E1)),
+                      style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textMuted),
                     ),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.15),
+                        color: const Color(0xFF10B981).withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '${board.entries.length} Candidates',
-                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
                       ),
                     ),
                   ],
@@ -2255,7 +2330,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 if (board.entries.isNotEmpty) ...[
                   Text(
                     'Top Performers:',
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8)),
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 6),
                   ...board.entries.take(3).map((e) {
@@ -2268,14 +2343,14 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           Expanded(
                             child: Text(
                               e.studentName,
-                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
                             '${e.marks.toInt()} marks (${e.grade})',
-                            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF818CF8), fontWeight: FontWeight.w600),
+                            style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -2315,12 +2390,12 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Leaderboard?', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
-        content: Text('Are you sure you want to delete this paper leaderboard?', style: GoogleFonts.poppins(color: Colors.white70)),
+        title: Text('Delete Leaderboard?', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        content: Text('Are you sure you want to delete this paper leaderboard?', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8)))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () async {
@@ -2509,23 +2584,23 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
     final screenWidth = MediaQuery.of(context).size.width;
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withOpacity(0.2),
+              color: AppColors.gold.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.emoji_events, color: Color(0xFFFBBF24), size: 22),
+            child: const Icon(Icons.emoji_events, color: Color(0xFFD97706), size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               isEdit ? 'Edit Paper Leaderboard' : 'Create Paper Leaderboard',
-              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
           ),
         ],
@@ -2541,20 +2616,20 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Paper Title', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                  Text('Paper Title', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                   const SizedBox(height: 4),
                   TextField(
                     controller: _titleCtrl,
-                    style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
                       hintText: 'e.g. Physics Model Paper 03 - Mechanics',
-                      hintStyle: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+                      hintStyle: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
                       filled: true,
-                      fillColor: const Color(0xFF0F172A),
+                      fillColor: AppColors.backgroundSoft,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                     ),
                   ),
                 ],
@@ -2570,15 +2645,15 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        Text('Subject', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                         const SizedBox(height: 4),
                         Container(
                           height: 44,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                            color: AppColors.backgroundSoft,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF334155)),
+                            border: Border.all(color: AppColors.border),
                           ),
                           alignment: Alignment.centerLeft,
                           child: Row(
@@ -2587,10 +2662,10 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                               const SizedBox(width: 8),
                               Text(
                                 _lockedSubject,
-                                style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8)),
+                                style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
                               ),
                               const Spacer(),
-                              const Icon(Icons.lock_rounded, size: 14, color: Color(0xFF64748B)),
+                              const Icon(Icons.lock_rounded, size: 14, color: AppColors.textMuted),
                             ],
                           ),
                         ),
@@ -2605,28 +2680,28 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Exam Year / Batch', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        Text('Exam Year / Batch', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                         const SizedBox(height: 4),
                         Container(
                           height: 44,
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                            color: AppColors.backgroundSoft,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF334155)),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: _selectedExamYear,
                               isExpanded: true,
-                              dropdownColor: const Color(0xFF1E293B),
-                              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF818CF8), size: 18),
+                              dropdownColor: Colors.white,
+                              icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary, size: 18),
                               items: _examYearOptions.map((year) {
                                 return DropdownMenuItem(
                                   value: year,
                                   child: Text(
                                     year,
-                                    style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                                    style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                                   ),
                                 );
                               }).toList(),
@@ -2647,21 +2722,21 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total Marks', style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        Text('Total Marks', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                         const SizedBox(height: 4),
                         SizedBox(
                           height: 44,
                           child: TextField(
                             controller: _totalMarksCtrl,
                             keyboardType: TextInputType.number,
-                            style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
+                            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
                             decoration: InputDecoration(
                               filled: true,
-                              fillColor: const Color(0xFF0F172A),
+                              fillColor: AppColors.backgroundSoft,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                             ),
                           ),
                         ),
@@ -2678,24 +2753,24 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                 children: [
                   Text(
                     'Ranked Candidates (${_rows.length})',
-                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   Row(
                     children: [
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF6366F1)),
+                          side: const BorderSide(color: AppColors.primary),
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         onPressed: _autoRank,
-                        icon: const Icon(Icons.sort, size: 14, color: Color(0xFF818CF8)),
-                        label: Text('Auto-Rank', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                        icon: const Icon(Icons.sort, size: 14, color: AppColors.primary),
+                        label: Text('Auto-Rank', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1),
+                          backgroundColor: AppColors.primary,
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
@@ -2713,19 +2788,19 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: AppColors.backgroundSoft,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Center(
                     child: Column(
                       children: [
-                        const Icon(Icons.group_add_outlined, color: Color(0xFF64748B), size: 32),
+                        const Icon(Icons.group_add_outlined, color: AppColors.textMuted, size: 32),
                         const SizedBox(height: 8),
                         Text(
                           'Click "+ Add Student" above to start entering candidate scores and ranks.',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -2736,34 +2811,35 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: AppColors.backgroundSoft,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
                       SizedBox(
                         width: 32,
-                        child: Text('#', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                        child: Text('#', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 4,
-                        child: Text('Student Name', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                        child: Text('Student Name', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                       ),
                       const SizedBox(width: 8),
                       SizedBox(
                         width: 72,
-                        child: Text('Marks', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                        child: Text('Marks', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                       ),
                       const SizedBox(width: 8),
                       SizedBox(
                         width: 58,
-                        child: Text('Grade', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                        child: Text('Grade', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 3,
-                        child: Text('Accolade / Note', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8))),
+                        child: Text('Accolade / Note', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                       ),
                       const SizedBox(width: 32),
                     ],
@@ -2778,9 +2854,16 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF334155)),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x040F172A),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -2790,50 +2873,50 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                           height: 32,
                           decoration: BoxDecoration(
                             color: r.rank == 1
-                                ? const Color(0xFFF59E0B).withOpacity(0.2)
+                                ? const Color(0xFFF59E0B).withOpacity(0.15)
                                 : (r.rank == 2
-                                    ? const Color(0xFF94A3B8).withOpacity(0.2)
+                                    ? const Color(0xFF94A3B8).withOpacity(0.15)
                                     : (r.rank == 3
-                                        ? const Color(0xFFB45309).withOpacity(0.2)
-                                        : const Color(0xFF1E293B))),
+                                        ? const Color(0xFFB45309).withOpacity(0.15)
+                                        : AppColors.backgroundSoft)),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: r.rank <= 3 ? const Color(0xFFF59E0B) : const Color(0xFF334155),
+                              color: r.rank <= 3 ? const Color(0xFFF59E0B) : AppColors.border,
                             ),
                           ),
                           child: Center(
                             child: Text(
                               r.rank == 1 ? '🥇' : (r.rank == 2 ? '🥈' : (r.rank == 3 ? '🥉' : '${r.rank}')),
-                              style: GoogleFonts.poppins(fontSize: r.rank <= 3 ? 14 : 11, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: GoogleFonts.poppins(fontSize: r.rank <= 3 ? 14 : 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
 
-                        // Student Name (Dark Background, White Text)
+                        // Student Name
                         Expanded(
                           flex: 4,
                           child: SizedBox(
                             height: 42,
                             child: TextField(
                               controller: r.nameCtrl,
-                              style: GoogleFonts.poppins(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                               decoration: InputDecoration(
                                 hintText: 'Student Name',
-                                hintStyle: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                                hintStyle: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
                                 filled: true,
-                                fillColor: const Color(0xFF1E293B),
+                                fillColor: AppColors.backgroundSoft,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
 
-                        // Marks Input (FIXED: Never converts 10 to 1.0 or 80 to 8.0)
+                        // Marks Input (Never converts 10 to 1.0 or 80 to 8.0)
                         SizedBox(
                           width: 72,
                           height: 42,
@@ -2842,16 +2925,16 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                             keyboardType: TextInputType.number,
                             onChanged: (_) => _onMarksChanged(r),
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF38BDF8), fontWeight: FontWeight.bold),
+                            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.bold),
                             decoration: InputDecoration(
                               hintText: '0-100',
-                              hintStyle: GoogleFonts.poppins(fontSize: 10.5, color: const Color(0xFF64748B)),
+                              hintStyle: GoogleFonts.poppins(fontSize: 10.5, color: AppColors.textMuted),
                               filled: true,
-                              fillColor: const Color(0xFF1E293B),
+                              fillColor: AppColors.backgroundSoft,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.5)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                             ),
                           ),
                         ),
@@ -2863,14 +2946,14 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                           width: 58,
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           decoration: BoxDecoration(
-                            color: _getGradeColor(r.grade).withOpacity(0.15),
+                            color: _getGradeColor(r.grade).withOpacity(0.12),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: _getGradeColor(r.grade)),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: r.grade,
-                              dropdownColor: const Color(0xFF1E293B),
+                              dropdownColor: Colors.white,
                               icon: const SizedBox.shrink(),
                               alignment: Alignment.center,
                               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: _getGradeColor(r.grade)),
@@ -2897,16 +2980,16 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                             height: 42,
                             child: TextField(
                               controller: r.remarksCtrl,
-                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.white),
+                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textPrimary),
                               decoration: InputDecoration(
                                 hintText: 'Accolade / Note',
-                                hintStyle: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF64748B)),
+                                hintStyle: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
                                 filled: true,
-                                fillColor: const Color(0xFF1E293B),
+                                fillColor: AppColors.backgroundSoft,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF334155))),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF818CF8), width: 1.5)),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                               ),
                             ),
                           ),
@@ -2941,11 +3024,11 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFF94A3B8))),
+          child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textMuted)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6366F1),
+            backgroundColor: AppColors.primary,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
