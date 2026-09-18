@@ -22,15 +22,15 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
   late Duration _remaining;
   late DateTime _targetDate;
   String _displayTitle = '';
-  bool _isEnabled = true;
+  bool _isEnabled = false;
   StreamSubscription<ExamCountdownConfig?>? _configSubscription;
 
   @override
   void initState() {
     super.initState();
     _initDefaultTargetDate();
-    _subscribeToConfig();
     _calculateRemaining();
+    _subscribeToConfig();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _calculateRemaining());
@@ -57,6 +57,10 @@ class _ExamCountdownWidgetState extends State<ExamCountdownWidget> {
               ? config.customTitle
               : '${widget.examYear} Final Countdown';
           _calculateRemaining();
+        });
+      } else {
+        setState(() {
+          _isEnabled = false;
         });
       }
     });
