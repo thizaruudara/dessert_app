@@ -63,6 +63,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   bool _isSendingHeartbeat = false;
   bool _hasExitedDueToEnd = false;
   bool _hasPromptedTimeUp = false;
+  final Set<int> _triggeredTimeMilestones = {};
+  bool _isBigTimerMinimized = false;
 
   @override
   void initState() {
@@ -498,6 +500,205 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     );
   }
 
+  void _checkWritingMilestones(int secondsLeft) {
+    if (secondsLeft <= 0) return;
+
+    // 1 Hour Left (60 minutes = 3600 seconds) - window: 3541-3600
+    if (secondsLeft <= 3600 && secondsLeft > 3540 && !_triggeredTimeMilestones.contains(60)) {
+      _triggeredTimeMilestones.add(60);
+      _fireTimeAlert(
+        minutesLeft: 60,
+        title: '⏳ පැය 1ක් ඉතිරිව ඇත (1 Hour Left)',
+        message: 'විභාගය අවසන් වීමට පැය 1ක් (විනාඩි 60ක්) ඉතිරිව ඇත. කරුණාකර ඔබගේ කාලය නිසි පරිදි කළමනාකරණය කරගන්න.',
+      );
+    }
+    // 30 Minutes Left (1800 seconds) - window: 1741-1800
+    else if (secondsLeft <= 1800 && secondsLeft > 1740 && !_triggeredTimeMilestones.contains(30)) {
+      _triggeredTimeMilestones.add(30);
+      _fireTimeAlert(
+        minutesLeft: 30,
+        title: '⏱️ විනාඩි 30ක් ඉතිරිව ඇත (30 Minutes Left)',
+        message: 'විභාගය අවසන් වීමට ඇත්තේ විනාඩි 30ක් පමණි! අවසන් පිළිතුරු සටහන් කිරීම වේගවත් කරන්න.',
+      );
+    }
+    // 10 Minutes Left (600 seconds) - window: 541-600
+    else if (secondsLeft <= 600 && secondsLeft > 540 && !_triggeredTimeMilestones.contains(10)) {
+      _triggeredTimeMilestones.add(10);
+      _fireTimeAlert(
+        minutesLeft: 10,
+        title: '⚠️ විනාඩි 10ක් පමණයි! (10 Minutes Left)',
+        message: 'අවධානය දෙන්න: විභාගය අවසන් වීමට ඇත්තේ විනාඩි 10ක් පමණි! පිළිතුරු පත්‍ර පිළිවෙල කර ගැනීමට සූදානම් වන්න.',
+      );
+    }
+    // 5 Minutes Left (300 seconds) - window: 241-300
+    else if (secondsLeft <= 300 && secondsLeft > 240 && !_triggeredTimeMilestones.contains(5)) {
+      _triggeredTimeMilestones.add(5);
+      _fireTimeAlert(
+        minutesLeft: 5,
+        title: '🚨 අවසන් විනාඩි 5යි! (Final 5 Minutes)',
+        message: 'ලිවීම අවසන් කර පිළිතුරු පත්‍ර Scan කිරීමට සූදානම් වන්න!',
+      );
+    }
+  }
+
+  void _fireTimeAlert({
+    required int minutesLeft,
+    required String title,
+    required String message,
+  }) {
+    // 1. Heavy physical haptic feedback
+    try {
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 200), () => HapticFeedback.heavyImpact());
+      Future.delayed(const Duration(milliseconds: 400), () => HapticFeedback.heavyImpact());
+    } catch (_) {}
+
+    // 2. System Push / Heads-up Notification
+    NotificationService.showNotification(
+      id: 9000 + minutesLeft,
+      title: title,
+      body: message,
+    );
+
+    // 3. Popup modal alert dialog
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _showTimeWarningDialog(minutesLeft: minutesLeft, title: title, message: message);
+      }
+    });
+  }
+
+  void _showTimeWarningDialog({
+    required int minutesLeft,
+    required String title,
+    required String message,
+  }) {
+    if (!mounted) return;
+
+    final Color accentColor = minutesLeft <= 10
+        ? const Color(0xFFEF4444)
+        : minutesLeft <= 30
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF3B82F6);
+
+    final IconData dialogIcon = minutesLeft <= 10
+        ? Icons.warning_amber_rounded
+        : minutesLeft <= 30
+            ? Icons.timer_outlined
+            : Icons.hourglass_bottom_rounded;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: accentColor, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withOpacity(0.35),
+                blurRadius: 24,
+                spreadRadius: 2,
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.7),
+                blurRadius: 20,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Glowing Icon badge
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accentColor, width: 2),
+                ),
+                child: Icon(dialogIcon, color: accentColor, size: 34),
+              ),
+              const SizedBox(height: 16),
+              // Prominent Time Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentColor.withOpacity(0.5)),
+                ),
+                child: Text(
+                  minutesLeft >= 60 ? '⏱️ 1 HOUR REMAINING' : '⏱️ $minutesLeft MINUTES REMAINING',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: accentColor,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Title
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Description
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: const Color(0xFFCBD5E1),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 22),
+              // Action Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'තේරුම් ගත්තා (Got It)',
+                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showProctorAlertDialog(ProctorAlert alert) {
     // 1. Heavy haptic feedback to physically notify student
     try {
@@ -688,6 +889,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         } else {
           _localWritingStartTime = null;
           _lastObservedWritingStartedAt = null;
+          _triggeredTimeMilestones.clear();
         }
 
         final int totalWritingSeconds = session.durationMinutes * 60;
@@ -698,6 +900,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         final Duration examWritingTimeLeft = isWriting && !isOvertime
             ? Duration(seconds: (totalWritingSeconds - writingElapsed).clamp(0, totalWritingSeconds))
             : Duration.zero;
+
+        // Check milestones for push and popup notifications
+        if (isWriting && !isOvertime) {
+          _checkWritingMilestones(examWritingTimeLeft.inSeconds);
+        }
         final Duration overtimeDuration = isOvertime
             ? Duration(seconds: writingElapsed - totalWritingSeconds)
             : Duration.zero;
@@ -814,26 +1021,34 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                   icon: const Icon(Icons.flip_camera_ios, color: Colors.white, size: 18),
                   onPressed: _switchCamera,
                 ),
-              // Live Timer Pill (Compact, fits all screens)
+              // Upgraded Live Timer Pill (High visibility, prominent badge)
               Container(
-                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: timerColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: timerColor),
+                  color: timerColor.withOpacity(0.22),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: timerColor, width: 1.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: timerColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      spreadRadius: 0,
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(timerIcon, size: 13, color: timerColor),
-                    const SizedBox(width: 4),
+                    Icon(timerIcon, size: 16, color: timerColor),
+                    const SizedBox(width: 6),
                     Text(
                       timerString,
                       style: GoogleFonts.poppins(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
                         color: timerColor,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
@@ -849,7 +1064,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     // 1. Full Screen Camera View (NO PDF)
                     _buildFullScreenCameraView(),
 
-                    // 2. Top Phase Banner (Package Opening, Exam Writing, or Time Up)
+                    // 2. Top Phase Banner (Package Opening, Big Exam Writing HUD, or Time Up)
                     Positioned(
                       top: 16,
                       left: 16,
@@ -861,6 +1076,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                         isEnded: isEnded,
                         isTimeUp: isTimeUp,
                         packageSecsLeft: packageOpeningSecsLeft,
+                        examWritingTimeLeft: examWritingTimeLeft,
                       ),
                     ),
 
@@ -1247,6 +1463,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     required bool isEnded,
     required bool isTimeUp,
     required int packageSecsLeft,
+    Duration? examWritingTimeLeft,
   }) {
     if (isEnded) {
       return Container(
@@ -1342,27 +1559,175 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         );
       }
 
+      // HIGH VISIBILITY BIG TIMER HUD FOR STUDENTS WRITING THE PAPER
+      final duration = examWritingTimeLeft ?? Duration.zero;
+      final hours = duration.inHours.toString().padLeft(2, '0');
+      final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+      final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+      final bool isUrgent = duration.inMinutes < 10;
+      final bool isWarning = duration.inMinutes < 30;
+      final Color hudColor = isUrgent
+          ? const Color(0xFFEF4444)
+          : isWarning
+              ? const Color(0xFFF59E0B)
+              : const Color(0xFF22C55E);
+
+      if (_isBigTimerMinimized) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A).withOpacity(0.92),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: hudColor.withOpacity(0.7), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 10),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: hudColor, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '✍️ ලිවීම සක්‍රීයයි • ඉතිරි කාලය:',
+                  style: GoogleFonts.poppins(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+              ),
+              Text(
+                duration.inHours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: hudColor,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() => _isBigTimerMinimized = false),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.expand_more, size: 18, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A).withOpacity(0.8),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.5)),
+          color: const Color(0xFF0B132B).withOpacity(0.94),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: hudColor, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: hudColor.withOpacity(0.28),
+              blurRadius: 18,
+              spreadRadius: 1,
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.65),
+              blurRadius: 16,
+            ),
+          ],
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
+            // Top Header: Live Status + Minimize Button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: hudColor,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: hudColor.withOpacity(0.7), blurRadius: 6, spreadRadius: 1),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '📝 පිළිතුරු ලිවීම සක්‍රීයයි (WRITING ACTIVE)',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFE2E8F0),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                InkWell(
+                  onTap: () => setState(() => _isBigTimerMinimized = true),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Text('සුළු කරන්න', style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8))),
+                        const SizedBox(width: 2),
+                        const Icon(Icons.expand_less, size: 16, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '✍️ පිළිතුරු ලිවීම සක්‍රීයයි - ලිවීම් මේසය සහ ඔබ කැමරාව ඉදිරියේ තබාගන්න.',
-                style: GoogleFonts.poppins(fontSize: 11, color: Colors.white),
-              ),
+            const SizedBox(height: 10),
+
+            // Centerpiece: Giant High-Contrast Digital Digits
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (duration.inHours > 0) ...[
+                  _buildDigitTile(hours, 'HOURS', hudColor),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: Text(
+                      ':',
+                      style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: hudColor),
+                    ),
+                  ),
+                ],
+                _buildDigitTile(minutes, 'MINUTES', hudColor),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: Text(
+                    ':',
+                    style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: hudColor),
+                  ),
+                ),
+                _buildDigitTile(seconds, 'SECONDS', hudColor),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+            Text(
+              'කැමරාව ඉදිරියේ ඔබගේ ලිවීම් මේසය සහ පිළිතුරු පත්‍රය තබා ගන්න',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
             ),
           ],
         ),
@@ -1479,6 +1844,43 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildDigitTile(String value, String label, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          constraints: const BoxConstraints(minWidth: 54),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.5), width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: color,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 8.5,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF64748B),
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildBottomExamControlBar(bool isEnded, bool isTimeUp) {
