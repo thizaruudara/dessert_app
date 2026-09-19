@@ -4,6 +4,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/models/dessert_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/media_image_view.dart';
+import '../../../core/widgets/liquid_glass_card.dart';
 
 class DessertListTile extends StatelessWidget {
   final DessertModel dessert;
@@ -16,29 +17,18 @@ class DessertListTile extends StatelessWidget {
     final hasImages = dessert.mediaUrls.isNotEmpty;
     final firstImg = dessert.mediaUrls.isNotEmpty ? dessert.mediaUrls.first : null;
 
-    return Container(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return LiquidGlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _borderColor),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x060F172A),
-            blurRadius: 12,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
+      padding: const EdgeInsets.all(14),
+      borderRadius: BorderRadius.circular(20),
+      blur: 16,
+      surfaceOpacity: isDark ? 0.60 : 0.86,
+      borderColor: _borderColor,
+      glowColor: _statusColor,
+      onTap: onTap,
+      child: Row(
               children: [
                 // Thumbnail or Status Emoji Box
                 if (hasImages && firstImg != null && firstImg.isNotEmpty)
@@ -172,9 +162,6 @@ class DessertListTile extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/dessert_model.dart';
+import '../../../core/widgets/liquid_glass_card.dart';
 
 class StudentProgressChart extends StatefulWidget {
   final List<DessertModel> desserts;
@@ -107,21 +108,14 @@ class _StudentProgressChartState extends State<StudentProgressChart> {
               ? ((widget.desserts.where((d) => d.isApproved).length / widget.desserts.length) * 100).toInt()
               : 100);
 
-      return Container(
-        width: double.infinity,
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+
+      return LiquidGlassCard(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x080F172A),
-              blurRadius: 16,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
+        borderRadius: BorderRadius.circular(22),
+        blur: 18,
+        surfaceOpacity: isDark ? 0.60 : 0.86,
+        glowColor: AppColors.primary,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -203,7 +203,7 @@ class _StudentShellState extends State<StudentShell> {
           }
         },
         items: _items,
-        barColor: isDark ? const Color(0xFF111827) : Colors.white,
+        barColor: isDark ? const Color(0xFF111827) : Colors.white.withOpacity(0.95),
         borderColor: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0),
         activeCircleGradient: isDark
             ? const LinearGradient(
