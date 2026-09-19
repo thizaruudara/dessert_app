@@ -1443,6 +1443,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                       'Restart 10m Timer (කාලය නැවත අරඹන්න)',
                       'ප්‍රශ්න පත්‍ර විවෘත කිරීමේ විනාඩි 10 ක කාලය නැවත 10:00 සිට ආරම්භ කිරීමට අවශ්‍යද?',
                       const Color(0xFFF59E0B),
+                      forceResetTimer: true,
                     ),
                     icon: const Icon(Icons.replay_rounded, size: 14, color: Colors.black),
                     label: Text(
@@ -1555,7 +1556,14 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     );
   }
 
-  void _confirmSetPhase(PaperSession session, String targetPhase, String title, String description, Color color) {
+  void _confirmSetPhase(
+    PaperSession session,
+    String targetPhase,
+    String title,
+    String description,
+    Color color, {
+    bool forceResetTimer = false,
+  }) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1576,7 +1584,11 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
             onPressed: () async {
               Navigator.of(ctx).pop();
               try {
-                await _paperService.setSessionPhase(session.id, targetPhase);
+                await _paperService.setSessionPhase(
+                  session.id,
+                  targetPhase,
+                  forceResetTimer: forceResetTimer,
+                );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

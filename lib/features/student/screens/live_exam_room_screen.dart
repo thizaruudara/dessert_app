@@ -48,10 +48,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   DateTime _now = DateTime.now();
   bool _isCurrentlyWaiting = true;
   String _currentStudentId = '';
-  DateTime? _localPackageOpeningStartTime;
-  DateTime? _lastObservedPackageOpeningStartedAt;
-  DateTime? _localWritingStartTime;
-  DateTime? _lastObservedWritingStartedAt;
+  DateTime? _cachedPackageOpeningStartTime;
+  DateTime? _cachedWritingStartTime;
 
   PaperSession? _latestSession;
   Timer? _sessionSyncTimer;
@@ -75,6 +73,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     if (user != null) {
       _currentStudentId = user.id;
     }
+    _loadCachedStartTimes();
     _ensureStudentRegistered();
     _initCamera();
     _loadDismissedAlerts();
@@ -83,6 +82,75 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkIfAlreadySubmitted();
     });
+  }
+
+  Future<void> _loadCachedStartTimes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final writingIso = prefs.getString('paper_writing_start_${widget.paperId}');
+      if (writingIso != null && writingIso.isNotEmpty) {
+        _cachedWritingStartTime = DateTime.tryParse(writingIso);
+      }
+      final pkgIso = prefs.getString('paper_pkg_start_${widget.paperId}');
+      if (pkgIso != null && pkgIso.isNotEmpty) {
+        _cachedPackageOpeningStartTime = DateTime.tryParse(pkgIso);
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Error loading cached exam start times: $e');
+    }
+  }
+
+  DateTime? _getEffectiveWritingStartTime(PaperSession session) {
+    if (session.writingStartedAt != null) {
+      if (_cachedWritingStartTime != session.writingStartedAt) {
+        _cachedWritingStartTime = session.writingStartedAt;
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('paper_writing_start_${session.id}', session.writingStartedAt!.toIso8601String());
+        }).catchError((_) {});
+      }
+      return session.writingStartedAt;
+    }
+
+    if (_cachedWritingStartTime != null) {
+      return _cachedWritingStartTime;
+    }
+
+    if (session.isWriting) {
+      _cachedWritingStartTime = DateTime.now();
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('paper_writing_start_${session.id}', _cachedWritingStartTime!.toIso8601String());
+      }).catchError((_) {});
+      return _cachedWritingStartTime;
+    }
+
+    return null;
+  }
+
+  DateTime? _getEffectivePackageOpeningStartTime(PaperSession session) {
+    if (session.packageOpeningStartedAt != null) {
+      if (_cachedPackageOpeningStartTime != session.packageOpeningStartedAt) {
+        _cachedPackageOpeningStartTime = session.packageOpeningStartedAt;
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('paper_pkg_start_${session.id}', session.packageOpeningStartedAt!.toIso8601String());
+        }).catchError((_) {});
+      }
+      return session.packageOpeningStartedAt;
+    }
+
+    if (_cachedPackageOpeningStartTime != null) {
+      return _cachedPackageOpeningStartTime;
+    }
+
+    if (session.isPackageOpening) {
+      _cachedPackageOpeningStartTime = DateTime.now();
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('paper_pkg_start_${session.id}', _cachedPackageOpeningStartTime!.toIso8601String());
+      }).catchError((_) {});
+      return _cachedPackageOpeningStartTime;
+    }
+
+    return null;
   }
 
   Future<void> _loadDismissedAlerts() async {
@@ -858,44 +926,31 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
         }
 
         // Package Opening Countdown (10 Minutes):
-        // Completely immune to device clock discrepancies. Counts down locally from 10:00.
-        // If the examiner triggers or restarts the 10m timer (packageOpeningStartedAt changes),
-        // we automatically reset the local reference time to restart the 10m countdown.
+        // Authoritative server timestamp synchronized + offline persistent cache.
         int packageOpeningSecsLeft = 600;
         if (isPackageOpening) {
-          if (_localPackageOpeningStartTime == null ||
-              (session.packageOpeningStartedAt != null &&
-                  session.packageOpeningStartedAt != _lastObservedPackageOpeningStartedAt)) {
-            _lastObservedPackageOpeningStartedAt = session.packageOpeningStartedAt;
-            _localPackageOpeningStartTime = DateTime.now();
+          final effectivePkgStart = _getEffectivePackageOpeningStartTime(session);
+          if (effectivePkgStart != null) {
+            final rawElapsed = _now.difference(effectivePkgStart).inSeconds;
+            final elapsed = rawElapsed < 0 ? 0 : rawElapsed;
+            packageOpeningSecsLeft = (600 - elapsed).clamp(0, 600);
           }
-          final elapsed = _now.difference(_localPackageOpeningStartTime!).inSeconds;
-          packageOpeningSecsLeft = (600 - elapsed).clamp(0, 600);
-        } else {
-          _localPackageOpeningStartTime = null;
-          _lastObservedPackageOpeningStartedAt = null;
         }
 
         // Real Exam Writing Phase:
-        // Counts down the full durationMinutes set by examiner.
-        // Immune to past timestamps or clock skew between examiner and student.
-        if (isWriting) {
-          if (_localWritingStartTime == null ||
-              (session.writingStartedAt != null &&
-                  session.writingStartedAt != _lastObservedWritingStartedAt)) {
-            _lastObservedWritingStartedAt = session.writingStartedAt;
-            _localWritingStartTime = DateTime.now();
-          }
-        } else {
-          _localWritingStartTime = null;
-          _lastObservedWritingStartedAt = null;
+        // Synchronized with when admin started the writing phase (writingStartedAt).
+        // Carries continuous elapsed time accurately and NEVER resets across app restarts,
+        // re-entry, hot-reload, screen orientation changes, or device locks.
+        final DateTime? effectiveWritingStart = isWriting ? _getEffectiveWritingStartTime(session) : null;
+        if (!isWriting) {
           _triggeredTimeMilestones.clear();
         }
 
         final int totalWritingSeconds = session.durationMinutes * 60;
-        final int writingElapsed = _localWritingStartTime != null
-            ? _now.difference(_localWritingStartTime!).inSeconds
+        final int rawWritingElapsed = effectiveWritingStart != null
+            ? _now.difference(effectiveWritingStart).inSeconds
             : 0;
+        final int writingElapsed = rawWritingElapsed < 0 ? 0 : rawWritingElapsed;
         final bool isOvertime = isWriting && writingElapsed > totalWritingSeconds;
         final Duration examWritingTimeLeft = isWriting && !isOvertime
             ? Duration(seconds: (totalWritingSeconds - writingElapsed).clamp(0, totalWritingSeconds))

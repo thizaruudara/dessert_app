@@ -512,28 +512,40 @@ class PaperSessionService {
   }
 
   // ── 15. Start / Set Active Paper Session Manually (Admin Only) ────────────
-  Future<void> startPaperSession(String paperId) async {
+  Future<void> startPaperSession(String paperId, {bool forceResetTimer = false}) async {
     await _ensureAuth();
+    final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
+    final data = docSnap.data();
+    final existingWritingStart = data?['writingStartedAt'];
     final now = Timestamp.now();
-    await _firestore.collection('paper_sessions').doc(paperId).update({
+    final Map<String, dynamic> updates = {
       'status': 'active',
       'currentPhase': 'writing',
-      'startedAt': now,
-      'writingStartedAt': now,
-    });
+      'startedAt': data?['startedAt'] ?? now,
+    };
+    if (forceResetTimer || existingWritingStart == null) {
+      updates['writingStartedAt'] = now;
+    }
+    await _firestore.collection('paper_sessions').doc(paperId).update(updates);
   }
 
   // ── 16. Re-open Ended Session (Admin Only) ────────────────────────────────
-  Future<void> reopenPaperSession(String paperId) async {
+  Future<void> reopenPaperSession(String paperId, {bool forceResetTimer = false}) async {
     await _ensureAuth();
+    final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
+    final data = docSnap.data();
+    final existingWritingStart = data?['writingStartedAt'];
     final now = Timestamp.now();
-    await _firestore.collection('paper_sessions').doc(paperId).update({
+    final Map<String, dynamic> updates = {
       'status': 'active',
       'currentPhase': 'writing',
       'isTimeUp': false,
       'reopenedAt': now,
-      'writingStartedAt': now,
-    });
+    };
+    if (forceResetTimer || existingWritingStart == null) {
+      updates['writingStartedAt'] = now;
+    }
+    await _firestore.collection('paper_sessions').doc(paperId).update(updates);
   }
 
   // ── 17. Trigger Time Up (Admin Only) ──────────────────────────────────────
@@ -555,18 +567,24 @@ class PaperSessionService {
   }
 
   // ── 18. Reset Time Up (Admin Only) ────────────────────────────────────────
-  Future<void> resetTimeUp(String paperId) async {
+  Future<void> resetTimeUp(String paperId, {bool forceResetTimer = false}) async {
     await _ensureAuth();
+    final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
+    final data = docSnap.data();
+    final existingWritingStart = data?['writingStartedAt'];
     final now = Timestamp.now();
-    await _firestore.collection('paper_sessions').doc(paperId).update({
+    final Map<String, dynamic> updates = {
       'isTimeUp': false,
       'currentPhase': 'writing',
-      'writingStartedAt': now,
-    });
+    };
+    if (forceResetTimer || existingWritingStart == null) {
+      updates['writingStartedAt'] = now;
+    }
+    await _firestore.collection('paper_sessions').doc(paperId).update(updates);
   }
 
   // ── 19. Set Session Phase Manually (Admin Only) ───────────────────────────
-  Future<void> setSessionPhase(String paperId, String phase) async {
+  Future<void> setSessionPhase(String paperId, String phase, {bool forceResetTimer = false}) async {
     await _ensureAuth();
     final nowTimestamp = Timestamp.now();
     final Map<String, dynamic> updates = {
@@ -582,13 +600,29 @@ class PaperSessionService {
     } else if (phase == 'package_opening') {
       updates['status'] = 'active';
       updates['isTimeUp'] = false;
-      updates['packageOpeningStartedAt'] = nowTimestamp;
+      if (forceResetTimer) {
+        updates['packageOpeningStartedAt'] = nowTimestamp;
+      } else {
+        final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
+        final existing = docSnap.data()?['packageOpeningStartedAt'];
+        if (existing == null) {
+          updates['packageOpeningStartedAt'] = nowTimestamp;
+        }
+      }
       alertMessage = '📦 ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කරන්න! (Open your exam parcel in front of the camera now!)';
       alertType = 'urgent';
     } else if (phase == 'writing') {
       updates['status'] = 'active';
       updates['isTimeUp'] = false;
-      updates['writingStartedAt'] = nowTimestamp;
+      if (forceResetTimer) {
+        updates['writingStartedAt'] = nowTimestamp;
+      } else {
+        final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
+        final existing = docSnap.data()?['writingStartedAt'];
+        if (existing == null) {
+          updates['writingStartedAt'] = nowTimestamp;
+        }
+      }
       updates['packageOpeningEndedAt'] = nowTimestamp;
       alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
       alertType = 'info';
