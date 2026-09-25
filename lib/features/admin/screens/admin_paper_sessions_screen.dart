@@ -24,6 +24,18 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   late final Stream<List<PaperSession>> _sessionsStream = _paperService.streamSessions();
   int _selectedAdminTab = 0; // 0: Live Sessions, 1: Upcoming Papers, 2: Paper Leaderboards
 
+  String _selectedLeaderboardBatchFilter = 'All Batches';
+  final List<String> _leaderboardBatchOptions = const [
+    'All Batches',
+    '2024 A/L',
+    '2025 A/L',
+    '2026 A/L',
+    '2027 A/L',
+    '2028 A/L',
+    '2029 A/L',
+  ];
+  final Set<String> _expandedAdminBoardIds = {};
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2164,74 +2176,197 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
   // ══════════════════════════════════════════════════════════════════════════
 
   Widget _buildAdminPaperLeaderboardsView() {
-    return StreamBuilder<List<PaperLeaderboard>>(
-      stream: _leaderboardService.streamPaperLeaderboards(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
+    final effectiveYear = _selectedLeaderboardBatchFilter == 'All Batches' ? null : _selectedLeaderboardBatchFilter;
 
-        final leaderboards = snapshot.data ?? [];
-        if (leaderboards.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundSoft,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: const Icon(Icons.emoji_events_outlined, size: 48, color: AppColors.gold),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No Paper Leaderboards Created Yet',
-                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'After evaluating a paper, create a leaderboard here to rank candidates and publish marks.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => _showPaperLeaderboardEditorDialog(),
-                    icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                    label: Text(
-                      'Create First Paper Leaderboard',
-                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+    return Column(
+      children: [
+        // ── Batch Filter Chips for Leaderboards ─────────────
+        Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _leaderboardBatchOptions.length,
+            itemBuilder: (context, index) {
+              final batch = _leaderboardBatchOptions[index];
+              final isSelected = _selectedLeaderboardBatchFilter == batch;
+
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedbackService.selection();
+                  setState(() => _selectedLeaderboardBatchFilter = batch);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary.withOpacity(0.12) : AppColors.backgroundSoft,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.border,
+                      width: isSelected ? 1.5 : 1,
                     ),
                   ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected) ...[
+                          const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          batch,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        // ── Stream Leaderboards List ────────────────────────
+        Expanded(
+          child: StreamBuilder<List<PaperLeaderboard>>(
+            stream: _leaderboardService.streamPaperLeaderboards(examYear: effectiveYear),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              }
+
+              final leaderboards = snapshot.data ?? [];
+
+              return CustomScrollView(
+                slivers: [
+                  // Top Subheader with Count & Create Button
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                      child: Row(
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$_selectedLeaderboardBatchFilter Leaderboards',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                '${leaderboards.length} published leaderboard(s)',
+                                style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                            onPressed: () => _showPaperLeaderboardEditorDialog(),
+                            icon: const Icon(Icons.add, color: Colors.white, size: 16),
+                            label: Text(
+                              '+ New Board',
+                              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Empty State or List
+                  if (leaderboards.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: AppColors.backgroundSoft,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: const Icon(Icons.emoji_events_outlined, size: 48, color: AppColors.gold),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No Leaderboards for $_selectedLeaderboardBatchFilter',
+                                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Create a paper leaderboard for this batch to evaluate and publish candidate ranks.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textMuted),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                onPressed: () => _showPaperLeaderboardEditorDialog(),
+                                icon: const Icon(Icons.add, color: Colors.white, size: 16),
+                                label: Text(
+                                  'Create Paper Leaderboard',
+                                  style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            return _buildAdminLeaderboardCard(leaderboards[index]);
+                          },
+                          childCount: leaderboards.length,
+                        ),
+                      ),
+                    ),
                 ],
-              ),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: leaderboards.length,
-          itemBuilder: (context, index) {
-            return _buildAdminLeaderboardCard(leaderboards[index]);
-          },
-        );
-      },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildAdminLeaderboardCard(PaperLeaderboard board) {
     final dateFormat = DateFormat('yyyy MMM dd');
+    final isExpanded = _expandedAdminBoardIds.contains(board.id);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -2275,9 +2410,16 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${board.subject} • ${board.examYear}',
-                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${board.subject} • ${board.examYear}',
+                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
@@ -2326,31 +2468,97 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Top 3 Candidates Preview
+                // Candidates list (Expanded or Top 3 Preview)
                 if (board.entries.isNotEmpty) ...[
-                  Text(
-                    'Top Performers:',
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 6),
-                  ...board.entries.take(3).map((e) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        children: [
-                          Text(e.rank == 1 ? '🥇' : (e.rank == 2 ? '🥈' : '🥉'), style: const TextStyle(fontSize: 13)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              e.studentName,
-                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Text(
+                        isExpanded ? 'All Candidate Rankings:' : 'Top Performers Preview:',
+                        style: GoogleFonts.poppins(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        onTap: () {
+                          HapticFeedbackService.selection();
+                          setState(() {
+                            if (isExpanded) {
+                              _expandedAdminBoardIds.remove(board.id);
+                            } else {
+                              _expandedAdminBoardIds.add(board.id);
+                            }
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            isExpanded ? 'Show Less ▴' : 'View All (${board.entries.length}) ▾',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF6366F1),
                             ),
                           ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Candidate Rows
+                  ...(isExpanded ? board.entries : board.entries.take(3)).map((e) {
+                    Color gradeColor = const Color(0xFF10B981);
+                    if (e.grade == 'B') gradeColor = const Color(0xFF3B82F6);
+                    if (e.grade == 'C') gradeColor = const Color(0xFFF59E0B);
+                    if (e.grade == 'S') gradeColor = const Color(0xFFA855F7);
+                    if (e.grade == 'F') gradeColor = const Color(0xFFEF4444);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(e.rank == 1 ? '🥇' : (e.rank == 2 ? '🥈' : (e.rank == 3 ? '🥉' : '#${e.rank}')),
+                              style: const TextStyle(fontSize: 13)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  e.studentName,
+                                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (e.remarks.isNotEmpty)
+                                  Text(
+                                    e.remarks,
+                                    style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: gradeColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Grade ${e.grade}',
+                              style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.bold, color: gradeColor),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            '${e.marks.toInt()} marks (${e.grade})',
-                            style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600),
+                            '${e.marks.toInt()} / ${board.totalMarks.toInt()}',
+                            style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),

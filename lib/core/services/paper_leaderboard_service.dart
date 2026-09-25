@@ -89,14 +89,22 @@ class PaperLeaderboardService {
 
       if (examYear != null && examYear.trim().isNotEmpty && examYear != 'All' && examYear != 'All Batches') {
         final cleanYear = examYear.replaceAll(' ', '').toUpperCase();
+        final yearDigits = RegExp(r'\b(20\d\d)\b').firstMatch(examYear)?.group(1);
         return list.where((p) {
           final pYear = p.examYear.replaceAll(' ', '').toUpperCase();
-          return pYear == cleanYear ||
+          if (pYear == cleanYear ||
               pYear == 'ALLBATCHES' ||
               pYear == 'ALL' ||
               p.examYear == examYear ||
               p.examYear == 'All Batches' ||
-              p.examYear == 'All';
+              p.examYear == 'All') {
+            return true;
+          }
+          if (yearDigits != null) {
+            final pDigits = RegExp(r'\b(20\d\d)\b').firstMatch(p.examYear)?.group(1);
+            if (pDigits != null && pDigits == yearDigits) return true;
+          }
+          return false;
         }).toList();
       }
       return list;

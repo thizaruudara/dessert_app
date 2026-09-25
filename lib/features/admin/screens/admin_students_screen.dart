@@ -448,7 +448,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: ['All', '2026 A/L', '2027 A/L', '2028 A/L'].map((batch) {
+                        children: ['All', '2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'].map((batch) {
                           final isSelected = _selectedBatchFilter == batch;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
