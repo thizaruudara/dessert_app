@@ -167,127 +167,140 @@ class _SplashScreenState extends State<SplashScreen>
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-      body: SlideTransition(
-        position: _swapUpSlide,
-        child: FadeTransition(
-          opacity: _swapUpFade,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: Column(
-                children: [
-                  const Spacer(flex: 3),
+      body: SizedBox.expand(
+        child: SlideTransition(
+          position: _swapUpSlide,
+          child: FadeTransition(
+            opacity: _swapUpFade,
+            child: SafeArea(
+              child: SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 20),
 
-                  // ── Hero Logo (100% Transparent, No Circles, No Boxes) ───
-                  SlideTransition(
-                    position: _logoSlide,
-                    child: ScaleTransition(
-                      scale: _logoScale,
-                      child: FadeTransition(
-                        opacity: _logoFade,
-                        child: SizedBox(
-                          width: 180,
-                          height: 180,
-                          child: Image.asset(
-                            'assets/images/edupeak_logo.png',
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── Tagline Pill Badge ───────────────────────────────────
-                  SlideTransition(
-                    position: _badgeSlide,
-                    child: FadeTransition(
-                      opacity: _badgeFade,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.06)
-                              : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: isDark
-                                ? Colors.white.withOpacity(0.10)
-                                : const Color(0xFFE2E8F0),
-                            width: 1.0,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(isDark ? 0.25 : 0.03),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                    // ── Center Content: Logo + Badge (100% Dead Centered) ───
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SlideTransition(
+                              position: _logoSlide,
+                              child: ScaleTransition(
+                                scale: _logoScale,
+                                child: FadeTransition(
+                                  opacity: _logoFade,
+                                  child: SizedBox(
+                                    width: 180,
+                                    height: 180,
+                                    child: Image.asset(
+                                      'assets/images/edupeak_logo.png',
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.high,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            SlideTransition(
+                              position: _badgeSlide,
+                              child: FadeTransition(
+                                opacity: _badgeFade,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.06)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? Colors.white.withOpacity(0.10)
+                                          : const Color(0xFFE2E8F0),
+                                      width: 1.0,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(isDark ? 0.25 : 0.03),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Color(0xFF2563EB),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Color(0xFF2563EB),
+                                              blurRadius: 6,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'AI & Advanced Level Institute',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark
+                                              ? const Color(0xFFCBD5E1)
+                                              : const Color(0xFF475569),
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        child: Row(
+                      ),
+                    ),
+
+                    // ── Bottom Loader (100% Dead Centered) ──────────────────
+                    Center(
+                      child: FadeTransition(
+                        opacity: _loaderFade,
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFF2563EB),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Color(0xFF2563EB),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
+                            _ModernProgressBar(isDark: isDark),
+                            const SizedBox(height: 12),
                             Text(
-                              'AI & Advanced Level Institute',
+                              'Connecting to Campus...',
                               style: GoogleFonts.poppins(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: isDark
-                                    ? const Color(0xFFCBD5E1)
-                                    : const Color(0xFF475569),
-                                letterSpacing: 0.3,
+                                    ? const Color(0xFF64748B)
+                                    : const Color(0xFF94A3B8),
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
 
-                  const Spacer(flex: 3),
-
-                  // ── Sleek Modern Bottom Loader ───────────────────────────
-                  FadeTransition(
-                    opacity: _loaderFade,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ModernProgressBar(isDark: isDark),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Connecting to Campus...',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFF64748B)
-                                : const Color(0xFF94A3B8),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-                ],
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
           ),
