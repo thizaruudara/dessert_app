@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../../core/models/user_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
+import '../../../core/services/student_management_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminStudentsScreen extends StatefulWidget {
@@ -39,7 +40,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     super.dispose();
   }
 
-  // ── Delete Student Account ────────────────────────────────────────────────
+  // ── Delete Student Account (Full Cascade Purge) ───────────────────────────
   Future<void> _confirmDeleteStudent(UserModel student) async {
     HapticFeedbackService.light();
     final shouldDelete = await showDialog<bool>(
@@ -75,7 +76,7 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'This action cannot be undone. All credits, submissions, and progress records will be removed.',
+                      'This action cannot be undone. All submissions, uploaded photos, MCQ attempts, exam registrations, credits, and records will be permanently deleted from the system.',
                       style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -104,19 +105,78 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
     );
 
     if (shouldDelete == true && mounted) {
-      try {
-        await FirebaseFirestore.instance.collection('users').doc(student.uid).delete();
-        HapticFeedbackService.success();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Account for ${student.name} was successfully deleted.'),
-              backgroundColor: Colors.red.shade700,
+      // Show non-dismissible deletion progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogCtx) => PopScope(
+          canPop: false,
+          child: Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.8, color: Colors.red),
+                  ),
+                  SizedBox(width: 18),
+                  Expanded(
+                    child: Text(
+                      'Purging student & all associated data...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          );
+          ),
+        ),
+      );
+
+      try {
+        final report = await StudentManagementService.deleteStudentCascade(student);
+
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // Dismiss progress dialog
+        }
+
+        if (report.success) {
+          HapticFeedbackService.success();
+          if (mounted) {
+            final studentDisplayName = student.name.isNotEmpty ? student.name : 'Student';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Account & all data for $studentDisplayName purged successfully! '
+                  '(${report.submissionsDeleted} submissions, ${report.sprintAttemptsDeleted} MCQ attempts, '
+                  '${report.registrationsDeleted} registrations removed)',
+                ),
+                backgroundColor: Colors.red.shade700,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Warning during deletion: ${report.error}'),
+                backgroundColor: Colors.orange.shade800,
+              ),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // Dismiss progress dialog
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to delete student: $e')),
           );
