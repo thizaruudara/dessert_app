@@ -1059,25 +1059,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  /// ── 9. Physics Concept Vault & Formula Spotlight Card ────────────────────
+  /// ── 8. Physics Concept Vault & Formula Spotlight Card (Light Theme) ─────
   Widget _buildPhysicsConceptVaultCard() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0F172A), // Deep Slate Navy
-            Color(0xFF1E293B), // Charcoal Slate
-          ],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.18),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0F172A).withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1090,9 +1084,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF38BDF8).withOpacity(0.15),
+                  color: const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1104,7 +1098,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF38BDF8),
+                        color: const Color(0xFF2563EB),
                         letterSpacing: 0.6,
                       ),
                     ),
@@ -1116,7 +1110,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.60),
+                  color: const Color(0xFF64748B),
                 ),
               ),
             ],
@@ -1125,28 +1119,28 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           Text(
             'Work-Energy Theorem & Friction Losses',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
               letterSpacing: -0.2,
             ),
           ),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Center(
               child: Text(
                 'W_net  =  ΔK  =  ½ m v²  -  ½ m u²',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF7DD3FC),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF2563EB),
                   letterSpacing: 0.8,
                 ),
               ),
@@ -1156,32 +1150,32 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           Text(
             'Tip: Always compute the work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 11.5,
-              color: Colors.white.withOpacity(0.80),
-              height: 1.4,
+              fontSize: 12,
+              color: const Color(0xFF475569),
+              height: 1.45,
             ),
           ),
           const SizedBox(height: 14),
           GestureDetector(
             onTap: _openWhatsAppTutor,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withOpacity(0.18)),
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFDBEAFE)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF7DD3FC), size: 15),
+                  const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF2563EB), size: 15),
                   const SizedBox(width: 8),
                   Text(
                     'Ask AI Tutor About This 💬',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: const Color(0xFF2563EB),
                     ),
                   ),
                 ],
