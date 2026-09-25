@@ -15,6 +15,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
 import '../../credits/providers/credits_provider.dart';
 import '../widgets/exam_countdown_widget.dart';
+import '../widgets/trophy_room_sheet.dart';
 
 class StudentHomeScreen extends StatefulWidget {
   const StudentHomeScreen({super.key});
@@ -151,6 +152,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     final credits = context.watch<CreditsProvider>();
     final user = auth.user;
 
+    final desserts = context.watch<DessertsProvider>();
+    final approvedCount = desserts.desserts.where((d) => d.isApproved).length;
+    final totalCount = desserts.desserts.length;
     final displayName = user?.name.isNotEmpty == true ? user!.name : 'Scholar';
     final examYear = user?.examYear ?? '2027 A/L';
     final totalCredits = user?.credits ?? credits.totalCredits;
@@ -248,28 +252,39 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                           ],
                         ),
                       ),
-                      // Streak Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF7ED),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: const Color(0xFFFFEDD5)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('🔥', style: TextStyle(fontSize: 12)),
-                            const SizedBox(width: 4),
-                            Text(
-                              '3 Days',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: const Color(0xFFEA580C),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
+                      // Tappable Streak & Trophy Pill
+                      GestureDetector(
+                        onTap: () {
+                          TrophyRoomSheet.show(
+                            context,
+                            totalCredits: totalCredits,
+                            approvedSubmissions: approvedCount,
+                            totalSubmissions: totalCount,
+                            streakDays: 3,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF7ED),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: const Color(0xFFFFEDD5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('🔥', style: TextStyle(fontSize: 12)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '3 Days',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: const Color(0xFFEA580C),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
