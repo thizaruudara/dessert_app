@@ -31,6 +31,7 @@ class PaperSessionService {
     // Asynchronously dispatch FCM push notification to topic 'paper_sessions'
     if (isNewSession) {
       unawaited(() async {
+        try {
           final idToken = await _auth.currentUser?.getIdToken();
           final client = HttpClient();
           final request = await client.postUrl(

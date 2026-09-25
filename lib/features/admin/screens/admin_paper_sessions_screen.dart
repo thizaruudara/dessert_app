@@ -10,6 +10,7 @@ import '../../../core/models/paper_leaderboard_model.dart';
 import '../../../core/services/paper_session_service.dart';
 import '../../../core/services/paper_leaderboard_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/haptic_feedback_service.dart';
 
 class AdminPaperSessionsScreen extends StatefulWidget {
   const AdminPaperSessionsScreen({super.key});
