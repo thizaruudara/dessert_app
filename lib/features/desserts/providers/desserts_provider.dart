@@ -10,6 +10,7 @@ class DessertsProvider extends ChangeNotifier {
 
   List<DessertModel> _desserts = [];
   bool _loading = false;
+  bool _hasLoadedOnce = false;
   String? _error;
   StreamSubscription? _dessertSub;
   String? _activeStudentId;
@@ -54,13 +55,17 @@ class DessertsProvider extends ChangeNotifier {
 
   /// Listen to a specific student's submissions (matches studentId or phone number)
   void listenToStudentDesserts(String studentId, {String? studentPhone}) {
-    if (_activeStudentId == studentId && _desserts.isNotEmpty) {
-      return; // Already actively listening and data loaded
+    if (_activeStudentId == studentId && (_desserts.isNotEmpty || _hasLoadedOnce)) {
+      return; // Already actively listening and resolved; avoid repeated spinner
     }
     _activeStudentId = studentId;
     _dessertSub?.cancel();
-    _loading = true;
-    notifyListeners();
+    
+    // Only show loading if we do not already have data in memory
+    if (_desserts.isEmpty) {
+      _loading = true;
+      notifyListeners();
+    }
 
     final rawPhone = (studentPhone ?? '').replaceAll(RegExp(r'\D'), '');
     final last7 = rawPhone.length >= 7 ? rawPhone.substring(rawPhone.length - 7) : rawPhone;
@@ -76,30 +81,25 @@ class DessertsProvider extends ChangeNotifier {
       return false;
     }
 
-    // 1. Instant one-time get with timeout & cache fallback for zero-delay initial load on VPN / Wi-Fi
-    _db
-        .collection('desserts')
-        .get(const GetOptions(source: Source.serverAndCache))
-        .timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => _db.collection('desserts').get(const GetOptions(source: Source.cache)),
-        )
-        .then((snap) {
-      _desserts = snap.docs
-          .map(DessertModel.fromFirestore)
-          .where(matchesStudent)
-          .toList()
-        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
-      _loading = false;
-      _error = null;
-      notifyListeners();
-    }).catchError((e) {
-      debugPrint('One-time desserts get error: $e');
-      _loading = false;
-      notifyListeners();
-    });
+    // 1. Instant Cache-First Read (< 10ms): Read local SQLite cache immediately
+    _db.collection('desserts').get(const GetOptions(source: Source.cache)).then((cachedSnap) {
+      if (cachedSnap.docs.isNotEmpty) {
+        final cached = cachedSnap.docs
+            .map(DessertModel.fromFirestore)
+            .where(matchesStudent)
+            .toList()
+          ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+        if (cached.isNotEmpty) {
+          _desserts = cached;
+          _loading = false;
+          _hasLoadedOnce = true;
+          _error = null;
+          notifyListeners();
+        }
+      }
+    }).catchError((_) {});
 
-    // 2. Real-time stream for live updates
+    // 2. Real-time stream for live updates (automatically syncs server delta)
     _dessertSub = _db.collection('desserts').snapshots().listen((snap) {
       _desserts = snap.docs
           .map(DessertModel.fromFirestore)
@@ -107,13 +107,24 @@ class DessertsProvider extends ChangeNotifier {
           .toList()
         ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _loading = false;
+      _hasLoadedOnce = true;
       _error = null;
       notifyListeners();
     }, onError: (e) {
       debugPrint('Desserts stream error: $e');
       _loading = false;
+      _hasLoadedOnce = true;
       _error = e.toString();
       notifyListeners();
+    });
+
+    // 3. Fast safety fallback: Never let loading spinner hang over 1.2s under any network condition
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (_loading && _activeStudentId == studentId) {
+        _loading = false;
+        _hasLoadedOnce = true;
+        notifyListeners();
+      }
     });
   }
 
@@ -125,11 +136,8 @@ class DessertsProvider extends ChangeNotifier {
     try {
       final snap = await _db
           .collection('desserts')
-          .get(const GetOptions(source: Source.serverAndCache))
-          .timeout(
-            const Duration(seconds: 4),
-            onTimeout: () => _db.collection('desserts').get(const GetOptions(source: Source.cache)),
-          );
+          .get()
+          .timeout(const Duration(seconds: 4));
       _desserts = snap.docs
           .map(DessertModel.fromFirestore)
           .where((d) {
@@ -143,6 +151,7 @@ class DessertsProvider extends ChangeNotifier {
           .toList()
         ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _loading = false;
+      _hasLoadedOnce = true;
       notifyListeners();
     } catch (e) {
       debugPrint('Refresh error: $e');
