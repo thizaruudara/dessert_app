@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -22,9 +23,11 @@ class StudentHomeScreen extends StatefulWidget {
 }
 
 class _StudentHomeScreenState extends State<StudentHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   String? _lastListenedUid;
   late AnimationController _enterAnimCtrl;
+  late AnimationController _floatCtrl;
+  late Animation<double> _floatAnim;
 
   @override
   void initState() {
@@ -35,6 +38,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     _enterAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
+    );
+
+    // Continuous smooth floating 3D mascot animation
+    _floatCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    )..repeat(reverse: true);
+
+    _floatAnim = Tween<double>(begin: -6.0, end: 6.0).animate(
+      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -53,6 +66,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   @override
   void dispose() {
     _enterAnimCtrl.dispose();
+    _floatCtrl.dispose();
     super.dispose();
   }
 
@@ -350,18 +364,55 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 3. Original Exam Countdown (Full 4-Digit Boxes & Pulse) ──────
+            // ── 3. 1:1 3D Animated Physics Mascot & Countdown ────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildPopItem(
                   index: 2,
-                  child: ExamCountdownWidget(examYear: examYear),
+                  child: Column(
+                    children: [
+                      // 1:1 Animated 3D Floating Physics Glass Mascot
+                      AnimatedBuilder(
+                        animation: _floatAnim,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _floatAnim.value),
+                            child: child,
+                          );
+                        },
+                        child: Center(
+                          child: Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFF38BDF8).withOpacity(0.18),
+                                  Colors.transparent,
+                                ],
+                                radius: 0.65,
+                              ),
+                            ),
+                            child: Image.asset(
+                              'assets/images/exam_3d_countdown.jpg',
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Original Countdown Widget
+                      ExamCountdownWidget(examYear: examYear),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-            // ── 4. Quick Actions (4 Clean Rounded Buttons) ───────────────────
+            // ── 4. Quick Actions (Previous Exact Icon Layout & Gradient Tile Style) ──
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -369,48 +420,57 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   index: 3,
                   child: Row(
                     children: [
-                      _buildQuickActionBtn(
-                        icon: Icons.bolt_rounded,
-                        label: 'Daily MCQ',
-                        bgColor: const Color(0xFFFFF7ED),
-                        iconColor: const Color(0xFFEA580C),
-                        onTap: () {
-                          HapticFeedbackService.light();
-                          context.push('/student/sprint');
-                        },
+                      // Daily MCQ Sprint
+                      Expanded(
+                        child: _buildActionTile(
+                          icon: Icons.bolt_rounded,
+                          title: 'Daily MCQ',
+                          subtitle: '5 Sprints 🔥',
+                          gradient: const [Color(0xFFEA580C), Color(0xFFC2410C)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.push('/student/sprint');
+                          },
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      _buildQuickActionBtn(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        label: 'AI Tutor',
-                        bgColor: const Color(0xFFF5F3FF),
-                        iconColor: const Color(0xFF7C3AED),
-                        onTap: () {
-                          HapticFeedbackService.light();
-                          _openWhatsAppTutor();
-                        },
+                      // Ask AI Tutor
+                      Expanded(
+                        child: _buildActionTile(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          title: 'AI Tutor',
+                          subtitle: 'Instant 💬',
+                          gradient: const [Color(0xFF7C3AED), Color(0xFF6D28D9)],
+                          onTap: _openWhatsAppTutor,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      _buildQuickActionBtn(
-                        icon: Icons.camera_alt_outlined,
-                        label: 'Submit HW',
-                        bgColor: const Color(0xFFEFF6FF),
-                        iconColor: const Color(0xFF2563EB),
-                        onTap: () {
-                          HapticFeedbackService.light();
-                          context.go('/student/desserts');
-                        },
+                      // Drop Homework
+                      Expanded(
+                        child: _buildActionTile(
+                          icon: Icons.camera_alt_outlined,
+                          title: 'Submit HW',
+                          subtitle: 'Earn XP 🚀',
+                          gradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.go('/student/desserts');
+                          },
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      _buildQuickActionBtn(
-                        icon: Icons.emoji_events_outlined,
-                        label: 'Ranks',
-                        bgColor: const Color(0xFFFEFCE8),
-                        iconColor: const Color(0xFFCA8A04),
-                        onTap: () {
-                          HapticFeedbackService.light();
-                          context.go('/student/leaderboard');
-                        },
+                      // Leaderboard
+                      Expanded(
+                        child: _buildActionTile(
+                          icon: Icons.emoji_events_outlined,
+                          title: 'Ranks',
+                          subtitle: 'Podium 👑',
+                          gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.go('/student/leaderboard');
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -436,55 +496,72 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildQuickActionBtn({
+  /// Exact previous action tile style with rich rounded gradient icon box
+  Widget _buildActionTile({
     required IconData icon,
-    required String label,
-    required Color bgColor,
-    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required List<Color> gradient,
     required VoidCallback onTap,
   }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F172A).withOpacity(0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 1),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.first.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: gradient),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: gradient.first.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0F172A),
+                letterSpacing: -0.2,
               ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF334155),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF64748B),
               ),
-            ],
-          ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
