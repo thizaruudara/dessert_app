@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
