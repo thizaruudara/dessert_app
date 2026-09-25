@@ -36,14 +36,28 @@ class PaperLeaderboardEntry {
       return 1;
     }
 
+    final parsedMarksVal = parseMarks(map['marks']);
+    String calcFallbackGrade = 'F';
+    if (parsedMarksVal >= 75) calcFallbackGrade = 'A';
+    else if (parsedMarksVal >= 65) calcFallbackGrade = 'B';
+    else if (parsedMarksVal >= 50) calcFallbackGrade = 'C';
+    else if (parsedMarksVal >= 35) calcFallbackGrade = 'S';
+
+    final rawGrade = map['grade']?.toString()?.trim().toUpperCase();
+    final validGrades = {'A', 'B', 'C', 'S', 'F'};
+    // If rawGrade is 'A' but marks is 0, fix the historical glitch to 'F'
+    final resolvedGrade = (rawGrade != null && validGrades.contains(rawGrade))
+        ? (parsedMarksVal == 0 && rawGrade == 'A' ? 'F' : rawGrade)
+        : calcFallbackGrade;
+
     return PaperLeaderboardEntry(
       rank: parseRank(map['rank']),
       studentId: map['studentId']?.toString() ?? '',
       studentName: map['studentName']?.toString() ?? 'Scholar',
       studentPhone: map['studentPhone']?.toString() ?? '',
       indexNumber: map['indexNumber']?.toString() ?? '',
-      marks: parseMarks(map['marks']),
-      grade: map['grade']?.toString() ?? 'A',
+      marks: parsedMarksVal,
+      grade: resolvedGrade,
       remarks: map['remarks']?.toString() ?? '',
       avatarUrl: map['avatarUrl']?.toString(),
     );

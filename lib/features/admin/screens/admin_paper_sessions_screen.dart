@@ -2722,13 +2722,23 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
     super.dispose();
   }
 
+  String _calculateGrade(double score, double total) {
+    if (total <= 0) total = 100.0;
+    final percentage = (score / total) * 100.0;
+    if (percentage >= 75) return 'A';
+    if (percentage >= 65) return 'B';
+    if (percentage >= 50) return 'C';
+    if (percentage >= 35) return 'S';
+    return 'F';
+  }
+
   void _addStudentRow() {
     setState(() {
       _rows.add(
         _CandidateRowController(
           name: '',
           marks: 0.0,
-          grade: 'A',
+          grade: 'F',
           remarks: '',
           rank: _rows.length + 1,
         ),
@@ -2751,19 +2761,17 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
 
   void _onMarksChanged(_CandidateRowController row) {
     final text = row.marksCtrl.text.trim();
-    final score = double.tryParse(text) ?? 0.0;
-    String newGrade = 'A';
-    if (score >= 75) {
-      newGrade = 'A';
-    } else if (score >= 65) {
-      newGrade = 'B';
-    } else if (score >= 50) {
-      newGrade = 'C';
-    } else if (score >= 35) {
-      newGrade = 'S';
-    } else {
-      newGrade = 'F';
+    if (text.isEmpty) {
+      if (row.grade != 'F') {
+        setState(() {
+          row.grade = 'F';
+        });
+      }
+      return;
     }
+    final score = double.tryParse(text) ?? 0.0;
+    final total = double.tryParse(_totalMarksCtrl.text.trim()) ?? 100.0;
+    final newGrade = _calculateGrade(score, total);
 
     if (row.grade != newGrade) {
       setState(() {
@@ -2938,6 +2946,18 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
                           child: TextField(
                             controller: _totalMarksCtrl,
                             keyboardType: TextInputType.number,
+                            onChanged: (_) {
+                              final total = double.tryParse(_totalMarksCtrl.text.trim()) ?? 100.0;
+                              setState(() {
+                                for (final r in _rows) {
+                                  final text = r.marksCtrl.text.trim();
+                                  if (text.isNotEmpty) {
+                                    final score = double.tryParse(text) ?? 0.0;
+                                    r.grade = _calculateGrade(score, total);
+                                  }
+                                }
+                              });
+                            },
                             style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
                             decoration: InputDecoration(
                               filled: true,
@@ -3245,20 +3265,104 @@ class _PaperLeaderboardEditorDialogState extends State<_PaperLeaderboardEditorDi
             final title = _titleCtrl.text.trim();
             if (title.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter a paper title'), backgroundColor: Color(0xFFEF4444)),
+                const SnackBar(
+                  content: Text('Please enter a paper title'),
+                  backgroundColor: Color(0xFFEF4444),
+                ),
               );
               return;
             }
 
+            final totalStr = _totalMarksCtrl.text.trim();
+            final total = double.tryParse(totalStr);
+            if (total == null || total <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please enter valid total marks greater than 0'),
+                  backgroundColor: Color(0xFFEF4444),
+                ),
+              );
+              return;
+            }
+
+            if (_rows.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please add at least one student before publishing the leaderboard'),
+                  backgroundColor: Color(0xFFEF4444),
+                ),
+              );
+              return;
+            }
+
+            for (int i = 0; i < _rows.length; i++) {
+              final r = _rows[i];
+              final name = r.nameCtrl.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Please enter student name for Row #${i + 1}'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+                return;
+              }
+
+              final marksStr = r.marksCtrl.text.trim();
+              if (marksStr.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Please enter score for "$name" (Row #${i + 1})'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+                return;
+              }
+
+              final marks = double.tryParse(marksStr);
+              if (marks == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Please enter a valid numeric score for "$name"'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+                return;
+              }
+
+              if (marks < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Score for "$name" cannot be negative'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+                return;
+              }
+
+              if (marks > total) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Score for "$name" (${marks.toStringAsFixed(marks.truncateToDouble() == marks ? 0 : 1)}) cannot exceed Total Marks (${total.toStringAsFixed(total.truncateToDouble() == total ? 0 : 1)})',
+                    ),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+                return;
+              }
+            }
+
             _autoRank();
 
-            final total = double.tryParse(_totalMarksCtrl.text.trim()) ?? 100.0;
             final entries = _rows.map((r) {
+              final score = double.tryParse(r.marksCtrl.text.trim()) ?? 0.0;
+              final accurateGrade = r.grade.isNotEmpty ? r.grade : _calculateGrade(score, total);
               return PaperLeaderboardEntry(
                 rank: r.rank,
-                studentName: r.nameCtrl.text.trim().isNotEmpty ? r.nameCtrl.text.trim() : 'Candidate ${r.rank}',
-                marks: double.tryParse(r.marksCtrl.text.trim()) ?? 0.0,
-                grade: r.grade,
+                studentName: r.nameCtrl.text.trim(),
+                marks: score,
+                grade: accurateGrade,
                 remarks: r.remarksCtrl.text.trim(),
               );
             }).toList();
