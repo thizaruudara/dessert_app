@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/media_image_view.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
+import '../../../core/services/paper_leaderboard_service.dart';
+import '../../../core/models/upcoming_paper_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
 import '../../credits/providers/credits_provider.dart';
@@ -581,7 +583,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 6. Spotlight: Daily 5-MCQ Sprint ─────────────────────────────
+            // ── 6. Spotlight: Daily 5-MCQ Sprint (Real Firestore Stream) ─────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -592,35 +594,35 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 7. Gamified Weekly Missions Tracker ──────────────────────────
+            // ── 7. Upcoming Live Exam Room & Paper Session (Real Firestore Stream) ──
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
                   index: 6,
-                  child: _buildWeeklyMissionsCard(),
-                ),
-              ),
-            ),
-
-            // ── 8. Upcoming Live Exam Room & Paper Session ───────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                child: _buildPopItem(
-                  index: 7,
                   child: _buildUpcomingPaperShowcase(examYear),
                 ),
               ),
             ),
 
-            // ── 9. High-Yield Physics Concept & Formula Vault ────────────────
+            // ── 8. High-Yield Physics Concept & Formula Vault ────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: _buildPopItem(
+                  index: 7,
+                  child: _buildPhysicsConceptVaultCard(),
+                ),
+              ),
+            ),
+
+            // ── 9. AI Study Assistant Fast-Prompt Launchers ──────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
                   index: 8,
-                  child: _buildPhysicsConceptVaultCard(),
+                  child: _buildAiPromptLaunchersCard(),
                 ),
               ),
             ),
@@ -716,6 +718,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               return bDate.compareTo(aDate);
             });
 
+          if (allDocs.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
           final matchingDocs = allDocs.where((d) {
             final docExamYear = d.data()['examYear']?.toString();
             if (docExamYear == null || docExamYear.isEmpty || docExamYear == 'All Batches') return true;
@@ -724,6 +730,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           }).toList();
 
           final docs = matchingDocs.isNotEmpty ? matchingDocs : allDocs;
+          if (docs.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
           final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
           QueryDocumentSnapshot<Map<String, dynamic>>? activeDoc;
@@ -733,18 +743,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               break;
             }
           }
-          if (docs.isNotEmpty) {
-            activeDoc ??= docs.first;
-          }
+          activeDoc ??= docs.first;
 
-          final data = activeDoc?.data();
-          final targetDate = data?['targetDate']?.toString() ?? todayStr;
-          final title = data?['title']?.toString() ?? "Dynamics & Newton's Laws";
-          final rawQuestions = data?['questions'];
+          final data = activeDoc.data();
+          final targetDate = data['targetDate']?.toString() ?? todayStr;
+          final title = data['title']?.toString() ?? 'Daily MCQ Sprint';
+          final rawQuestions = data['questions'];
           final List<dynamic> questions = rawQuestions is List
               ? rawQuestions
               : (rawQuestions is Map ? rawQuestions.values.toList() : []);
-          final qCount = questions.isNotEmpty ? questions.length : 5;
+          final qCount = questions.length;
 
           return Container(
             padding: const EdgeInsets.all(18),
@@ -870,327 +878,152 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
-  /// ── 7. Gamified Weekly Study Quests Card ─────────────────────────────────
-  Widget _buildWeeklyMissionsCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Text('🎯', style: TextStyle(fontSize: 15)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Weekly Study Quests',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '2 / 3 Completed 🏆',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF2563EB),
-                  ),
-                ),
+  /// ── 7. Upcoming Live Exam Room & Paper Session Showcase (Real Firestore) ─
+  Widget _buildUpcomingPaperShowcase(String examYear) {
+    return StreamBuilder<List<UpcomingPaper>>(
+      stream: PaperLeaderboardService().streamUpcomingPapers(examYear: examYear),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink(); // Zero fake data! Only renders when admin publishes real papers.
+        }
+
+        final papers = snapshot.data!;
+        final paper = papers.first;
+        final dateStr = DateFormat('MMM d, yyyy • h:mm a').format(paper.scheduledDate);
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-
-          // Mission 1: MCQs
-          _buildMissionRow(
-            icon: '⚡',
-            title: 'Complete 5 Daily MCQs',
-            subtitle: '3 of 5 sprints solved (60%)',
-            progress: 0.60,
-            badge: '+50 XP',
-            badgeColor: const Color(0xFFEA580C),
-            badgeBg: const Color(0xFFFFF7ED),
-          ),
-          const SizedBox(height: 10),
-
-          // Mission 2: Homework
-          _buildMissionRow(
-            icon: '📝',
-            title: 'Submit Weekly Homework',
-            subtitle: '1 submission in review',
-            progress: 1.0,
-            badge: 'In Review ⏳',
-            badgeColor: const Color(0xFF2563EB),
-            badgeBg: const Color(0xFFEFF6FF),
-          ),
-          const SizedBox(height: 10),
-
-          // Mission 3: Streak
-          _buildMissionRow(
-            icon: '🔥',
-            title: 'Keep 3-Day Study Streak',
-            subtitle: 'Streak goal achieved!',
-            progress: 1.0,
-            badge: 'Claimed! 🌟',
-            badgeColor: const Color(0xFF059669),
-            badgeBg: const Color(0xFFECFDF5),
-          ),
-
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Complete all 3 missions to unlock +100 Bonus XP on Sunday!',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF475569),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMissionRow({
-    required String icon,
-    required String title,
-    required String subtitle,
-    required double progress,
-    required String badge,
-    required Color badgeColor,
-    required Color badgeBg,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: badgeBg,
-            shape: BoxShape.circle,
-          ),
-          child: Center(child: Text(icon, style: const TextStyle(fontSize: 14))),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  valueColor: AlwaysStoppedAnimation<Color>(badgeColor),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: badgeBg,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            badge,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: badgeColor,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// ── 8. Upcoming Live Exam Room & Paper Session Showcase ─────────────────
-  Widget _buildUpcomingPaperShowcase(String examYear) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF10B981),
-                        boxShadow: [
-                          BoxShadow(color: Color(0xFF10B981), blurRadius: 4),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'UPCOMING EVALUATION',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF047857),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                'Live Proctoring 🎥',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '$examYear Physics Term Paper 01',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Full Examination Syllabus • Real-time AI Proctoring & Timed Slots',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11.5,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildPaperInfoPill(Icons.timer_outlined, '2h 30m Duration'),
-              const SizedBox(width: 8),
-              _buildPaperInfoPill(Icons.description_outlined, 'MCQ + Essays'),
-              const SizedBox(width: 8),
-              _buildPaperInfoPill(Icons.emoji_events_outlined, 'Island Rank'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          GestureDetector(
-            onTap: () {
-              HapticFeedbackService.light();
-              context.go('/student/papers');
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'View Exam Room & Select Slot',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF10B981),
+                            boxShadow: [
+                              BoxShadow(color: Color(0xFF10B981), blurRadius: 4),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'UPCOMING EVALUATION',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF047857),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 15),
+                  Text(
+                    dateStr,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
                 ],
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                paper.title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (paper.syllabusTopics.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  paper.syllabusTopics.join(' • '),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    color: const Color(0xFF64748B),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildPaperInfoPill(Icons.timer_outlined, '${paper.durationMinutes}m Duration'),
+                  const SizedBox(width: 8),
+                  _buildPaperInfoPill(
+                    Icons.description_outlined,
+                    paper.paperStructure.isNotEmpty ? paper.paperStructure : 'MCQ + Essays',
+                  ),
+                  const SizedBox(width: 8),
+                  _buildPaperInfoPill(Icons.school_outlined, paper.examYear),
+                ],
+              ),
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedbackService.light();
+                  context.go('/student/papers');
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'View Exam Room & Select Slot',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 15),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1358,5 +1191,123 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         ],
       ),
     );
+  }
+
+  /// ── 9. AI Study Assistant Fast-Prompt Launchers ──────────────────────────
+  Widget _buildAiPromptLaunchersCard() {
+    final List<Map<String, String>> promptTopics = [
+      {
+        'title': '⚡ Explain Lenz\'s Law & Induced Current',
+        'code': 'topic_lenz_law',
+      },
+      {
+        'title': '🎯 Circular Motion: Banking & Friction Formulas',
+        'code': 'topic_circular_motion',
+      },
+      {
+        'title': '💡 Doppler Effect Frequency Shift Rules',
+        'code': 'topic_doppler_effect',
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.psychology_outlined, color: Color(0xFF2563EB), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'AI Tutor Quick Inquiries',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Tap any high-yield topic to get an instant explanation from your AI Physics Tutor.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.5,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...promptTopics.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _openTutorWithTopic(item['code']!),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item['title']!,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF334155),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_outward_rounded, size: 14, color: Color(0xFF2563EB)),
+                  ],
+                ),
+              ),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openTutorWithTopic(String topicCode) async {
+    HapticFeedbackService.light();
+    final appUri = Uri.parse('tg://resolve?domain=edupeakbot&start=$topicCode');
+    final webUri = Uri.parse('https://t.me/edupeakbot?start=$topicCode');
+    try {
+      if (await canLaunchUrl(appUri)) {
+        await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 }
