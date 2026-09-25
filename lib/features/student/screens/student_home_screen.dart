@@ -7,13 +7,11 @@ import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/models/dessert_model.dart';
 import '../../../core/widgets/media_image_view.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
 import '../../credits/providers/credits_provider.dart';
-import '../widgets/dessert_list_tile.dart';
 import '../widgets/exam_countdown_widget.dart';
 
 class StudentHomeScreen extends StatefulWidget {
@@ -88,7 +86,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   /// Staggered pop-up animation wrapper for each element
   Widget _buildPopItem({required int index, required Widget child}) {
-    final start = (index * 0.10).clamp(0.0, 0.6);
+    final start = (index * 0.12).clamp(0.0, 0.6);
     final end = (start + 0.40).clamp(0.0, 1.0);
 
     final animation = CurvedAnimation(
@@ -127,7 +125,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final desserts = context.watch<DessertsProvider>();
     final credits = context.watch<CreditsProvider>();
     final user = auth.user;
 
@@ -353,7 +350,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 3. Clean Exam Countdown (One Row) ────────────────────────────
+            // ── 3. Original Exam Countdown (Full 4-Digit Boxes & Pulse) ──────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -431,116 +428,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 ),
               ),
             ),
-
-            // ── 6. Recent Submissions Section Header ─────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Recent Submissions',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => context.go('/student/desserts'),
-                      child: Text(
-                        'View all',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF2563EB),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── 7. Recent Submissions Feed ───────────────────────────────────
-            if (desserts.loading && desserts.desserts.isEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => _buildSkeletonItem(),
-                    childCount: 2,
-                  ),
-                ),
-              )
-            else if (desserts.desserts.isEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text('🚀', style: TextStyle(fontSize: 30)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No homework submissions yet',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Submit your homework to earn XP and rank up!',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        ElevatedButton(
-                          onPressed: () => context.go('/student/desserts'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          ),
-                          child: Text(
-                            'Submit Homework 📸',
-                            style: GoogleFonts.plusJakartaSans(fontSize: 12.5, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) {
-                      final d = desserts.desserts.take(4).toList()[i];
-                      return DessertListTile(
-                        dessert: d,
-                        onTap: () => context.push('/student/dessert/${d.id}'),
-                      );
-                    },
-                    childCount: desserts.desserts.take(4).length,
-                  ),
-                ),
-              ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
@@ -757,54 +644,5 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     } catch (e) {
       return const SizedBox.shrink();
     }
-  }
-
-  Widget _buildSkeletonItem() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 12,
-                  width: 130,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  height: 10,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
