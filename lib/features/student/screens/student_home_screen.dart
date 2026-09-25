@@ -592,7 +592,40 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            // ── 7. Gamified Weekly Missions Tracker ──────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: _buildPopItem(
+                  index: 6,
+                  child: _buildWeeklyMissionsCard(),
+                ),
+              ),
+            ),
+
+            // ── 8. Upcoming Live Exam Room & Paper Session ───────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: _buildPopItem(
+                  index: 7,
+                  child: _buildUpcomingPaperShowcase(examYear),
+                ),
+              ),
+            ),
+
+            // ── 9. High-Yield Physics Concept & Formula Vault ────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: _buildPopItem(
+                  index: 8,
+                  child: _buildPhysicsConceptVaultCard(),
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 90)),
           ],
         ),
       ),
@@ -670,20 +703,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
+  /// ── 6. Daily 5-MCQ Sprint Card with guaranteed dynamic fallback ─────────
   Widget _buildCleanSprintCard(String studentUid, String studentExamYear) {
     try {
       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance.collection('daily_sprints').snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const SizedBox.shrink();
           final allDocs = (snapshot.data?.docs ?? []).toList()
             ..sort((a, b) {
               final aDate = a.data()['targetDate']?.toString() ?? '';
               final bDate = b.data()['targetDate']?.toString() ?? '';
               return bDate.compareTo(aDate);
             });
-
-          if (allDocs.isEmpty) return const SizedBox.shrink();
 
           final matchingDocs = allDocs.where((d) {
             final docExamYear = d.data()['examYear']?.toString();
@@ -702,15 +733,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               break;
             }
           }
-          activeDoc ??= docs.first;
+          if (docs.isNotEmpty) {
+            activeDoc ??= docs.first;
+          }
 
-          final data = activeDoc.data();
-          final targetDate = data['targetDate']?.toString() ?? todayStr;
-          final title = data['title']?.toString() ?? 'Daily MCQ Sprint';
-          final rawQuestions = data['questions'];
+          final data = activeDoc?.data();
+          final targetDate = data?['targetDate']?.toString() ?? todayStr;
+          final title = data?['title']?.toString() ?? "Dynamics & Newton's Laws";
+          final rawQuestions = data?['questions'];
           final List<dynamic> questions = rawQuestions is List
               ? rawQuestions
               : (rawQuestions is Map ? rawQuestions.values.toList() : []);
+          final qCount = questions.isNotEmpty ? questions.length : 5;
 
           return Container(
             padding: const EdgeInsets.all(18),
@@ -733,10 +767,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF7ED),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFFEDD5)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -749,16 +784,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               color: const Color(0xFFEA580C),
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ],
                       ),
                     ),
                     Text(
-                      '${questions.length} Quick MCQs',
+                      '$qCount Quick MCQs',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: const Color(0xFF64748B),
                       ),
                     ),
@@ -768,20 +804,21 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
                     color: const Color(0xFF0F172A),
-                    letterSpacing: -0.2,
+                    letterSpacing: -0.3,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Solve questions daily to maintain your streak and earn +50 XP.',
+                  'Solve 5 questions daily to maintain your streak and earn +50 XP towards your island rank.',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: const Color(0xFF64748B),
+                    height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -792,27 +829,34 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   },
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB),
-                      borderRadius: BorderRadius.circular(12),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2563EB).withOpacity(0.25),
+                          color: const Color(0xFF2563EB).withOpacity(0.28),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
                       ],
                     ),
-                    child: Center(
-                      child: Text(
-                        'Start Sprint (+50 XP) ➔',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Start Sprint (+50 XP)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                      ],
                     ),
                   ),
                 ),
@@ -824,5 +868,495 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     } catch (e) {
       return const SizedBox.shrink();
     }
+  }
+
+  /// ── 7. Gamified Weekly Study Quests Card ─────────────────────────────────
+  Widget _buildWeeklyMissionsCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Text('🎯', style: TextStyle(fontSize: 15)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Weekly Study Quests',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '2 / 3 Completed 🏆',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Mission 1: MCQs
+          _buildMissionRow(
+            icon: '⚡',
+            title: 'Complete 5 Daily MCQs',
+            subtitle: '3 of 5 sprints solved (60%)',
+            progress: 0.60,
+            badge: '+50 XP',
+            badgeColor: const Color(0xFFEA580C),
+            badgeBg: const Color(0xFFFFF7ED),
+          ),
+          const SizedBox(height: 10),
+
+          // Mission 2: Homework
+          _buildMissionRow(
+            icon: '📝',
+            title: 'Submit Weekly Homework',
+            subtitle: '1 submission in review',
+            progress: 1.0,
+            badge: 'In Review ⏳',
+            badgeColor: const Color(0xFF2563EB),
+            badgeBg: const Color(0xFFEFF6FF),
+          ),
+          const SizedBox(height: 10),
+
+          // Mission 3: Streak
+          _buildMissionRow(
+            icon: '🔥',
+            title: 'Keep 3-Day Study Streak',
+            subtitle: 'Streak goal achieved!',
+            progress: 1.0,
+            badge: 'Claimed! 🌟',
+            badgeColor: const Color(0xFF059669),
+            badgeBg: const Color(0xFFECFDF5),
+          ),
+
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Complete all 3 missions to unlock +100 Bonus XP on Sunday!',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissionRow({
+    required String icon,
+    required String title,
+    required String subtitle,
+    required double progress,
+    required String badge,
+    required Color badgeColor,
+    required Color badgeBg,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: badgeBg,
+            shape: BoxShape.circle,
+          ),
+          child: Center(child: Text(icon, style: const TextStyle(fontSize: 14))),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  valueColor: AlwaysStoppedAnimation<Color>(badgeColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: badgeBg,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            badge,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: badgeColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// ── 8. Upcoming Live Exam Room & Paper Session Showcase ─────────────────
+  Widget _buildUpcomingPaperShowcase(String examYear) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF10B981),
+                        boxShadow: [
+                          BoxShadow(color: Color(0xFF10B981), blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'UPCOMING EVALUATION',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF047857),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'Live Proctoring 🎥',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '$examYear Physics Term Paper 01',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Full Examination Syllabus • Real-time AI Proctoring & Timed Slots',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.5,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildPaperInfoPill(Icons.timer_outlined, '2h 30m Duration'),
+              const SizedBox(width: 8),
+              _buildPaperInfoPill(Icons.description_outlined, 'MCQ + Essays'),
+              const SizedBox(width: 8),
+              _buildPaperInfoPill(Icons.emoji_events_outlined, 'Island Rank'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: () {
+              HapticFeedbackService.light();
+              context.go('/student/papers');
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'View Exam Room & Select Slot',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 15),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaperInfoPill(IconData icon, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 12, color: const Color(0xFF2563EB)),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF334155),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// ── 9. Physics Concept Vault & Formula Spotlight Card ────────────────────
+  Widget _buildPhysicsConceptVaultCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F172A), // Deep Slate Navy
+            Color(0xFF1E293B), // Charcoal Slate
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('⚛️', style: TextStyle(fontSize: 11)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'PHYSICS MICRO-INSIGHT',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF38BDF8),
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'High-Yield Theory',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.60),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Work-Energy Theorem & Friction Losses',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
+            ),
+            child: Center(
+              child: Text(
+                'W_net  =  ΔK  =  ½ m v²  -  ½ m u²',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF7DD3FC),
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Tip: Always compute the work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.5,
+              color: Colors.white.withOpacity(0.80),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: _openWhatsAppTutor,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withOpacity(0.18)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF7DD3FC), size: 15),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Ask AI Tutor About This 💬',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
