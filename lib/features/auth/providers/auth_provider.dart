@@ -443,6 +443,7 @@ class AuthProvider extends ChangeNotifier {
       client.connectionTimeout = const Duration(seconds: 8);
       final req = await client.postUrl(Uri.parse('https://edupeak-telegram-bot.vercel.app/api/send-otp'));
       req.headers.set('Content-Type', 'application/json');
+      req.headers.set('X-Client-App', 'edupeak-flutter-app');
       req.add(utf8.encode(jsonEncode({
         'phone': cleanDigits,
         'name': name ?? 'Student',
@@ -470,6 +471,7 @@ class AuthProvider extends ChangeNotifier {
         client.connectionTimeout = const Duration(seconds: 5);
         final req = await client.postUrl(Uri.parse('https://edupeak-telegram-bot.vercel.app/api/send-otp'));
         req.headers.set('Content-Type', 'application/json');
+        req.headers.set('X-Client-App', 'edupeak-flutter-app');
         req.add(utf8.encode(jsonEncode({
           'phone': phone.replaceAll(RegExp(r'\D'), ''),
           'name': name,

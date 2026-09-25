@@ -31,12 +31,16 @@ class PaperSessionService {
     // Asynchronously dispatch FCM push notification to topic 'paper_sessions'
     if (isNewSession) {
       unawaited(() async {
-        try {
+          final idToken = await _auth.currentUser?.getIdToken();
           final client = HttpClient();
           final request = await client.postUrl(
             Uri.parse('https://edupeak-telegram-bot.vercel.app/api/paper-broadcast'),
           );
           request.headers.set('Content-Type', 'application/json');
+          if (idToken != null) {
+            request.headers.set('Authorization', 'Bearer $idToken');
+          }
+          request.headers.set('X-Admin-Secret', 'edupeak_admin_sec_2026');
           request.add(utf8.encode(jsonEncode({
             'title': session.title,
             'subject': session.subject,

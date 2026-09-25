@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
@@ -280,9 +281,14 @@ class _AdminStudentsScreenState extends State<AdminStudentsScreen> {
                         final adminName = auth.user?.name ?? 'EduPeak Admin';
 
                         try {
+                          final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
                           final res = await http.post(
                             Uri.parse('https://edupeak-telegram-bot.vercel.app/api/broadcast'),
-                            headers: {'Content-Type': 'application/json'},
+                            headers: {
+                              'Content-Type': 'application/json',
+                              if (idToken != null) 'Authorization': 'Bearer $idToken',
+                              'X-Admin-Secret': 'edupeak_admin_sec_2026',
+                            },
                             body: jsonEncode({
                               'title': title,
                               'message': body,
