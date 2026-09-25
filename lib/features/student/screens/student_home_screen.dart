@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -26,8 +27,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     with TickerProviderStateMixin {
   String? _lastListenedUid;
   late AnimationController _enterAnimCtrl;
-  late AnimationController _floatCtrl;
-  late Animation<double> _floatAnim;
+
+  // Motivational quote rotator
+  int _quoteIndex = 0;
+  Timer? _quoteTimer;
+  final List<String> _quotes = [
+    '“Success is the sum of small efforts repeated day in and day out.”',
+    '“Master today’s concepts, conquer tomorrow’s physics exam.”',
+    '“Every problem you solve brings you one rank closer to your island dream.”',
+    '“Discipline is choosing between what you want now and what you want most.”',
+    '“Consistency always beats raw talent. Keep pushing forward!”',
+  ];
 
   @override
   void initState() {
@@ -40,15 +50,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       duration: const Duration(milliseconds: 900),
     );
 
-    // Continuous smooth floating 3D mascot animation
-    _floatCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2800),
-    )..repeat(reverse: true);
-
-    _floatAnim = Tween<double>(begin: -6.0, end: 6.0).animate(
-      CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut),
-    );
+    // Rotate quotes smoothly every 6 seconds
+    _quoteTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted) {
+        setState(() {
+          _quoteIndex = (_quoteIndex + 1) % _quotes.length;
+        });
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -66,7 +75,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   @override
   void dispose() {
     _enterAnimCtrl.dispose();
-    _floatCtrl.dispose();
+    _quoteTimer?.cancel();
     super.dispose();
   }
 
@@ -165,28 +174,28 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
           slivers: [
-            // ── 1. Clean Top Header ──────────────────────────────────────────
+            // ── 1. Top Bar (Avatar & Streak Pill) ────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   20,
                   MediaQuery.of(context).padding.top + 16,
                   20,
-                  10,
+                  6,
                 ),
                 child: _buildPopItem(
                   index: 0,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              HapticFeedbackService.light();
-                              context.go('/student/profile');
-                            },
-                            child: Container(
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedbackService.light();
+                          context.go('/student/profile');
+                        },
+                        child: Row(
+                          children: [
+                            Container(
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
@@ -214,47 +223,32 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                                       ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _getGreeting(),
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Text(
-                                    displayName,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: const Color(0xFF0F172A),
-                                      letterSpacing: -0.3,
-                                    ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getGreeting(),
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF64748B),
                                   ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.verified_rounded, color: Color(0xFF2563EB), size: 16),
-                                ],
-                              ),
-                              Text(
-                                '$examYear Candidate',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF2563EB),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                                Text(
+                                  '$examYear Scholar',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      // Clean Streak Pill
+                      // Streak Pill
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -284,12 +278,158 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 2. Minimalist Level & XP Progress ────────────────────────────
+            // ── 2. Live Animated Hero Banner: Big Student Name & Live Quote ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: _buildPopItem(
+                  index: 1,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF1E3A8A), // Deep Royal Navy
+                          Color(0xFF2563EB), // Vibrant Electric Blue
+                          Color(0xFF0284C7), // Sky Cyan Glow
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withOpacity(0.32),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        // Subtle background decoration glow ring
+                        Positioned(
+                          right: -20,
+                          bottom: -20,
+                          child: Container(
+                            width: 110,
+                            height: 110,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.08),
+                            ),
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Big Headline Student Name
+                            Row(
+                              children: [
+                                Text(
+                                  'Hello, ',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withOpacity(0.90),
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    displayName,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: -0.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  color: Color(0xFF7DD3FC),
+                                  size: 22,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // Live Animated Rotating Quote
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 600),
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0.0, 0.20),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                _quotes[_quoteIndex],
+                                key: ValueKey<int>(_quoteIndex),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13.5,
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFFE0F2FE),
+                                  height: 1.45,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            // Micro Live Beacon Indicator
+                            Row(
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Color(0xFF38BDF8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Color(0xFF38BDF8),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 7),
+                                Text(
+                                  'Daily Inspiration • EduPeak Scholar',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withOpacity(0.75),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── 3. Minimalist Level & XP Progress ────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
-                  index: 1,
+                  index: 2,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                     decoration: BoxDecoration(
@@ -364,60 +504,23 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 3. 1:1 3D Animated Physics Mascot & Countdown ────────────────
+            // ── 4. Original Exam Countdown ───────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
-                  index: 2,
-                  child: Column(
-                    children: [
-                      // 1:1 Animated 3D Floating Physics Glass Mascot
-                      AnimatedBuilder(
-                        animation: _floatAnim,
-                        builder: (context, child) {
-                          return Transform.translate(
-                            offset: Offset(0, _floatAnim.value),
-                            child: child,
-                          );
-                        },
-                        child: Center(
-                          child: Container(
-                            width: 140,
-                            height: 140,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFF38BDF8).withOpacity(0.18),
-                                  Colors.transparent,
-                                ],
-                                radius: 0.65,
-                              ),
-                            ),
-                            child: Image.asset(
-                              'assets/images/exam_3d_countdown.jpg',
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      // Original Countdown Widget
-                      ExamCountdownWidget(examYear: examYear),
-                    ],
-                  ),
+                  index: 3,
+                  child: ExamCountdownWidget(examYear: examYear),
                 ),
               ),
             ),
 
-            // ── 4. Quick Actions (Previous Exact Icon Layout & Gradient Tile Style) ──
+            // ── 5. Quick Actions (Original Exact Icon Layout & Gradient Tile Style) ──
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildPopItem(
-                  index: 3,
+                  index: 4,
                   child: Row(
                     children: [
                       // Daily MCQ Sprint
@@ -478,12 +581,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 5. Spotlight: Daily 5-MCQ Sprint ─────────────────────────────
+            // ── 6. Spotlight: Daily 5-MCQ Sprint ─────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
-                  index: 4,
+                  index: 5,
                   child: _buildCleanSprintCard(user?.uid ?? '', examYear),
                 ),
               ),
