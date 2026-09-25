@@ -73,7 +73,7 @@ class AppRouter {
           state.matchedLocation == '/splash';
 
       if (!loggedIn && !onAuth) return '/auth/login';
-      if (loggedIn && onAuth) {
+      if (loggedIn && state.matchedLocation != '/splash' && onAuth) {
         return authProvider.isAdmin ? '/admin' : '/student';
       }
       return null;
