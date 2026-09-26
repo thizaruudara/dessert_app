@@ -31,6 +31,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   String? _lastListenedUid;
   late AnimationController _enterAnimCtrl;
 
+  // Physics Micro-Insight rotator offset
+  int _conceptOffset = 0;
+
   // Motivational quote rotator
   int _quoteIndex = 0;
   Timer? _quoteTimer;
@@ -1059,8 +1062,25 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  /// ── 8. Physics Concept Vault & Formula Spotlight Card (Light Theme) ─────
+  /// ── 8. Physics Concept Vault & Formula Spotlight Card (Bilingual + Daily Refresh) ─────
+  _PhysicsDailyConcept _getCurrentPhysicsConcept() {
+    final now = DateTime.now();
+    // Deterministic calendar day seed: refreshes automatically at midnight
+    final daySeed = (now.year * 366 + now.month * 31 + now.day);
+    final index = (daySeed + _conceptOffset) % _physicsConcepts.length;
+    return _physicsConcepts[index];
+  }
+
+  void _shufflePhysicsConcept() {
+    HapticFeedbackService.light();
+    setState(() {
+      _conceptOffset++;
+    });
+  }
+
   Widget _buildPhysicsConceptVaultCard() {
+    final concept = _getCurrentPhysicsConcept();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1082,7 +1102,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(8),
@@ -1105,30 +1125,85 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   ],
                 ),
               ),
-              Text(
-                'High-Yield Theory',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF64748B),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'අද දවසේ සූත්‍රය • Daily',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: 'මාරු කරන්න (Shuffle Concept)',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: _shufflePhysicsConcept,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Icon(
+                          Icons.refresh_rounded,
+                          size: 15,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            'Work-Energy Theorem & Friction Losses',
+            '${concept.unitSinhala} • ${concept.unitEnglish}',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-              letterSpacing: -0.2,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF2563EB),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          RichText(
+            text: TextSpan(
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+                letterSpacing: -0.2,
+                height: 1.3,
+              ),
+              children: [
+                TextSpan(text: concept.titleSinhala),
+                TextSpan(
+                  text: '  (${concept.titleEnglish})',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
@@ -1136,28 +1211,69 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
             child: Center(
               child: Text(
-                'W_net  =  ΔK  =  ½ m v²  -  ½ m u²',
+                concept.formula,
+                textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF2563EB),
-                  letterSpacing: 0.8,
+                  color: const Color(0xFF1D4ED8),
+                  letterSpacing: 0.6,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Tip: Always compute the work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: const Color(0xFF475569),
-              height: 1.45,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFEF3C7)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text('💡', style: TextStyle(fontSize: 12)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'විභාග උපදෙස (Exam Tip):',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF92400E),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  concept.tipSinhala,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF78350F),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'En: ${concept.tipEnglish}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: const Color(0xFF92400E).withOpacity(0.85),
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 14),
           GestureDetector(
-            onTap: _openWhatsAppTutor,
+            onTap: () => _openTutorWithTopic(concept.topicCode),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
               decoration: BoxDecoration(
@@ -1170,12 +1286,15 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 children: [
                   const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF2563EB), size: 15),
                   const SizedBox(width: 8),
-                  Text(
-                    'Ask AI Tutor About This 💬',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF2563EB),
+                  Flexible(
+                    child: Text(
+                      'මේ ගැන AI Tutor ගෙන් අසන්න (Ask AI Tutor) 💬',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2563EB),
+                      ),
                     ),
                   ),
                 ],
@@ -1191,16 +1310,20 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Widget _buildAiPromptLaunchersCard() {
     final List<Map<String, String>> promptTopics = [
       {
-        'title': '⚡ Explain Lenz\'s Law & Induced Current',
+        'title': '⚡ ලෙන්ස්ගේ නියමය සහ ප්‍රේරණය (Lenz\'s Law & Induction)',
         'code': 'topic_lenz_law',
       },
       {
-        'title': '🎯 Circular Motion: Banking & Friction Formulas',
+        'title': '🎯 වක්‍ර මාර්ගවල බැංකු නැංවීම (Banking of Roads)',
         'code': 'topic_circular_motion',
       },
       {
-        'title': '💡 Doppler Effect Frequency Shift Rules',
+        'title': '💡 ඩොප්ලර් ආචරණය (Doppler Frequency Shifts)',
         'code': 'topic_doppler_effect',
+      },
+      {
+        'title': '⚛️ ප්‍රකාශ විද්‍යුත් ආචරණය (Photoelectric Effect)',
+        'code': 'topic_photoelectric',
       },
     ];
 
@@ -1244,10 +1367,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Tap any high-yield topic to get an instant explanation from your AI Physics Tutor.',
+            'ඔබට අපැහැදිලි ඕනෑම A/L භෞතික විද්‍යා සංකල්පයක් පිළිබඳව AI Tutor ගෙන් ක්ෂණික පැහැදිලි කිරීමක් ලබාගන්න (Sinhala & English).',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11.5,
               color: const Color(0xFF64748B),
+              height: 1.4,
             ),
           ),
           const SizedBox(height: 12),
@@ -1305,3 +1429,129 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 }
+
+/// ── Physics Micro-Insight Concept Model & Curated A/L Bank ──────────────────
+class _PhysicsDailyConcept {
+  final String titleSinhala;
+  final String titleEnglish;
+  final String unitSinhala;
+  final String unitEnglish;
+  final String formula;
+  final String tipSinhala;
+  final String tipEnglish;
+  final String topicCode;
+
+  const _PhysicsDailyConcept({
+    required this.titleSinhala,
+    required this.titleEnglish,
+    required this.unitSinhala,
+    required this.unitEnglish,
+    required this.formula,
+    required this.tipSinhala,
+    required this.tipEnglish,
+    required this.topicCode,
+  });
+}
+
+const List<_PhysicsDailyConcept> _physicsConcepts = [
+  _PhysicsDailyConcept(
+    titleSinhala: 'කාර්යය-ශක්ති ප්‍රමේයය',
+    titleEnglish: 'Work-Energy Theorem & Friction Losses',
+    unitSinhala: 'යාන්ත්‍ර විද්‍යාව',
+    unitEnglish: 'Mechanics',
+    formula: 'W_net  =  ΔK  =  ½ m v²  -  ½ m u²',
+    tipSinhala: 'ආනත තලයක චලිතයේදී ඝර්ෂණයට එරෙහි කාර්යය (W_f = -f · s) යාන්ත්‍රික ශක්ති සමීකරණයට පෙර වෙන්ව සලකා බලන්න.',
+    tipEnglish: 'Always compute work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.',
+    topicCode: 'topic_work_energy',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'වක්‍ර මාර්ගවල බැංකු නැංවීම',
+    titleEnglish: 'Banking of Roads & Circular Motion',
+    unitSinhala: 'වෘත්ත චලිතය',
+    unitEnglish: 'Circular Motion',
+    formula: 'tan θ  =  v² / (r · g)',
+    tipSinhala: 'ඝර්ෂණය රහිත උපරිම ආරක්ෂිත ප්‍රවේගය (v) සඳහා අභිකේන්ද්‍ර බලය සැපයෙන්නේ අභිලම්භ ප්‍රතික්‍රියාවේ තිරස් සංරචකය (R sin θ) මගිනි.',
+    tipEnglish: 'For frictionless optimal banking speed v, the centripetal force is provided solely by the horizontal normal component R sin θ.',
+    topicCode: 'topic_circular_motion',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'ඩොප්ලර් ආචරණය',
+    titleEnglish: 'Doppler Effect in Sound Waves',
+    unitSinhala: 'තරංග හා දෝලන',
+    unitEnglish: 'Waves & Sound',
+    formula: 'f\'  =  f₀ [ (v ± v₀) / (v ∓ v_s) ]',
+    tipSinhala: 'ප්‍රභවය සහ නිරීක්ෂකයා එකිනෙකා වෙත ළඟා වන විට සංඛ්‍යාතය වැඩි වන බව (f\' > f₀) ලකුණු තේරීමේදී මතක තබා ගන්න.',
+    tipEnglish: 'Apparent frequency increases when source and observer approach each other, and decreases when moving apart.',
+    topicCode: 'topic_doppler_effect',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'ලෙන්ස්ගේ නියමය සහ වි.ගා.බ. ප්‍රේරණය',
+    titleEnglish: "Lenz's Law & Faraday Induction",
+    unitSinhala: 'විද්‍යුත් චුම්භකත්වය',
+    unitEnglish: 'Electromagnetism',
+    formula: 'ε  =  - N ( ΔΦ / Δt )',
+    tipSinhala: 'සෘණ ලකුණෙන් දැක්වෙන්නේ ප්‍රේරිත ධාරාව සැමවිටම එය ඇතිවීමට හේතු වූ චුම්භක ස්‍රාව වෙනසට විරුද්ධ වන බවයි (ශක්ති සංස්ථිති නියමය).',
+    tipEnglish: 'The negative sign indicates induced current magnetic field opposes the original flux change (Conservation of Energy).',
+    topicCode: 'topic_lenz_law',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'වියෝග ප්‍රවේගය (මිදීමේ ප්‍රවේගය)',
+    titleEnglish: 'Gravitational Escape Velocity',
+    unitSinhala: 'ගුරුත්වාකර්ෂණ ක්ෂේත්‍ර',
+    unitEnglish: 'Gravitational Fields',
+    formula: 'v_e  =  √( 2 G M / R )  =  √( 2 g R )',
+    tipSinhala: 'වියෝග ප්‍රවේගය ප්‍රක්ෂේපිත වස්තුවේ ස්කන්ධය හෝ විදින කෝණය මත රඳා නොපවතී; එය ග්‍රහලෝකයේ ස්කන්ධය හා අරය මත පමණක් රඳා පවතී.',
+    tipEnglish: 'Escape velocity is independent of projectile mass and angle; it depends solely on the planet mass and radius.',
+    topicCode: 'topic_escape_velocity',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'ධාරිත්‍රකයක ගබඩා වන ශක්තිය',
+    titleEnglish: 'Electrostatic Energy in Capacitors',
+    unitSinhala: 'ස්ථිති විද්‍යුතය',
+    unitEnglish: 'Electrostatics',
+    formula: 'U  =  ½ C V²  =  ½ Q V  =  ½ Q² / C',
+    tipSinhala: 'බැටරියෙන් සපයන ශක්තිය (Q V) වන අතර, ඉන් හරියටම අඩක් ප්‍රතිරෝධ මගින් තාපය ලෙස හානි වී ඉතිරි අර්ධය (½ Q V) පමණක් විද්‍යුත් ක්ෂේත්‍රයේ ගබඩා වේ.',
+    tipEnglish: 'The charging source delivers work W = QV, but exactly 50% is dissipated as thermal loss, leaving U = ½QV in the capacitor field.',
+    topicCode: 'topic_capacitors',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'තාපගති විද්‍යාවේ පළමු නියමය',
+    titleEnglish: 'First Law of Thermodynamics',
+    unitSinhala: 'තාප භෞතික විද්‍යාව',
+    unitEnglish: 'Thermal Physics',
+    formula: 'ΔQ  =  ΔU  +  ΔW  (ΔW = P ΔV)',
+    tipSinhala: 'සමපරිමා ක්‍රියාවලිවලදී පරිමාව වෙනස් නොවන බැවින් ΔW = 0 වන අතර ලබාදෙන සියලු තාපය අභ්‍යන්තර ශක්තිය වැඩිකරයි (ΔQ = ΔU).',
+    tipEnglish: 'In isochoric processes ΔW = 0 since volume is constant, so all absorbed heat increases internal energy ΔQ = ΔU.',
+    topicCode: 'topic_thermodynamics',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'ප්‍රකාශ විද්‍යුත් ආචරණය',
+    titleEnglish: 'Photoelectric Effect & Photons',
+    unitSinhala: 'නූතන භෞතික විද්‍යාව',
+    unitEnglish: 'Modern Physics',
+    formula: 'h f  =  Φ  +  ½ m v_max²  =  Φ  +  e V_s',
+    tipSinhala: 'නැවැත්වීමේ විභවය (V_s) රඳා පවතින්නේ ආලෝකයේ සංඛ්‍යාතය (f) මත පමණි; ආලෝක තීව්‍රතාව වැඩි කළද V_s වෙනස් නොවේ.',
+    tipEnglish: 'Stopping potential V_s depends solely on frequency f and metal work function Φ, never on incident light intensity.',
+    topicCode: 'topic_photoelectric',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'බර්නූලිගේ මූලධර්මය',
+    titleEnglish: "Bernoulli's Principle & Fluid Flow",
+    unitSinhala: 'තරල විද්‍යාව',
+    unitEnglish: 'Hydrodynamics',
+    formula: 'P  +  ½ ρ v²  +  ρ g h  =  Constant',
+    tipSinhala: 'තිරස් නලයක ද්‍රව ප්‍රවේගය (v) වැඩි වන සිහින් ස්ථානවල පීඩනය (P) අඩුවේ (Venturi ආචරණය).',
+    tipEnglish: 'For horizontal streamline flow, locations with higher velocity experience lower fluid pressure (Venturi effect).',
+    topicCode: 'topic_bernoulli',
+  ),
+  _PhysicsDailyConcept(
+    titleSinhala: 'පොටෙන්ෂියෝමීටරය හා අභ්‍යන්තර ප්‍රතිරෝධය',
+    titleEnglish: 'Potentiometer & Internal Resistance',
+    unitSinhala: 'ධාරා විද්‍යුතය',
+    unitEnglish: 'Current Electricity',
+    formula: 'r  =  R [ ( l₁ - l₂ ) / l₂ ]',
+    tipSinhala: 'සමතුලිත අවස්ථාවේදී කෝෂයෙන් ධාරාවක් නොගලා යන බැවින් අග්‍රස්ථ විභව අන්තරය වෙනුවට නිවැරදිම විද්‍යුත් ගාමක බලය (EMF) මැනේ.',
+    tipEnglish: 'At balance point zero current flows through the galvanometer, measuring the true EMF without internal resistance voltage drops.',
+    topicCode: 'topic_potentiometer',
+  ),
+];
