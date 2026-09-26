@@ -210,44 +210,71 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                         },
                         child: Row(
                           children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFEFF6FF),
-                                border: Border.all(color: const Color(0xFF2563EB), width: 1.8),
-                              ),
-                              child: ClipOval(
-                                child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                                    ? MediaImageView(
-                                        url: user.avatarUrl!,
-                                        fit: BoxFit.cover,
-                                        width: 44,
-                                        height: 44,
-                                      )
-                                    : Center(
-                                        child: Text(
-                                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'S',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            color: const Color(0xFF2563EB),
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 18,
-                                          ),
-                                        ),
-                                      ),
-                              ),
+                            Stack(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  padding: const EdgeInsets.all(2.5),
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+                                    ),
+                                  ),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                    ),
+                                    padding: const EdgeInsets.all(1.5),
+                                    child: ClipOval(
+                                      child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                                          ? MediaImageView(
+                                              url: user.avatarUrl!,
+                                              fit: BoxFit.cover,
+                                              width: 42,
+                                              height: 42,
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'S',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  color: const Color(0xFF2563EB),
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 18,
+                                                ),
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: const Color(0xFF10B981),
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   _getGreeting(),
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
                                     color: const Color(0xFF64748B),
+                                    letterSpacing: 0.2,
                                   ),
                                 ),
                                 const SizedBox(height: 1),
@@ -257,7 +284,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                                     Text(
                                       displayName,
                                       style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 17,
+                                        fontSize: 17.5,
                                         fontWeight: FontWeight.w800,
                                         color: const Color(0xFF0F172A),
                                         letterSpacing: -0.3,
@@ -266,18 +293,25 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                                     const SizedBox(width: 4),
                                     const Icon(
                                       Icons.verified_rounded,
-                                      size: 15,
+                                      size: 16,
                                       color: Color(0xFF2563EB),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 1),
-                                Text(
-                                  '$examYear Candidate',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF2563EB),
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '$examYear Candidate',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF2563EB),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -297,23 +331,32 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                           );
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF7ED),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+                            ),
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: const Color(0xFFFFEDD5)),
+                            border: Border.all(color: const Color(0xFFFDBA74)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFEA580C).withOpacity(0.12),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('🔥', style: TextStyle(fontSize: 12)),
+                              const Text('🔥', style: TextStyle(fontSize: 13)),
                               const SizedBox(width: 4),
                               Text(
                                 '3 Days',
                                 style: GoogleFonts.plusJakartaSans(
-                                  color: const Color(0xFFEA580C),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
+                                  color: const Color(0xFFC2410C),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
                                 ),
                               ),
                             ],
@@ -457,77 +500,159 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 3. Minimalist Level & XP Progress ────────────────────────────
+            // ── 3. Cockpit Radar & Daily Quests ────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
                   index: 2,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0F172A).withOpacity(0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
+                          color: const Color(0xFF0F172A).withOpacity(0.03),
+                          blurRadius: 14,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
+                    clipBehavior: Clip.antiAlias,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Text('⚡', style: TextStyle(fontSize: 14)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Level $currentLevel Cadet',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
+                        // Multi-accent cockpit radar top stripe
+                        Container(
+                          height: 3.5,
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF2563EB), Color(0xFF06B6D4), Color(0xFF8B5CF6)],
                             ),
-                            Text(
-                              '$totalCredits / ${(currentLevel) * 100} XP',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF2563EB),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            height: 6,
-                            width: double.infinity,
-                            color: const Color(0xFFF1F5F9),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: FractionallySizedBox(
-                                widthFactor: levelProgress.clamp(0.04, 1.0),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 14, 18, 15),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFBFDBFE)),
                                     ),
-                                    borderRadius: BorderRadius.circular(999),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text('⚡', style: TextStyle(fontSize: 12)),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          'Level $currentLevel • Cadet',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xFF1D4ED8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        '$totalCredits',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF2563EB),
+                                        ),
+                                      ),
+                                      Text(
+                                        ' / ${(currentLevel) * 100} XP',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 11),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: Container(
+                                  height: 7,
+                                  width: double.infinity,
+                                  color: const Color(0xFFF1F5F9),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FractionallySizedBox(
+                                      widthFactor: levelProgress.clamp(0.04, 1.0),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+                                          ),
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                              const SizedBox(height: 13),
+                              // Daily Quest Objectives
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildQuestPill(
+                                      icon: '⚡',
+                                      title: 'Daily MCQ',
+                                      reward: '+50 XP',
+                                      isDone: false,
+                                      onTap: () {
+                                        HapticFeedbackService.light();
+                                        context.push('/student/sprint');
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildQuestPill(
+                                      icon: '💡',
+                                      title: 'Physics Tip',
+                                      reward: '+20 XP',
+                                      isDone: true,
+                                      onTap: () {
+                                        HapticFeedbackService.light();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildQuestPill(
+                                      icon: '📸',
+                                      title: 'Homework',
+                                      reward: '+100 XP',
+                                      isDone: false,
+                                      onTap: () {
+                                        HapticFeedbackService.light();
+                                        context.go('/student/desserts');
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -548,65 +673,81 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 5. Quick Actions (Original Exact Icon Layout & Gradient Tile Style) ──
+            // ── 5. Quick Actions (Creative 2x2 Command Grid) ──
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildPopItem(
                   index: 4,
-                  child: Row(
+                  child: Column(
                     children: [
-                      // Daily MCQ Sprint
-                      Expanded(
-                        child: _buildActionTile(
-                          icon: Icons.bolt_rounded,
-                          title: 'Daily MCQ',
-                          subtitle: '5 Sprints 🔥',
-                          gradient: const [Color(0xFFEA580C), Color(0xFFC2410C)],
-                          onTap: () {
-                            HapticFeedbackService.light();
-                            context.push('/student/sprint');
-                          },
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildGridActionCard(
+                              icon: Icons.bolt_rounded,
+                              title: 'Daily MCQ Sprint',
+                              subtitle: '5 Sprints • +50 XP 🔥',
+                              accentColor: const Color(0xFFD97706),
+                              bgGradient: const [Color(0xFFFFFBEB), Colors.white],
+                              borderColor: const Color(0xFFFDE68A),
+                              iconGradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+                              onTap: () {
+                                HapticFeedbackService.light();
+                                context.push('/student/sprint');
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildGridActionCard(
+                              icon: Icons.forum_rounded,
+                              title: 'AI Physics Tutor',
+                              subtitle: 'Instant Doubts 💬',
+                              accentColor: const Color(0xFF7C3AED),
+                              bgGradient: const [Color(0xFFFAF5FF), Colors.white],
+                              borderColor: const Color(0xFFE9D5FF),
+                              iconGradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                              onTap: _openWhatsAppTutor,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      // Ask AI Tutor
-                      Expanded(
-                        child: _buildActionTile(
-                          icon: Icons.chat_bubble_outline_rounded,
-                          title: 'AI Tutor',
-                          subtitle: 'Instant 💬',
-                          gradient: const [Color(0xFF7C3AED), Color(0xFF6D28D9)],
-                          onTap: _openWhatsAppTutor,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Drop Homework
-                      Expanded(
-                        child: _buildActionTile(
-                          icon: Icons.camera_alt_outlined,
-                          title: 'Submit HW',
-                          subtitle: 'Earn XP 🚀',
-                          gradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-                          onTap: () {
-                            HapticFeedbackService.light();
-                            context.go('/student/desserts');
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Leaderboard
-                      Expanded(
-                        child: _buildActionTile(
-                          icon: Icons.emoji_events_outlined,
-                          title: 'Ranks',
-                          subtitle: 'Podium 👑',
-                          gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-                          onTap: () {
-                            HapticFeedbackService.light();
-                            context.go('/student/leaderboard');
-                          },
-                        ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildGridActionCard(
+                              icon: Icons.camera_alt_rounded,
+                              title: 'Submit Homework',
+                              subtitle: 'Photo HW • Earn XP 🚀',
+                              accentColor: const Color(0xFF0284C7),
+                              bgGradient: const [Color(0xFFF0F9FF), Colors.white],
+                              borderColor: const Color(0xFFBAE6FD),
+                              iconGradient: const [Color(0xFF0EA5E9), Color(0xFF0284C7)],
+                              onTap: () {
+                                HapticFeedbackService.light();
+                                context.go('/student/desserts');
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildGridActionCard(
+                              icon: Icons.emoji_events_rounded,
+                              title: 'Leaderboard',
+                              subtitle: 'Island Podium 👑',
+                              accentColor: const Color(0xFFEA580C),
+                              bgGradient: const [Color(0xFFFFF7ED), Colors.white],
+                              borderColor: const Color(0xFFFFEDD5),
+                              iconGradient: const [Color(0xFFF97316), Color(0xFFC2410C)],
+                              onTap: () {
+                                HapticFeedbackService.light();
+                                context.go('/student/leaderboard');
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -665,72 +806,153 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  /// Exact previous action tile style with rich rounded gradient icon box
-  Widget _buildActionTile({
-    required IconData icon,
+  /// Daily Objective / Quest pill inside Cockpit Radar
+  Widget _buildQuestPill({
+    required String icon,
     required String title,
-    required String subtitle,
-    required List<Color> gradient,
+    required String reward,
+    required bool isDone,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.first.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          color: isDone ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDone ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: gradient),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: gradient.first.withOpacity(0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isDone)
+                  const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A))
+                else
+                  Text(icon, style: const TextStyle(fontSize: 11)),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: isDone ? const Color(0xFF166534) : const Color(0xFF334155),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.white, size: 18),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF0F172A),
-                letterSpacing: -0.2,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(
-              subtitle,
+              reward,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF64748B),
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: isDone ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// High-yield 2x2 Grid Action Card with soft glowing tinted background and chevron
+  Widget _buildGridActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color accentColor,
+    required List<Color> bgGradient,
+    required Color borderColor,
+    required List<Color> iconGradient,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: bgGradient,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: iconGradient),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: iconGradient.first.withOpacity(0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 19),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: accentColor.withOpacity(0.55),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
