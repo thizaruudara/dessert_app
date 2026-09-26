@@ -783,7 +783,7 @@ class _AdminDailyInsightScreenState extends State<AdminDailyInsightScreen> {
                     onPressed: _isSaving ? null : _resetToRandomMode,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      side: const Border.all(color: Color(0xFFCBD5E1)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text(

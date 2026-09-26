@@ -161,6 +161,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
     final desserts = context.watch<DessertsProvider>();
     final approvedCount = desserts.desserts.where((d) => d.isApproved).length;
+    final totalCount = desserts.desserts.length;
     final rawName = user?.name.trim();
     final displayName = (rawName != null && rawName.isNotEmpty)
         ? rawName
