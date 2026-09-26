@@ -562,6 +562,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          _buildCommandButton(
+            title: 'Physics Micro-Insight ⚛️',
+            subtitle: 'Auto-rotate random or pin custom formula',
+            icon: Icons.science_outlined,
+            color: const Color(0xFF10B981),
+            onTap: () => context.push('/admin/daily-insight'),
+          ),
         ],
       ),
     );

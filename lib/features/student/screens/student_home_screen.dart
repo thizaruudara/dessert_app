@@ -12,6 +12,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/media_image_view.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
 import '../../../core/services/paper_leaderboard_service.dart';
+import '../../../core/services/daily_physics_insight_service.dart';
+import '../../../core/models/daily_physics_insight_model.dart';
 import '../../../core/models/upcoming_paper_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../desserts/providers/desserts_provider.dart';
@@ -1062,7 +1064,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  /// ── 8. Physics Concept Vault & Formula Spotlight Card (Bilingual + Daily Refresh) ─────
+  /// ── 8. Physics Concept Vault & Formula Spotlight Card (Bilingual + Daily Refresh + Admin Pin Support) ─────
+  final DailyPhysicsInsightService _dailyInsightService = DailyPhysicsInsightService();
+
   _PhysicsDailyConcept _getCurrentPhysicsConcept() {
     final now = DateTime.now();
     // Deterministic calendar day seed: refreshes automatically at midnight
@@ -1079,230 +1083,281 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   Widget _buildPhysicsConceptVaultCard() {
-    final concept = _getCurrentPhysicsConcept();
+    return StreamBuilder<DailyPhysicsInsightModel>(
+      stream: _dailyInsightService.streamInsight(),
+      builder: (context, snapshot) {
+        final customConfig = snapshot.data;
+        final bool isCustom = customConfig != null &&
+            customConfig.isCustom &&
+            customConfig.formula.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('⚛️', style: TextStyle(fontSize: 11)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'PHYSICS MICRO-INSIGHT',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF2563EB),
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'අද දවසේ සූත්‍රය • Daily',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF475569),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Tooltip(
-                    message: 'මාරු කරන්න (Shuffle Concept)',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: _shufflePhysicsConcept,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Icon(
-                          Icons.refresh_rounded,
-                          size: 15,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+        final _PhysicsDailyConcept concept;
+        final bool isPinned;
+
+        if (isCustom) {
+          isPinned = true;
+          concept = _PhysicsDailyConcept(
+            titleSinhala: customConfig.titleSinhala.isNotEmpty
+                ? customConfig.titleSinhala
+                : 'විශේෂ සංකල්පය',
+            titleEnglish: customConfig.titleEnglish.isNotEmpty
+                ? customConfig.titleEnglish
+                : 'Featured Physics Concept',
+            unitSinhala: customConfig.unitSinhala.isNotEmpty
+                ? customConfig.unitSinhala
+                : 'භෞතික විද්‍යාව',
+            unitEnglish: customConfig.unitEnglish.isNotEmpty
+                ? customConfig.unitEnglish
+                : 'Physics',
+            formula: customConfig.formula,
+            tipSinhala: customConfig.tipSinhala,
+            tipEnglish: customConfig.tipEnglish,
+            topicCode: customConfig.topicCode,
+          );
+        } else {
+          isPinned = false;
+          concept = _getCurrentPhysicsConcept();
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isPinned ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isPinned
+                    ? const Color(0xFFF59E0B).withOpacity(0.06)
+                    : const Color(0xFF0F172A).withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            '${concept.unitSinhala} • ${concept.unitEnglish}',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF2563EB),
-            ),
-          ),
-          const SizedBox(height: 4),
-          RichText(
-            text: TextSpan(
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-                letterSpacing: -0.2,
-                height: 1.3,
-              ),
-              children: [
-                TextSpan(text: concept.titleSinhala),
-                TextSpan(
-                  text: '  (${concept.titleEnglish})',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF64748B),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('⚛️', style: TextStyle(fontSize: 11)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'PHYSICS MICRO-INSIGHT',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF2563EB),
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Center(
-              child: Text(
-                concept.formula,
-                textAlign: TextAlign.center,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: isPinned ? const Color(0xFFFFFBEB) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isPinned ? const Color(0xFFFDE68A) : Colors.transparent,
+                          ),
+                        ),
+                        child: Text(
+                          isPinned ? '📌 විශේෂ සූත්‍රය • Pinned by Tutor' : 'අද දවසේ සූත්‍රය • Daily',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: isPinned ? const Color(0xFF92400E) : const Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                      if (!isPinned) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'මාරු කරන්න (Shuffle Concept)',
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: _shufflePhysicsConcept,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: const Icon(
+                                Icons.refresh_rounded,
+                                size: 15,
+                                color: Color(0xFF2563EB),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${concept.unitSinhala} • ${concept.unitEnglish}',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF1D4ED8),
-                  letterSpacing: 0.6,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF2563EB),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFEF3C7)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              const SizedBox(height: 4),
+              RichText(
+                text: TextSpan(
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                    height: 1.3,
+                  ),
                   children: [
-                    const Text('💡', style: TextStyle(fontSize: 12)),
-                    const SizedBox(width: 6),
-                    Text(
-                      'විභාග උපදෙස (Exam Tip):',
+                    TextSpan(text: concept.titleSinhala),
+                    TextSpan(
+                      text: '  (${concept.titleEnglish})',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF92400E),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  concept.tipSinhala,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF78350F),
-                    height: 1.45,
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Center(
+                  child: Text(
+                    concept.formula,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1D4ED8),
+                      letterSpacing: 0.6,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'En: ${concept.tipEnglish}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                    color: const Color(0xFF92400E).withOpacity(0.85),
-                    height: 1.35,
+              ),
+              if (concept.tipSinhala.isNotEmpty || concept.tipEnglish.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFEF3C7)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text('💡', style: TextStyle(fontSize: 12)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'විභාග උපදෙස (Exam Tip):',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF92400E),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (concept.tipSinhala.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          concept.tipSinhala,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF78350F),
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                      if (concept.tipEnglish.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'En: ${concept.tipEnglish}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: const Color(0xFF92400E).withOpacity(0.85),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          GestureDetector(
-            onTap: () => _openTutorWithTopic(concept.topicCode),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDBEAFE)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF2563EB), size: 15),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      'මේ ගැන AI Tutor ගෙන් අසන්න (Ask AI Tutor) 💬',
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF2563EB),
-                      ),
-                    ),
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: () => _openTutorWithTopic(concept.topicCode),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDBEAFE)),
                   ),
-                ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF2563EB), size: 15),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'මේ ගැන AI Tutor ගෙන් අසන්න (Ask AI Tutor) 💬',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

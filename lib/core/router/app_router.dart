@@ -24,6 +24,7 @@ import '../../features/student/screens/live_exam_room_screen.dart';
 import '../../features/admin/screens/admin_paper_sessions_screen.dart';
 import '../../features/admin/screens/admin_live_proctor_screen.dart';
 import '../../features/admin/screens/admin_exam_countdowns_screen.dart';
+import '../../features/admin/screens/admin_daily_insight_screen.dart';
 import '../../features/student/screens/student_mcq_sprint_screen.dart';
 
 CustomTransitionPage<void> _buildSmoothPage({
@@ -236,6 +237,13 @@ class AppRouter {
             pageBuilder: (context, state) => _buildSmoothPage(
               key: state.pageKey,
               child: const AdminExamCountdownsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/admin/daily-insight',
+            pageBuilder: (context, state) => _buildSmoothPage(
+              key: state.pageKey,
+              child: const AdminDailyInsightScreen(),
             ),
           ),
         ],
