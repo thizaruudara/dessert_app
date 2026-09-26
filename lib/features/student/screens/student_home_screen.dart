@@ -161,8 +161,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
     final desserts = context.watch<DessertsProvider>();
     final approvedCount = desserts.desserts.where((d) => d.isApproved).length;
-    final totalCount = desserts.desserts.length;
-    final displayName = user?.name.isNotEmpty == true ? user!.name : 'Scholar';
+    final rawName = user?.name.trim();
+    final displayName = (rawName != null && rawName.isNotEmpty)
+        ? rawName
+        : (user?.studentId != null && user!.studentId!.trim().isNotEmpty
+            ? user!.studentId!.trim()
+            : 'Scholar');
     final examYear = user?.examYear ?? '2027 A/L';
     final totalCredits = user?.credits ?? credits.totalCredits;
 
@@ -246,10 +250,32 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                                     color: const Color(0xFF64748B),
                                   ),
                                 ),
+                                const SizedBox(height: 1),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF0F172A),
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.verified_rounded,
+                                      size: 15,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 1),
                                 Text(
-                                  '$examYear Scholar',
+                                  '$examYear Candidate',
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11.5,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     color: const Color(0xFF2563EB),
                                   ),
