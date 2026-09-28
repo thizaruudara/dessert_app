@@ -120,37 +120,94 @@ export class NotificationService {
     }
   }
 
-  // In-app animated banner toast for active sessions
+  // In-app animated banner toast matching Flutter floating SnackBar
   showInAppBanner(title, message, type = 'info') {
-    const existing = document.getElementById('in-app-toast-container');
-    const container = existing || document.createElement('div');
-    if (!existing) {
+    let container = document.getElementById('in-app-toast-container');
+    if (!container) {
+      container = document.createElement('div');
       container.id = 'in-app-toast-container';
-      container.className = 'toast-container';
+      container.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 400px;
+        width: calc(100% - 32px);
+        pointer-events: none;
+      `;
       document.body.appendChild(container);
     }
 
     const toast = document.createElement('div');
-    toast.className = `app-toast toast-${type}`;
+    const isUrgent = type === 'urgent' || type === 'error';
+    const isSuccess = type === 'success';
+    const isWarning = type === 'warning';
+
+    const bgBadge = isSuccess
+      ? '#22C55E'
+      : isUrgent
+      ? '#EF4444'
+      : isWarning
+      ? '#F59E0B'
+      : '#6366F1';
+
+    const iconSymbol = isSuccess ? '✓' : isUrgent ? '⚠️' : isWarning ? '⏱️' : '🔔';
+
+    toast.style.cssText = `
+      background: #1E293B;
+      border: 1px solid ${bgBadge}80;
+      border-left: 4px solid ${bgBadge};
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #FFFFFF;
+      font-family: 'Poppins', sans-serif;
+      pointer-events: auto;
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    `;
+
     toast.innerHTML = `
-      <div class="toast-icon">
-        ${type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '🔔'}
+      <div style="width:34px; height:34px; border-radius:50%; background:${bgBadge}25; display:flex; align-items:center; justify-content:center; color:${bgBadge}; font-size:16px; font-weight:bold; flex-shrink:0;">
+        ${iconSymbol}
       </div>
-      <div class="toast-body">
-        <div class="toast-title">${title}</div>
-        <div class="toast-text">${message}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:12.5px; font-weight:700; color:#FFFFFF; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          ${title}
+        </div>
+        <div style="font-size:11px; color:#CBD5E1; line-height:1.4;">
+          ${message}
+        </div>
       </div>
-      <button class="toast-close" onclick="this.parentElement.remove()">✕</button>
+      <button style="background:transparent; border:none; color:#94A3B8; font-size:16px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; display:flex; align-items:center;" onmouseover="this.style.color='#FFFFFF'" onmouseout="this.style.color='#94A3B8'" onclick="this.parentElement.remove()">
+        ✕
+      </button>
     `;
 
     container.appendChild(toast);
 
-    // Audio chime if audio context allowed
+    // Trigger enter animation
+    requestAnimationFrame(() => {
+      toast.style.transform = 'translateY(0)';
+      toast.style.opacity = '1';
+    });
+
+    // Audio chime
     this.playChime();
 
+    // Auto dismiss after 4.5s
     setTimeout(() => {
-      toast.classList.add('toast-fade');
-      setTimeout(() => toast.remove(), 400);
+      toast.style.transform = 'translateY(10px)';
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 250);
     }, 4500);
   }
 
