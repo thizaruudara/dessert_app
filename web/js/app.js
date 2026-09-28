@@ -3196,7 +3196,7 @@ class AppController {
     document.getElementById('btn-fab-admin-paper')?.addEventListener('click', triggerAdd);
     document.getElementById('btn-empty-create-paper')?.addEventListener('click', triggerAdd);
 
-    // Interactive paper action handlers
+    // Interactive paper action handlers matching Flutter 1:1
     container.querySelectorAll('[data-view-proctor]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.openAdminLiveProctorHall(btn.dataset.viewProctor);
@@ -3209,32 +3209,88 @@ class AppController {
       });
     });
 
-    container.querySelectorAll('[data-toggle-paper]').forEach(btn => {
+    container.querySelectorAll('[data-edit-times]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const p = papers.find(x => x.id === btn.dataset.togglePaper);
-        if (p) {
-          p.isLive = !p.isLive;
-          notificationService.showInAppBanner('Paper Status Updated', `${p.title} is now ${p.isLive ? 'LIVE' : 'ENDED'}.`, 'info');
-          this.renderAdminPapersScreen(container);
-        }
+        const p = papers.find(x => x.id === btn.dataset.editTimes);
+        if (p) this._showEditTimesDialog(p, container);
       });
     });
 
-    container.querySelectorAll('[data-cycle-phase]').forEach(btn => {
+    container.querySelectorAll('[data-delete-paper]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const p = papers.find(x => x.id === btn.dataset.cyclePhase);
-        if (p) {
-          const phases = ['scheduled', 'package_opening', 'writing', 'time_up', 'ended'];
-          const currentIdx = phases.indexOf(p.phase || (p.isLive ? 'writing' : 'scheduled'));
-          const nextPhase = phases[(currentIdx + 1) % phases.length];
-          p.phase = nextPhase;
-          p.isLive = nextPhase === 'package_opening' || nextPhase === 'writing';
-          p.isEnded = nextPhase === 'ended';
-          notificationService.showInAppBanner('Phase Advanced ⏱️', `${p.title}: ${nextPhase.replace('_', ' ').toUpperCase()}`, 'success');
-          this.renderAdminPapersScreen(container);
-        }
+        const p = papers.find(x => x.id === btn.dataset.deletePaper);
+        if (p) this._showDeleteConfirmation(p, container);
       });
     });
+
+    container.querySelectorAll('[data-end-session]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = papers.find(x => x.id === btn.dataset.endSession);
+        if (p) this._showEndSessionConfirmation(p, container);
+      });
+    });
+
+    container.querySelectorAll('[data-start-session]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = papers.find(x => x.id === btn.dataset.startSession);
+        if (p) this._startSessionNow(p, container);
+      });
+    });
+
+    container.querySelectorAll('[data-reopen-session]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = papers.find(x => x.id === btn.dataset.reopenSession);
+        if (p) this._reopenSession(p, container);
+      });
+    });
+  }
+
+  _computePaperStatus(session) {
+    if (session.isEnded || session.status === 'ended' || session.currentPhase === 'ended') {
+      return 'ended';
+    }
+    const isActive = session.status === 'active' && session.currentPhase !== 'ended' && session.currentPhase !== 'waiting';
+    let isAfterSlot1 = false;
+    if (session.slot1 && session.slot1.startTime) {
+      const s1 = new Date(session.slot1.startTime);
+      if (!isNaN(s1.getTime())) {
+        isAfterSlot1 = new Date() >= s1;
+      }
+    }
+    if (isActive || isAfterSlot1) {
+      return 'live';
+    }
+    return 'upcoming';
+  }
+
+  _formatSessionDate(dateStr) {
+    try {
+      const d = dateStr ? new Date(dateStr) : new Date();
+      if (isNaN(d.getTime())) return dateStr || 'Today';
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      return `${d.getFullYear()} ${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')} (${days[d.getDay()]})`;
+    } catch (_) {
+      return dateStr || 'Today';
+    }
+  }
+
+  _formatSessionTime(timeVal, fallback = '08:30 AM') {
+    if (!timeVal) return fallback;
+    try {
+      const d = new Date(timeVal);
+      if (!isNaN(d.getTime())) {
+        let h = d.getHours();
+        const m = String(d.getMinutes()).padStart(2, '0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        if (h === 0) h = 12;
+        return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+      }
+      return String(timeVal);
+    } catch (_) {
+      return fallback;
+    }
   }
 
   _buildAdminLiveSessionsHTML(papers) {
@@ -3258,64 +3314,336 @@ class AppController {
     }
 
     return `
-      <div style="display:flex; flex-direction:column; gap:14px; margin-top:12px;">
-        ${papers.map(p => {
-          const phase = p.phase || (p.isLive ? 'writing' : 'scheduled');
-          const isWriting = phase === 'writing';
-          const isPackage = phase === 'package_opening';
-          const isTimeUp = phase === 'time_up';
-          const isEnded = phase === 'ended';
-
-          let pillClass = 'phase-upcoming';
-          let pillText = '⏰ Scheduled';
-          if (isWriting) { pillClass = 'phase-live'; pillText = '🔴 Writing in Progress'; }
-          else if (isPackage) { pillClass = 'phase-live'; pillText = '📦 Package Opening (10M)'; }
-          else if (isTimeUp) { pillClass = 'phase-live'; pillText = '⏰ Time Up - Submitting'; }
-          else if (isEnded) { pillClass = ''; pillText = '🛑 Session Ended'; }
-
-          return `
-            <div class="hero-card" style="padding:16px; border:1px solid #E2E8F0;">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="phase-pill ${pillClass}" style="${isEnded ? 'background:#F1F5F9; color:#64748B;' : ''}">
-                  ${pillText}
-                </span>
-                <span style="font-size:12px; font-weight:800; color:#2563EB;">⏱️ ${p.durationMinutes || 120} Mins</span>
-              </div>
-
-              <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
-              <div style="font-size:12px; color:#64748B; margin-top:2px;">${p.subject} • ${p.examYear || '2027 A/L'}</div>
-
-              <!-- Slots Info Row -->
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; background:#F8FAFC; padding:10px; border-radius:10px; border:1px solid #F1F5F9;">
-                <div>
-                  <div style="font-size:11px; font-weight:700; color:#0F172A;">☀️ Slot 1 (Morning)</div>
-                  <div style="font-size:10.5px; color:#64748B;">08:30 AM - 11:30 AM</div>
-                  <div style="font-size:10.5px; font-weight:700; color:#2563EB; margin-top:2px;">👥 48 Enrolled</div>
-                </div>
-                <div>
-                  <div style="font-size:11px; font-weight:700; color:#0F172A;">🌙 Slot 2 (Evening)</div>
-                  <div style="font-size:10.5px; color:#64748B;">04:00 PM - 07:00 PM</div>
-                  <div style="font-size:10.5px; font-weight:700; color:#2563EB; margin-top:2px;">👥 32 Enrolled</div>
-                </div>
-              </div>
-
-              <!-- Action Buttons matching Mobile App -->
-              <div style="display:flex; gap:8px; margin-top:12px;">
-                <button class="apk-btn-primary" style="flex:1.2; background:#10B981; padding:11px 10px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;" data-student-exam="${p.id}">
-                  <span>▶</span> Start Live Writing
-                </button>
-                <button class="apk-btn-primary" style="flex:1; background:#2563EB; color:#FFFFFF; padding:11px 10px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;" data-view-proctor="${p.id}">
-                  <span>🎥</span> Proctor Hall
-                </button>
-                <button class="apk-btn-primary" style="background:#F1F5F9; color:#475569; width:auto; padding:11px 10px; font-size:12px; box-shadow:none;" data-cycle-phase="${p.id}" title="Advance Exam Phase">
-                  ⚙️
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
+      <div style="display:flex; flex-direction:column; gap:16px; margin-top:12px;">
+        ${papers.map(p => this._buildAdminPaperCard(p)).join('')}
       </div>
     `;
+  }
+
+  _buildAdminPaperCard(session) {
+    const status = this._computePaperStatus(session);
+    const isEnded = status === 'ended';
+    const isLive = status === 'live';
+    const isUpcoming = status === 'upcoming';
+
+    let badgeText = '🟡 Upcoming';
+    let badgeBg = 'rgba(245, 158, 11, 0.12)';
+    let badgeBorder = '#F59E0B';
+    let badgeColor = '#D97706';
+
+    if (isEnded) {
+      badgeText = '🔴 Ended';
+      badgeBg = 'rgba(239, 68, 68, 0.12)';
+      badgeBorder = '#EF4444';
+      badgeColor = '#DC2626';
+    } else if (isLive) {
+      badgeText = '🟢 Live';
+      badgeBg = 'rgba(34, 197, 94, 0.12)';
+      badgeBorder = '#22C55E';
+      badgeColor = '#16A34A';
+    }
+
+    const dateFormatted = this._formatSessionDate(session.date);
+    const hasSlot2 = !!(session.slot2 && session.slot2.startTime);
+    
+    const slot1Name = hasSlot2 ? 'Slot 1 (Morning)' : 'Exam Session Time';
+    const slot1Start = this._formatSessionTime(session.slot1?.startTime, '08:30 AM');
+    const slot1End = this._formatSessionTime(session.slot1?.endTime, '11:30 AM');
+    const slot1Count = session.slot1?.registeredCount || 0;
+
+    const slot2Name = 'Slot 2 (Evening)';
+    const slot2Start = this._formatSessionTime(session.slot2?.startTime, '04:00 PM');
+    const slot2End = this._formatSessionTime(session.slot2?.endTime, '07:00 PM');
+    const slot2Count = session.slot2?.registeredCount || 0;
+
+    return `
+      <div class="admin-paper-card" style="background:#FFFFFF; border-radius:16px; border:1px solid #E2E8F0; box-shadow:0 3px 12px rgba(15,23,42,0.04); margin-bottom:4px; overflow:hidden;">
+        <!-- Top Badges & Actions matching Flutter 1:1 -->
+        <div style="padding:16px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px;">
+              ${session.subject || 'Physics'}
+            </span>
+            <span style="background:#FFFFFF; border:1px solid #E2E8F0; color:#64748B; font-size:11px; padding:4px 10px; border-radius:20px;">
+              ${session.examYear || '2027 A/L'}
+            </span>
+            <span style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 8px; border-radius:20px;">
+              ${badgeText}
+            </span>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:4px;">
+              <button class="apk-icon-action-btn" data-edit-times="${session.id}" title="Change Session Times (Slot 1 / Slot 2)" style="color:#2563EB; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
+                📅
+              </button>
+              <button class="apk-icon-action-btn" data-delete-paper="${session.id}" title="Delete Paper Session (සැසිය මකා දැමීම)" style="color:#EF4444; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <div style="font-size:16px; font-weight:700; color:#0F172A; margin-top:8px;">
+            ${session.title}
+          </div>
+
+          <div style="display:flex; align-items:center; gap:14px; margin-top:4px; font-size:11px; color:#64748B;">
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <span>📅</span> ${dateFormatted}
+            </span>
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <span>⏱️</span> ${session.durationMinutes || 180} Mins
+            </span>
+          </div>
+        </div>
+
+        <!-- Slots & Action Buttons matching Flutter 1:1 -->
+        <div style="padding:16px;">
+          <!-- Slots Container -->
+          <div style="display:grid; grid-template-columns: ${hasSlot2 ? '1fr 1fr' : '1fr'}; gap:12px;">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+              <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#0F172A;">
+                <span style="color:#F59E0B;">☀️</span> ${slot1Name}
+              </div>
+              <div style="font-size:11px; color:#64748B; margin-top:6px;">
+                ${slot1Start} - ${slot1End}
+              </div>
+              <div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:4px;">
+                👥 ${slot1Count} Registered
+              </div>
+            </div>
+
+            ${hasSlot2 ? `
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+              <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#0F172A;">
+                <span style="color:#2563EB;">🌙</span> ${slot2Name}
+              </div>
+              <div style="font-size:11px; color:#64748B; margin-top:6px;">
+                ${slot2Start} - ${slot2End}
+              </div>
+              <div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:4px;">
+                👥 ${slot2Count} Registered
+              </div>
+            </div>
+            ` : ''}
+          </div>
+
+          <!-- Primary Full-Width Proctor Button matching Flutter 1:1 -->
+          <button class="apk-btn-primary" data-view-proctor="${session.id}" style="width:100%; height:46px; border-radius:12px; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:16px; background:#2563EB; color:#FFFFFF; box-shadow:0 4px 14px rgba(37,99,235,0.25);">
+            <span style="font-size:16px;">📹</span> Live Camera Proctor Monitor (අධීක්ෂණ මධ්‍යස්ථානය)
+          </button>
+
+          <!-- Secondary Row matching Flutter 1:1 -->
+          <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+            ${!isEnded ? `
+              <button data-end-session="${session.id}" style="flex:1; padding:10px; border-radius:10px; border:1px solid #EF4444; background:transparent; color:#EF4444; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
+                <span>⏹</span> End Session (සැසිය අවසන් කරන්න)
+              </button>
+              ${isUpcoming ? `
+                <button data-start-session="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #22C55E; background:transparent; color:#22C55E; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;">
+                  <span>▶</span> Start Now
+                </button>
+              ` : ''}
+            ` : `
+              <div style="flex:1; padding:8px; border-radius:8px; background:#F1F5F9; border:1px solid #E2E8F0; text-align:center; font-size:11px; color:#64748B; font-weight:500;">
+                සැසිය අවසන් කර ඇත (Session Ended)
+              </div>
+              <button data-reopen-session="${session.id}" style="padding:8px 12px; border-radius:8px; border:none; background:transparent; color:#2563EB; font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                <span>🔄</span> Reopen
+              </button>
+            `}
+          </div>
+
+          <!-- Student Preview link -->
+          <div style="text-align:right; margin-top:10px;">
+            <a href="javascript:void(0)" data-student-exam="${session.id}" style="font-size:11px; color:#64748B; text-decoration:none;">
+              👁 Enter Student Exam Room (Preview) ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  _showEditTimesDialog(session, container) {
+    const s1Start = this._formatSessionTime(session.slot1?.startTime, '08:30 AM');
+    const s1End = this._formatSessionTime(session.slot1?.endTime, '11:40 AM');
+    const hasSlot2 = !!(session.slot2 && session.slot2.startTime);
+    const s2Start = this._formatSessionTime(session.slot2?.startTime, '04:00 PM');
+    const s2End = this._formatSessionTime(session.slot2?.endTime, '07:10 PM');
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:85vh; overflow-y:auto;">
+        <div class="modal-header">
+          <div style="font-size:15px; font-weight:700; color:#0F172A;">Change Session Times (වේලාවන් වෙනස් කිරීම)</div>
+          <button class="modal-close-btn" id="btn-close-edit-times">✕</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:14px; margin-top:8px;">
+          <div>
+            <div style="font-size:12px; font-weight:600; color:#D97706; margin-bottom:6px;">
+              ${hasSlot2 ? 'Slot 1 (Morning Session):' : 'Exam Session Times:'}
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div>
+                <div class="form-label" style="font-size:11px;">Start Time:</div>
+                <input type="text" id="edit-s1-start" class="form-textarea" style="height:38px;" value="${s1Start}" />
+              </div>
+              <div>
+                <div class="form-label" style="font-size:11px;">End Time:</div>
+                <input type="text" id="edit-s1-end" class="form-textarea" style="height:38px;" value="${s1End}" />
+              </div>
+            </div>
+          </div>
+
+          ${hasSlot2 ? `
+          <div>
+            <div style="font-size:12px; font-weight:600; color:#2563EB; margin-bottom:6px;">
+              Slot 2 (Evening Session):
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div>
+                <div class="form-label" style="font-size:11px;">Start Time:</div>
+                <input type="text" id="edit-s2-start" class="form-textarea" style="height:38px;" value="${s2Start}" />
+              </div>
+              <div>
+                <div class="form-label" style="font-size:11px;">End Time:</div>
+                <input type="text" id="edit-s2-end" class="form-textarea" style="height:38px;" value="${s2End}" />
+              </div>
+            </div>
+          </div>
+          ` : ''}
+
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="apk-btn-primary" id="btn-cancel-edit-times" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+              Cancel
+            </button>
+            <button class="apk-btn-primary" id="btn-save-edit-times" style="flex:1.5; background:#22C55E;">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-edit-times')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-cancel-edit-times')?.addEventListener('click', () => modal.remove());
+
+    document.getElementById('btn-save-edit-times')?.addEventListener('click', async () => {
+      const newS1Start = document.getElementById('edit-s1-start')?.value || s1Start;
+      const newS1End = document.getElementById('edit-s1-end')?.value || s1End;
+      
+      const updatedSlot1 = {
+        ...(session.slot1 || {}),
+        startTime: newS1Start,
+        endTime: newS1End
+      };
+
+      let updatedSlot2 = null;
+      if (hasSlot2) {
+        const newS2Start = document.getElementById('edit-s2-start')?.value || s2Start;
+        const newS2End = document.getElementById('edit-s2-end')?.value || s2End;
+        updatedSlot2 = {
+          ...(session.slot2 || {}),
+          startTime: newS2Start,
+          endTime: newS2End
+        };
+      }
+
+      await dbService.updateSlotTimes(session.id, { slot1: updatedSlot1, slot2: updatedSlot2 });
+      notificationService.showInAppBanner('Times Updated ✅', 'Session Times Updated Successfully!', 'success');
+      modal.remove();
+      this.renderAdminPapersScreen(container);
+    });
+  }
+
+  _showDeleteConfirmation(session, container) {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:360px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="background:rgba(239,68,68,0.15); color:#EF4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px;">
+            🗑️
+          </div>
+          <div style="font-size:16px; font-weight:700; color:#0F172A;">Delete Session?</div>
+        </div>
+        <div style="font-size:12.5px; color:#475569; line-height:1.5;">
+          Are you sure you want to delete this paper session?
+        </div>
+        <div style="margin-top:10px; padding:10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px;">
+          <div style="font-size:13px; font-weight:700; color:#0F172A;">${session.title}</div>
+          <div style="font-size:11px; color:#64748B; margin-top:2px;">${session.subject || 'Physics'} • ${session.examYear || '2027 A/L'}</div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="apk-btn-primary" id="btn-cancel-delete" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+            Cancel
+          </button>
+          <button class="apk-btn-primary" id="btn-confirm-delete" style="flex:1; background:#EF4444;">
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-cancel-delete')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-confirm-delete')?.addEventListener('click', async () => {
+      await dbService.deletePaperSession(session.id);
+      notificationService.showInAppBanner('Session Deleted 🗑️', 'Paper Session එක සාර්ථකව මකා දමන ලදී (Deleted).', 'warning');
+      modal.remove();
+      this.renderAdminPapersScreen(container);
+    });
+  }
+
+  _showEndSessionConfirmation(session, container) {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:380px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="background:rgba(239,68,68,0.15); color:#EF4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px;">
+            ⚠️
+          </div>
+          <div style="font-size:16px; font-weight:700; color:#0F172A;">End Paper Session?</div>
+        </div>
+        <div style="font-size:12px; color:#475569; line-height:1.5;">
+          ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?<br><br>
+          සැසිය අවසන් කළ පසු සිසුන්ට විභාග කාමරයට පිවිසීමට හෝ නව පිළිතුරු පත්‍ර Submit කිරීමට නොහැක.
+        </div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="apk-btn-primary" id="btn-cancel-end" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+            Cancel
+          </button>
+          <button class="apk-btn-primary" id="btn-confirm-end" style="flex:1.4; background:#EF4444;">
+            End Session (අවසන් කරන්න)
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-cancel-end')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-confirm-end')?.addEventListener('click', async () => {
+      await dbService.endPaperSession(session.id);
+      notificationService.showInAppBanner('Session Ended 🛑', '✅ Paper Session එක සාර්ථකව අවසන් කරන ලදී (Session Ended).', 'info');
+      modal.remove();
+      this.renderAdminPapersScreen(container);
+    });
+  }
+
+  async _startSessionNow(session, container) {
+    await dbService.startPaperSession(session.id);
+    notificationService.showInAppBanner('Session Live 🚀', '🚀 සැසිය සක්‍රීය කරන ලදී (Session is now Live)!', 'success');
+    this.renderAdminPapersScreen(container);
+  }
+
+  async _reopenSession(session, container) {
+    await dbService.reopenPaperSession(session.id);
+    notificationService.showInAppBanner('Session Reopened 🔄', '✅ සැසිය නැවත සක්‍රීය කරන ලදී (Session Re-opened).', 'info');
+    this.renderAdminPapersScreen(container);
   }
 
   _buildAdminUpcomingPapersHTML() {
@@ -3876,6 +4204,7 @@ class AppController {
   }
 
   openAdminCreatePaperModal() {
+    const today = new Date().toISOString().split('T')[0];
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.style.display = 'flex';
@@ -3890,18 +4219,34 @@ class AppController {
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
           <div>
             <div class="form-label">Paper Title:</div>
-            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2026 A/L Physics Model Paper 04" />
+            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 (Mechanics)" />
           </div>
 
-          <div>
-            <div class="form-label">Units / Syllabus Covered:</div>
-            <input type="text" id="new-paper-units" class="form-textarea" style="height:40px;" placeholder="e.g. Mechanics, Oscillations & Waves" />
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <div class="form-label">Subject:</div>
+              <select id="new-paper-subject" class="form-textarea" style="height:40px; padding:8px;">
+                <option value="Physics" selected>Physics</option>
+              </select>
+            </div>
+            <div>
+              <div class="form-label">Exam Year / Batch:</div>
+              <select id="new-paper-year" class="form-textarea" style="height:40px; padding:8px;">
+                <option value="2024 A/L">2024 A/L</option>
+                <option value="2025 A/L">2025 A/L</option>
+                <option value="2026 A/L">2026 A/L</option>
+                <option value="2027 A/L" selected>2027 A/L</option>
+                <option value="2028 A/L">2028 A/L</option>
+                <option value="2029 A/L">2029 A/L</option>
+                <option value="All Batches">All Batches</option>
+              </select>
+            </div>
           </div>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
             <div>
               <div class="form-label">Duration (Mins):</div>
-              <input type="number" id="new-paper-duration" class="form-textarea" style="height:40px;" value="120" />
+              <input type="number" id="new-paper-duration" class="form-textarea" style="height:40px;" value="180" />
             </div>
             <div>
               <div class="form-label">Total Marks:</div>
@@ -3909,49 +4254,172 @@ class AppController {
             </div>
           </div>
 
-          <div>
-            <div class="form-label">Exam Slots (Slot 1 & Slot 2):</div>
-            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px; font-size:12px; color:#475569;">
-              <div>• <strong>Slot 1:</strong> 08:30 AM - 10:30 AM (50 Seats)</div>
-              <div style="margin-top:4px;">• <strong>Slot 2:</strong> 04:00 PM - 06:00 PM (50 Seats)</div>
+          <!-- Physical Paper Delivery Note matching Flutter -->
+          <div style="background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.2); border-radius:10px; padding:10px; display:flex; gap:8px;">
+            <span style="font-size:18px;">📦</span>
+            <div style="font-size:10.5px; color:#1E3A8A; line-height:1.45;">
+              <strong>Physical Paper Delivery:</strong> සිසුන්ගේ නිවෙස් වලට කුරියර් කර ඇති මුද්‍රිත ප්‍රශ්න පත්‍රය කැමරාව ඉදිරියේ විවෘත කිරීමට ප්‍රථම විනාඩි 10 ක කාලයක් ස්වයංක්‍රීයව හිමිවේ.
             </div>
           </div>
 
-          <button class="apk-btn-primary" id="btn-save-new-paper" style="margin-top:10px; padding:14px; font-size:14px;">
-            🚀 Publish Paper Session to Students
-          </button>
+          <div>
+            <div class="form-label">📅 Examination Date:</div>
+            <input type="date" id="new-paper-date" class="form-textarea" style="height:40px;" value="${today}" />
+          </div>
+
+          <div>
+            <div class="form-label">Number of Session Slots:</div>
+            <div style="display:flex; gap:10px; margin-top:4px;">
+              <label style="flex:1; display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer;">
+                <input type="radio" name="slot-count" value="1" id="radio-slot-1">
+                <span>1 Slot</span>
+              </label>
+              <label style="flex:1; display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer;">
+                <input type="radio" name="slot-count" value="2" id="radio-slot-2" checked>
+                <span>2 Slots (Morning & Evening)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Slot Times Container -->
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+            <div style="font-size:11.5px; font-weight:700; color:#D97706; margin-bottom:6px;">☀️ Slot 1 (Morning Session):</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div>
+                <span style="font-size:10.5px; color:#64748B;">Start:</span>
+                <input type="text" id="new-s1-start" class="form-textarea" style="height:36px; font-size:11px;" value="08:30 AM" />
+              </div>
+              <div>
+                <span style="font-size:10.5px; color:#64748B;">End:</span>
+                <input type="text" id="new-s1-end" class="form-textarea" style="height:36px; font-size:11px;" value="11:40 AM" />
+              </div>
+            </div>
+
+            <div id="new-slot2-box" style="margin-top:10px;">
+              <div style="font-size:11.5px; font-weight:700; color:#2563EB; margin-bottom:6px;">🌙 Slot 2 (Evening Session):</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div>
+                  <span style="font-size:10.5px; color:#64748B;">Start:</span>
+                  <input type="text" id="new-s2-start" class="form-textarea" style="height:36px; font-size:11px;" value="04:00 PM" />
+                </div>
+                <div>
+                  <span style="font-size:10.5px; color:#64748B;">End:</span>
+                  <input type="text" id="new-s2-end" class="form-textarea" style="height:36px; font-size:11px;" value="07:10 PM" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Manual Session End Note matching Flutter -->
+          <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:10px; display:flex; gap:8px;">
+            <span style="font-size:16px; color:#D97706;">🛑</span>
+            <div style="font-size:10.5px; color:#92400E; line-height:1.45;">
+              <strong>Manual Session End:</strong> විභාග සැසිය ස්වයංක්‍රීයව අවසන් නොවේ. විභාගය අවසන් වූ පසු Admin විසින් "End Session" බොත්තම ඔබා එය අවසන් කළ යුතුය.
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button class="apk-btn-primary" id="btn-cancel-create-paper" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+              Cancel
+            </button>
+            <button class="apk-btn-primary" id="btn-save-new-paper" style="flex:1.5; background:#2563EB; padding:13px; font-size:13px;">
+              Create Paper (නිර්මාණය කරන්න)
+            </button>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(modal);
     document.getElementById('btn-close-new-paper')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-cancel-create-paper')?.addEventListener('click', () => modal.remove());
+
+    const slot2Box = document.getElementById('new-slot2-box');
+    document.getElementById('radio-slot-1')?.addEventListener('change', () => {
+      if (slot2Box) slot2Box.style.display = 'none';
+    });
+    document.getElementById('radio-slot-2')?.addEventListener('change', () => {
+      if (slot2Box) slot2Box.style.display = 'block';
+    });
 
     document.getElementById('btn-save-new-paper')?.addEventListener('click', async () => {
-      const title = document.getElementById('new-paper-title')?.value;
-      const subject = document.getElementById('new-paper-units')?.value;
-      const duration = Number(document.getElementById('new-paper-duration')?.value) || 120;
+      const title = document.getElementById('new-paper-title')?.value?.trim();
+      const subject = document.getElementById('new-paper-subject')?.value || 'Physics';
+      const examYear = document.getElementById('new-paper-year')?.value || '2027 A/L';
+      const duration = Number(document.getElementById('new-paper-duration')?.value) || 180;
       const marks = Number(document.getElementById('new-paper-marks')?.value) || 100;
+      const examDate = document.getElementById('new-paper-date')?.value || today;
+      const isTwoSlots = document.getElementById('radio-slot-2')?.checked;
+
+      const s1Start = document.getElementById('new-s1-start')?.value || '08:30 AM';
+      const s1End = document.getElementById('new-s1-end')?.value || '11:40 AM';
+      const s2Start = document.getElementById('new-s2-start')?.value || '04:00 PM';
+      const s2End = document.getElementById('new-s2-end')?.value || '07:10 PM';
 
       if (!title) {
-        alert('Please enter a paper title.');
+        alert('කරුණාකර Paper Title එක ඇතුළත් කරන්න (Please enter Paper Title)');
         return;
       }
 
+      // Convert date + time strings to ISO timestamps for slot1 and slot2
+      const makeIsoTime = (dStr, timeStr) => {
+        try {
+          const parts = timeStr.trim().split(' ');
+          const [hStr, mStr] = parts[0].split(':');
+          let h = parseInt(hStr, 10);
+          const m = parseInt(mStr, 10);
+          const isPm = (parts[1] || '').toUpperCase() === 'PM';
+          if (isPm && h < 12) h += 12;
+          if (!isPm && h === 12) h = 0;
+          const [yr, mo, da] = dStr.split('-').map(Number);
+          return new Date(yr, mo - 1, da, h, m).toISOString();
+        } catch (_) {
+          return new Date().toISOString();
+        }
+      };
+
+      const slot1StartIso = makeIsoTime(examDate, s1Start);
+      const slot1EndIso = makeIsoTime(examDate, s1End);
+
+      const slot1 = {
+        id: 'slot1',
+        name: isTwoSlots ? 'Morning Session (උදෑසන සැසිය)' : 'Exam Session Time',
+        startTime: slot1StartIso,
+        endTime: slot1EndIso,
+        registeredCount: 0,
+        maxCapacity: 200
+      };
+
+      let slot2 = null;
+      if (isTwoSlots) {
+        slot2 = {
+          id: 'slot2',
+          name: 'Evening Session (සවස සැසිය)',
+          startTime: makeIsoTime(examDate, s2Start),
+          endTime: makeIsoTime(examDate, s2End),
+          registeredCount: 0,
+          maxCapacity: 200
+        };
+      }
+
+      // Sessions ALWAYS start in 'upcoming' status and 'waiting' phase!
       await dbService.savePaperSession({
         title,
-        subject: subject || 'A/L Physics',
+        subject,
+        examYear,
+        date: examDate,
         durationMinutes: duration,
         totalMarks: marks,
-        isLive: true,
-        proctoringRequired: true,
-        slots: [
-          { id: 'slot_1', name: 'Morning (08:30 AM)', seatsLeft: 50 },
-          { id: 'slot_2', name: 'Evening (04:00 PM)', seatsLeft: 50 }
-        ]
+        status: 'upcoming',
+        currentPhase: 'waiting',
+        isEnded: false,
+        isLive: false,
+        isTimeUp: false,
+        slot1,
+        slot2
       });
 
-      notificationService.showInAppBanner('Paper Created! 📋', `${title} published to student portal.`, 'success');
+      notificationService.showInAppBanner('Paper Created! 📋', '✅ Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
       modal.remove();
       const vp = document.getElementById('admin-main-viewport');
       if (vp) this.renderAdminPapersScreen(vp);

@@ -9,6 +9,7 @@ import {
   setDoc, 
   addDoc, 
   updateDoc, 
+  deleteDoc, 
   query, 
   where, 
   orderBy, 
@@ -418,6 +419,39 @@ export class DbService {
       message: '🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් විය. (Exam session ended by Admin)',
       type: 'urgent'
     }).catch(() => {});
+  }
+
+  async startPaperSession(paperId) {
+    if (!paperId) return;
+    return this.setSessionPhase(paperId, 'package_opening', { forceResetTimer: true });
+  }
+
+  async reopenPaperSession(paperId) {
+    if (!paperId) return;
+    return this.setSessionPhase(paperId, 'waiting');
+  }
+
+  async deletePaperSession(paperId) {
+    if (!paperId) return;
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      await deleteDoc(docRef);
+    } catch (e) {
+      console.warn('[DB] deletePaperSession error:', e);
+    }
+  }
+
+  async updateSlotTimes(paperId, { slot1, slot2 }) {
+    if (!paperId) return;
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      const updates = {};
+      if (slot1) updates.slot1 = slot1;
+      if (slot2) updates.slot2 = slot2;
+      await updateDoc(docRef, updates);
+    } catch (e) {
+      console.warn('[DB] updateSlotTimes error:', e);
+    }
   }
 
   async sendProctorAlert({ paperId, studentId, studentPhone, senderName, message, type = 'warning' }) {
