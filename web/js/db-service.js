@@ -148,7 +148,7 @@ export class DbService {
     } catch (e) {
       console.warn('[DB] Admin desserts fetch fallback:', e);
     }
-    return this.getMockDesserts();
+    return [];
   }
 
   // Admin: Save or update paper session
@@ -175,16 +175,7 @@ export class DbService {
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
     } catch (_) {}
-    return [
-      { id: 'st_01', name: 'Danushka Wickramasinghe', phone: '0771234567', examYear: '2026 A/L', credits: 1420, isVerified: true, role: 'student' },
-      { id: 'st_02', name: 'Minoli Senarath', phone: '0719876543', examYear: '2026 A/L', credits: 1280, isVerified: true, role: 'student' },
-      { id: 'st_03', name: 'Kasun Perera', phone: '0770557769', examYear: '2027 A/L', credits: 155, isVerified: true, role: 'student' },
-      { id: 'st_04', name: 'Sachintha Fernando', phone: '0754433221', examYear: '2027 A/L', credits: 1190, isVerified: true, role: 'student' },
-      { id: 'st_05', name: 'Dinuka Rajapaksha', phone: '0761122334', examYear: '2026 A/L', credits: 940, isVerified: false, role: 'student' },
-      { id: 'st_06', name: 'Kavindu Jayawardena', phone: '0789988776', examYear: '2026 A/L', credits: 890, isVerified: true, role: 'student' },
-      { id: 'st_07', name: 'Anuki Dissanayake', phone: '0723344556', examYear: '2027 A/L', credits: 810, isVerified: true, role: 'student' },
-      { id: 'st_08', name: 'Praveen Silva', phone: '0701122334', examYear: '2028 A/L', credits: 710, isVerified: false, role: 'student' }
-    ];
+    return [];
   }
 
   matchesYear(paperYear, targetYear) {
@@ -208,7 +199,40 @@ export class DbService {
         return list.filter(p => this.matchesYear(p.examYear, examYear));
       }
     } catch (_) {}
-    return this.getMockPaperSessions(examYear);
+    return [];
+  }
+
+  async getPaperSession(paperId) {
+    if (!paperId) return null;
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        return { id: snap.id, ...snap.data() };
+      }
+    } catch (e) {
+      console.warn('[DB] getPaperSession error:', e);
+    }
+    return null;
+  }
+
+  streamPaperSession(paperId, callback) {
+    if (!paperId) return () => {};
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      return onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          callback({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          callback(null);
+        }
+      }, (err) => {
+        console.warn('[DB] streamPaperSession error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] streamPaperSession setup error:', e);
+      return () => {};
+    }
   }
 
   async getUpcomingPapers(examYear) {
@@ -220,7 +244,7 @@ export class DbService {
         return list.filter(p => this.matchesYear(p.examYear, examYear));
       }
     } catch (_) {}
-    return this.getMockUpcomingPapers(examYear);
+    return [];
   }
 
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
@@ -250,6 +274,187 @@ export class DbService {
       if (saved) return JSON.parse(saved);
     } catch (_) {}
     return null;
+  }
+
+  async getSlotRegistrations(paperId, slotId) {
+    if (!paperId) return [];
+    try {
+      const ref = collection(db, 'paper_registrations');
+      const q = query(ref, where('paperId', '==', paperId));
+      const snap = await getDocs(q);
+      const list = [];
+      snap.forEach(d => {
+        const data = { id: d.id, ...d.data() };
+        if (!slotId || slotId === 'all' || data.selectedSlot === slotId || (!data.selectedSlot && slotId === 'slot1')) {
+          list.push(data);
+        }
+      });
+      return list;
+    } catch (e) {
+      console.warn('[DB] getSlotRegistrations error:', e);
+      return [];
+    }
+  }
+
+  streamSlotRegistrations(paperId, slotId, callback) {
+    if (!paperId) return () => {};
+    try {
+      const ref = collection(db, 'paper_registrations');
+      const q = query(ref, where('paperId', '==', paperId));
+      return onSnapshot(q, (snapshot) => {
+        const all = [];
+        snapshot.forEach(d => {
+          all.push({ id: d.id, ...d.data() });
+        });
+        if (!slotId || slotId === 'all') {
+          callback(all);
+        } else {
+          callback(all.filter(r => (r.selectedSlot || 'slot1') === slotId));
+        }
+      }, (err) => {
+        console.warn('[DB] streamSlotRegistrations error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] streamSlotRegistrations setup error:', e);
+      return () => {};
+    }
+  }
+
+  // 1:1 Phase Controller matching admin_live_proctor_screen.dart
+  async setSessionPhase(paperId, phase, { forceResetTimer = false } = {}) {
+    if (!paperId) return;
+    const nowIso = new Date().toISOString();
+    const updates = { currentPhase: phase };
+    let alertMessage = null;
+    let alertType = 'info';
+
+    if (phase === 'waiting') {
+      updates.status = 'upcoming';
+      updates.isTimeUp = false;
+    } else if (phase === 'package_opening') {
+      updates.status = 'active';
+      updates.isTimeUp = false;
+      if (forceResetTimer) {
+        updates.packageOpeningStartedAt = nowIso;
+      }
+      alertMessage = '📦 ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කරන්න! (Open your exam parcel in front of the camera now!)';
+      alertType = 'urgent';
+    } else if (phase === 'writing') {
+      updates.status = 'active';
+      updates.isTimeUp = false;
+      if (forceResetTimer) {
+        updates.writingStartedAt = nowIso;
+      }
+      updates.packageOpeningEndedAt = nowIso;
+      alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
+      alertType = 'info';
+    } else if (phase === 'time_up') {
+      updates.status = 'active';
+      updates.isTimeUp = true;
+      updates.timeUpAt = nowIso;
+      alertMessage = '⏰ වේලාව අවසන් විය! ලිවීම නවතා ඔබගේ පිළිතුරු පත්‍ර In-App Scanner එකෙන් Scan කර දැන්ම Submit කරන්න.';
+      alertType = 'urgent';
+    } else if (phase === 'ended') {
+      updates.status = 'ended';
+      updates.endedAt = nowIso;
+      alertMessage = '🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් විය. (Session Ended by Examiner)';
+      alertType = 'urgent';
+    }
+
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      await updateDoc(docRef, updates);
+    } catch (e) {
+      console.warn('[DB] setSessionPhase updateDoc error:', e);
+    }
+
+    if (alertMessage) {
+      this.broadcastProctorAlert({
+        paperId,
+        senderName: 'Admin / Examiner',
+        message: alertMessage,
+        type: alertType
+      }).catch(() => {});
+    }
+  }
+
+  async triggerTimeUp(paperId) {
+    if (!paperId) return;
+    const nowIso = new Date().toISOString();
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      await updateDoc(docRef, {
+        isTimeUp: true,
+        currentPhase: 'time_up',
+        timeUpAt: nowIso
+      });
+    } catch (e) {
+      console.warn('[DB] triggerTimeUp error:', e);
+    }
+    this.broadcastProctorAlert({
+      paperId,
+      senderName: 'Admin / Examiner',
+      message: '⏰ වේලාව අවසන් විය! (Time is Up!) කරුණාකර ලිවීම නවතා ඔබගේ පිළිතුරු පත්‍ර In-App Scanner එක හරහා Scan කර දැන්ම Submit කරන්න.',
+      type: 'urgent'
+    }).catch(() => {});
+  }
+
+  async endPaperSession(paperId) {
+    if (!paperId) return;
+    const nowIso = new Date().toISOString();
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      await updateDoc(docRef, {
+        status: 'ended',
+        currentPhase: 'ended',
+        endedAt: nowIso
+      });
+    } catch (e) {
+      console.warn('[DB] endPaperSession error:', e);
+    }
+    this.broadcastProctorAlert({
+      paperId,
+      senderName: 'Admin / Examiner',
+      message: '🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් විය. (Exam session ended by Admin)',
+      type: 'urgent'
+    }).catch(() => {});
+  }
+
+  async sendProctorAlert({ paperId, studentId, studentPhone, senderName, message, type = 'warning' }) {
+    if (!paperId || !studentId) return;
+    try {
+      const alertsRef = collection(db, 'proctor_alerts');
+      await addDoc(alertsRef, {
+        paperId,
+        studentId,
+        studentPhone: studentPhone || '',
+        senderName: senderName || 'Admin / Teacher',
+        message,
+        type,
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('[DB] sendProctorAlert error:', e);
+    }
+  }
+
+  async broadcastProctorAlert({ paperId, senderName, message, type = 'info' }) {
+    if (!paperId) return;
+    try {
+      const alertsRef = collection(db, 'proctor_alerts');
+      await addDoc(alertsRef, {
+        paperId,
+        studentId: 'ALL',
+        senderName: senderName || 'Admin / Examiner',
+        message,
+        type,
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('[DB] broadcastProctorAlert error:', e);
+    }
   }
 
   // ── 3. Daily MCQ Sprint ──────────────────────────────────────────────────
@@ -317,7 +522,7 @@ export class DbService {
         }));
       }
     } catch (_) {}
-    return this.getMockLeaderboard();
+    return [];
   }
 
   // ── 5. Daily Physics Insight ─────────────────────────────────────────────

@@ -685,7 +685,7 @@ class AppController {
     document.getElementById('btn-ask-tutor-insight')?.addEventListener('click', () => this.openAiTutorDialog('Work-Energy Theorem'));
     document.getElementById('act-submit-hw')?.addEventListener('click', () => this.openDocumentScanner());
     document.getElementById('act-ranks')?.addEventListener('click', () => this.switchTab('ranks'));
-    document.getElementById('btn-enter-eval-room')?.addEventListener('click', () => this.openLiveExamRoom('paper_001'));
+    document.getElementById('btn-enter-eval-room')?.addEventListener('click', () => this.switchTab('papers'));
     document.getElementById('btn-header-avatar')?.addEventListener('click', () => this.switchTab('profile'));
 
     container.querySelectorAll('.inquiry-item-btn').forEach(btn => {
@@ -2525,87 +2525,9 @@ class AppController {
     });
   }
 
-  // ── Live Exam Room with Front-Camera Proctoring ───────────────────────────
-  openLiveExamRoom(paperId) {
-    this.isInsideLiveExam = true;
-    this.antiCheatViolations = 0;
-
-    const modal = document.createElement('div');
-    modal.className = 'exam-hall-container';
-    modal.id = 'exam-hall-room';
-
-    modal.innerHTML = `
-      <header class="exam-header">
-        <div class="exam-info-col">
-          <span class="exam-title">2027 A/L Physics Term Paper 01</span>
-          <span class="exam-status-indicator">
-            <span class="live-dot"></span>
-            Proctored Session Active
-          </span>
-        </div>
-        <div class="exam-timer-box">
-          <span>⏱️</span>
-          <span>02:29:59</span>
-        </div>
-        <button class="btn-scanner-icon" id="btn-exit-exam">✕</button>
-      </header>
-
-      <div class="proctor-live-box">
-        <video class="proctor-video" id="proctor-live-video" autoplay playsinline muted></video>
-        <div class="proctor-badge">
-          <span class="proctor-pulse"></span>
-          <span>LIVE</span>
-        </div>
-      </div>
-
-      <div class="exam-body">
-        <div class="question-card">
-          <div class="q-badge-row">
-            <span class="q-number-pill">Question 1</span>
-            <span class="q-points-pill">1.0 Mark</span>
-          </div>
-          <div class="q-text">
-            A simple pendulum has period T at the Earth's surface. If it is placed in an elevator moving downwards with acceleration g/4, its new period is:
-          </div>
-          <div class="q-options-list">
-            <div class="q-option-item"><span class="q-option-letter">A</span><span class="q-option-text">T / 2</span></div>
-            <div class="q-option-item selected"><span class="q-option-letter">B</span><span class="q-option-text">2T / √3</span></div>
-            <div class="q-option-item"><span class="q-option-letter">C</span><span class="q-option-text">T * √3 / 2</span></div>
-            <div class="q-option-item"><span class="q-option-letter">D</span><span class="q-option-text">2T</span></div>
-            <div class="q-option-item"><span class="q-option-letter">E</span><span class="q-option-text">T / √2</span></div>
-          </div>
-        </div>
-      </div>
-
-      <footer class="exam-footer">
-        <button class="btn-nav-q" disabled>← Prev</button>
-        <span style="font-size:12px; font-weight:700; color:var(--text-sub);">Q1 / 50</span>
-        <button class="btn-nav-q">Next →</button>
-        <button class="btn-finish-exam" id="btn-submit-exam-paper">Submit Paper</button>
-      </footer>
-    `;
-
-    document.body.appendChild(modal);
-
-    const proctorVideo = document.getElementById('proctor-live-video');
-    cameraService.startCamera(proctorVideo, 'user').catch(err => {
-      console.warn('[Proctor] Notice:', err.message);
-    });
-
-    const exit = () => {
-      this.isInsideLiveExam = false;
-      cameraService.stopCamera();
-      modal.remove();
-    };
-
-    document.getElementById('btn-exit-exam')?.addEventListener('click', () => {
-      if (confirm('Leave the proctored exam hall?')) exit();
-    });
-
-    document.getElementById('btn-submit-exam-paper')?.addEventListener('click', () => {
-      alert('Paper successfully submitted! Score recorded.');
-      exit();
-    });
+  // ── Live Exam Room with Front-Camera Proctoring (1:1 Mobile Parity) ──
+  openLiveExamRoom(paperId, slotId = 'slot1') {
+    return this.openStudentLiveExamRoom(paperId, slotId);
   }
 
   handleExamTabSwitch() {
@@ -4123,37 +4045,31 @@ class AppController {
     this.openAdminLiveProctorHall(paperId);
   }
 
-  // ── A. Examiner Live Proctoring Center (admin_live_proctor_screen.dart) ──
+  // ── A. Examiner Live Proctoring Center (admin_live_proctor_screen.dart 1:1) ──
   async openAdminLiveProctorHall(paperId) {
-    const papers = await dbService.getPaperSessions();
-    const paper = papers.find(p => p.id === paperId) || {
-      id: paperId || 'p_demo',
-      title: '2027 A/L Speed Paper 01 (Physics)',
-      subject: 'Physics',
-      durationMinutes: 150,
-      phase: 'writing',
-      examYear: '2027 A/L'
-    };
+    let session = await dbService.getPaperSession(paperId);
+    if (!session) {
+      const papers = await dbService.getPaperSessions();
+      session = papers.find(p => p.id === paperId) || {
+        id: paperId,
+        title: 'Exam Proctoring Center',
+        currentPhase: 'writing',
+        durationMinutes: 150
+      };
+    }
 
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.style.display = 'flex';
-    modal.style.background = '#0B0F19';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.background = 'rgba(11, 15, 25, 0.9)';
+    modal.style.backdropFilter = 'blur(12px)';
     modal.style.zIndex = '9999';
 
-    let currentPhase = paper.phase || 'writing';
-    let phaseTimeRemaining = 150 * 60; // in seconds
-    let activeFilter = 'all'; // 'all', 'slot1', 'slot2'
-
-    // Mock students in the proctor hall
-    const mockStudents = [
-      { id: 'st_1', name: 'Kasun Perera', batch: '2027 A/L', slot: 'slot1', desk: 'Desk #12', status: 'live', fps: 30, warning: 0 },
-      { id: 'st_2', name: 'Danushka Wickramasinghe', batch: '2026 A/L', slot: 'slot1', desk: 'Desk #04', status: 'live', fps: 30, warning: 0 },
-      { id: 'st_3', name: 'Minoli Senarath', batch: '2026 A/L', slot: 'slot2', desk: 'Desk #08', status: 'live', fps: 28, warning: 0 },
-      { id: 'st_4', name: 'Kavindu Jayawardena', batch: '2026 A/L', slot: 'slot1', desk: 'Desk #19', status: 'live', fps: 25, warning: 1 },
-      { id: 'st_5', name: 'Anuki Dissanayake', batch: '2027 A/L', slot: 'slot2', desk: 'Desk #23', status: 'live', fps: 30, warning: 0 },
-      { id: 'st_6', name: 'Sachintha Fernando', batch: '2027 A/L', slot: 'slot1', desk: 'Desk #07', status: 'live', fps: 30, warning: 0 }
-    ];
+    let activeTab = 'slot1'; // 'slot1', 'slot2', 'answers'
+    let allStudents = [];
+    let unsubs = [];
 
     const formatTimer = (secs) => {
       const h = String(Math.floor(secs / 3600)).padStart(2, '0');
@@ -4162,225 +4078,640 @@ class AppController {
       return `${h}:${m}:${s}`;
     };
 
-    const renderHallContent = () => {
-      const filtered = activeFilter === 'all' ? mockStudents : mockStudents.filter(s => s.slot === activeFilter);
+    const render = () => {
+      const slot1Students = allStudents.filter(s => (s.selectedSlot || 'slot1') === 'slot1');
+      const slot2Students = allStudents.filter(s => s.selectedSlot === 'slot2');
+      const submittedStudents = allStudents.filter(s => s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0));
+
+      const currentSlotStudents = activeTab === 'slot2' ? slot2Students : slot1Students;
+      const liveCount = currentSlotStudents.filter(s => s.status !== 'submitted' && (s.isCameraActive || s.isOnline)).length;
+      const submittedSlotCount = currentSlotStudents.filter(s => s.status === 'submitted').length;
+      const inactiveCount = Math.max(0, currentSlotStudents.length - liveCount - submittedSlotCount);
+
+      const phase = session.currentPhase || 'waiting';
+      let phaseColor = '#818CF8';
+      let phaseLabel = '⏳ Waiting Room (Students Waiting)';
+
+      switch (phase) {
+        case 'package_opening':
+          phaseColor = '#F59E0B';
+          phaseLabel = '📦 Package Opening (10 Mins Active)';
+          break;
+        case 'writing':
+          phaseColor = '#22C55E';
+          phaseLabel = '✍️ Exam Writing In Progress';
+          break;
+        case 'time_up':
+          phaseColor = '#EA580C';
+          phaseLabel = '⏰ Time is Up (Collecting Answers)';
+          break;
+        case 'ended':
+          phaseColor = '#EF4444';
+          phaseLabel = '🛑 Session Ended';
+          break;
+        default:
+          phaseColor = '#818CF8';
+          phaseLabel = '⏳ Waiting Room (Students Waiting)';
+          break;
+      }
+
+      const isEnded = session.isEnded || phase === 'ended';
+      const isTimeUp = session.isTimeUp || phase === 'time_up';
 
       modal.innerHTML = `
-        <div style="width:100%; height:100%; display:flex; flex-direction:column; background:#0B0F19; color:#F8FAFC; overflow-y:auto; font-family:'Plus Jakarta Sans',sans-serif;">
-          <!-- Top Surveillance Header -->
-          <div style="background:#111827; border-bottom:1px solid #1F2937; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <span class="apk-pulsing-dot" style="background:#EF4444; width:12px; height:12px;"></span>
-              <div>
-                <div style="font-size:14px; font-weight:800; color:#F8FAFC; display:flex; align-items:center; gap:6px;">
-                  <span>PROCTOR RADAR ACTIVE</span>
-                  <span style="font-size:11px; background:#1E3A8A; color:#93C5FD; padding:2px 8px; border-radius:6px;">LIVE 720p</span>
+        <div style="width:100%; max-width:440px; height:92vh; max-height:890px; border-radius:24px; border:1px solid #334155; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow:hidden; font-family:'Poppins','Plus Jakarta Sans',sans-serif; box-shadow:0 25px 60px rgba(0,0,0,0.7); position:relative;">
+          
+          <!-- ── AppBar (matching admin_live_proctor_screen.dart AppBar) ── -->
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 0 14px; flex-shrink:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="width:8px; height:8px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E; display:inline-block;"></span>
+                  <span style="font-size:15px; font-weight:700; color:#FFFFFF;">Live Invigilator Monitor</span>
                 </div>
-                <div style="font-size:11.5px; color:#94A3B8;">${paper.title} • Channel: edupeak_proctor_${paper.id}</div>
+                <div style="font-size:11px; color:#94A3B8; padding-left:16px;">${session.title || 'Exam Proctoring Center'}</div>
+              </div>
+
+              <!-- Top Actions: Time Up, End Session, Broadcast Alert, Close -->
+              <div style="display:flex; align-items:center; gap:6px;">
+                ${!isEnded ? `
+                  <button id="btn-proctor-time-up" style="background:${isTimeUp ? '#EA580C' : '#F59E0B'}; color:#000000; border:none; padding:5px 8px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    <span>⏰</span> ${isTimeUp ? 'Time Up (Sent)' : 'Time Up'}
+                  </button>
+                  <button id="btn-proctor-end-session" style="background:#EF4444; color:#FFFFFF; border:none; padding:5px 8px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    <span>🛑</span> End Session
+                  </button>
+                ` : `
+                  <div style="padding:4px 8px; border-radius:6px; background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px;">
+                    <span>✓</span> Ended
+                  </div>
+                `}
+                <button id="btn-proctor-broadcast" title="Broadcast Announcement to All Students" style="background:transparent; border:none; color:#F59E0B; font-size:18px; cursor:pointer; padding:4px;">
+                  📢
+                </button>
+                <button id="btn-close-proctor-hall" title="Exit Hall" style="background:transparent; border:none; color:#94A3B8; font-size:16px; cursor:pointer; padding:4px 6px;">
+                  ✕
+                </button>
               </div>
             </div>
-            <button id="btn-close-proctor-hall" style="background:#1F2937; border:none; color:#F8FAFC; padding:8px 14px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;">
-              ✕ Exit Hall
-            </button>
+
+            <!-- TabBar: Slot 1, Slot 2, Answers (Count) -->
+            <div style="display:flex; border-bottom:1px solid #334155;">
+              <button class="proctor-tab-btn" data-tab="slot1" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'slot1' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'slot1' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <span>☀️</span> ${session.slot2 ? 'Slot 1' : 'Slot 1 (Live)'}
+              </button>
+              <button class="proctor-tab-btn" data-tab="slot2" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'slot2' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'slot2' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <span>🌙</span> ${session.slot2 ? 'Slot 2' : 'Slot 2 (None)'}
+              </button>
+              <button class="proctor-tab-btn" data-tab="answers" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'answers' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'answers' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <span style="color:#4ADE80;">✅</span> Answers (${submittedStudents.length})
+              </button>
+            </div>
           </div>
 
-          <!-- Examiner Phase Controller matching admin_live_proctor_screen.dart -->
-          <div style="background:#1E293B; padding:12px 18px; border-bottom:1px solid #334155;">
+          <!-- ── Phase Control Bar (_buildSessionPhaseControlBar) ── -->
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:8px 14px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <div style="font-size:12px; font-weight:800; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">
-                ⚙️ Examiner Phase Controller:
+              <div style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
               </div>
-              <div id="hall-countdown-display" style="font-size:16px; font-weight:900; color:#38BDF8; font-family:monospace; background:#0F172A; padding:4px 12px; border-radius:8px; border:1px solid #334155;">
-                ${formatTimer(phaseTimeRemaining)}
-              </div>
+              <div style="font-size:10px; font-weight:600; color:#64748B;">Manual Phase Controls</div>
             </div>
 
-            <!-- Phase Buttons -->
-            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;">
-              <button class="phase-btn ${currentPhase === 'waiting' ? 'active-phase' : ''}" data-phase="waiting" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'waiting' ? '#2563EB' : '#0F172A'}; color:#FFFFFF;">
-                ⏳ Waiting
-              </button>
-              <button class="phase-btn ${currentPhase === 'package_opening' ? 'active-phase' : ''}" data-phase="package_opening" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'package_opening' ? '#D97706' : '#0F172A'}; color:#FFFFFF;">
-                📦 Package (10M)
-              </button>
-              <button class="phase-btn ${currentPhase === 'writing' ? 'active-phase' : ''}" data-phase="writing" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'writing' ? '#10B981' : '#0F172A'}; color:#FFFFFF;">
-                ✍️ Writing
-              </button>
-              <button class="phase-btn ${currentPhase === 'time_up' ? 'active-phase' : ''}" data-phase="time_up" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'time_up' ? '#EF4444' : '#0F172A'}; color:#FFFFFF;">
-                ⏰ Time Up
-              </button>
-              <button class="phase-btn ${currentPhase === 'ended' ? 'active-phase' : ''}" data-phase="ended" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'ended' ? '#475569' : '#0F172A'}; color:#FFFFFF;">
-                🛑 End
-              </button>
+            <!-- Horizontal Action Buttons Matching Mobile Dart Screen -->
+            <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
+              ${phase === 'waiting' ? `
+                <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>📦</span> Start Package Opening (10m)
+                </button>
+                <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #22C55E; color:#22C55E; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>▶</span> Start Writing Direct
+                </button>
+              ` : phase === 'package_opening' ? `
+                <button class="phase-action-btn" data-set-phase="writing" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>✍️</span> Start Exam Writing (ලිවීම අරඹන්න)
+                </button>
+                <button class="phase-action-btn" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>🔄</span> Restart 10m Timer
+                </button>
+                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>🛑</span> End Session
+                </button>
+              ` : phase === 'writing' ? `
+                <button class="phase-action-btn" data-trigger-time-up="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>⏰</span> Trigger Time Up (වේලාව අවසන්)
+                </button>
+                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>🛑</span> End Session
+                </button>
+              ` : phase === 'time_up' ? `
+                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>🛑</span> End Session (සැසිය අවසන් කරන්න)
+                </button>
+                <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #38BDF8; color:#38BDF8; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>🔄</span> Resume Writing
+                </button>
+              ` : `
+                <button class="phase-action-btn" data-set-phase="writing" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span>🔄</span> Reopen Session (නැවත අරඹන්න)
+                </button>
+              `}
             </div>
           </div>
 
-          <!-- Telemetry Stats Row -->
-          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; padding:12px 18px; background:#0F172A; border-bottom:1px solid #1F2937;">
-            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
-              <div style="font-size:10.5px; color:#94A3B8;">Enrolled</div>
-              <div style="font-size:16px; font-weight:800; color:#F8FAFC;">48</div>
-            </div>
-            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
-              <div style="font-size:10.5px; color:#94A3B8;">Online Cams</div>
-              <div style="font-size:16px; font-weight:800; color:#10B981;">45 Active</div>
-            </div>
-            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
-              <div style="font-size:10.5px; color:#94A3B8;">Warnings</div>
-              <div style="font-size:16px; font-weight:800; color:#F59E0B;">1 Flagged</div>
-            </div>
-            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
-              <div style="font-size:10.5px; color:#94A3B8;">Submitted</div>
-              <div style="font-size:16px; font-weight:800; color:#38BDF8;">12 Done</div>
-            </div>
-          </div>
-
-          <!-- Filter & Controls Toolbar -->
-          <div style="padding:10px 18px; display:flex; justify-content:space-between; align-items:center; background:#111827;">
-            <div style="display:flex; gap:6px;">
-              <button class="slot-filter-btn" data-slot="all" style="background:${activeFilter === 'all' ? '#2563EB' : '#1F2937'}; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">All Desks (6)</button>
-              <button class="slot-filter-btn" data-slot="slot1" style="background:${activeFilter === 'slot1' ? '#2563EB' : '#1F2937'}; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">☀️ Slot 1</button>
-              <button class="slot-filter-btn" data-slot="slot2" style="background:${activeFilter === 'slot2' ? '#2563EB' : '#1F2937'}; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">🌙 Slot 2</button>
-            </div>
-            <button id="btn-broadcast-hall" style="background:#4F46E5; color:#FFFFFF; border:none; border-radius:8px; padding:7px 14px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
-              <span>📢</span> Broadcast Alert
-            </button>
-          </div>
-
-          <!-- Live Student Video Grid -->
-          <div style="flex:1; padding:14px 18px; display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; align-content:start;">
-            ${filtered.map(s => `
-              <div style="background:#111827; border:1px solid ${s.warning > 0 ? '#EF4444' : '#1F2937'}; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-                <!-- Simulated Student Camera View -->
-                <div style="position:relative; width:100%; height:180px; background:linear-gradient(135deg, #0F172A, #1E293B); display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                  <!-- Camera Watermark & Grid -->
-                  <div style="position:absolute; inset:0; opacity:0.1; background-image:linear-gradient(#38BDF8 1px, transparent 1px), linear-gradient(90deg, #38BDF8 1px, transparent 1px); background-size:20px 20px;"></div>
-
-                  <!-- Student Avatar Icon -->
-                  <div style="width:64px; height:64px; border-radius:50%; background:#1E293B; border:2px solid #38BDF8; display:flex; align-items:center; justify-content:center; font-size:28px; color:#F8FAFC;">
-                    👨‍🎓
+          <!-- ── Main Tab Content ── -->
+          <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+            ${activeTab === 'answers' ? `
+              <!-- Answers Section (_buildSubmittedAnswersSection) -->
+              <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="padding:8px; background:rgba(34,197,94,0.2); border-radius:10px; color:#4ADE80; font-size:18px;">
+                    📝
                   </div>
-
-                  <!-- Stream Overlay Overlays -->
-                  <div style="position:absolute; top:10px; left:10px; display:flex; align-items:center; gap:6px; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);">
-                    <span class="apk-pulsing-dot" style="background:#10B981; width:8px; height:8px;"></span>
-                    <span style="font-size:10px; font-weight:800; color:#10B981;">LIVE • ${s.fps} FPS</span>
-                  </div>
-
-                  <div style="position:absolute; top:10px; right:10px; background:rgba(15,23,42,0.8); padding:4px 8px; border-radius:6px; font-size:10px; font-weight:700; color:#38BDF8; border:1px solid rgba(255,255,255,0.1);">
-                    ${s.desk}
-                  </div>
-
-                  ${s.warning > 0 ? `
-                    <div style="position:absolute; bottom:10px; left:10px; right:10px; background:rgba(239,68,68,0.9); color:#FFFFFF; padding:4px 8px; border-radius:6px; font-size:10.5px; font-weight:800; text-align:center;">
-                      ⚠️ Warning: Face Angle Misaligned
-                    </div>
-                  ` : `
-                    <div style="position:absolute; bottom:10px; left:10px; background:rgba(15,23,42,0.7); color:#94A3B8; padding:3px 6px; border-radius:4px; font-size:9.5px;">
-                      Audio: Quiet (18 dB) • Heartbeat: 1s
-                    </div>
-                  `}
-                </div>
-
-                <!-- Student Information Card -->
-                <div style="padding:12px; background:#111827; display:flex; justify-content:space-between; align-items:center;">
                   <div>
-                    <div style="font-size:13px; font-weight:800; color:#F8FAFC;">${s.name}</div>
-                    <div style="font-size:11px; color:#94A3B8;">${s.batch} • ${s.slot === 'slot1' ? '☀️ Slot 1' : '🌙 Slot 2'}</div>
-                  </div>
-                  <div style="display:flex; gap:6px;">
-                    <button class="btn-inspect-student" data-student="${s.name}" style="background:#1E293B; border:1px solid #334155; color:#38BDF8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer;" title="Enlarge Video Feed">
-                      🔍 Inspect
-                    </button>
-                    <button class="btn-warn-student" data-student="${s.name}" style="background:#EF4444; border:none; color:#FFFFFF; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer;" title="Issue Proctor Warning">
-                      ⚠️ Warn
-                    </button>
+                    <div style="font-size:12.5px; font-weight:700; color:#FFFFFF;">Submitted Answer Sheets (ලැබුණු පිළිතුරු පත්‍ර)</div>
+                    <div style="font-size:11px; color:#94A3B8;">${submittedStudents.length} of ${allStudents.length} Students Submitted</div>
                   </div>
                 </div>
+                <div style="padding:4px 10px; border-radius:12px; background:rgba(34,197,94,0.15); border:1px solid #22C55E; color:#4ADE80; font-size:11px; font-weight:700;">
+                  ${submittedStudents.length} Submitted
+                </div>
               </div>
-            `).join('')}
+
+              <!-- List of Submitted Students or Empty State -->
+              <div style="flex:1; padding:16px;">
+                ${submittedStudents.length === 0 ? `
+                  <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:260px; text-align:center; padding:32px;">
+                    <div style="width:70px; height:70px; border-radius:50%; background:#1E293B; border:1px solid #334155; display:flex; align-items:center; justify-content:center; font-size:32px; color:#64748B; margin-bottom:16px;">
+                      📂
+                    </div>
+                    <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">තවමත් පිළිතුරු පත්‍ර ලැබී නොමැත</div>
+                    <div style="font-size:12px; color:#94A3B8; line-height:1.5;">සිසුන් පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කළ පසු ඒවා ශිෂ්‍ය නාමය සමඟ මෙහි සජීවීව දිස්වනු ඇත.</div>
+                  </div>
+                ` : `
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    ${submittedStudents.map((s, idx) => `
+                      <div style="background:#1E293B; border:1px solid #334155; border-radius:14px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          <div style="width:26px; height:26px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#94A3B8;">
+                            #${idx + 1}
+                          </div>
+                          <div>
+                            <div style="font-size:13px; font-weight:700; color:#FFFFFF;">${s.studentName || 'Student'}</div>
+                            <div style="font-size:11px; color:#94A3B8;">${s.studentPhone || ''} • ${s.submissionPhotos?.length || 1} Pages</div>
+                          </div>
+                        </div>
+                        <button class="btn-view-answers" data-student-id="${s.studentId}" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                          View Answers
+                        </button>
+                      </div>
+                    `).join('')}
+                  </div>
+                `}
+              </div>
+            ` : `
+              <!-- Slot Proctored Grid (_buildSlotProctorGrid) -->
+              <!-- Top Analytics Stats Bar -->
+              <div style="padding:10px 16px; background:rgba(30,41,59,0.5); display:flex; justify-content:space-around; align-items:center; border-bottom:1px solid #1E293B; flex-shrink:0;">
+                <div style="text-align:center;">
+                  <div style="font-size:15px; font-weight:700; color:#818CF8;">${currentSlotStudents.length}</div>
+                  <div style="font-size:10px; color:#94A3B8;">Registered</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:15px; font-weight:700; color:#22C55E;">${liveCount}</div>
+                  <div style="font-size:10px; color:#94A3B8;">🟢 Live Cameras</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:15px; font-weight:700; color:#EF4444;">${inactiveCount}</div>
+                  <div style="font-size:10px; color:#94A3B8;">🔴 Inactive</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:15px; font-weight:700; color:#38BDF8;">${submittedSlotCount}</div>
+                  <div style="font-size:10px; color:#94A3B8;">✅ Submitted</div>
+                </div>
+              </div>
+
+              <!-- Students Grid or Exact Empty State -->
+              <div style="flex:1; padding:14px; overflow-y:auto;">
+                ${currentSlotStudents.length === 0 ? `
+                  <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:280px; text-align:center; padding:24px;">
+                    <div style="font-size:13px; color:#94A3B8; line-height:1.6;">
+                      ${activeTab === 'slot2' && !session.slot2
+                        ? 'මෙම Paper එක සඳහා 2nd Slot එකක් සකසා නොමැත.<br><span style="font-size:11px; color:#64748B;">(Single Slot Session)</span>'
+                        : 'මෙම සැසිය සඳහා තවම ශිෂ්‍යයින් ලියාපදිංචි වී නොමැත.'}
+                    </div>
+                  </div>
+                ` : `
+                  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
+                    ${currentSlotStudents.map(student => {
+                      const isSubmitted = student.status === 'submitted';
+                      const isCameraActive = student.isCameraActive;
+                      const isOnline = student.isOnline || isCameraActive;
+                      const borderColor = isSubmitted ? '#38BDF8' : isCameraActive ? '#22C55E' : isOnline ? '#3B82F6' : '#EF4444';
+                      const statusBadge = isSubmitted ? 'SUBMITTED' : isCameraActive ? 'LIVE' : isOnline ? 'ONLINE' : 'OFFLINE';
+
+                      return `
+                        <div style="background:#1E293B; border-radius:14px; border:1.5px solid ${borderColor}; display:flex; flex-direction:column; overflow:hidden;">
+                          <!-- Camera Preview Box -->
+                          <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                            ${student.cameraSnapshotUrl ? `
+                              <img src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
+                            ` : `
+                              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+                                <span style="font-size:26px; color:${borderColor};">📹</span>
+                                <span style="font-size:10px; font-weight:500; color:${isOnline ? '#4ADE80' : '#94A3B8'};">
+                                  ${isSubmitted ? 'Paper Submitted' : isCameraActive ? 'Proctor Stream Active' : 'Camera Offline'}
+                                </span>
+                              </div>
+                            `}
+                            <!-- Status Pill Top Left -->
+                            <div style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${borderColor}; color:#FFFFFF; font-size:8.5px; font-weight:700;">
+                              ${statusBadge}
+                            </div>
+                            <!-- Fullscreen Icon Top Right -->
+                            <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF;">
+                              🔍
+                            </div>
+                          </div>
+
+                          <!-- Details & Actions -->
+                          <div style="padding:10px; display:flex; flex-direction:column; gap:6px;">
+                            <div>
+                              <div style="font-size:12px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${student.studentName || 'Student'}
+                              </div>
+                              <div style="font-size:10px; color:#94A3B8;">
+                                ${student.studentPhone || `ID: ${(student.studentId || '').slice(0, 6)}`}
+                              </div>
+                            </div>
+
+                            ${(student.submissionPhotos?.length || isSubmitted) ? `
+                              <button class="btn-view-answers" data-student-id="${student.studentId}" style="width:100%; height:26px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:700; cursor:pointer;">
+                                View Answers (${student.submissionPhotos?.length || 1})
+                              </button>
+                            ` : ''}
+
+                            <div style="display:flex; gap:6px;">
+                              <button class="btn-full-view" data-student-id="${student.studentId}" style="flex:1; height:26px; background:transparent; border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
+                                Full View
+                              </button>
+                              <button class="btn-alert-student" data-student-id="${student.studentId}" style="flex:1; height:26px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
+                                Alert
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `}
+              </div>
+            `}
           </div>
 
-          <!-- Bottom Proctor Bar -->
-          <div style="padding:12px 18px; background:#111827; border-top:1px solid #1F2937; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-            <div style="font-size:12px; color:#94A3B8;">
-              Connected to Agora RTC Audio/Video Channel. Automated anti-cheat active.
+          <!-- Bottom Status Footer -->
+          <div style="padding:10px 14px; background:#111827; border-top:1px solid #1E293B; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <div style="font-size:11px; color:#94A3B8;">
+              Connected to Session Channel: edupeak_proctor_${session.id}
             </div>
-            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:10px; padding:8px 16px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px;">
-              <span>📝</span> Test Student Exam Room ➔
+            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">
+              📝 Test Student View ➔
             </button>
           </div>
         </div>
       `;
 
-      // Event handlers
+      attachEventHandlers();
+    };
+
+    const attachEventHandlers = () => {
+      // Close Hall
       document.getElementById('btn-close-proctor-hall')?.addEventListener('click', () => {
-        clearInterval(ticker);
+        unsubs.forEach(fn => { try { fn(); } catch (_) {} });
         modal.remove();
       });
 
+      // Tab Buttons
+      modal.querySelectorAll('.proctor-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeTab = btn.dataset.tab;
+          render();
+        });
+      });
+
+      // Test Student View
       document.getElementById('btn-hall-test-student')?.addEventListener('click', () => {
-        clearInterval(ticker);
+        unsubs.forEach(fn => { try { fn(); } catch (_) {} });
         modal.remove();
-        this.openStudentLiveExamRoom(paper.id, 'slot1');
+        this.openStudentLiveExamRoom(session.id, 'slot1');
       });
 
-      modal.querySelectorAll('[data-phase]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          currentPhase = btn.dataset.phase;
-          paper.phase = currentPhase;
-          paper.isLive = currentPhase === 'package_opening' || currentPhase === 'writing';
-          paper.isEnded = currentPhase === 'ended';
-          if (currentPhase === 'package_opening') phaseTimeRemaining = 10 * 60;
-          else if (currentPhase === 'writing') phaseTimeRemaining = 150 * 60;
-          else if (currentPhase === 'time_up') phaseTimeRemaining = 15 * 60;
-          notificationService.playChime();
-          notificationService.showInAppBanner('Exam Phase Updated ⏱️', `Hall transitioned to: ${currentPhase.toUpperCase()}`, 'info');
-          renderHallContent();
-        });
-      });
-
-      modal.querySelectorAll('.slot-filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeFilter = btn.dataset.slot;
-          renderHallContent();
-        });
-      });
-
-      modal.querySelectorAll('.btn-inspect-student').forEach(btn => {
-        btn.addEventListener('click', () => {
-          alert(`🔍 Fullscreen High-Definition Stream: ${btn.dataset.student}\n\n• Video: 1080p 30fps (Active)\n• Face Orientation: 98% Facing Camera (Safe)\n• Ambient Noise: 18 dB (Quiet)\n• Second Device Detection: None Detected`);
-        });
-      });
-
-      modal.querySelectorAll('.btn-warn-student').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const reason = prompt(`Enter proctor warning message for ${btn.dataset.student}:`, 'කරුණාකර ඔබගේ කැමරාව ඉදිරියට හරවා මුහුණ පෙනෙන සේ තබන්න (Please adjust camera to face screen).');
-          if (reason) {
-            notificationService.showInAppBanner('Warning Dispatched ⚠️', `Proctor warning sent to ${btn.dataset.student}`, 'warning');
+      // Trigger Time Up Button in AppBar
+      document.getElementById('btn-proctor-time-up')?.addEventListener('click', () => {
+        this._confirmProctorAction({
+          title: 'Trigger Time Up (වේලාව අවසන් කරන්නද?)',
+          content: 'සියලුම සිසුන්ට ලිවීම නවත්වා, පිළිතුරු පත්‍රවල ඡායාරූප (Photos) ලබාගෙන App එක හරහා Submit කරන ලෙස Alert එකක් යැවීමට අවශ්‍ය බව සහතිකද?',
+          confirmText: 'Trigger Time Up (දන්වන්න)',
+          confirmColor: '#F59E0B',
+          onConfirm: async () => {
+            await dbService.triggerTimeUp(session.id);
+            notificationService.showInAppBanner('⏰ Time Up Sent', 'Time up alert broadcasted to all students!', 'info');
           }
         });
       });
 
-      document.getElementById('btn-broadcast-hall')?.addEventListener('click', () => {
-        const msg = prompt('Enter announcement to broadcast to all exam candidates:', 'අවධානයට: විභාගයේ ඉතිරිව ඇත්තේ විනාඩි 15 ක් පමණි. කරුණාකර පිළිතුරු පත්‍ර සූදානම් කරගන්න (15 minutes remaining).');
-        if (msg) {
-          notificationService.playChime();
-          notificationService.showInAppBanner('Hall Broadcast Dispatched 📢', msg, 'info');
-        }
+      // End Session Button in AppBar
+      document.getElementById('btn-proctor-end-session')?.addEventListener('click', () => {
+        this._confirmProctorAction({
+          title: 'End Paper Session?',
+          content: 'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සියලුම සිසුන්ගේ විභාග කාමරය වසා දැමෙන අතර නව submissions ලබාගත නොහැක.',
+          confirmText: 'End Session (අවසන් කරන්න)',
+          confirmColor: '#EF4444',
+          onConfirm: async () => {
+            await dbService.endPaperSession(session.id);
+            notificationService.showInAppBanner('🛑 Session Ended', 'Exam session has been officially ended.', 'warning');
+          }
+        });
+      });
+
+      // Broadcast Alert Button
+      document.getElementById('btn-proctor-broadcast')?.addEventListener('click', () => {
+        this._showProctorBroadcastDialog(session.id);
+      });
+
+      // Phase Control Buttons
+      modal.querySelectorAll('[data-set-phase]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const targetPhase = btn.dataset.setPhase;
+          await dbService.setSessionPhase(session.id, targetPhase);
+          notificationService.showInAppBanner('✅ Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
+        });
+      });
+
+      modal.querySelectorAll('[data-restart-10m]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
+          notificationService.showInAppBanner('🔄 10m Timer Restarted', 'Package opening timer reset to 10:00', 'info');
+        });
+      });
+
+      modal.querySelectorAll('[data-trigger-time-up]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await dbService.triggerTimeUp(session.id);
+          notificationService.showInAppBanner('⏰ Time Up Triggered', 'Time is Up alert sent!', 'info');
+        });
+      });
+
+      modal.querySelectorAll('[data-end-now]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await dbService.endPaperSession(session.id);
+          notificationService.showInAppBanner('🛑 Session Ended', 'Session closed.', 'warning');
+        });
+      });
+
+      // Student Item Actions
+      modal.querySelectorAll('.btn-alert-student').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
+          if (student) this._showDirectAlertSheet(session.id, student);
+        });
+      });
+
+      modal.querySelectorAll('.btn-view-answers').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
+          if (student) this._showSubmissionViewer(student);
+        });
+      });
+
+      modal.querySelectorAll('.btn-full-view, .student-camera-box').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
+          if (student) this._showFullScreenStudentViewer(session.id, student);
+        });
       });
     };
 
-    renderHallContent();
-    document.body.appendChild(modal);
-
-    const ticker = setInterval(() => {
-      if (phaseTimeRemaining > 0) {
-        phaseTimeRemaining--;
-        const disp = document.getElementById('hall-countdown-display');
-        if (disp) disp.textContent = formatTimer(phaseTimeRemaining);
+    // Real-Time Listeners (Matching Dart _sessionStream & _allRegistrationsStream)
+    const unsubSession = dbService.streamPaperSession(session.id, (updatedSession) => {
+      if (updatedSession) {
+        session = { ...session, ...updatedSession };
+        render();
       }
-    }, 1000);
+    });
+    unsubs.push(unsubSession);
+
+    const unsubRegs = dbService.streamSlotRegistrations(session.id, 'all', (regs) => {
+      allStudents = regs || [];
+      render();
+    });
+    unsubs.push(unsubRegs);
+
+    render();
+    document.body.appendChild(modal);
+  }
+
+  // Helper: Confirmation Dialog matching Flutter AlertDialog
+  _confirmProctorAction({ title, content, confirmText, confirmColor = '#6366F1', onConfirm }) {
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10001;';
+    dialog.innerHTML = `
+      <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:380px; color:#FFFFFF; font-family:'Poppins',sans-serif; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
+        <div style="font-size:15px; font-weight:700; margin-bottom:10px;">${title}</div>
+        <div style="font-size:12px; color:#CBD5E1; line-height:1.5; margin-bottom:18px; white-space:pre-line;">${content}</div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button id="dialog-btn-cancel" style="background:transparent; border:none; color:#94A3B8; font-size:12px; font-weight:600; padding:6px 12px; cursor:pointer;">Cancel</button>
+          <button id="dialog-btn-confirm" style="background:${confirmColor}; border:none; color:${confirmColor === '#F59E0B' ? '#000000' : '#FFFFFF'}; border-radius:8px; font-size:12px; font-weight:700; padding:6px 14px; cursor:pointer;">${confirmText}</button>
+        </div>
+      </div>
+    `;
+    dialog.querySelector('#dialog-btn-cancel').onclick = () => dialog.remove();
+    dialog.querySelector('#dialog-btn-confirm').onclick = async () => {
+      dialog.remove();
+      if (onConfirm) await onConfirm();
+    };
+    document.body.appendChild(dialog);
+  }
+
+  // Helper: Broadcast Announcement Dialog (_showBroadcastDialog)
+  _showProctorBroadcastDialog(paperId) {
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10001;';
+    dialog.innerHTML = `
+      <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:400px; color:#FFFFFF; font-family:'Poppins',sans-serif;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <span style="font-size:18px;">📢</span>
+          <span style="font-size:14px; font-weight:700;">Broadcast Announcement</span>
+        </div>
+        <div style="font-size:11px; color:#94A3B8; margin-bottom:14px;">සියලුම සිසුන්ගේ තිරය මත ක්ෂණිකව දිස්වන නිවේදනයක් යවන්න.</div>
+        <textarea id="broadcast-msg-input" rows="3" placeholder="පණිවිඩය මෙහි ටයිප් කරන්න..." style="width:100%; background:#0F172A; border:1px solid #334155; border-radius:10px; color:#FFFFFF; padding:10px; font-size:12px; resize:none; margin-bottom:14px; box-sizing:border-box;"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button id="dialog-broadcast-cancel" style="background:transparent; border:none; color:#94A3B8; font-size:12px; cursor:pointer; padding:6px 12px;">Cancel</button>
+          <button id="dialog-broadcast-send" style="background:#F59E0B; border:none; color:#000000; border-radius:8px; font-size:12px; font-weight:700; padding:6px 14px; cursor:pointer;">Broadcast Alert</button>
+        </div>
+      </div>
+    `;
+    dialog.querySelector('#dialog-broadcast-cancel').onclick = () => dialog.remove();
+    dialog.querySelector('#dialog-broadcast-send').onclick = async () => {
+      const msg = dialog.querySelector('#broadcast-msg-input').value.trim();
+      if (!msg) return;
+      dialog.remove();
+      await dbService.broadcastProctorAlert({
+        paperId,
+        senderName: 'Admin / Examiner',
+        message: msg,
+        type: 'info'
+      });
+      notificationService.showInAppBanner('📢 Broadcast Sent', 'Announcement sent to all students!', 'info');
+    };
+    document.body.appendChild(dialog);
+  }
+
+  // Helper: Direct Proctor Alert Sheet (_showDirectMessageSheet)
+  _showDirectAlertSheet(paperId, student) {
+    const sheet = document.createElement('div');
+    sheet.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:flex-end; z-index:10001;';
+    const quickWarnings = [
+      'කරුණාකර ඔබගේ මේසය සහ පිළිතුරු පත්‍රය පෙනෙන සේ කැමරාව සකසන්න. (Please adjust camera angle)',
+      'ඔබගේ මුහුණ සහ පරිසරය පැහැදිලිව නොපෙනේ. (Please improve lighting/position)',
+      'විභාග කාලය අවසන් වීමට විනාඩි 15 ක් ඉතිරිව ඇත. (15 Minutes Remaining)',
+      'කරුණාකර අවධානයෙන් පිළිතුරු ලියන්න. වෙනත් කටයුතු වලින් වළකින්න.'
+    ];
+
+    sheet.innerHTML = `
+      <div style="background:#1E293B; border-radius:20px 20px 0 0; border:1px solid #334155; padding:20px; width:100%; max-width:440px; color:#FFFFFF; font-family:'Poppins',sans-serif; box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <div style="font-size:14px; font-weight:700; color:#FFFFFF;">Direct Proctor Alert (ශිෂ්‍යයාට පණිවිඩයක්)</div>
+            <div style="font-size:11px; color:#94A3B8;">To: ${student.studentName} (${student.studentPhone || ''})</div>
+          </div>
+          <button id="sheet-close-btn" style="background:transparent; border:none; color:#94A3B8; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="font-size:11px; font-weight:600; color:#CBD5E1; margin-bottom:8px;">ක්ෂණික අනතුරු ඇඟවීම් (Quick Warnings):</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+          ${quickWarnings.map(w => `
+            <button class="quick-warn-chip" data-msg="${w}" style="text-align:left; background:#0F172A; border:1px solid #334155; border-radius:8px; padding:6px 10px; font-size:10.5px; color:#E2E8F0; cursor:pointer;">
+              ${w}
+            </button>
+          `).join('')}
+        </div>
+
+        <textarea id="direct-msg-input" rows="3" placeholder="පණිවිඩය මෙහි ටයිප් කරන්න..." style="width:100%; background:#0F172A; border:1px solid #334155; border-radius:10px; color:#FFFFFF; padding:10px; font-size:12px; resize:none; margin-bottom:12px; box-sizing:border-box;"></textarea>
+
+        <button id="direct-send-btn" style="width:100%; height:40px; background:#6366F1; color:#FFFFFF; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
+          Send Instant Alert to Student
+        </button>
+      </div>
+    `;
+
+    sheet.querySelector('#sheet-close-btn').onclick = () => sheet.remove();
+    sheet.querySelectorAll('.quick-warn-chip').forEach(chip => {
+      chip.onclick = () => {
+        sheet.querySelector('#direct-msg-input').value = chip.dataset.msg;
+      };
+    });
+    sheet.querySelector('#direct-send-btn').onclick = async () => {
+      const msg = sheet.querySelector('#direct-msg-input').value.trim();
+      if (!msg) return;
+      sheet.remove();
+      await dbService.sendProctorAlert({
+        paperId,
+        studentId: student.studentId,
+        studentPhone: student.studentPhone,
+        senderName: 'Admin / Examiner',
+        message: msg,
+        type: 'warning'
+      });
+      notificationService.showInAppBanner('✅ Alert Sent', `Alert sent to ${student.studentName}!`, 'info');
+    };
+    document.body.appendChild(sheet);
+  }
+
+  // Helper: Submission Viewer (_showStudentSubmissionViewer)
+  _showSubmissionViewer(student) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:10002;';
+    const photos = student.submissionPhotos || [];
+
+    modal.innerHTML = `
+      <div style="background:#1E293B; border-radius:20px; border:1px solid #334155; width:92%; max-width:440px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; font-family:'Poppins',sans-serif; color:#FFFFFF;">
+        <div style="padding:14px 16px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:14px; font-weight:700;">${student.studentName}</div>
+            <div style="font-size:11px; color:#94A3B8;">${student.studentPhone || ''} • Submitted ${photos.length} Pages</div>
+          </div>
+          <button id="view-ans-close" style="background:transparent; border:none; color:#94A3B8; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px;">
+          ${photos.length === 0 ? `
+            <div style="text-align:center; padding:32px; color:#94A3B8; font-size:12px;">No answer sheet photos attached yet.</div>
+          ` : photos.map((p, idx) => `
+            <div style="background:#0F172A; border-radius:12px; border:1px solid #334155; overflow:hidden;">
+              <div style="padding:8px 10px; background:#111827; font-size:11px; font-weight:700; color:#4ADE80;">Page ${idx + 1}</div>
+              <img src="${p}" style="width:100%; max-height:350px; object-fit:contain; background:#000000;" />
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    modal.querySelector('#view-ans-close').onclick = () => modal.remove();
+    document.body.appendChild(modal);
+  }
+
+  // Helper: Full Screen Student Viewer (_showFullScreenStudentViewer)
+  _showFullScreenStudentViewer(paperId, student) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed; inset:0; background:#0F172A; display:flex; flex-direction:column; z-index:10002; font-family:Poppins,sans-serif;';
+    modal.innerHTML = `
+      <div style="background:#1E293B; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155;">
+        <div>
+          <div style="font-size:14px; font-weight:700; color:#FFFFFF;">${student.studentName}</div>
+          <div style="font-size:11px; color:#94A3B8;">Surveillance Monitor • Slot: ${student.selectedSlot || 'slot1'}</div>
+        </div>
+        <button id="fs-close-btn" style="background:#334155; border:none; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;">
+          ✕ Exit Full View
+        </button>
+      </div>
+
+      <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#000000; position:relative;">
+        ${student.cameraSnapshotUrl ? `
+          <img src="${student.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+        ` : `
+          <div style="text-align:center; color:#94A3B8;">
+            <div style="font-size:48px; margin-bottom:12px;">📹</div>
+            <div style="font-size:14px; font-weight:600;">Active Proctoring Feed</div>
+            <div style="font-size:11px;">Audio & Video Active • Real-time Monitoring</div>
+          </div>
+        `}
+      </div>
+
+      <div style="background:#1E293B; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #334155;">
+        <button id="fs-warn-btn" style="background:#EF4444; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer;">
+          ⚠️ Issue Direct Warning
+        </button>
+        ${(student.submissionPhotos?.length || student.status === 'submitted') ? `
+          <button id="fs-answers-btn" style="background:#22C55E; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer;">
+            View Submitted Answers
+          </button>
+        ` : ''}
+      </div>
+    `;
+
+    modal.querySelector('#fs-close-btn').onclick = () => modal.remove();
+    modal.querySelector('#fs-warn-btn').onclick = () => {
+      this._showDirectAlertSheet(paperId, student);
+    };
+    modal.querySelector('#fs-answers-btn')?.addEventListener('click', () => {
+      this._showSubmissionViewer(student);
+    });
+
+    document.body.appendChild(modal);
   }
 
   // ── B. Student Live Exam Writing Room (live_exam_room_screen.dart) ────────
@@ -4398,7 +4729,10 @@ class AppController {
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.style.display = 'flex';
-    modal.style.background = '#0F172A';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.background = 'rgba(11, 15, 25, 0.88)';
+    modal.style.backdropFilter = 'blur(12px)';
     modal.style.zIndex = '9999';
 
     let examSeconds = (paper.durationMinutes || 150) * 60;
@@ -4414,9 +4748,9 @@ class AppController {
     };
 
     modal.innerHTML = `
-      <div style="width:100%; height:100%; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow-y:auto; font-family:'Plus Jakarta Sans',sans-serif;">
+      <div style="width:100%; max-width:430px; height:92vh; max-height:860px; border-radius:28px; border:1px solid #334155; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow-y:auto; font-family:'Plus Jakarta Sans',sans-serif; box-shadow:0 24px 60px rgba(0,0,0,0.7); position:relative;">
         <!-- Top App Bar -->
-        <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+        <div style="background:#1E293B; border-bottom:1px solid #334155; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
           <div style="display:flex; align-items:center; gap:10px;">
             <div style="width:36px; height:36px; border-radius:10px; background:rgba(37,99,235,0.15); display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:18px;">
               📝
@@ -4610,6 +4944,7 @@ class AppController {
       }
     });
   }
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   const app = new AppController();
