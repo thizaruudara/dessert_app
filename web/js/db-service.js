@@ -36,6 +36,9 @@ export class DbService {
           list.push({ id: docSnap.id, ...data });
         }
       });
+      if (list.length === 0) {
+        return this.getMockDesserts(studentId);
+      }
       return list;
     } catch (e) {
       console.warn('[DB] Fallback to local sample desserts if offline/empty:', e);

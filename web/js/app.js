@@ -22,6 +22,10 @@ class AppController {
   }
 
   init() {
+    // 0. Theme Initialization
+    const savedTheme = localStorage.getItem('edupeak_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
     // 1. Initialize PWA Gatekeeper for iOS Add to Home Screen enforcement
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: () => {
@@ -447,209 +451,985 @@ class AppController {
     });
   }
 
-  // ── 2. Papers Tab (Exam Sessions) ─────────────────────────────────────────
+  // ── 2. Papers Tab (Exam Sessions & Upcoming Hints - 1:1 Android Parity) ──
   async renderPapersScreen(container) {
+    this.papersTab = this.papersTab ?? 0;
+    this.papersBatch = this.papersBatch ?? '2027 A/L';
+    this.selectedSlots = this.selectedSlots ?? { 'paper_001': 'slot_1', 'paper_002': 'slot_sprint' };
+
     const papers = await dbService.getPaperSessions();
+    const isAll = this.papersBatch === 'All Batches';
+
     container.innerHTML = `
-      <div style="font-size: 18px; font-weight:800; color: #0F172A; margin-bottom: 12px; display:flex; align-items:center; gap:8px;">
-        <span>📋</span>
-        <span>A/L Physics Paper Sessions</span>
+      <!-- Screen Top Bar with Batch Filter and Refresh -->
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box">📋</div>
+          <div>
+            <div class="appbar-title">Paper Writing Sessions</div>
+            <div class="appbar-subtitle">${isAll ? 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි' : this.papersBatch + ' • සජීවී විභාග සහ අධීක්ෂණ සැසි'}</div>
+          </div>
+        </div>
+        <button class="appbar-badge-toggle" id="btn-toggle-papers-batch">
+          <span>🔄</span>
+          <span>${this.papersBatch}</span>
+        </button>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:14px;">
-        ${papers.map(p => `
-          <div class="hero-card" style="padding: 18px;">
-            <div style="display:flex; align-items:center; justify-content:space-between;">
-              <span class="quests-badge">${p.isLive ? '🔴 LIVE NOW' : 'SCHEDULED'}</span>
-              <span style="font-size:12px; font-weight:700; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
+      <!-- Dual Sub-Tabs (Live Sessions vs Upcoming Papers & Hints) -->
+      <div class="sub-tabs-container">
+        <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live">
+          <span>🔴 Live Sessions</span>
+          <span class="tab-sub">සජීවී විභාග සැසි</span>
+        </button>
+        <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
+          <span>📚 Upcoming & Hints</span>
+          <span class="tab-sub">ඉදිරි විභාග සහ මාර්ගෝපදේශ</span>
+        </button>
+      </div>
+
+      <!-- Tab 0: Live Sessions -->
+      <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:14px;' : 'display:none;'}">
+        ${papers.map(p => {
+          const isLive = p.isLive;
+          const selectedSlot = this.selectedSlots[p.id] || (p.slots && p.slots[0]?.id) || 'slot_1';
+
+          return `
+            <div class="paper-session-card">
+              <div class="paper-card-header">
+                <span class="phase-pill ${isLive ? 'phase-live' : 'phase-upcoming'}">
+                  ${isLive ? '🔴 සක්‍රීයයි (Writing in Progress)' : '⏰ ආරම්භ වීමට නියමිතයි (Upcoming)'}
+                </span>
+                <span style="font-size:12px; font-weight:700; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
+              </div>
+
+              <div class="paper-title">${p.title}</div>
+
+              <div class="paper-meta-row">
+                <div class="meta-chip">📚 ${p.subject}</div>
+                <div class="meta-chip">📝 100 Marks</div>
+                <div class="meta-chip">🎥 Live Proctoring</div>
+              </div>
+
+              <!-- Slot Selection Cards -->
+              <div style="font-size:11.5px; font-weight:800; color:#475569; margin-top:2px;">
+                තෝරාගත් විභාග කාල සැසිය (Selected Exam Slot):
+              </div>
+              <div class="slots-container">
+                ${(p.slots || [
+                  { id: 'slot_1', name: 'Morning (08:30 AM)', seatsLeft: 42 },
+                  { id: 'slot_2', name: 'Evening (04:00 PM)', seatsLeft: 78 }
+                ]).map(slot => `
+                  <div class="slot-selection-box ${selectedSlot === slot.id ? 'selected' : ''}" data-paper-id="${p.id}" data-slot-id="${slot.id}">
+                    <div class="slot-name">
+                      <span>${slot.name}</span>
+                      <span>${selectedSlot === slot.id ? '✓' : '○'}</span>
+                    </div>
+                    <div class="slot-seats">🪑 ${slot.seatsLeft || 50} Seats Remaining</div>
+                  </div>
+                `).join('')}
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="paper-actions-row">
+                <button class="btn-exam-hall" data-paper-join="${p.id}">
+                  <span>🎥</span>
+                  <span>Enter Exam Hall (විභාග ශාලාවට)</span>
+                </button>
+                <button class="btn-paper-script" data-paper-scan="${p.id}" title="Scan & Upload Script">
+                  <span>📄</span>
+                  <span>Upload Script</span>
+                </button>
+              </div>
             </div>
-            <div style="font-size:16px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
-            <div style="font-size:12px; color:#64748B;">${p.subject}</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #E2E8F0; padding-top:12px; margin-top:8px;">
-              <span style="font-size:11.5px; font-weight:600; color:#64748B;">Full Score: ${p.totalMarks} Marks</span>
-              <button class="btn-primary" style="width:auto; padding:8px 16px; font-size:12px;" data-paper-join="${p.id}">
-                📹 Enter Exam Room
-              </button>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Tab 1: Upcoming Papers & Hints -->
+      <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:14px;' : 'display:none;'}">
+        <div class="upcoming-hint-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="phase-pill phase-upcoming">🎯 Upcoming Term Paper 02</span>
+            <span style="font-size:11px; font-weight:800; color:#2563EB;">2027 A/L Target</span>
+          </div>
+
+          <div class="paper-title">2027 A/L Full Syllabus Consolidation Paper</div>
+          <div style="font-size:12px; color:#64748B;">Scheduled: October 14, 2026 • 08:30 AM</div>
+
+          <div class="syllabus-breakdown">
+            <div style="font-size:11px; font-weight:800; color:#0F172A; margin-bottom:4px;">විභාග විෂය නිර්දේශ ප්‍රතිශත (Syllabus Coverage):</div>
+            <div>
+              <div class="syllabus-row"><span>1. Mechanics & Newton's Laws</span><span>40%</span></div>
+              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:40%;"></div></div>
+            </div>
+            <div>
+              <div class="syllabus-row"><span>2. Waves & Oscillations</span><span>30%</span></div>
+              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:30%; background:#0284C7;"></div></div>
+            </div>
+            <div>
+              <div class="syllabus-row"><span>3. Electricity & Magnetism</span><span>20%</span></div>
+              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:20%; background:#7C3AED;"></div></div>
+            </div>
+            <div>
+              <div class="syllabus-row"><span>4. Thermal Physics</span><span>10%</span></div>
+              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:10%; background:#EA580C;"></div></div>
             </div>
           </div>
-        `).join('')}
+
+          <div class="teacher-tip-box">
+            <strong>💡 ගුරු උපදෙස (Teacher Hint):</strong><br>
+            "ආනත තලයක චලිතයේදී ඝර්ෂණ බලය සහ ගම්‍යතා සංස්ථිති මූලධර්මය පිළිබඳ විශේෂ අවධානය යොමු කරන්න. රූප සටහන් පැහැදිලිව ඇඳීමෙන් ලකුණු පහසුවෙන් තහවුරු කරගත හැක."
+          </div>
+
+          <button class="btn-primary" style="background:#0F172A; padding:10px; font-size:12px;" onclick="alert('Pre-Exam Revision Guide PDF will download once published.')">
+            📥 Download Revision Hints PDF
+          </button>
+        </div>
       </div>
     `;
+
+    // Event Listeners
+    document.getElementById('tab-papers-live')?.addEventListener('click', () => {
+      this.papersTab = 0;
+      this.renderPapersScreen(container);
+    });
+
+    document.getElementById('tab-papers-upcoming')?.addEventListener('click', () => {
+      this.papersTab = 1;
+      this.renderPapersScreen(container);
+    });
+
+    document.getElementById('btn-toggle-papers-batch')?.addEventListener('click', () => {
+      this.papersBatch = this.papersBatch === '2027 A/L' ? 'All Batches' : '2027 A/L';
+      this.renderPapersScreen(container);
+    });
+
+    container.querySelectorAll('.slot-selection-box').forEach(slotEl => {
+      slotEl.addEventListener('click', () => {
+        const pId = slotEl.dataset.paperId;
+        const sId = slotEl.dataset.slotId;
+        this.selectedSlots[pId] = sId;
+        this.renderPapersScreen(container);
+      });
+    });
 
     container.querySelectorAll('[data-paper-join]').forEach(b => {
       b.addEventListener('click', () => {
         this.openLiveExamRoom(b.dataset.paperJoin);
       });
     });
-  }
 
-  // ── 3. Ranks Tab (Podium & Leaderboard) ────────────────────────────────────
-  async renderRanksScreen(container) {
-    const leaders = await dbService.getLeaderboard();
-    const top3 = leaders.slice(0, 3);
-    const rest = leaders.slice(3);
-
-    container.innerHTML = `
-      <div style="font-size: 18px; font-weight:800; color: #0F172A; margin-bottom: 14px; display:flex; align-items:center; gap:8px;">
-        <span>🏆</span>
-        <span>Island-Wide Physics Leaderboard</span>
-      </div>
-
-      <!-- Top 3 Podium Cards -->
-      <div style="display:grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 8px; align-items:flex-end; margin-bottom: 16px;">
-        <!-- Rank 2 -->
-        ${top3[1] ? `
-          <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:18px; padding:14px 6px; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
-            <div style="font-size:22px;">🥈</div>
-            <div style="font-size:12px; font-weight:800; color:#0F172A; margin-top:4px;">${top3[1].name.split(' ')[0]}</div>
-            <div style="font-size:11px; color:#2563EB; font-weight:800;">${top3[1].credits} XP</div>
-          </div>
-        ` : ''}
-
-        <!-- Rank 1 (Gold) -->
-        ${top3[0] ? `
-          <div style="background:linear-gradient(135deg, #FEF3C7, #FDE68A); border:2px solid #F59E0B; border-radius:20px; padding:18px 8px; text-align:center; box-shadow:0 8px 20px rgba(245,158,11,0.25);">
-            <div style="font-size:28px;">👑</div>
-            <div style="font-size:13px; font-weight:800; color:#78350F; margin-top:4px;">${top3[0].name.split(' ')[0]}</div>
-            <div style="font-size:12px; color:#B45309; font-weight:900;">${top3[0].credits} XP</div>
-          </div>
-        ` : ''}
-
-        <!-- Rank 3 -->
-        ${top3[2] ? `
-          <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:18px; padding:12px 6px; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
-            <div style="font-size:20px;">🥉</div>
-            <div style="font-size:12px; font-weight:800; color:#0F172A; margin-top:4px;">${top3[2].name.split(' ')[0]}</div>
-            <div style="font-size:11px; color:#2563EB; font-weight:800;">${top3[2].credits} XP</div>
-          </div>
-        ` : ''}
-      </div>
-
-      <!-- Rest of list -->
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        ${rest.map(r => `
-          <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <div style="display:flex; align-items:center; gap:12px;">
-              <span style="font-size:13px; font-weight:800; color:#64748B; width:22px;">#${r.rank}</span>
-              <div>
-                <div style="font-size:13px; font-weight:700; color:#0F172A;">${r.name}</div>
-                <div style="font-size:11px; color:#64748B;">${r.examYear}</div>
-              </div>
-            </div>
-            <span style="font-size:13px; font-weight:800; color:#2563EB;">${r.credits} XP</span>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }
-
-  // ── 4. Desserts Tab (Homework Submissions & History) ───────────────────────
-  async renderDessertsScreen(container) {
-    const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid, user.phone);
-
-    container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-        <span style="font-size: 18px; font-weight:800; color: #0F172A;">📁 Dessert Homework</span>
-        <button class="btn-primary" style="width:auto; padding:8px 14px; font-size:12px;" id="btn-desserts-scan">
-          📷 Scan & Submit
-        </button>
-      </div>
-
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        ${desserts.map(d => {
-          const isApproved = d.status === 'approved';
-          const isPending = d.status === 'pending';
-          const badgeClass = isApproved ? 'quest-badge-green' : isPending ? 'quest-badge-orange' : 'quest-badge-orange';
-          const label = isApproved ? 'Approved ✓' : isPending ? 'In Review ⏳' : 'Needs Redo ⚠️';
-
-          return `
-            <div class="hero-card" style="padding:16px;" data-dessert-id="${d.id}">
-              <div style="display:flex; align-items:center; justify-content:space-between;">
-                <span class="quest-status-badge ${badgeClass}">${label}</span>
-                <span style="font-size:11.5px; font-weight:700; color:#2563EB;">+${d.creditsAwarded || 0} XP</span>
-              </div>
-              <div style="font-size:14.5px; font-weight:800; color:#0F172A; margin-top:8px;">${d.subject}</div>
-              <div style="font-size:12px; color:#64748B; margin-top:2px;">${d.caption || 'No note added'}</div>
-              ${d.adminFeedback ? `
-                <div style="margin-top:10px; padding:10px; background:#EFF6FF; border-left:3px solid #2563EB; border-radius:6px; font-size:11.5px; color:#1E3A8A;">
-                  <strong>Teacher Feedback:</strong> ${d.adminFeedback}
-                </div>
-              ` : ''}
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-
-    document.getElementById('btn-desserts-scan')?.addEventListener('click', () => {
-      this.openDocumentScanner();
+    container.querySelectorAll('[data-paper-scan]').forEach(b => {
+      b.addEventListener('click', () => {
+        this.openDocumentScanner();
+      });
     });
   }
 
-  // ── 5. Profile Tab ────────────────────────────────────────────────────────
+  // ── 3. Ranks Tab (Dessert XP Leagues & Paper Leaderboard - 1:1 Android) ───
+  async renderRanksScreen(container) {
+    this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Dessert, 1: Paper
+    this.selectedLeague = this.selectedLeague ?? 'All Scholars';
+    this.selectedRanksBatch = this.selectedRanksBatch ?? 'All Batches';
+    this.expandedPaperBoards = this.expandedPaperBoards ?? new Set(['paper_001']);
+
+    const leaders = await dbService.getLeaderboard();
+    const leagues = [
+      { name: 'All Scholars', emoji: '🌐' },
+      { name: 'Diamond', emoji: '💎' },
+      { name: 'Gold', emoji: '🥇' },
+      { name: 'Silver', emoji: '🥈' },
+      { name: 'Bronze', emoji: '🥉' }
+    ];
+
+    const filtered = leaders.filter(s => {
+      if (this.selectedRanksBatch !== 'All Batches' && s.examYear !== this.selectedRanksBatch) return false;
+      if (this.selectedLeague === 'Diamond') return s.credits >= 500;
+      if (this.selectedLeague === 'Gold') return s.credits >= 250 && s.credits < 500;
+      if (this.selectedLeague === 'Silver') return s.credits >= 100 && s.credits < 250;
+      if (this.selectedLeague === 'Bronze') return s.credits < 100;
+      return true;
+    });
+
+    const top3 = filtered.slice(0, 3);
+    const rest = filtered.slice(3);
+
+    container.innerHTML = `
+      <!-- Screen Top Bar -->
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#FEF3C7; color:#B45309;">🏆</div>
+          <div>
+            <div class="appbar-title">${this.ranksBoardType === 0 ? 'Dessert Leaderboard 🧁' : 'Paper Leaderboard 📝'}</div>
+            <div class="appbar-subtitle">${this.ranksBoardType === 0 ? 'XP Credits & Activity Leagues' : 'Exam Marks & Island Rankings'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Segmented Switcher: Dessert vs Paper -->
+      <div class="sub-tabs-container">
+        <button class="sub-tab-btn ${this.ranksBoardType === 0 ? 'active' : ''}" id="btn-ranks-dessert-mode">
+          <span>🧁 Dessert Leaderboard</span>
+          <span class="tab-sub">XP & Activity Leagues</span>
+        </button>
+        <button class="sub-tab-btn ${this.ranksBoardType === 1 ? 'active' : ''}" id="btn-ranks-paper-mode">
+          <span>📝 Paper Leaderboard</span>
+          <span class="tab-sub">Exam Marks & Ranks</span>
+        </button>
+      </div>
+
+      ${this.ranksBoardType === 0 ? `
+        <!-- League Horizontal Filter Scroll -->
+        <div class="leagues-scroll-row">
+          ${leagues.map(l => `
+            <button class="league-chip ${this.selectedLeague === l.name ? 'active' : ''}" data-league="${l.name}">
+              <span>${l.emoji}</span>
+              <span>${l.name}</span>
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Batch Filter Row -->
+        <div class="batch-filter-row">
+          <span>Batch Selection:</span>
+          <select class="batch-select" id="select-ranks-batch">
+            <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
+            <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
+            <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
+            <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
+          </select>
+        </div>
+
+        <!-- Top 3 Podium (Rank 2 Silver on left, Rank 1 Gold in center, Rank 3 Bronze on right) -->
+        <div class="podium-container">
+          <!-- Rank 2 -->
+          ${top3[1] ? `
+            <div class="podium-card">
+              <div class="podium-medal">🥈</div>
+              <div class="podium-name">${top3[1].name.split(' ')[0]}</div>
+              <div class="podium-xp">${top3[1].credits} XP</div>
+              <span style="font-size:10px; color:#64748B;">#2 Rank</span>
+            </div>
+          ` : '<div></div>'}
+
+          <!-- Rank 1 Gold (Elevated) -->
+          ${top3[0] ? `
+            <div class="podium-card podium-card-gold">
+              <div class="podium-medal-gold">👑</div>
+              <div class="podium-name">${top3[0].name.split(' ')[0]}</div>
+              <div class="podium-xp">${top3[0].credits} XP</div>
+              <span style="font-size:11px; font-weight:800; color:#B45309;">#1 Island Rank</span>
+            </div>
+          ` : '<div></div>'}
+
+          <!-- Rank 3 -->
+          ${top3[2] ? `
+            <div class="podium-card">
+              <div class="podium-medal">🥉</div>
+              <div class="podium-name">${top3[2].name.split(' ')[0]}</div>
+              <div class="podium-xp">${top3[2].credits} XP</div>
+              <span style="font-size:10px; color:#64748B;">#3 Rank</span>
+            </div>
+          ` : '<div></div>'}
+        </div>
+
+        <!-- Full List from Rank #4 onwards -->
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          ${rest.map(r => `
+            <div class="rank-list-item">
+              <div class="rank-item-left">
+                <span class="rank-index">#${r.rank}</span>
+                <div class="rank-avatar">${r.name.charAt(0)}</div>
+                <div class="rank-name-box">
+                  <div class="rank-student-name">
+                    <span>${r.name}</span>
+                    <span style="color:#2563EB; font-size:11px;">✓</span>
+                  </div>
+                  <div class="rank-batch-tag">${r.examYear} Candidate</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:11.5px;">🔥 3d</span>
+                <span class="rank-xp-pill">${r.credits} XP</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Sticky Bottom Bar for Current Student's Rank -->
+        <div class="my-rank-sticky-bar">
+          <div class="my-rank-info">
+            <span class="my-rank-num">#3</span>
+            <div>
+              <div style="font-size:12.5px; font-weight:800;">Kasun Perera (You)</div>
+              <div style="font-size:10.5px; color:#94A3B8;">Next Rank: +45 XP needed</div>
+            </div>
+          </div>
+          <span style="font-size:13px; font-weight:900; color:#38BDF8;">155 XP</span>
+        </div>
+      ` : `
+        <!-- Paper Leaderboard View -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="paper-board-card">
+            <div class="paper-board-header" id="btn-toggle-pb1">
+              <div>
+                <div style="font-size:14.5px; font-weight:800; color:#0F172A;">2027 A/L Physics Term Paper 01</div>
+                <div class="paper-board-stats">
+                  <span>📅 Sept 2026</span>
+                  <span>📊 Avg: 68.4</span>
+                  <span>🏆 Highest: 98</span>
+                  <span>👥 142 Students</span>
+                </div>
+              </div>
+              <span style="font-size:18px; color:#2563EB;">▼</span>
+            </div>
+
+            <div class="paper-scores-table" id="pb1-table">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 6px; border-bottom:1px solid #E2E8F0; font-size:12px; font-weight:800; background:#ECFDF5; border-radius:8px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="color:#047857;">#14 (You)</span>
+                  <span>Kasun Perera</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="grade-badge grade-A">A Grade</span>
+                  <span style="font-size:13px; font-weight:900; color:#047857;">78 / 100</span>
+                </div>
+              </div>
+
+              ${[
+                { rank: 1, name: 'Danushka Wickramasinghe', marks: 98, grade: 'A', time: '2h 10m' },
+                { rank: 2, name: 'Minoli Senarath', marks: 94, grade: 'A', time: '2h 18m' },
+                { rank: 3, name: 'Sachintha Fernando', marks: 91, grade: 'A', time: '2h 25m' },
+                { rank: 4, name: 'Dinuka Rajapaksha', marks: 88, grade: 'A', time: '2h 28m' },
+                { rank: 5, name: 'Kavindu Jayawardena', marks: 84, grade: 'A', time: '2h 30m' }
+              ].map(s => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 6px; font-size:12px; border-bottom:1px solid #F1F5F9;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:800; color:#64748B; width:22px;">#${s.rank}</span>
+                    <span style="font-weight:700; color:#1E293B;">${s.name}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10.5px; color:#64748B;">⏱️ ${s.time}</span>
+                    <span class="grade-badge grade-${s.grade}">${s.grade}</span>
+                    <span style="font-weight:800; color:#2563EB;">${s.marks}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `}
+    `;
+
+    // Event Listeners
+    document.getElementById('btn-ranks-dessert-mode')?.addEventListener('click', () => {
+      this.ranksBoardType = 0;
+      this.renderRanksScreen(container);
+    });
+
+    document.getElementById('btn-ranks-paper-mode')?.addEventListener('click', () => {
+      this.ranksBoardType = 1;
+      this.renderRanksScreen(container);
+    });
+
+    container.querySelectorAll('.league-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.selectedLeague = btn.dataset.league;
+        this.renderRanksScreen(container);
+      });
+    });
+
+    document.getElementById('select-ranks-batch')?.addEventListener('change', (e) => {
+      this.selectedRanksBatch = e.target.value;
+      this.renderRanksScreen(container);
+    });
+
+    document.getElementById('btn-toggle-pb1')?.addEventListener('click', () => {
+      const tbl = document.getElementById('pb1-table');
+      if (tbl) tbl.style.display = tbl.style.display === 'none' ? 'flex' : 'none';
+    });
+  }
+
+  // ── 4. Desserts Tab (Submit Homework & Submissions History - 1:1 Android) ──
+  async renderDessertsScreen(container) {
+    this.dessertsTab = this.dessertsTab ?? 0; // 0: Submit Homework, 1: History
+    this.selectedTopic = this.selectedTopic ?? 'Mechanics';
+    this.capturedHomeworkPhotos = this.capturedHomeworkPhotos ?? [];
+    this.dessertHistoryFilter = this.dessertHistoryFilter ?? 'All';
+
+    const user = this.currentUser || {};
+    const desserts = await dbService.getStudentDesserts(user.uid, user.phone);
+
+    const topics = [
+      'Mechanics',
+      'Waves & Optics',
+      'Thermal Physics',
+      'Electricity & Mag',
+      'Modern Physics',
+      'Unit Test'
+    ];
+
+    container.innerHTML = `
+      <!-- Screen Top Bar -->
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">📁</div>
+          <div>
+            <div class="appbar-title">Dessert Homework System</div>
+            <div class="appbar-subtitle">A/L Physics Daily Problem Sets & Submissions</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-Tabs: Submit Homework vs Submissions History -->
+      <div class="sub-tabs-container">
+        <button class="sub-tab-btn ${this.dessertsTab === 0 ? 'active' : ''}" id="tab-dessert-submit">
+          <span>📤 Submit Homework</span>
+          <span class="tab-sub">Scan & Upload Pages</span>
+        </button>
+        <button class="sub-tab-btn ${this.dessertsTab === 1 ? 'active' : ''}" id="tab-dessert-history">
+          <span>📁 Submission History</span>
+          <span class="tab-sub">Marks & Teacher Feedback</span>
+        </button>
+      </div>
+
+      ${this.dessertsTab === 0 ? `
+        <!-- Tab 0: Submit Homework Form -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <!-- Topic Tag Selector -->
+          <div class="hero-card" style="padding:16px;">
+            <div class="form-label" style="margin-bottom:4px;">1. තෝරාගත් ඒකකය (Select Topic Tag):</div>
+            <div class="topic-chips-grid">
+              ${topics.map(t => `
+                <button class="topic-chip ${this.selectedTopic === t ? 'active' : ''}" data-topic="${t}">
+                  ${t}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Document Capture Buttons -->
+          <div class="hero-card" style="padding:16px;">
+            <div class="form-label" style="margin-bottom:8px;">2. පිළිතුරු පත්‍ර ඡායාරූප (Capture Homework Pages):</div>
+            <div class="capture-buttons-row">
+              <button class="capture-btn" id="btn-dessert-open-cam">
+                <span style="font-size:24px;">📷</span>
+                <span>In-App Camera</span>
+              </button>
+              <label class="capture-btn" for="input-hw-gallery" style="margin-bottom:0;">
+                <span style="font-size:24px;">🖼️</span>
+                <span>Gallery / Files</span>
+                <input type="file" id="input-hw-gallery" accept="image/*" multiple style="display:none;" />
+              </label>
+            </div>
+
+            <!-- Multi-Page Photo Strip -->
+            ${this.capturedHomeworkPhotos.length > 0 ? `
+              <div style="font-size:11px; font-weight:800; color:#2563EB; margin:8px 0 4px;">
+                Attached Pages (${this.capturedHomeworkPhotos.length}):
+              </div>
+              <div class="photos-preview-strip">
+                ${this.capturedHomeworkPhotos.map((url, i) => `
+                  <div class="photo-thumb-card">
+                    <img src="${url}" alt="Page ${i + 1}" />
+                    <span class="photo-page-num">P${i + 1}</span>
+                    <button class="photo-delete-btn" data-del-photo="${i}">✕</button>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div style="text-align:center; padding:12px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:12px; font-size:11.5px; color:#64748B;">
+                No pages attached yet. Tap Camera or Gallery to add pages.
+              </div>
+            `}
+          </div>
+
+          <!-- Caption Textarea -->
+          <div class="hero-card" style="padding:16px;">
+            <div class="form-label" style="margin-bottom:6px;">3. සටහන / ප්‍රශ්න අංක (Student Remarks / Questions):</div>
+            <textarea class="form-textarea" id="input-dessert-caption" rows="2" placeholder="උදා: Mechanics Past Paper 2024 Structured Essay Q1 & Q2..."></textarea>
+          </div>
+
+          <!-- Telegram Alternative Guide -->
+          <div class="telegram-guide-card">
+            <div>
+              <div style="font-size:12.5px; font-weight:800;">🤖 Submit via Telegram AI Bot</div>
+              <div style="font-size:10.5px; opacity:0.9; margin-top:2px;">Prefer Telegram? Forward images directly to @edupeakbot</div>
+            </div>
+            <a href="https://t.me/edupeakbot" target="_blank" style="background:#FFFFFF; color:#0369A1; padding:6px 12px; border-radius:20px; font-size:11.5px; font-weight:800; text-decoration:none;">
+              Open Bot
+            </a>
+          </div>
+
+          <!-- Submit Button -->
+          <button class="btn-primary" id="btn-submit-dessert-final" style="padding:14px; font-size:15px; margin-top:4px;">
+            🚀 Submit Homework (+100 XP)
+          </button>
+        </div>
+      ` : `
+        <!-- Tab 1: Submission History -->
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <!-- Filter Chips -->
+          <div class="history-filter-chips">
+            ${['All', 'Pending', 'Approved', 'Rejected'].map(f => `
+              <button class="history-filter-chip ${this.dessertHistoryFilter === f ? 'active' : ''}" data-hist-filter="${f}">
+                ${f}
+              </button>
+            `).join('')}
+          </div>
+
+          <!-- List of Submissions -->
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            ${(() => {
+              const filtered = desserts.filter(d => {
+                if (this.dessertHistoryFilter === 'All') return true;
+                return (d.status || '').toLowerCase() === this.dessertHistoryFilter.toLowerCase();
+              });
+              if (filtered.length === 0) {
+                return `
+                  <div style="text-align:center; padding:32px 16px; background:#FFFFFF; border-radius:16px; border:1px dashed #CBD5E1; color:#64748B;">
+                    <div style="font-size:32px; margin-bottom:8px;">📁</div>
+                    <div style="font-weight:700; font-size:14px; color:#0F172A;">No Submissions Found</div>
+                    <div style="font-size:11.5px; margin-top:4px;">No ${this.dessertHistoryFilter} submissions yet. Submit your homework in Tab 1 to earn XP!</div>
+                  </div>
+                `;
+              }
+              return filtered.map(d => {
+                const isApp = d.status === 'approved';
+                const isPend = d.status === 'pending';
+                const badgeClass = isApp ? 'quest-badge-green' : isPend ? 'quest-badge-orange' : 'quest-badge-blue';
+                const label = isApp ? 'Approved ✓' : isPend ? 'In Review ⏳' : 'Needs Redo ⚠️';
+
+                return `
+                  <div class="hero-card" style="padding:16px; cursor:pointer;" data-view-dessert="${d.id}">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span class="quest-status-badge ${badgeClass}">${label}</span>
+                      <span style="font-size:12px; font-weight:900; color:#2563EB;">+${d.creditsAwarded || 100} XP</span>
+                    </div>
+
+                    <div style="font-size:14.5px; font-weight:800; color:#0F172A; margin-top:8px;">${d.subject}</div>
+                    <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${d.caption || 'Daily Dessert Problem Set'}</div>
+
+                    ${d.mediaUrls && d.mediaUrls.length > 0 ? `
+                      <div style="display:flex; gap:6px; margin-top:8px; overflow-x:auto;">
+                        ${d.mediaUrls.map(u => `
+                          <img src="${u}" style="width:48px; height:48px; border-radius:8px; object-fit:cover; border:1px solid #E2E8F0;" />
+                        `).join('')}
+                      </div>
+                    ` : ''}
+
+                    ${d.adminFeedback ? `
+                      <div style="margin-top:10px; padding:10px; background:#EFF6FF; border-left:3px solid #2563EB; border-radius:8px; font-size:11.5px; color:#1E3A8A; line-height:1.4;">
+                        <strong>👨‍🏫 Teacher Feedback:</strong> ${d.adminFeedback}
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('');
+            })()}
+          </div>
+        </div>
+      `}
+    `;
+
+    // Event Listeners for Desserts Tab
+    document.getElementById('tab-dessert-submit')?.addEventListener('click', () => {
+      this.dessertsTab = 0;
+      this.renderDessertsScreen(container);
+    });
+
+    document.getElementById('tab-dessert-history')?.addEventListener('click', () => {
+      this.dessertsTab = 1;
+      this.renderDessertsScreen(container);
+    });
+
+    container.querySelectorAll('.topic-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.selectedTopic = btn.dataset.topic;
+        this.renderDessertsScreen(container);
+      });
+    });
+
+    container.querySelectorAll('.history-filter-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.dessertHistoryFilter = btn.dataset.histFilter;
+        this.renderDessertsScreen(container);
+      });
+    });
+
+    document.getElementById('btn-dessert-open-cam')?.addEventListener('click', () => {
+      this.openDocumentScanner();
+    });
+
+    const fileInput = document.getElementById('input-hw-gallery');
+    fileInput?.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          this.capturedHomeworkPhotos.push(re.target.result);
+          this.renderDessertsScreen(container);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    container.querySelectorAll('[data-del-photo]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = Number(btn.dataset.delPhoto);
+        this.capturedHomeworkPhotos.splice(idx, 1);
+        this.renderDessertsScreen(container);
+      });
+    });
+
+    document.getElementById('btn-submit-dessert-final')?.addEventListener('click', async () => {
+      const caption = document.getElementById('input-dessert-caption')?.value.trim();
+      const btn = document.getElementById('btn-submit-dessert-final');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Uploading to Teacher... ⏳';
+      }
+
+      await dbService.submitDessert({
+        studentId: user.uid,
+        studentName: user.name,
+        studentPhone: user.phone,
+        subject: `Physics: ${this.selectedTopic}`,
+        caption: caption || `Homework submission on ${this.selectedTopic}`,
+        mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : ['./icons/exam_3d_countdown.jpg']
+      });
+
+      this.capturedHomeworkPhotos = [];
+      notificationService.showInAppBanner('Homework Submitted! 🍰', '+100 XP awarded to your profile.', 'success');
+      this.dessertsTab = 1;
+      this.renderDessertsScreen(container);
+    });
+
+    container.querySelectorAll('[data-view-dessert]').forEach(card => {
+      card.addEventListener('click', () => {
+        this.openDessertDetailModal(card.dataset.viewDessert);
+      });
+    });
+  }
+
+  // ── 5. Profile Tab (Trophy Room, Dark Mode, Admin Switcher - 1:1 Android) ──
   renderProfileScreen(container) {
     const user = this.currentUser || {};
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     container.innerHTML = `
-      <div style="font-size: 18px; font-weight:800; color: #0F172A; margin-bottom: 14px;">
-        👤 Student Profile & Settings
-      </div>
-
-      <div class="hero-card" style="align-items:center; text-align:center; padding:24px;">
-        <div class="avatar-ring" style="width:72px; height:72px; font-size:28px;">
-          <div class="avatar-img">${user.name ? user.name.charAt(0).toUpperCase() : 'T'}</div>
-        </div>
-        <div style="font-size:18px; font-weight:800; color:#0F172A; margin-top:10px;">${user.name || 'ThiZaru'}</div>
-        <div style="font-size:12.5px; color:#64748B;">${user.examYear || '2027 A/L Candidate'} • ID: ${user.studentId || 'EP-2027'}</div>
-
-        <div style="margin-top:12px; padding:6px 14px; border-radius:20px; font-size:11.5px; font-weight:800; background: ${isStandalone ? '#ECFDF5' : '#FEF3C7'}; color: ${isStandalone ? '#047857' : '#B45309'}; border: 1px solid ${isStandalone ? '#A7F3D0' : '#FDE68A'};">
-          ${isStandalone ? '🟢 Running on iPhone Home Screen (PWA Mode)' : '⚠️ Safari Browser Tab'}
+      <!-- Screen Top Bar -->
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">👤</div>
+          <div>
+            <div class="appbar-title">Student Profile</div>
+            <div class="appbar-subtitle">Account Details, Trophy Room & Preferences</div>
+          </div>
         </div>
       </div>
 
+      <!-- Large DP with Camera Badge -->
+      <div class="hero-card" style="align-items:center; text-align:center; padding:22px;">
+        <div class="profile-avatar-stack">
+          ${user.avatarUrl ? `
+            <img src="${user.avatarUrl}" class="profile-avatar-img" />
+          ` : `
+            <div class="profile-avatar-img">${user.name ? user.name.charAt(0).toUpperCase() : 'K'}</div>
+          `}
+          <button class="profile-cam-btn" id="btn-change-avatar" title="Change Photo">📷</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+          <span style="font-size:19px; font-weight:800; color:#0F172A;">${user.name || 'Kasun Perera'}</span>
+          <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:14px;">✏️</button>
+        </div>
+
+        <div style="font-size:12px; color:#64748B; margin-top:2px;">
+          ${user.phone || '+94 77 123 4567'} • <span style="color:#059669; font-weight:700;">Verified Student ✓</span>
+        </div>
+
+        <div style="margin-top:10px; padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800; background: ${isStandalone ? '#ECFDF5' : '#FEF3C7'}; color: ${isStandalone ? '#047857' : '#B45309'}; border: 1px solid ${isStandalone ? '#A7F3D0' : '#FDE68A'};">
+          ${isStandalone ? '🟢 iPhone Home Screen (PWA Standalone Mode)' : '⚠️ Safari Browser Tab'}
+        </div>
+      </div>
+
+      <!-- 3-Item Stats Card (Credits, Approved, Pending) -->
+      <div class="stats-trio-card">
+        <div>
+          <div class="stat-number" style="color:#F59E0B;">⭐ 155</div>
+          <div class="stat-label">Credits (XP)</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div>
+          <div class="stat-number" style="color:#10B981;">✅ 4</div>
+          <div class="stat-label">Approved</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div>
+          <div class="stat-number" style="color:#EA580C;">⏳ 1</div>
+          <div class="stat-label">Pending</div>
+        </div>
+      </div>
+
+      <!-- Account Details Card -->
+      <div class="hero-card" style="padding:14px 18px; margin-top:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #E2E8F0;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
+            <span>🎓 Role:</span>
+          </div>
+          <span style="font-size:12px; font-weight:800; color:#2563EB;">Student (A/L Physics)</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #E2E8F0;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
+            <span>📅 Member Since:</span>
+          </div>
+          <span style="font-size:12px; font-weight:600; color:#64748B;">September 2026</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
+            <span>📁 Total Submissions:</span>
+          </div>
+          <span style="font-size:12px; font-weight:800; color:#0F172A;">5 Problem Sets</span>
+        </div>
+      </div>
+
+      <!-- Features & Preferences -->
       <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <!-- Trophy Room -->
+        <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer;" id="btn-open-trophy-room">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:24px;">🏆</span>
+            <div style="text-align:left;">
+              <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Trophy Room & Flex Zone</div>
+              <div style="font-size:11px; color:#64748B;">View 8 Unlockable Badges & Achievements</div>
+            </div>
+          </div>
+          <span style="color:#2563EB; font-weight:800;">➔</span>
+        </button>
+
+        <!-- Dark Mode Toggle -->
+        <div class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:22px;">🌙</span>
+            <div style="text-align:left;">
+              <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Cyber Midnight Dark Mode</div>
+              <div style="font-size:11px; color:#64748B;">Switch between Frost White & Dark</div>
+            </div>
+          </div>
+          <input type="checkbox" id="chk-dark-mode" ${isDark ? 'checked' : ''} style="width:20px; height:20px; accent-color:#2563EB; cursor:pointer;" />
+        </div>
+
+        <!-- Push Notifications Center -->
         <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer;" id="btn-profile-notifs">
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:20px;">🔔</span>
+            <span style="font-size:22px;">🔔</span>
             <div style="text-align:left;">
-              <div style="font-size:13px; font-weight:700; color:#0F172A;">Web Push Notifications</div>
-              <div style="font-size:11px; color:#64748B;">Enable & Test iOS 16.4+ Alert Banners</div>
+              <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Web Push Notifications</div>
+              <div style="font-size:11px; color:#64748B;">Test Alert Banners & Audio Chime</div>
             </div>
           </div>
-          <span style="color:#94A3B8;">➔</span>
+          <span style="color:#2563EB; font-weight:800;">➔</span>
         </button>
 
-        <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer;" id="btn-profile-scanner">
+        <!-- Teacher / Admin Console (Always accessible in Demo Mode) -->
+        <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); border-color:#93C5FD;" id="btn-profile-admin">
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:20px;">📷</span>
+            <span style="font-size:22px;">👑</span>
             <div style="text-align:left;">
-              <div style="font-size:13px; font-weight:700; color:#0F172A;">Camera Scanner</div>
-              <div style="font-size:11px; color:#64748B;">Test Rear Document Scanner & Filters</div>
+              <div style="font-size:13.5px; font-weight:800; color:#1E3A8A;">Teacher / Admin Console</div>
+              <div style="font-size:11px; color:#2563EB;">Grade Submissions & Manage Exam Papers</div>
             </div>
           </div>
-          <span style="color:#94A3B8;">➔</span>
+          <span style="color:#2563EB; font-weight:800;">➔</span>
         </button>
 
-        <button class="btn-primary" style="background:#EF4444; margin-top:10px;" id="btn-profile-logout">
-          Sign Out
+        <!-- Sign Out Button -->
+        <button class="btn-primary" style="background:#EF4444; margin-top:6px;" id="btn-profile-logout">
+          🚪 Sign Out
         </button>
       </div>
     `;
+
+    // Event Listeners for Profile Tab
+    document.getElementById('btn-open-trophy-room')?.addEventListener('click', () => {
+      this.openTrophyRoomModal();
+    });
+
+    document.getElementById('btn-edit-student-name')?.addEventListener('click', () => {
+      this.openEditNameDialog();
+    });
+
+    document.getElementById('btn-change-avatar')?.addEventListener('click', () => {
+      const url = prompt('Enter image URL or photo link for your profile picture:', user.avatarUrl || '');
+      if (url) {
+        user.avatarUrl = url;
+        authService.currentUser.avatarUrl = url;
+        this.renderProfileScreen(container);
+      }
+    });
+
+    document.getElementById('chk-dark-mode')?.addEventListener('change', (e) => {
+      const dark = e.target.checked;
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      localStorage.setItem('edupeak_theme', dark ? 'dark' : 'light');
+    });
 
     document.getElementById('btn-profile-notifs')?.addEventListener('click', () => {
       this.openNotificationCenter();
     });
 
-    document.getElementById('btn-profile-scanner')?.addEventListener('click', () => {
-      this.openDocumentScanner();
+    document.getElementById('btn-profile-admin')?.addEventListener('click', () => {
+      alert('Teacher / Admin Dashboard: Accessing paper administration & student grading portal.');
+      this.openAdminReviewModal();
     });
 
     document.getElementById('btn-profile-logout')?.addEventListener('click', () => {
-      authService.logout();
-      location.reload();
+      if (confirm('Are you sure you want to log out of your student account?')) {
+        authService.logout();
+        location.reload();
+      }
     });
+  }
+
+  // ── Trophy Room Modal (Matching badge_model.dart & trophy_room_sheet.dart) ─
+  openTrophyRoomModal() {
+    const badges = [
+      { id: 'streak_3', emoji: '🔥', title: '3-Day Fire Streak', desc: 'Stay active and learn for 3 consecutive days.', unlocked: true, progress: 100, label: '3 / 3 Days' },
+      { id: 'first_masterpiece', emoji: '🍰', title: 'First Masterpiece', desc: 'Get your very first homework approved by teacher.', unlocked: true, progress: 100, label: '1 / 1 Approved' },
+      { id: 'century_club', emoji: '⚡', title: 'Century Scholar', desc: 'Earn 100 or more XP credits across all homework.', unlocked: true, progress: 100, label: '155 / 100 XP' },
+      { id: 'speed_demon', emoji: '🚀', title: 'Speed Demon', desc: 'Submit 5 homework solutions with high precision.', unlocked: false, progress: 80, label: '4 / 5 Done' },
+      { id: 'night_owl', emoji: '🦉', title: 'Night Owl Scholar', desc: 'Dedication at night! Submit homework after 9:00 PM.', unlocked: true, progress: 100, label: '2 / 2 Night Subs' },
+      { id: 'podium_king', emoji: '👑', title: 'Podium King', desc: 'Reach the Top 3 on the Institute Leaderboard.', unlocked: false, progress: 77, label: '155 / 200 XP' },
+      { id: 'grandmaster', emoji: '🏆', title: 'Dessert Grandmaster', desc: 'Accumulate 500 XP and achieve ultimate mastery.', unlocked: false, progress: 31, label: '155 / 500 XP' },
+      { id: 'physics_guru', emoji: '⚛️', title: 'Physics Prodigy', desc: 'Solve 3 Daily MCQ Sprints with 100% correct score.', unlocked: true, progress: 100, label: '3 / 3 Completed' }
+    ];
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:22px;">🏆</span>
+            <div>
+              <h3 class="modal-title">Trophy Room & Flex Zone</h3>
+              <div style="font-size:11px; color:#64748B;">Unlock badges by submitting homework & earning XP</div>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-trophy">✕</button>
+        </div>
+
+        <div class="badges-grid">
+          ${badges.map(b => `
+            <div class="badge-card ${b.unlocked ? 'unlocked' : ''}">
+              <div class="badge-top">
+                <span class="badge-emoji">${b.emoji}</span>
+                <span class="badge-status-tag ${b.unlocked ? 'badge-unlocked-tag' : 'badge-locked-tag'}">
+                  ${b.unlocked ? 'UNLOCKED' : 'LOCKED'}
+                </span>
+              </div>
+              <div class="badge-title">${b.title}</div>
+              <div class="badge-desc">${b.desc}</div>
+              <div class="badge-progress-bg">
+                <div class="badge-progress-fill" style="width:${b.progress}%; background:${b.unlocked ? '#10B981' : '#2563EB'};"></div>
+              </div>
+              <div style="font-size:9.5px; font-weight:800; color:#64748B; margin-top:2px;">${b.label}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-trophy')?.addEventListener('click', () => modal.remove());
+  }
+
+  // ── Edit Name Dialog ──────────────────────────────────────────────────────
+  openEditNameDialog() {
+    const currentName = this.currentUser?.name || 'Kasun Perera';
+    const newName = prompt('Enter your full name:', currentName);
+    if (newName && newName.trim().length > 0) {
+      this.currentUser.name = newName.trim();
+      authService.currentUser.name = newName.trim();
+      this.renderScreen(this.activeTab);
+    }
+  }
+
+  // ── Dessert Detail Modal ──────────────────────────────────────────────────
+  async openDessertDetailModal(dessertId) {
+    const user = this.currentUser || {};
+    const desserts = await dbService.getStudentDesserts(user.uid, user.phone);
+    const d = desserts.find(x => x.id === dessertId) || desserts[0];
+    if (!d) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3 class="modal-title">📁 Submission Details</h3>
+          <button class="modal-close-btn" id="btn-close-detail">✕</button>
+        </div>
+
+        <div style="font-size:15px; font-weight:800; color:#0F172A; margin-bottom:4px;">${d.subject}</div>
+        <div style="font-size:12px; color:#64748B; margin-bottom:12px;">Submitted on ${new Date(d.submittedAt || Date.now()).toLocaleDateString()}</div>
+
+        <div style="display:flex; gap:10px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px;">
+          ${(d.mediaUrls || ['./icons/exam_3d_countdown.jpg']).map(url => `
+            <img src="${url}" style="width:140px; height:180px; object-fit:cover; border-radius:12px; border:1px solid #CBD5E1; box-shadow:0 4px 10px rgba(0,0,0,0.1);" />
+          `).join('')}
+        </div>
+
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:11px; font-weight:800; color:#475569;">STUDENT REMARKS:</div>
+          <div style="font-size:12.5px; color:#1E293B; margin-top:2px;">${d.caption || 'No extra note provided.'}</div>
+        </div>
+
+        ${d.adminFeedback ? `
+          <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:12px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:800; color:#1D4ED8;">TEACHER EVALUATION & FEEDBACK:</div>
+            <div style="font-size:12.5px; color:#1E3A8A; margin-top:2px; line-height:1.45;">${d.adminFeedback}</div>
+          </div>
+        ` : ''}
+
+        <button class="btn-primary" id="btn-done-detail">Done</button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-detail')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-done-detail')?.addEventListener('click', () => modal.remove());
+  }
+
+  // ── Admin Review Modal (Mock Teacher Console) ─────────────────────────────
+  openAdminReviewModal() {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3 class="modal-title">👑 Teacher / Admin Console</h3>
+          <button class="modal-close-btn" id="btn-close-admin">✕</button>
+        </div>
+        <div style="font-size:13px; color:#475569; line-height:1.5; margin-bottom:14px;">
+          Welcome to the Teacher portal. Here you can grade submitted physics problem sets, set exam timers, and schedule new paper sessions.
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="btn-primary" style="background:#059669;" onclick="alert('Grading sheet loaded. 5 pending submissions marked as Approved (+100 XP).'); modal.remove();">
+            ✅ Approve All Pending Submissions (+100 XP)
+          </button>
+          <button class="btn-primary" style="background:#2563EB;" onclick="alert('New exam paper created for 2027 A/L batch.'); modal.remove();">
+            📝 Schedule New Model Paper
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-admin')?.addEventListener('click', () => modal.remove());
   }
 
   // ── AI Tutor Inquiry Modal ───────────────────────────────────────────────
@@ -689,64 +1469,158 @@ class AppController {
     });
   }
 
-  // ── Daily MCQ Sprint Modal ────────────────────────────────────────────────
+  // ── Daily MCQ Sprint Runner (Full 1:1 Android Parity) ─────────────────────
   openSprintDialog() {
     const sprint = dbService.getDailySprint();
-    const q = sprint.questions[0];
+    const questions = sprint.questions;
+    let currentIdx = 0;
+    let selectedAnswers = {};
+    let elapsedSeconds = 0;
+    let timer = null;
 
     const modal = document.createElement('div');
     modal.className = 'app-modal';
-    modal.innerHTML = `
-      <div class="modal-sheet">
-        <div class="modal-header">
-          <h3 class="modal-title">⚡ Dynamics & Newton's Laws</h3>
-          <button class="modal-close-btn" id="btn-close-sprint-sheet">✕</button>
-        </div>
 
-        <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:12px; font-weight:700;">
-          <span style="color:#EA580C;">Question 1 of 5</span>
-          <span style="color:#2563EB;">⏱️ 60s remaining</span>
-        </div>
+    const renderQuestion = () => {
+      const q = questions[currentIdx];
+      const selected = selectedAnswers[currentIdx];
 
-        <div style="font-size:14px; font-weight:700; color:#0F172A; line-height:1.5; margin-bottom:14px;">
-          ${q.text}
-        </div>
-
-        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-          ${q.options.map((opt, i) => `
-            <div style="padding:10px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; font-size:13px; font-weight:600; cursor:pointer;" class="sprint-opt-item" data-idx="${i}">
-              ${String.fromCharCode(65 + i)}. ${opt}
+      modal.innerHTML = `
+        <div class="modal-sheet" style="max-height:92vh;">
+          <div class="modal-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:22px;">🔥</span>
+              <div>
+                <h3 class="modal-title">Daily MCQ Sprint</h3>
+                <div style="font-size:11px; color:#64748B;">A/L Physics • දවසේ MCQ 5</div>
+              </div>
             </div>
-          `).join('')}
-        </div>
+            <button class="modal-close-btn" id="btn-close-sprint">✕</button>
+          </div>
 
-        <button class="btn-primary" id="btn-submit-sprint-opt">
-          Confirm Answer (+15 XP)
-        </button>
-      </div>
-    `;
+          <!-- Stepper and Timer Bar -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; gap:6px;">
+              ${questions.map((_, i) => `
+                <div class="sprint-step-dot ${i === currentIdx ? 'active' : selectedAnswers[i] !== undefined ? 'done' : ''}">
+                  ${i + 1}
+                </div>
+              `).join('')}
+            </div>
+            <div class="stopwatch-pill">
+              <span>⏱️</span>
+              <span id="sprint-timer-val">${Math.floor(elapsedSeconds / 60).toString().padStart(2, '0')}:${(elapsedSeconds % 60).toString().padStart(2, '0')}</span>
+            </div>
+          </div>
+
+          <!-- Question Text -->
+          <div style="font-size:14px; font-weight:800; color:#0F172A; line-height:1.5; margin-bottom:14px; background:#F8FAFC; padding:14px; border-radius:14px; border:1px solid #E2E8F0;">
+            ${q.text}
+          </div>
+
+          <!-- Options -->
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+            ${q.options.map((opt, i) => `
+              <div class="mcq-choice-btn ${selected === i ? 'selected' : ''}" data-opt-idx="${i}">
+                <div class="mcq-choice-index">${String.fromCharCode(65 + i)}</div>
+                <span>${opt}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Explanation Box if answered -->
+          ${selected !== undefined ? `
+            <div style="background:#EFF6FF; border-left:3px solid #2563EB; border-radius:10px; padding:12px; margin-bottom:14px; font-size:12px; color:#1E3A8A; line-height:1.45;">
+              <strong>💡 විවරණය (Explanation):</strong><br>
+              ${q.explanation}
+            </div>
+          ` : ''}
+
+          <!-- Navigation Buttons -->
+          <div style="display:flex; gap:8px;">
+            ${currentIdx > 0 ? `
+              <button class="btn-primary" style="background:#F1F5F9; color:#475569; width:auto; padding:12px 18px;" id="btn-sprint-prev">
+                ◀ Prev
+              </button>
+            ` : ''}
+
+            <button class="btn-primary" style="flex:1;" id="btn-sprint-next">
+              ${currentIdx === questions.length - 1 ? 'Finish Sprint & Claim +50 XP 🚀' : 'Next Question ▶'}
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Option selection
+      modal.querySelectorAll('.mcq-choice-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedAnswers[currentIdx] = Number(btn.dataset.optIdx);
+          renderQuestion();
+        });
+      });
+
+      document.getElementById('btn-close-sprint')?.addEventListener('click', () => {
+        clearInterval(timer);
+        modal.remove();
+      });
+
+      document.getElementById('btn-sprint-prev')?.addEventListener('click', () => {
+        currentIdx--;
+        renderQuestion();
+      });
+
+      document.getElementById('btn-sprint-next')?.addEventListener('click', () => {
+        if (selectedAnswers[currentIdx] === undefined) {
+          alert('Please select an option before continuing.');
+          return;
+        }
+
+        if (currentIdx < questions.length - 1) {
+          currentIdx++;
+          renderQuestion();
+        } else {
+          // Finished!
+          clearInterval(timer);
+          let correct = 0;
+          questions.forEach((qu, idx) => {
+            if (selectedAnswers[idx] === qu.correctIndex) correct++;
+          });
+
+          notificationService.showInAppBanner('Sprint Complete! 🔥', `You scored ${correct}/5. +50 XP awarded!`, 'success');
+
+          modal.innerHTML = `
+            <div class="modal-sheet" style="text-align:center; padding:30px 20px;">
+              <div style="font-size:54px;">🏆</div>
+              <h2 style="font-size:20px; font-weight:900; color:#0F172A; margin-top:8px;">Sprint Completed!</h2>
+              <div style="font-size:13.5px; color:#64748B; margin-top:4px;">
+                You scored <strong style="color:#059669;">${correct} / 5</strong> in ${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s.
+              </div>
+              <div style="margin:16px auto; padding:10px 20px; background:#FEF3C7; color:#B45309; border-radius:20px; font-size:14px; font-weight:900; width:fit-content;">
+                ⭐ +50 XP Added to Your Rank!
+              </div>
+              <button class="btn-primary" id="btn-finish-sprint-sheet" style="margin-top:10px;">
+                Back to Dashboard
+              </button>
+            </div>
+          `;
+
+          document.getElementById('btn-finish-sprint-sheet')?.addEventListener('click', () => {
+            modal.remove();
+          });
+        }
+      });
+    };
+
+    timer = setInterval(() => {
+      elapsedSeconds++;
+      const tEl = document.getElementById('sprint-timer-val');
+      if (tEl) {
+        tEl.textContent = `${Math.floor(elapsedSeconds / 60).toString().padStart(2, '0')}:${(elapsedSeconds % 60).toString().padStart(2, '0')}`;
+      }
+    }, 1000);
 
     document.body.appendChild(modal);
-    let selected = null;
-
-    modal.querySelectorAll('.sprint-opt-item').forEach(el => {
-      el.addEventListener('click', () => {
-        modal.querySelectorAll('.sprint-opt-item').forEach(x => {
-          x.style.background = '#F8FAFC';
-          x.style.borderColor = '#E2E8F0';
-        });
-        el.style.background = '#EFF6FF';
-        el.style.borderColor = '#2563EB';
-        selected = el.dataset.idx;
-      });
-    });
-
-    document.getElementById('btn-close-sprint-sheet')?.addEventListener('click', () => modal.remove());
-    document.getElementById('btn-submit-sprint-opt')?.addEventListener('click', () => {
-      if (selected === null) return;
-      alert('Answer recorded! +15 XP added to your island ranking.');
-      modal.remove();
-    });
+    renderQuestion();
   }
 
   // ── Camera Document Scanner Flow (Full iOS Match) ─────────────────────────
