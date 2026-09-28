@@ -1,0 +1,14 @@
+{
+  "name": "edupeak-ios-pwa",
+  "version": "1.0.0",
+  "description": "EduPeak Physics Institute iOS PWA & Web App with Camera Scanner & Push Notifications",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -s . -l 3000",
+    "dev": "npx serve -s . -l 3000"
+  },
+  "keywords": ["pwa", "ios", "education", "physics", "scanner", "push-notifications"],
+  "author": "EduPeak Team",
+  "license": "ISC",
+  "dependencies": {}
+}

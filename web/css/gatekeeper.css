@@ -1,0 +1,353 @@
+/* ==========================================================================
+   EduPeak iOS PWA Gatekeeper Styles
+   Enforces Add to Home Screen on iOS Mobile devices
+   ========================================================================== */
+
+.gatekeeper-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #090D16;
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.gatekeeper-overlay.fade-out {
+  opacity: 0;
+  transform: scale(0.98);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(1.02); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Ambient Radial Glows */
+.gatekeeper-ambient-glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(60px);
+  z-index: 0;
+}
+
+.glow-1 {
+  width: 320px;
+  height: 320px;
+  top: -60px;
+  right: -60px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.28) 0%, rgba(6, 182, 212, 0.15) 60%, transparent 80%);
+}
+
+.glow-2 {
+  width: 280px;
+  height: 280px;
+  bottom: -40px;
+  left: -40px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.22) 0%, rgba(245, 158, 11, 0.12) 60%, transparent 80%);
+}
+
+/* Central Card */
+.gatekeeper-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  background: rgba(18, 26, 43, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  padding: 30px 22px 24px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  text-align: center;
+}
+
+/* Header & Icon */
+.gatekeeper-header {
+  margin-bottom: 22px;
+}
+
+.gatekeeper-icon-wrap {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gatekeeper-icon {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.4);
+  position: relative;
+  z-index: 2;
+}
+
+.icon-ring-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 24px;
+  border: 2px solid rgba(56, 189, 248, 0.6);
+  animation: pulseRing 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  z-index: 1;
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.95); opacity: 0.9; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+.gatekeeper-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.gatekeeper-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #FFFFFF;
+  margin-bottom: 10px;
+  letter-spacing: -0.4px;
+}
+
+.gatekeeper-subtitle {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #94A3B8;
+  margin: 0 auto;
+}
+
+.gatekeeper-subtitle strong {
+  color: #F1F5F9;
+}
+
+/* Steps List */
+.gatekeeper-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.step-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 12px 14px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.step-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.step-num {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563EB, #06B6D4);
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #F8FAFC;
+  margin-bottom: 2px;
+}
+
+.step-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #94A3B8;
+}
+
+.step-icon-box {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Status Bar & Recheck */
+.gatekeeper-status-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.status-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38BDF8;
+  box-shadow: 0 0 10px #38BDF8;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+.status-text {
+  font-size: 11.5px;
+  color: #94A3B8;
+  flex: 1;
+  text-align: left;
+}
+
+.btn-recheck {
+  background: rgba(37, 99, 235, 0.25);
+  border: 1px solid rgba(37, 99, 235, 0.5);
+  color: #60A5FA;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-recheck:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+/* Developer Bypass Footer */
+.gatekeeper-dev-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+}
+
+.btn-dev-preview {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  color: #CBD5E1;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-dev-preview:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.dev-hint {
+  font-size: 10.5px;
+  color: #64748B;
+  margin-top: 6px;
+}
+
+/* Safari Bottom Bar Animated Arrow */
+.safari-arrow-indicator {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 100000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.safari-arrow-indicator.active {
+  opacity: 1;
+}
+
+.arrow-text {
+  background: #2563EB;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.6);
+  letter-spacing: 0.5px;
+}
+
+.bouncing-arrow {
+  font-size: 22px;
+  color: #38BDF8;
+  animation: bounce 1.2s infinite ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+/* App Lock Modifier */
+.app-locked {
+  filter: blur(12px);
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.app-unlocked {
+  filter: none;
+  pointer-events: auto;
+  user-select: auto;
+}
