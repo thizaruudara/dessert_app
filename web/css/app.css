@@ -112,6 +112,10 @@ body {
 }
 .main-viewport::-webkit-scrollbar { display: none; }
 
+.main-viewport > * {
+  flex-shrink: 0;
+}
+
 /* ── 1. Header Row (Avatar, Name, Verified Badge, 2027 Tag, Streak) ── */
 .header-row {
   display: flex;
@@ -325,6 +329,8 @@ body {
 
 /* ── 3. Daily Inspiration Banner ── */
 .inspiration-banner {
+  flex-shrink: 0;
+  min-height: 110px;
   background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 50%, #0284C7 100%);
   border-radius: 24px;
   padding: 20px 22px;
@@ -332,6 +338,8 @@ body {
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .banner-ambient-circle {
@@ -390,6 +398,9 @@ body {
   font-weight: 500;
   color: #FFFFFF;
   line-height: 1.5;
+  display: block;
+  opacity: 1;
+  transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
 /* ── 4. Original 4-Digit Box Countdown (Clean White Theme) ── */

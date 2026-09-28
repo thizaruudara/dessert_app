@@ -210,7 +210,7 @@ class AppController {
           </div>
           <span class="quote-mark">“</span>
         </div>
-        <div class="inspiration-quote">
+        <div class="inspiration-quote" id="inspiration-quote-text">
           “Success is the sum of small efforts repeated day in and day out.”
         </div>
       </div>
@@ -426,8 +426,9 @@ class AppController {
       </div>
     `;
 
-    // Start Live Clock Countdown
+    // Start Live Clock Countdown & Quote Rotator
     this.startCountdownTimer();
+    this.startInspirationRotator();
 
     // Event Listeners
     document.getElementById('act-daily-mcq')?.addEventListener('click', () => this.switchTab('home'));
@@ -1123,6 +1124,31 @@ class AppController {
 
     this.countdownTimer = setInterval(update, 1000);
     update();
+  }
+
+  // Live Daily Inspiration Quote Rotator
+  startInspirationRotator() {
+    if (this.quoteRotator) clearInterval(this.quoteRotator);
+    const quotes = [
+      '“Success is the sum of small efforts repeated day in and day out.”',
+      '“Discipline is choosing between what you want now and what you want most.”',
+      '“Physics isn’t about memorizing formulas; it’s about understanding the universe.”',
+      '“Small progress every single day adds up to big island ranks.”',
+      '“Focus on the step in front of you, not the whole staircase.”'
+    ];
+    let index = 0;
+    this.quoteRotator = setInterval(() => {
+      const el = document.getElementById('inspiration-quote-text');
+      if (!el) return;
+      index = (index + 1) % quotes.length;
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(4px)';
+      setTimeout(() => {
+        el.textContent = quotes[index];
+        el.style.opacity = '1';
+        el.style.transform = 'translateY(0)';
+      }, 350);
+    }, 5000);
   }
 }
 
