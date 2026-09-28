@@ -1275,5 +1275,414 @@
   color: #B45309;
 }
 
+/* ── Auth Screen Styles (1:1 login_screen.dart replica) ── */
+.auth-screen-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #0B1120;
+  color: #F8FAFC;
+  padding: 24px 20px;
+  box-sizing: border-box;
+}
 
+.auth-header {
+  text-align: center;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
 
+.auth-brand-logo {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+  margin-bottom: 12px;
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  color: #94A3B8;
+}
+
+.auth-tabs-bar {
+  display: flex;
+  background: #1E293B;
+  border-radius: 14px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #334155;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94A3B8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.auth-tab-btn.active {
+  background: #6366F1;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.auth-form-card {
+  background: #1E293B;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #CBD5E1;
+}
+
+.auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-phone-prefix {
+  position: absolute;
+  left: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #818CF8;
+}
+
+.auth-input {
+  width: 100%;
+  background: #0F172A;
+  border: 1.5px solid #334155;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #F8FAFC;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.auth-input.has-prefix {
+  padding-left: 54px;
+}
+
+.auth-input:focus {
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.auth-pw-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94A3B8;
+  font-size: 16px;
+}
+
+.auth-btn-submit {
+  background: #6366F1;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+  margin-top: 6px;
+}
+
+.auth-btn-submit:hover {
+  background: #4F46E5;
+}
+
+.auth-quick-demo-section {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-quick-btn {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px dashed #475569;
+  border-radius: 12px;
+  padding: 12px;
+  color: #CBD5E1;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s;
+}
+
+.auth-quick-btn:hover {
+  background: #1E293B;
+  border-color: #818CF8;
+  color: #FFFFFF;
+}
+
+/* ── Flutter Alert Dialog Replica ── */
+.app-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.app-dialog-box {
+  background: #1E293B;
+  border: 1px solid #334155;
+  border-radius: 18px;
+  padding: 22px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  color: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.app-dialog-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.app-dialog-content {
+  font-size: 13.5px;
+  color: #CBD5E1;
+  line-height: 1.5;
+}
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.app-dialog-btn-cancel {
+  background: transparent;
+  color: #94A3B8;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-dialog-btn-danger {
+  background: #EF4444;
+  color: #FFFFFF;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* ── Flutter Bottom Sheet Replica (Scope & Hints Modal) ── */
+.flutter-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(3px);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.flutter-sheet-container {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  background: #0F172A;
+  border-radius: 28px 28px 0 0;
+  border-top: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  color: #F8FAFC;
+  overflow: hidden;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  animation: slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.flutter-sheet-handle {
+  width: 44px;
+  height: 4px;
+  background: #334155;
+  border-radius: 2px;
+  margin: 12px auto 8px auto;
+}
+
+.flutter-sheet-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Upcoming Paper Card Styling (1:1 Mobile Parity) ── */
+.upcoming-paper-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.upcoming-paper-header-banner {
+  background: #F8FAFC;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.upcoming-countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #15803D;
+}
+
+.upcoming-topics-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.upcoming-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #0F172A;
+  color: #FFFFFF;
+  border: 1px solid #334155;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.upcoming-hints-highlight-box {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upcoming-hints-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #B45309;
+}
+
+.upcoming-hints-text {
+  font-size: 12.5px;
+  color: #78350F;
+  line-height: 1.45;
+}
+
+/* ── Live Paper Session Status Boxes ── */
+.phase-status-banner-box {
+  padding: 14px 16px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.phase-status-banner-box.submitted {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+.phase-status-banner-box.pkg-opening {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+}
+.phase-status-banner-box.writing {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+.phase-status-banner-box.time-up {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+.phase-status-banner-box.waiting {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+.phase-status-banner-box.ended {
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+}

@@ -187,16 +187,69 @@ export class DbService {
     ];
   }
 
-  // ── 2. Paper Sessions (Online Exam Hall) ──────────────────────────────────
-  async getPaperSessions() {
+  matchesYear(paperYear, targetYear) {
+    if (!targetYear || targetYear === 'All' || targetYear === 'All Batches') return true;
+    const cleanTarget = targetYear.replace(/\s+/g, '').toUpperCase();
+    const cleanPaper = (paperYear || '').replace(/\s+/g, '').toUpperCase();
+    if (cleanPaper === cleanTarget || cleanPaper === 'ALLBATCHES' || cleanPaper === 'ALL') return true;
+    const yearMatch = targetYear.match(/\b(20\d\d)\b/);
+    if (yearMatch && cleanPaper.includes(yearMatch[1])) return true;
+    if (cleanTarget.includes(cleanPaper)) return true;
+    return false;
+  }
+
+  // ── 2. Paper Sessions (Online Exam Hall - 1:1 Mobile Parity) ───────────────
+  async getPaperSessions(examYear) {
     try {
       const ref = collection(db, 'paper_sessions');
       const snap = await getDocs(ref);
       if (!snap.empty) {
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return list.filter(p => this.matchesYear(p.examYear, examYear));
       }
     } catch (_) {}
-    return this.getMockPaperSessions();
+    return this.getMockPaperSessions(examYear);
+  }
+
+  async getUpcomingPapers(examYear) {
+    try {
+      const ref = collection(db, 'upcoming_papers');
+      const snap = await getDocs(ref);
+      if (!snap.empty) {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return list.filter(p => this.matchesYear(p.examYear, examYear));
+      }
+    } catch (_) {}
+    return this.getMockUpcomingPapers(examYear);
+  }
+
+  async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
+    const regKey = `edupeak_reg_${paperId}_${studentId}`;
+    const regData = {
+      paperId,
+      studentId,
+      studentName,
+      studentPhone,
+      selectedSlot: slotId,
+      status: 'registered',
+      isCameraActive: false,
+      registeredAt: new Date().toISOString()
+    };
+    try {
+      localStorage.setItem(regKey, JSON.stringify(regData));
+      const ref = doc(db, 'paper_registrations', `${paperId}_${studentId}`);
+      await setDoc(ref, regData, { merge: true });
+    } catch (_) {}
+    return regData;
+  }
+
+  getStudentRegistration(paperId, studentId) {
+    try {
+      const regKey = `edupeak_reg_${paperId}_${studentId}`;
+      const saved = localStorage.getItem(regKey);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return null;
   }
 
   // ── 3. Daily MCQ Sprint ──────────────────────────────────────────────────
@@ -348,36 +401,137 @@ export class DbService {
     ];
   }
 
-  getMockPaperSessions() {
-    return [
+  getMockPaperSessions(examYear) {
+    const now = Date.now();
+    const list = [
       {
         id: 'paper_001',
-        title: '2026 A/L Island-Wide Physics Model Paper 04',
-        subject: 'Full Syllabus (Mechanics, Waves, Electricity, Modern Physics)',
-        examDate: new Date(Date.now() + 86400000 * 2).toISOString(),
-        durationMinutes: 120,
-        totalMarks: 100,
-        isLive: true,
-        proctoringRequired: true,
-        slots: [
-          { id: 'slot_1', name: 'Morning Session (08:30 AM - 10:30 AM)', seatsLeft: 42 },
-          { id: 'slot_2', name: 'Evening Session (04:00 PM - 06:00 PM)', seatsLeft: 78 }
-        ]
+        title: '2027 A/L Speed Paper 01 (Physics)',
+        subject: 'Physics',
+        examYear: '2027 A/L',
+        date: new Date().toISOString(),
+        durationMinutes: 150,
+        status: 'active',
+        currentPhase: 'package_opening', // 10-Minute Package Opening Phase
+        packageOpeningStartedAt: new Date(now - 3.5 * 60 * 1000).toISOString(), // ~6.5 mins left
+        writingStartedAt: null,
+        slot1: {
+          id: 'slot1',
+          name: 'Slot 1 (Morning)',
+          startTime: new Date(now - 3.5 * 60 * 1000).toISOString(),
+          endTime: new Date(now + 150 * 60 * 1000).toISOString(),
+          registeredCount: 42,
+          maxCapacity: 100
+        },
+        slot2: {
+          id: 'slot2',
+          name: 'Slot 2 (Evening)',
+          startTime: new Date(now + 8 * 3600 * 1000).toISOString(),
+          endTime: new Date(now + 10.5 * 3600 * 1000).toISOString(),
+          registeredCount: 18,
+          maxCapacity: 100
+        }
       },
       {
         id: 'paper_002',
-        title: 'Speed Sprint Paper: Mechanics & Oscillations',
-        subject: 'Unit 01 & Unit 02 Rapid Timed Drill',
-        examDate: new Date(Date.now() + 86400000 * 6).toISOString(),
-        durationMinutes: 60,
-        totalMarks: 50,
-        isLive: false,
-        proctoringRequired: true,
-        slots: [
-          { id: 'slot_sprint', name: 'Standard Slot (07:00 PM - 08:00 PM)', seatsLeft: 120 }
-        ]
+        title: '2027 A/L Unit 01 Mechanics Speed Paper',
+        subject: 'Physics',
+        examYear: '2027 A/L',
+        date: new Date(now + 86400000 * 3).toISOString(),
+        durationMinutes: 120,
+        status: 'upcoming',
+        currentPhase: 'waiting', // Waiting Room Phase
+        packageOpeningStartedAt: null,
+        writingStartedAt: null,
+        slot1: {
+          id: 'slot1',
+          name: 'Slot 1 (Morning)',
+          startTime: new Date(now + 86400000 * 3 + 8 * 3600 * 1000).toISOString(),
+          endTime: new Date(now + 86400000 * 3 + 10 * 3600 * 1000).toISOString(),
+          registeredCount: 85,
+          maxCapacity: 150
+        },
+        slot2: {
+          id: 'slot2',
+          name: 'Slot 2 (Evening)',
+          startTime: new Date(now + 86400000 * 3 + 16 * 3600 * 1000).toISOString(),
+          endTime: new Date(now + 86400000 * 3 + 18 * 3600 * 1000).toISOString(),
+          registeredCount: 30,
+          maxCapacity: 150
+        }
+      },
+      {
+        id: 'paper_003',
+        title: '2026 A/L Island-Wide Comprehensive Paper 04',
+        subject: 'Physics',
+        examYear: '2026 A/L',
+        date: new Date(now - 86400000 * 2).toISOString(),
+        durationMinutes: 180,
+        status: 'ended',
+        currentPhase: 'ended',
+        packageOpeningStartedAt: null,
+        writingStartedAt: null,
+        slot1: {
+          id: 'slot1',
+          name: 'Slot 1 (Morning)',
+          startTime: new Date(now - 86400000 * 2).toISOString(),
+          endTime: new Date(now - 86400000 * 2 + 180 * 60000).toISOString(),
+          registeredCount: 140,
+          maxCapacity: 150
+        },
+        slot2: null
       }
     ];
+
+    return list.filter(p => this.matchesYear(p.examYear, examYear));
+  }
+
+  getMockUpcomingPapers(examYear) {
+    const now = Date.now();
+    const list = [
+      {
+        id: 'upcoming_001',
+        title: '2027 A/L Final Preparation Paper 02',
+        subject: 'Physics',
+        examYear: '2027 A/L',
+        scheduledDate: new Date(now + 86400000 * 3.5).toISOString(),
+        durationMinutes: 180,
+        paperStructure: 'Section A (MCQ 50) + Section B (Structured Essay 4)',
+        syllabusTopics: [
+          'Units & Dimensions',
+          'Kinematics & Vector Resolution',
+          "Newton's Laws & Friction Losses",
+          'Work, Energy & Power Theorem',
+          'Circular & Gravitational Motion',
+          'Rotational Dynamics'
+        ],
+        hints: '💡 Special Focus: Vector resolution on tilted inclined planes and friction boundary conditions (f_s <= μ_s * R). In Section B, ensure free-body diagrams clearly mark normal reactions at contact points. Calculation speed is tested heavily in the first 10 MCQ problems.',
+        instructions: 'Students must join with camera positioned at 45 degrees showing both writing table and hands. Package opening will be initiated exactly 10 minutes prior to writing commencement.',
+        status: 'upcoming'
+      },
+      {
+        id: 'upcoming_002',
+        title: '2026 A/L Island-Wide Comprehensive Paper 05',
+        subject: 'Physics',
+        examYear: '2026 A/L',
+        scheduledDate: new Date(now + 86400000 * 6.5).toISOString(),
+        durationMinutes: 180,
+        paperStructure: 'Full Examination Syllabus Blueprint',
+        syllabusTopics: [
+          'Waves & Sound Oscillations',
+          'Physical Optics & Interference',
+          'Current Electricity & Kirchhoff Laws',
+          'Magnetic Fields & Biot-Savart Law',
+          'Thermal Physics & Heat Capacities',
+          'Photoelectric Effect & Quantum Physics'
+        ],
+        hints: '💡 Special Focus: Wave interference fringe shifts when inserting thin glass plates into Young slit apparatus. Be ready for non-linear temperature coefficient problems in platinum resistance thermometers.',
+        instructions: 'Official 100-page examination booklet strictly required. Digital smart watches and secondary communication devices are strictly prohibited in the exam chamber.',
+        status: 'upcoming'
+      }
+    ];
+
+    return list.filter(p => this.matchesYear(p.examYear, examYear));
   }
 
   getMockLeaderboard() {

@@ -9,16 +9,13 @@ import { PwaGatekeeper } from './pwa-gatekeeper.js';
 class AppController {
   constructor() {
     this.currentTab = 'home';
-    this.currentUser = authService.currentUser || {
-      name: 'ThiZaru',
-      phone: '0770557769',
-      examYear: '2027 A/L Candidate',
-      credits: 155,
-      studentId: 'EP-2027'
-    };
+    this.currentUser = authService.currentUser || null;
     this.countdownTimer = null;
+    this.papersInterval = null;
     this.isInsideLiveExam = false;
     this.antiCheatViolations = 0;
+    this.papersTab = 0; // 0: Live Sessions, 1: Upcoming Papers & Hints
+    this.showAllBatches = false;
   }
 
   init() {
@@ -35,7 +32,9 @@ class AppController {
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: () => {
         console.log('[App] PWA Standalone Mode active.');
-        if (this.currentMode === 'admin') {
+        if (!this.currentUser) {
+          this.renderAuthScreen();
+        } else if (this.currentMode === 'admin' || this.currentUser?.role === 'admin') {
           this.renderAdminApp();
         } else {
           this.renderApp();
@@ -50,6 +49,242 @@ class AppController {
       if (document.visibilityState === 'hidden' && this.isInsideLiveExam) {
         this.handleExamTabSwitch();
       }
+    });
+  }
+
+  // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
+  renderAuthScreen(initialTab = 0) {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+
+    this.authTab = initialTab; // 0 = Login, 1 = Register
+
+    root.innerHTML = `
+      <div class="auth-screen-container">
+        <!-- Status Bar -->
+        <div class="ios-status-bar" style="background:transparent; color:#FFFFFF;">
+          <span class="status-time" id="status-clock">8:15</span>
+          <div class="status-icons">
+            <span>●●●</span>
+            <span>📶</span>
+            <span>🔋</span>
+          </div>
+        </div>
+
+        <div class="auth-header">
+          <div class="auth-brand-logo">🍰</div>
+          <div class="auth-title">EduPeak Learning Platform</div>
+          <div class="auth-subtitle">A/L Physics Examination & Proctoring Suite</div>
+        </div>
+
+        <!-- Auth Tabs (Login vs Register) -->
+        <div class="auth-tabs-bar">
+          <button class="auth-tab-btn ${this.authTab === 0 ? 'active' : ''}" id="tab-auth-login">
+            🔑 Login with Password
+          </button>
+          <button class="auth-tab-btn ${this.authTab === 1 ? 'active' : ''}" id="tab-auth-register">
+            📝 Register
+          </button>
+        </div>
+
+        <!-- Form Card -->
+        <div class="auth-form-card" id="auth-form-card">
+          ${this.authTab === 0 ? `
+            <!-- Login Form -->
+            <form id="form-login" style="display:flex; flex-direction:column; gap:14px;">
+              <div class="auth-field-group">
+                <label class="auth-field-label">Phone Number (දුරකථන අංකය)</label>
+                <div class="auth-input-wrapper">
+                  <span class="auth-phone-prefix">+94</span>
+                  <input type="tel" class="auth-input has-prefix" id="input-login-phone" placeholder="77 055 7769" value="0770557769" required />
+                </div>
+              </div>
+
+              <div class="auth-field-group">
+                <label class="auth-field-label">Password (මුරපදය)</label>
+                <div class="auth-input-wrapper">
+                  <input type="password" class="auth-input" id="input-login-password" placeholder="••••••••" value="demo1234" required />
+                  <button type="button" class="auth-pw-toggle" id="btn-toggle-login-pw">👁️</button>
+                </div>
+              </div>
+
+              <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
+
+              <button type="submit" class="auth-btn-submit" id="btn-submit-login">
+                Sign In (ඇතුල් වන්න) ➔
+              </button>
+            </form>
+          ` : `
+            <!-- Register Form -->
+            <form id="form-register" style="display:flex; flex-direction:column; gap:14px;">
+              <div class="auth-field-group">
+                <label class="auth-field-label">Full Name (සම්පූර්ණ නම)</label>
+                <input type="text" class="auth-input" id="input-reg-name" placeholder="Ex: ThiZaru Perera" required />
+              </div>
+
+              <div class="auth-field-group">
+                <label class="auth-field-label">Phone Number (දුරකථන අංකය)</label>
+                <div class="auth-input-wrapper">
+                  <span class="auth-phone-prefix">+94</span>
+                  <input type="tel" class="auth-input has-prefix" id="input-reg-phone" placeholder="77 123 4567" required />
+                </div>
+              </div>
+
+              <div class="auth-field-group">
+                <label class="auth-field-label">Target A/L Examination Batch</label>
+                <select class="auth-input" id="input-reg-batch" style="background:#0F172A; color:#FFFFFF;">
+                  <option value="2027 A/L" selected>2027 A/L</option>
+                  <option value="2028 A/L">2028 A/L</option>
+                  <option value="2029 A/L">2029 A/L</option>
+                  <option value="2026 A/L">2026 A/L</option>
+                </select>
+              </div>
+
+              <div class="auth-field-group">
+                <label class="auth-field-label">Password (මුරපදය)</label>
+                <div class="auth-input-wrapper">
+                  <input type="password" class="auth-input" id="input-reg-password" placeholder="Create password" required />
+                  <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-pw">👁️</button>
+                </div>
+              </div>
+
+              <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
+
+              <button type="submit" class="auth-btn-submit" id="btn-submit-reg">
+                Create Account & Claim +50 Bonus XP ➔
+              </button>
+            </form>
+          `}
+        </div>
+
+        <!-- Quick 1-Tap Demo Switcher -->
+        <div class="auth-quick-demo-section">
+          <div style="font-size:11.5px; font-weight:700; color:#64748B; text-align:center;">
+            ⚡ Quick 1-Tap Login for Testing & Evaluation:
+          </div>
+          <button class="auth-quick-btn" id="btn-quick-student">
+            <span>👨‍🎓 Student Demo (ThiZaru • 2027 A/L)</span>
+            <span style="color:#818CF8; font-weight:800;">Log In ➔</span>
+          </button>
+          <button class="auth-quick-btn" id="btn-quick-admin">
+            <span>👑 Teacher / Admin Demo (Prof. Senanayake)</span>
+            <span style="color:#F59E0B; font-weight:800;">Log In ➔</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    this.updateClock();
+
+    // Tab Listeners
+    document.getElementById('tab-auth-login')?.addEventListener('click', () => this.renderAuthScreen(0));
+    document.getElementById('tab-auth-register')?.addEventListener('click', () => this.renderAuthScreen(1));
+
+    // Show/Hide Password toggles
+    document.getElementById('btn-toggle-login-pw')?.addEventListener('click', () => {
+      const inp = document.getElementById('input-login-password');
+      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+    document.getElementById('btn-toggle-reg-pw')?.addEventListener('click', () => {
+      const inp = document.getElementById('input-reg-password');
+      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+
+    // Form Submissions
+    document.getElementById('form-login')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = document.getElementById('input-login-phone')?.value || '';
+      const password = document.getElementById('input-login-password')?.value || '';
+      const errEl = document.getElementById('auth-error-msg');
+      try {
+        const user = await authService.login({ phone, password });
+        this.currentUser = user;
+        if (user.role === 'admin' || authService.isPhoneAdmin(user.phone)) {
+          this.renderAdminApp();
+        } else {
+          this.renderApp();
+        }
+      } catch (err) {
+        if (errEl) {
+          errEl.style.display = 'block';
+          errEl.textContent = err.message || 'Invalid login credentials.';
+        }
+      }
+    });
+
+    document.getElementById('form-register')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('input-reg-name')?.value || '';
+      const phone = document.getElementById('input-reg-phone')?.value || '';
+      const examYear = document.getElementById('input-reg-batch')?.value || '2027 A/L';
+      const password = document.getElementById('input-reg-password')?.value || '';
+      const errEl = document.getElementById('auth-error-msg');
+      try {
+        const user = await authService.register({ name, phone, password, examYear });
+        this.currentUser = user;
+        this.renderApp();
+      } catch (err) {
+        if (errEl) {
+          errEl.style.display = 'block';
+          errEl.textContent = err.message || 'Registration failed.';
+        }
+      }
+    });
+
+    // Quick Demo Logins
+    document.getElementById('btn-quick-student')?.addEventListener('click', () => {
+      const user = authService.loginDemo('student');
+      user.name = 'ThiZaru';
+      user.examYear = '2027 A/L Candidate';
+      user.phone = '0770557769';
+      user.credits = 155;
+      authService.saveSession(user);
+      this.currentUser = user;
+      this.renderApp();
+    });
+
+    document.getElementById('btn-quick-admin')?.addEventListener('click', () => {
+      const user = authService.loginDemo('admin');
+      authService.saveSession(user);
+      this.currentUser = user;
+      this.renderAdminApp();
+    });
+  }
+
+  // ── Logout In-App Confirmation Dialog (1:1 student_profile_screen.dart replica) ─
+  confirmLogout() {
+    const existing = document.getElementById('app-logout-dialog');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'app-dialog-overlay';
+    overlay.id = 'app-logout-dialog';
+    overlay.innerHTML = `
+      <div class="app-dialog-box">
+        <div class="app-dialog-title">Log Out</div>
+        <div class="app-dialog-content">
+          Are you sure you want to log out of your account?
+        </div>
+        <div class="app-dialog-actions">
+          <button class="app-dialog-btn-cancel" id="btn-cancel-logout">Cancel</button>
+          <button class="app-dialog-btn-danger" id="btn-confirm-logout">Log Out</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btn-cancel-logout')?.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    overlay.querySelector('#btn-confirm-logout')?.addEventListener('click', () => {
+      overlay.remove();
+      authService.logout();
+      this.currentUser = null;
+      if (this.countdownTimer) clearInterval(this.countdownTimer);
+      if (this.papersInterval) clearInterval(this.papersInterval);
+      this.renderAuthScreen(0);
     });
   }
 
@@ -462,143 +697,365 @@ class AppController {
 
   // ── 2. Papers Tab (Exam Sessions & Upcoming Hints - 1:1 Android Parity) ──
   async renderPapersScreen(container) {
-    this.papersTab = this.papersTab ?? 0;
-    this.papersBatch = this.papersBatch ?? '2027 A/L';
-    this.selectedSlots = this.selectedSlots ?? { 'paper_001': 'slot_1', 'paper_002': 'slot_sprint' };
+    if (this.papersInterval) {
+      clearInterval(this.papersInterval);
+      this.papersInterval = null;
+    }
 
-    const papers = await dbService.getPaperSessions();
-    const isAll = this.papersBatch === 'All Batches';
+    const user = this.currentUser || { name: 'Scholar', phone: '', examYear: '2027 A/L' };
+    const currentYear = user.examYear || '2027 A/L';
+    const activeTargetYear = this.showAllBatches ? null : currentYear;
+
+    const [sessions, upcomingList] = await Promise.all([
+      dbService.getPaperSessions(activeTargetYear),
+      dbService.getUpcomingPapers(activeTargetYear)
+    ]);
+
+    const formatHeaderSubtitle = () => {
+      if (this.showAllBatches) {
+        return 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි';
+      }
+      return `${currentYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි`;
+    };
 
     container.innerHTML = `
-      <!-- Screen Top Bar with Batch Filter and Refresh -->
+      <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
       <div class="screen-appbar">
         <div class="appbar-left">
-          <div class="appbar-icon-box">📋</div>
+          <div class="appbar-icon-box" style="background:rgba(99,102,241,0.1); color:#6366F1;">
+            📋
+          </div>
           <div>
             <div class="appbar-title">Paper Writing Sessions</div>
-            <div class="appbar-subtitle">${isAll ? 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි' : this.papersBatch + ' • සජීවී විභාග සහ අධීක්ෂණ සැසි'}</div>
+            <div class="appbar-subtitle" id="papers-batch-subtitle">${formatHeaderSubtitle()}</div>
           </div>
         </div>
-        <button class="appbar-badge-toggle" id="btn-toggle-papers-batch">
-          <span>🔄</span>
-          <span>${this.papersBatch}</span>
-        </button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="appbar-badge-toggle" id="btn-toggle-papers-batch" title="Toggle Batch Filter">
+            <span>${this.showAllBatches ? '🌐 All' : '🎓 Batch'}</span>
+          </button>
+          <button class="btn-vault-refresh" id="btn-refresh-papers" title="Refresh Sessions">
+            🔄
+          </button>
+        </div>
       </div>
 
-      <!-- Dual Sub-Tabs (Live Sessions vs Upcoming Papers & Hints) -->
-      <div class="sub-tabs-container">
+      <!-- View Switcher Tabs (1:1 with lines 156-185 of paper_sessions_screen.dart) -->
+      <div class="sub-tabs-container" style="margin: 6px 16px 14px;">
         <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live">
-          <span>🔴 Live Sessions</span>
-          <span class="tab-sub">සජීවී විභාග සැසි</span>
+          <span>📝 Live Exam Sessions</span>
+          <span class="tab-sub">Active & Scheduled</span>
         </button>
         <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
-          <span>📚 Upcoming & Hints</span>
-          <span class="tab-sub">ඉදිරි විභාග සහ මාර්ගෝපදේශ</span>
+          <span>🔮 Upcoming Papers & Hints</span>
+          <span class="tab-sub">Scope, Tips & Hints</span>
         </button>
       </div>
 
-      <!-- Tab 0: Live Sessions -->
-      <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:14px;' : 'display:none;'}">
-        ${papers.map(p => {
-          const isLive = p.isLive;
-          const selectedSlot = this.selectedSlots[p.id] || (p.slots && p.slots[0]?.id) || 'slot_1';
+      <!-- Tab 0: Live Exam Sessions View -->
+      <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
+        ${sessions.length === 0 ? `
+          <div style="padding:40px 24px; text-align:center; color:#64748B;">
+            <div style="font-size:44px; margin-bottom:12px;">📖</div>
+            <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">නව Paper Sessions සූදානම් වෙමින් පවතී</div>
+            <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.' : `ඔබගේ කණ්ඩායම (${currentYear}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.`}</div>
+            <button class="btn-primary" id="btn-empty-toggle-batch" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
+              ${this.showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න'}
+            </button>
+          </div>
+        ` : sessions.map(session => {
+          const reg = dbService.getStudentRegistration(session.id, user.phone || 'demo_user');
+          const isSubmitted = reg?.status === 'submitted' || reg?.isSubmitted === true;
+          const selectedSlotId = reg?.selectedSlot || 'slot1';
+          const targetSlot = (selectedSlotId === 'slot2' && session.slot2) ? session.slot2 : session.slot1;
+
+          const isEnded = session.status === 'ended' || session.currentPhase === 'ended';
+          const isWaiting = session.currentPhase === 'waiting' && !isEnded;
+          const isPackageOpening = session.currentPhase === 'package_opening' && !isEnded;
+          const isWriting = session.currentPhase === 'writing' && !isEnded;
+          const isTimeUp = session.currentPhase === 'time_up' && !isEnded;
+          const isLive = !isEnded && !isWaiting && (session.status === 'active' || isPackageOpening || isWriting || isTimeUp);
+
+          // Calculate initial Package Opening Remaining Seconds
+          let packageRemainingSecs = 600;
+          if (session.packageOpeningStartedAt) {
+            const elapsed = Math.floor((Date.now() - new Date(session.packageOpeningStartedAt).getTime()) / 1000);
+            if (elapsed >= 0 && elapsed <= 600) {
+              packageRemainingSecs = 600 - elapsed;
+            }
+          }
+
+          const pkgMin = Math.floor(packageRemainingSecs / 60).toString().padStart(2, '0');
+          const pkgSec = (packageRemainingSecs % 60).toString().padStart(2, '0');
 
           return `
-            <div class="paper-session-card">
+            <div class="paper-session-card" id="paper-card-${session.id}" style="${isSubmitted ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.15);' : (isLive ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.12);' : '')}">
+              <!-- Header Row -->
               <div class="paper-card-header">
-                <span class="phase-pill ${isLive ? 'phase-live' : 'phase-upcoming'}">
-                  ${isLive ? '🔴 සක්‍රීයයි (Writing in Progress)' : '⏰ ආරම්භ වීමට නියමිතයි (Upcoming)'}
-                </span>
-                <span style="font-size:12px; font-weight:700; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">
+                    ${session.subject}
+                  </span>
+                  <span style="background:#FFFFFF; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;">
+                    ${session.examYear}
+                  </span>
+                </div>
+                ${isSubmitted ? `
+                  <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                    <span>✓</span> <span>SUBMITTED</span>
+                  </span>
+                ` : isLive ? `
+                  <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
+                    <span>LIVE NOW</span>
+                  </span>
+                ` : ''}
               </div>
 
-              <div class="paper-title">${p.title}</div>
-
+              <!-- Title & Meta -->
+              <div class="paper-title" style="margin-top:2px;">${session.title}</div>
               <div class="paper-meta-row">
-                <div class="meta-chip">📚 ${p.subject}</div>
-                <div class="meta-chip">📝 100 Marks</div>
-                <div class="meta-chip">🎥 Live Proctoring</div>
+                <div class="meta-chip">📅 ${new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</div>
+                <div class="meta-chip">⏱️ ${session.durationMinutes} Minutes</div>
+                <div class="meta-chip">🎥 Camera Monitored</div>
               </div>
 
-              <!-- Slot Selection Cards -->
-              <div style="font-size:11.5px; font-weight:800; color:#475569; margin-top:2px;">
-                තෝරාගත් විභාග කාල සැසිය (Selected Exam Slot):
+              <!-- Slot Selector (1:1 with _buildSlotCard) -->
+              <div style="font-size:11.5px; font-weight:700; color:#475569; margin-top:4px;">
+                ${session.slot2 ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:' : 'විභාග සැසිය (Exam Session):'}
               </div>
               <div class="slots-container">
-                ${(p.slots || [
-                  { id: 'slot_1', name: 'Morning (08:30 AM)', seatsLeft: 42 },
-                  { id: 'slot_2', name: 'Evening (04:00 PM)', seatsLeft: 78 }
-                ]).map(slot => `
-                  <div class="slot-selection-box ${selectedSlot === slot.id ? 'selected' : ''}" data-paper-id="${p.id}" data-slot-id="${slot.id}">
-                    <div class="slot-name">
-                      <span>${slot.name}</span>
-                      <span>${selectedSlot === slot.id ? '✓' : '○'}</span>
-                    </div>
-                    <div class="slot-seats">🪑 ${slot.seatsLeft || 50} Seats Remaining</div>
+                <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1">
+                  <div class="slot-name">
+                    <span>☀️ Slot 1 (Morning)</span>
+                    <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot1' ? '✓' : '○'}</span>
                   </div>
-                `).join('')}
+                  <div style="font-size:11px; color:#475569; font-weight:600;">
+                    ${new Date(session.slot1.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(session.slot1.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  <div class="slot-seats">🪑 ${session.slot1.registeredCount} / ${session.slot1.maxCapacity} Seats</div>
+                </div>
+
+                ${session.slot2 ? `
+                  <div class="slot-selection-box ${selectedSlotId === 'slot2' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot2">
+                    <div class="slot-name">
+                      <span>🌙 Slot 2 (Evening)</span>
+                      <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot2' ? '✓' : '○'}</span>
+                    </div>
+                    <div style="font-size:11px; color:#475569; font-weight:600;">
+                      ${new Date(session.slot2.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(session.slot2.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div class="slot-seats">🪑 ${session.slot2.registeredCount} / ${session.slot2.maxCapacity} Seats</div>
+                  </div>
+                ` : ''}
               </div>
 
-              <!-- Action Buttons -->
-              <div class="paper-actions-row">
-                <button class="btn-exam-hall" data-paper-join="${p.id}">
-                  <span>🎥</span>
-                  <span>Enter Exam Hall (විභාග ශාලාවට)</span>
+              <!-- Real-Time Phase Status Banner Box -->
+              ${isSubmitted ? `
+                <div class="phase-status-banner-box submitted">
+                  <span style="font-size:24px;">🎉</span>
+                  <div>
+                    <div style="font-size:12px; font-weight:800; color:#15803D;">පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)</div>
+                    <div style="font-size:11px; color:#475569; margin-top:2px;">
+                      ඔබ විසින් පිටු ${reg?.submissionPhotos?.length || 4} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදෙන ලදී.
+                    </div>
+                  </div>
+                </div>
+              ` : isPackageOpening ? `
+                <div class="phase-status-banner-box pkg-opening">
+                  <span style="font-size:24px;">📦</span>
+                  <div>
+                    <div style="font-size:11.5px; font-weight:800; color:#B45309;">පැකේජය විවෘත කිරීමේ කාලය (Package Opening)</div>
+                    <div style="font-size:12px; font-weight:800; color:#D97706; margin-top:2px;">
+                      කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (<span class="timer-pkg-span" data-start="${session.packageOpeningStartedAt}">${pkgMin}:${pkgSec}</span>)
+                    </div>
+                  </div>
+                </div>
+              ` : isWriting ? `
+                <div class="phase-status-banner-box writing">
+                  <span style="font-size:24px;">✍️</span>
+                  <div>
+                    <div style="font-size:11.5px; font-weight:800; color:#15803D;">විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)</div>
+                    <div style="font-size:12px; font-weight:800; color:#059669; margin-top:2px;">දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)</div>
+                  </div>
+                </div>
+              ` : isTimeUp ? `
+                <div class="phase-status-banner-box time-up">
+                  <span style="font-size:24px;">⏰</span>
+                  <div>
+                    <div style="font-size:11.5px; font-weight:800; color:#DC2626;">වේලාව අවසන් (Time Up - Scan Answers)</div>
+                    <div style="font-size:12px; font-weight:800; color:#B91C1C; margin-top:2px;">පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න</div>
+                  </div>
+                </div>
+              ` : isWaiting ? `
+                <div class="phase-status-banner-box waiting">
+                  <span style="font-size:24px;">⏳</span>
+                  <div>
+                    <div style="font-size:11.5px; font-weight:800; color:#4338CA;">විභාග පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)</div>
+                    <div style="font-size:12px; font-weight:800; color:#6366F1; margin-top:2px;">පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)</div>
+                  </div>
+                </div>
+              ` : isEnded ? `
+                <div class="phase-status-banner-box ended">
+                  <span style="font-size:24px;">🛑</span>
+                  <div>
+                    <div style="font-size:11.5px; font-weight:800; color:#64748B;">සැසිය අවසන් (Session Completed)</div>
+                    <div style="font-size:12px; color:#94A3B8; margin-top:2px;">ස්තුතියි, මෙම විභාග සැසිය අවසන් කර ඇත.</div>
+                  </div>
+                </div>
+              ` : `
+                <div class="phase-status-banner-box waiting">
+                  <span style="font-size:24px;">⏱️</span>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#475569;">${targetSlot.name} ආරම්භ වීමට:</div>
+                    <div style="font-size:15px; font-weight:800; color:#2563EB; letter-spacing:1px; margin-top:2px;" class="timer-upcoming-span" data-target="${targetSlot.startTime}">
+                      01 : 45 : 30
+                    </div>
+                  </div>
+                </div>
+              `}
+
+              <!-- Action Buttons (1:1 with lines 1373-1498) -->
+              ${isSubmitted ? `
+                <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px;" data-view-sub="${session.id}">
+                  ✅ Submitted (${reg?.submissionPhotos?.length || 4} Pages) • විස්තර බලන්න
                 </button>
-                <button class="btn-paper-script" data-paper-scan="${p.id}" title="Scan & Upload Script">
-                  <span>📄</span>
-                  <span>Upload Script</span>
+              ` : isPackageOpening ? `
+                <button class="btn-primary" style="background:#D97706; padding:12px;" data-enter-exam="${session.id}">
+                  📦 Open Package in Camera Room (පාර්සලය විවෘත කරන්න)
+                </button>
+              ` : isWriting ? `
+                <button class="btn-primary" style="background:#16A34A; padding:12px;" data-enter-exam="${session.id}">
+                  🎥 Enter Live Exam Room (කැමරාව ON කරන්න)
+                </button>
+              ` : isTimeUp ? `
+                <button class="btn-primary" style="background:#DC2626; padding:12px;" data-scan-answers="${session.id}">
+                  📄 Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)
+                </button>
+              ` : isWaiting ? `
+                <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
+                  🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
+                </button>
+              ` : isEnded ? `
+                <button class="btn-primary" style="background:#F1F5F9; color:#94A3B8; border:1px solid #CBD5E1; cursor:not-allowed; padding:12px;" onclick="alert('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත (Session Ended).')">
+                  🛑 විභාග සැසිය අවසන් විය (Ended)
+                </button>
+              ` : `
+                <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
+                  🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
+                </button>
+              `}
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Tab 1: Upcoming Papers & Hints View (1:1 with _buildUpcomingPapersView lines 298-665) -->
+      <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
+        ${upcomingList.length === 0 ? `
+          <div style="padding:40px 24px; text-align:center; color:#64748B;">
+            <div style="font-size:44px; margin-bottom:12px;">🔮</div>
+            <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled Yet</div>
+            <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'Check back soon for new exam papers, scopes, and preparation hints.' : `Upcoming papers and hints for ${currentYear} will be announced here.`}</div>
+            <button class="btn-primary" id="btn-empty-toggle-batch-2" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
+              ${this.showAllBatches ? 'Show My Batch Only' : 'Show All Batches'}
+            </button>
+          </div>
+        ` : upcomingList.map(paper => {
+          const schedDate = new Date(paper.scheduledDate);
+          const durationHours = (paper.durationMinutes / 60).toFixed(1);
+          const diffMs = schedDate.getTime() - Date.now();
+          const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+          const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
+          const countdownText = days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
+
+          return `
+            <div class="upcoming-paper-card">
+              <!-- Banner Header -->
+              <div class="upcoming-paper-header-banner">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">
+                    ${paper.subject}
+                  </span>
+                  <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:600;">
+                    ${paper.examYear}
+                  </span>
+                </div>
+                <div class="upcoming-countdown-badge">
+                  <span>⏱️</span>
+                  <span>${diffMs > 0 ? countdownText : 'Paper Active'}</span>
+                </div>
+              </div>
+
+              <!-- Card Body -->
+              <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+                <div class="paper-title" style="font-size:16.5px;">${paper.title}</div>
+
+                <!-- Date & Duration -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
+                    <span>📅</span>
+                    <span>${schedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })} at ${schedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
+                    <span>⏳</span>
+                    <span>${paper.durationMinutes} Minutes (${durationHours} Hours) • ${paper.paperStructure}</span>
+                  </div>
+                </div>
+
+                <!-- Syllabus Topics Chips (1:1 with lines 543-575) -->
+                ${paper.syllabusTopics && paper.syllabusTopics.length > 0 ? `
+                  <div style="margin-top:2px;">
+                    <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Syllabus & Tested Topics:</div>
+                    <div class="upcoming-topics-wrap">
+                      ${paper.syllabusTopics.map(topic => `
+                        <div class="upcoming-topic-chip">
+                          <span style="color:#10B981; font-weight:800;">✓</span>
+                          <span>${topic}</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <!-- EXCLUSIVE HINTS & TIPS (Highlight Box 1:1 with lines 578-617) -->
+                ${paper.hints ? `
+                  <div class="upcoming-hints-highlight-box">
+                    <div class="upcoming-hints-title">
+                      <span style="font-size:16px;">💡</span>
+                      <span>Special Paper Hints & Guidance</span>
+                    </div>
+                    <div class="upcoming-hints-text">
+                      ${paper.hints}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <!-- Instructions -->
+                ${paper.instructions ? `
+                  <div style="display:flex; align-items:flex-start; gap:6px; font-size:11.5px; color:#64748B;">
+                    <span>ℹ️</span>
+                    <span>${paper.instructions}</span>
+                  </div>
+                ` : ''}
+
+                <!-- Action Button -->
+                <button class="btn-primary" style="background:#6366F1; padding:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 14px rgba(99,102,241,0.3);" data-paper-scope="${paper.id}">
+                  <span>👁️</span>
+                  <span>View Full Scope & Hints</span>
                 </button>
               </div>
             </div>
           `;
         }).join('')}
       </div>
-
-      <!-- Tab 1: Upcoming Papers & Hints -->
-      <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:14px;' : 'display:none;'}">
-        <div class="upcoming-hint-card">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="phase-pill phase-upcoming">🎯 Upcoming Term Paper 02</span>
-            <span style="font-size:11px; font-weight:800; color:#2563EB;">2027 A/L Target</span>
-          </div>
-
-          <div class="paper-title">2027 A/L Full Syllabus Consolidation Paper</div>
-          <div style="font-size:12px; color:#64748B;">Scheduled: October 14, 2026 • 08:30 AM</div>
-
-          <div class="syllabus-breakdown">
-            <div style="font-size:11px; font-weight:800; color:#0F172A; margin-bottom:4px;">විභාග විෂය නිර්දේශ ප්‍රතිශත (Syllabus Coverage):</div>
-            <div>
-              <div class="syllabus-row"><span>1. Mechanics & Newton's Laws</span><span>40%</span></div>
-              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:40%;"></div></div>
-            </div>
-            <div>
-              <div class="syllabus-row"><span>2. Waves & Oscillations</span><span>30%</span></div>
-              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:30%; background:#0284C7;"></div></div>
-            </div>
-            <div>
-              <div class="syllabus-row"><span>3. Electricity & Magnetism</span><span>20%</span></div>
-              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:20%; background:#7C3AED;"></div></div>
-            </div>
-            <div>
-              <div class="syllabus-row"><span>4. Thermal Physics</span><span>10%</span></div>
-              <div class="syllabus-bar-bg"><div class="syllabus-bar-fill" style="width:10%; background:#EA580C;"></div></div>
-            </div>
-          </div>
-
-          <div class="teacher-tip-box">
-            <strong>💡 ගුරු උපදෙස (Teacher Hint):</strong><br>
-            "ආනත තලයක චලිතයේදී ඝර්ෂණ බලය සහ ගම්‍යතා සංස්ථිති මූලධර්මය පිළිබඳ විශේෂ අවධානය යොමු කරන්න. රූප සටහන් පැහැදිලිව ඇඳීමෙන් ලකුණු පහසුවෙන් තහවුරු කරගත හැක."
-          </div>
-
-          <button class="btn-primary" style="background:#0F172A; padding:10px; font-size:12px;" onclick="alert('Pre-Exam Revision Guide PDF will download once published.')">
-            📥 Download Revision Hints PDF
-          </button>
-        </div>
-      </div>
     `;
 
-    // Event Listeners
+    // ── Live 1-Second Interval Ticker ──
+    this.startPapersTimer(container, sessions);
+
+    // ── Event Handlers ──
     document.getElementById('tab-papers-live')?.addEventListener('click', () => {
       this.papersTab = 0;
       this.renderPapersScreen(container);
@@ -609,30 +1066,266 @@ class AppController {
       this.renderPapersScreen(container);
     });
 
-    document.getElementById('btn-toggle-papers-batch')?.addEventListener('click', () => {
-      this.papersBatch = this.papersBatch === '2027 A/L' ? 'All Batches' : '2027 A/L';
+    const toggleBatch = () => {
+      this.showAllBatches = !this.showAllBatches;
       this.renderPapersScreen(container);
-    });
+    };
 
-    container.querySelectorAll('.slot-selection-box').forEach(slotEl => {
-      slotEl.addEventListener('click', () => {
-        const pId = slotEl.dataset.paperId;
-        const sId = slotEl.dataset.slotId;
-        this.selectedSlots[pId] = sId;
+    document.getElementById('btn-toggle-papers-batch')?.addEventListener('click', toggleBatch);
+    document.getElementById('btn-refresh-papers')?.addEventListener('click', () => this.renderPapersScreen(container));
+    document.getElementById('btn-empty-toggle-batch')?.addEventListener('click', toggleBatch);
+    document.getElementById('btn-empty-toggle-batch-2')?.addEventListener('click', toggleBatch);
+
+    // Slot Selection
+    container.querySelectorAll('.slot-selection-box').forEach(box => {
+      box.addEventListener('click', async () => {
+        const pId = box.dataset.paperId;
+        const sId = box.dataset.slotId;
+        await dbService.registerStudentSlot({
+          paperId: pId,
+          studentId: user.phone || 'demo_user',
+          studentName: user.name || 'Scholar',
+          studentPhone: user.phone || '0770557769',
+          slotId: sId
+        });
+        notificationService.showLocalToast(`✅ ${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
         this.renderPapersScreen(container);
       });
     });
 
-    container.querySelectorAll('[data-paper-join]').forEach(b => {
-      b.addEventListener('click', () => {
-        this.openLiveExamRoom(b.dataset.paperJoin);
+    // View Submission Details
+    container.querySelectorAll('[data-view-sub]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pId = btn.dataset.viewSub;
+        const sess = sessions.find(s => s.id === pId);
+        const reg = dbService.getStudentRegistration(pId, user.phone || 'demo_user');
+        if (sess) this.showSubmissionDetailsDialog(sess, reg);
       });
     });
 
-    container.querySelectorAll('[data-paper-scan]').forEach(b => {
-      b.addEventListener('click', () => {
+    // Enter Exam / Waiting Room
+    container.querySelectorAll('[data-enter-exam]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openLiveExamRoom(btn.dataset.enterExam);
+      });
+    });
+
+    // Scan Answers
+    container.querySelectorAll('[data-scan-answers]').forEach(btn => {
+      btn.addEventListener('click', () => {
         this.openDocumentScanner();
       });
+    });
+
+    // View Full Scope & Hints Modal
+    container.querySelectorAll('[data-paper-scope]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pId = btn.dataset.paperScope;
+        const paper = upcomingList.find(p => p.id === pId);
+        if (paper) this.showUpcomingPaperDetailsModal(paper);
+      });
+    });
+  }
+
+  // ── Live 1-Second Timer for Papers Screen ──
+  startPapersTimer(container, sessions) {
+    if (this.papersInterval) clearInterval(this.papersInterval);
+    this.papersInterval = setInterval(() => {
+      const now = Date.now();
+
+      // Update package opening countdowns
+      container.querySelectorAll('.timer-pkg-span').forEach(span => {
+        const startIso = span.dataset.start;
+        if (startIso) {
+          const elapsed = Math.floor((now - new Date(startIso).getTime()) / 1000);
+          const remaining = Math.max(0, 600 - elapsed);
+          const m = Math.floor(remaining / 60).toString().padStart(2, '0');
+          const s = (remaining % 60).toString().padStart(2, '0');
+          span.textContent = `${m}:${s}`;
+        }
+      });
+
+      // Update upcoming slot countdowns
+      container.querySelectorAll('.timer-upcoming-span').forEach(span => {
+        const targetIso = span.dataset.target;
+        if (targetIso) {
+          const diff = Math.max(0, new Date(targetIso).getTime() - now);
+          const h = Math.floor(diff / (1000 * 3600)).toString().padStart(2, '0');
+          const m = Math.floor((diff / (1000 * 60)) % 60).toString().padStart(2, '0');
+          const s = Math.floor((diff / 1000) % 60).toString().padStart(2, '0');
+          span.textContent = `${h} : ${m} : ${s}`;
+        }
+      });
+    }, 1000);
+  }
+
+  // ── Show Full Scope & Hints Bottom Sheet (1:1 with _showUpcomingPaperDetailsModal lines 667-848) ──
+  showUpcomingPaperDetailsModal(paper) {
+    const existing = document.getElementById('upcoming-details-modal');
+    if (existing) existing.remove();
+
+    const schedDate = new Date(paper.scheduledDate);
+    const durationHours = (paper.durationMinutes / 60).toFixed(1);
+
+    const sheet = document.createElement('div');
+    sheet.className = 'flutter-sheet-overlay';
+    sheet.id = 'upcoming-details-modal';
+    sheet.innerHTML = `
+      <div class="flutter-sheet-container">
+        <!-- Handle Bar (lines 688-698) -->
+        <div class="flutter-sheet-handle"></div>
+
+        <div class="flutter-sheet-body">
+          <!-- Subject & Year Pills -->
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:rgba(99,102,241,0.2); color:#818CF8; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:800;">
+              ${paper.subject}
+            </span>
+            <span style="background:rgba(255,255,255,0.1); color:#E2E8F0; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:600;">
+              ${paper.examYear}
+            </span>
+          </div>
+
+          <!-- Paper Title -->
+          <div style="font-size:19px; font-weight:800; color:#FFFFFF; line-height:1.35;">
+            ${paper.title}
+          </div>
+
+          <!-- Date & Time Card (lines 739-760) -->
+          <div style="background:#1E293B; border:1px solid #334155; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:20px;">📅</span>
+              <div>
+                <div style="font-size:11px; color:#94A3B8;">Scheduled Date & Time</div>
+                <div style="font-size:13px; font-weight:700; color:#F8FAFC;">
+                  ${schedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+                </div>
+                <div style="font-size:12px; color:#818CF8; font-weight:600;">
+                  Starting at ${schedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+
+            <div style="height:1px; background:#334155;"></div>
+
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:20px;">⏱️</span>
+              <div>
+                <div style="font-size:11px; color:#94A3B8;">Exam Duration & Structure</div>
+                <div style="font-size:13px; font-weight:700; color:#F8FAFC;">
+                  ${paper.durationMinutes} Minutes (${durationHours} Hours)
+                </div>
+                <div style="font-size:12px; color:#CBD5E1;">
+                  ${paper.paperStructure}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Full Syllabus Topics Scope (lines 770-800) -->
+          ${paper.syllabusTopics && paper.syllabusTopics.length > 0 ? `
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#FFFFFF; margin-bottom:8px;">
+                Tested Syllabus Topics (විභාග විෂය පථය):
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                ${paper.syllabusTopics.map((topic, idx) => `
+                  <div style="display:flex; align-items:center; gap:8px; background:#1E293B; padding:9px 12px; border-radius:10px; border:1px solid #334155; font-size:12px; color:#E2E8F0;">
+                    <span style="color:#10B981; font-weight:800;">✓</span>
+                    <span>${topic}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Special Paper Hints & Guidance (lines 801-813) -->
+          ${paper.hints ? `
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#F59E0B; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                <span>💡</span>
+                <span>Exclusive Teacher Guidance & Exam Hints</span>
+              </div>
+              <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4); border-radius:16px; padding:16px; color:#FEF3C7; font-size:12.5px; line-height:1.55;">
+                ${paper.hints}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Instructions & Rules (lines 815-827) -->
+          ${paper.instructions ? `
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#FFFFFF; margin-bottom:6px;">
+                Instructions & Exam Chamber Rules
+              </div>
+              <div style="color:#94A3B8; font-size:12.5px; line-height:1.45;">
+                ${paper.instructions}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Close Button (lines 829-841) -->
+          <button class="btn-primary" style="background:#6366F1; padding:14px; border-radius:14px; font-size:14px; font-weight:700; margin-top:8px;" id="btn-close-paper-scope">
+            Close Scope & Hints (වසන්න)
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(sheet);
+
+    sheet.querySelector('#btn-close-paper-scope')?.addEventListener('click', () => {
+      sheet.remove();
+    });
+
+    sheet.addEventListener('click', (e) => {
+      if (e.target === sheet) sheet.remove();
+    });
+  }
+
+  // ── Show Submission Details Dialog (1:1 with _showSubmissionDetailsDialog lines 1538-1601) ──
+  showSubmissionDetailsDialog(session, reg) {
+    const existing = document.getElementById('submission-details-dialog');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'app-dialog-overlay';
+    overlay.id = 'submission-details-dialog';
+    overlay.innerHTML = `
+      <div class="app-dialog-box" style="max-width:380px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:26px; color:#22C55E;">✅</span>
+          <div class="app-dialog-title" style="font-size:16px;">Submission Confirmed</div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:12.5px; color:#CBD5E1;">
+          <div style="font-size:14px; font-weight:800; color:#A5B4FC;">${session.title}</div>
+          <div>Subject: <strong style="color:#FFFFFF;">${session.subject} (${session.examYear})</strong></div>
+          <div>Submitted Pages: <strong style="color:#4ADE80;">${reg?.submissionPhotos?.length || 4} Pages</strong></div>
+          <div style="font-size:11px; color:#94A3B8;">
+            Time: ${reg?.submittedAt ? new Date(reg.submittedAt).toLocaleString() : 'Today, Live Session Verified'}
+          </div>
+          <div style="background:rgba(30,41,59,0.8); border:1px solid #334155; border-radius:10px; padding:10px; font-size:11px; color:#94A3B8; line-height:1.45; margin-top:4px;">
+            ඔබගේ පිළිතුරු පත්‍ර ගුරුභවතුන් වෙත සුරක්ෂිතව ලැබී ඇති බැවින් නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.
+          </div>
+        </div>
+
+        <div class="app-dialog-actions" style="margin-top:10px;">
+          <button class="btn-primary" style="background:#22C55E; width:100%; padding:10px; border-radius:8px; font-weight:800; font-size:13px;" id="btn-close-sub-dialog">
+            හරි (Done)
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btn-close-sub-dialog')?.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
     });
   }
 
@@ -1297,10 +1990,7 @@ class AppController {
     });
 
     document.getElementById('btn-profile-logout')?.addEventListener('click', () => {
-      if (confirm('Are you sure you want to log out of your student account?')) {
-        authService.logout();
-        location.reload();
-      }
+      this.confirmLogout();
     });
   }
 
@@ -2066,10 +2756,15 @@ class AppController {
               <span style="font-size:10.5px; opacity:0.8; color:#CBD5E1;">A/L Lead Proctor</span>
             </div>
           </div>
-          <button class="btn-switch-to-student" id="btn-global-exit-admin">
-            <span>🎓</span>
-            <span>Student App</span>
-          </button>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn-switch-to-student" id="btn-global-exit-admin">
+              <span>🎓</span>
+              <span>Student App</span>
+            </button>
+            <button class="btn-switch-to-student" style="background:#EF4444; border-color:#DC2626;" id="btn-admin-logout" title="Sign Out">
+              <span>🚪</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2106,6 +2801,10 @@ class AppController {
     document.getElementById('btn-global-exit-admin')?.addEventListener('click', () => {
       this.currentMode = 'student';
       this.renderApp();
+    });
+
+    document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
+      this.confirmLogout();
     });
 
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(btn => {
