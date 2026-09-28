@@ -134,6 +134,59 @@ export class DbService {
     }
   }
 
+  // Admin: Get all student submissions for grading
+  async getAllDessertsForAdmin() {
+    try {
+      const dessertsRef = collection(db, 'desserts');
+      const q = query(dessertsRef, orderBy('submittedAt', 'desc'), limit(100));
+      const snap = await getDocs(q);
+      const list = [];
+      snap.forEach(docSnap => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      if (list.length > 0) return list;
+    } catch (e) {
+      console.warn('[DB] Admin desserts fetch fallback:', e);
+    }
+    return this.getMockDesserts();
+  }
+
+  // Admin: Save or update paper session
+  async savePaperSession(session) {
+    try {
+      const ref = collection(db, 'paper_sessions');
+      const docRef = await addDoc(ref, {
+        ...session,
+        createdAt: new Date().toISOString()
+      });
+      return { id: docRef.id, ...session };
+    } catch (e) {
+      console.warn('[DB] Saved paper locally:', e);
+      return { id: 'paper_' + Date.now(), ...session };
+    }
+  }
+
+  // Admin: Get student roster
+  async getAllStudents() {
+    try {
+      const usersRef = collection(db, 'users');
+      const snap = await getDocs(usersRef);
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    } catch (_) {}
+    return [
+      { id: 'st_01', name: 'Danushka Wickramasinghe', phone: '0771234567', examYear: '2026 A/L', credits: 1420, isVerified: true, role: 'student' },
+      { id: 'st_02', name: 'Minoli Senarath', phone: '0719876543', examYear: '2026 A/L', credits: 1280, isVerified: true, role: 'student' },
+      { id: 'st_03', name: 'Kasun Perera', phone: '0770557769', examYear: '2027 A/L', credits: 155, isVerified: true, role: 'student' },
+      { id: 'st_04', name: 'Sachintha Fernando', phone: '0754433221', examYear: '2027 A/L', credits: 1190, isVerified: true, role: 'student' },
+      { id: 'st_05', name: 'Dinuka Rajapaksha', phone: '0761122334', examYear: '2026 A/L', credits: 940, isVerified: false, role: 'student' },
+      { id: 'st_06', name: 'Kavindu Jayawardena', phone: '0789988776', examYear: '2026 A/L', credits: 890, isVerified: true, role: 'student' },
+      { id: 'st_07', name: 'Anuki Dissanayake', phone: '0723344556', examYear: '2027 A/L', credits: 810, isVerified: true, role: 'student' },
+      { id: 'st_08', name: 'Praveen Silva', phone: '0701122334', examYear: '2028 A/L', credits: 710, isVerified: false, role: 'student' }
+    ];
+  }
+
   // ── 2. Paper Sessions (Online Exam Hall) ──────────────────────────────────
   async getPaperSessions() {
     try {

@@ -26,11 +26,20 @@ class AppController {
     const savedTheme = localStorage.getItem('edupeak_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
 
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('admin') === 'true') {
+      this.currentMode = 'admin';
+    }
+
     // 1. Initialize PWA Gatekeeper for iOS Add to Home Screen enforcement
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: () => {
         console.log('[App] PWA Standalone Mode active.');
-        this.renderApp();
+        if (this.currentMode === 'admin') {
+          this.renderAdminApp();
+        } else {
+          this.renderApp();
+        }
       }
     });
 
@@ -1283,8 +1292,8 @@ class AppController {
     });
 
     document.getElementById('btn-profile-admin')?.addEventListener('click', () => {
-      alert('Teacher / Admin Dashboard: Accessing paper administration & student grading portal.');
-      this.openAdminReviewModal();
+      this.currentMode = 'admin';
+      this.renderAdminApp();
     });
 
     document.getElementById('btn-profile-logout')?.addEventListener('click', () => {
@@ -2023,6 +2032,767 @@ class AppController {
         el.style.transform = 'translateY(0)';
       }, 350);
     }, 5000);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // ── ADMIN CONSOLE (1:1 FIDELITY WITH admin_shell.dart & FLUTTER ADMIN) ──
+  // ═════════════════════════════════════════════════════════════════════════
+
+  renderAdminApp() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+
+    this.currentMode = 'admin';
+    this.adminTab = this.adminTab || 'dashboard';
+
+    root.innerHTML = `
+      <!-- iOS Status Bar -->
+      <div class="ios-status-bar">
+        <span class="status-time" id="status-clock">8:15</span>
+        <div class="status-icons">
+          <span>●●●</span>
+          <span>📶</span>
+          <span>🔋</span>
+        </div>
+      </div>
+
+      <!-- Sticky Executive Header across all Admin Screens -->
+      <div style="padding: 44px 14px 6px; background: #0F172A; flex-shrink: 0; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
+        <div class="admin-executive-header" style="margin-bottom:0; padding:10px 12px; border-radius:14px; background:transparent; box-shadow:none;">
+          <div>
+            <div style="font-size:14.5px; font-weight:900; letter-spacing:-0.02em; color:#FFFFFF;">EduPeak Admin Shell</div>
+            <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+              <span class="admin-badge-faculty">🛡️ Physics Faculty</span>
+              <span style="font-size:10.5px; opacity:0.8; color:#CBD5E1;">A/L Lead Proctor</span>
+            </div>
+          </div>
+          <button class="btn-switch-to-student" id="btn-global-exit-admin">
+            <span>🎓</span>
+            <span>Student App</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Scrollable Viewport -->
+      <div class="main-viewport" id="admin-main-viewport"></div>
+
+      <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart) -->
+      <nav class="bottom-nav-bar" id="admin-bottom-nav">
+        <button class="nav-tab-btn ${this.adminTab === 'dashboard' ? 'active' : ''}" data-admin-tab="dashboard">
+          <div class="nav-pill-icon">📊</div>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-tab-btn ${this.adminTab === 'papers' ? 'active' : ''}" data-admin-tab="papers">
+          <div class="nav-pill-icon">📋</div>
+          <span>Papers</span>
+        </button>
+        <button class="nav-tab-btn ${this.adminTab === 'sprints' ? 'active' : ''}" data-admin-tab="sprints">
+          <div class="nav-pill-icon">⚡</div>
+          <span>Sprints</span>
+        </button>
+        <button class="nav-tab-btn ${this.adminTab === 'students' ? 'active' : ''}" data-admin-tab="students">
+          <div class="nav-pill-icon">👥</div>
+          <span>Students</span>
+        </button>
+        <button class="nav-tab-btn ${this.adminTab === 'broadcasts' ? 'active' : ''}" data-admin-tab="broadcasts">
+          <div class="nav-pill-icon">📢</div>
+          <span>Broadcasts</span>
+        </button>
+      </nav>
+    `;
+
+    this.updateClock();
+
+    document.getElementById('btn-global-exit-admin')?.addEventListener('click', () => {
+      this.currentMode = 'student';
+      this.renderApp();
+    });
+
+    document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.switchAdminTab(btn.dataset.adminTab);
+      });
+    });
+
+    this.switchAdminTab(this.adminTab);
+  }
+
+  switchAdminTab(tabName) {
+    this.adminTab = tabName;
+    const viewport = document.getElementById('admin-main-viewport');
+    if (!viewport) return;
+
+    document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.adminTab === tabName);
+    });
+
+    switch (tabName) {
+      case 'dashboard':
+        this.renderAdminDashboardScreen(viewport);
+        break;
+      case 'papers':
+        this.renderAdminPapersScreen(viewport);
+        break;
+      case 'sprints':
+        this.renderAdminSprintsScreen(viewport);
+        break;
+      case 'students':
+        this.renderAdminStudentsScreen(viewport);
+        break;
+      case 'broadcasts':
+        this.renderAdminBroadcastsScreen(viewport);
+        break;
+      default:
+        this.renderAdminDashboardScreen(viewport);
+    }
+  }
+
+  // 1. Admin Dashboard (Submissions Review Workspace - admin_home_screen.dart)
+  async renderAdminDashboardScreen(container) {
+    this.adminFilterTab = this.adminFilterTab ?? 'pending';
+    this.adminSearchQuery = this.adminSearchQuery ?? '';
+
+    const allDesserts = await dbService.getAllDessertsForAdmin();
+    const students = await dbService.getAllStudents();
+
+    const pending = allDesserts.filter(d => (d.status || '').toLowerCase() === 'pending');
+    const approved = allDesserts.filter(d => (d.status || '').toLowerCase() === 'approved');
+    const rejected = allDesserts.filter(d => (d.status || '').toLowerCase() === 'rejected');
+
+    let currentList = this.adminFilterTab === 'pending' ? pending :
+                      this.adminFilterTab === 'approved' ? approved :
+                      this.adminFilterTab === 'rejected' ? rejected : allDesserts;
+
+    if (this.adminSearchQuery.trim()) {
+      const q = this.adminSearchQuery.toLowerCase();
+      currentList = currentList.filter(d => 
+        (d.studentName || '').toLowerCase().includes(q) ||
+        (d.subject || '').toLowerCase().includes(q) ||
+        (d.studentPhone || '').includes(q)
+      );
+    }
+
+    container.innerHTML = `
+      <!-- Real-Time Overview Metrics Grid -->
+      <div class="admin-metrics-grid">
+        <div class="admin-metric-card" style="border-left:4px solid #F59E0B;">
+          <div class="metric-top">
+            <span class="metric-lbl">Pending Submissions</span>
+            <div class="metric-icon" style="background:#FEF3C7; color:#D97706;">⏳</div>
+          </div>
+          <div class="metric-val" style="color:#D97706;">${pending.length}</div>
+        </div>
+
+        <div class="admin-metric-card" style="border-left:4px solid #10B981;">
+          <div class="metric-top">
+            <span class="metric-lbl">Approved Submissions</span>
+            <div class="metric-icon" style="background:#DCFCE7; color:#059669;">✅</div>
+          </div>
+          <div class="metric-val" style="color:#059669;">${approved.length}</div>
+        </div>
+
+        <div class="admin-metric-card" style="border-left:4px solid #EF4444;">
+          <div class="metric-top">
+            <span class="metric-lbl">Revisions Needed</span>
+            <div class="metric-icon" style="background:#FEE2E2; color:#DC2626;">❌</div>
+          </div>
+          <div class="metric-val" style="color:#DC2626;">${rejected.length}</div>
+        </div>
+
+        <div class="admin-metric-card" style="border-left:4px solid #6366F1;">
+          <div class="metric-top">
+            <span class="metric-lbl">Enrolled Scholars</span>
+            <div class="metric-icon" style="background:#EEF2FF; color:#4F46E5;">👥</div>
+          </div>
+          <div class="metric-val" style="color:#4F46E5;">${students.length}</div>
+        </div>
+      </div>
+
+      <!-- Submissions Review Workspace -->
+      <div style="font-size:14px; font-weight:800; color:#0F172A; margin:6px 0 10px; display:flex; justify-content:space-between; align-items:center;">
+        <span>📝 Homework Submissions Workspace</span>
+        <span style="font-size:11px; color:#64748B;">Live Sync</span>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="admin-tab-nav">
+        <button class="admin-tab-btn ${this.adminFilterTab === 'pending' ? 'active' : ''}" data-af-tab="pending">
+          Pending (${pending.length})
+        </button>
+        <button class="admin-tab-btn ${this.adminFilterTab === 'approved' ? 'active' : ''}" data-af-tab="approved">
+          Approved (${approved.length})
+        </button>
+        <button class="admin-tab-btn ${this.adminFilterTab === 'rejected' ? 'active' : ''}" data-af-tab="rejected">
+          Rejected (${rejected.length})
+        </button>
+        <button class="admin-tab-btn ${this.adminFilterTab === 'all' ? 'active' : ''}" data-af-tab="all">
+          All (${allDesserts.length})
+        </button>
+      </div>
+
+      <!-- Search Box -->
+      <div style="position:relative; margin-bottom:12px;">
+        <input type="text" id="input-admin-search" placeholder="Search by student name or phone..." value="${this.adminSearchQuery}"
+          style="width:100%; box-sizing:border-box; padding:10px 12px 10px 34px; border-radius:12px; border:1px solid #CBD5E1; font-size:12.5px; font-family:inherit;" />
+        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:14px; color:#94A3B8;">🔍</span>
+      </div>
+
+      <!-- Submissions List -->
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${currentList.length === 0 ? `
+          <div style="text-align:center; padding:32px 16px; background:#FFFFFF; border-radius:16px; border:1px dashed #CBD5E1; color:#64748B;">
+            <div style="font-size:28px; margin-bottom:6px;">🎉</div>
+            <div style="font-weight:700; font-size:13.5px; color:#0F172A;">All Clear!</div>
+            <div style="font-size:11.5px; margin-top:2px;">No submissions found in this tab.</div>
+          </div>
+        ` : currentList.map(d => {
+          const isPending = (d.status || '').toLowerCase() === 'pending';
+          const isApp = (d.status || '').toLowerCase() === 'approved';
+          const badgeClass = isApp ? 'quest-badge-green' : isPending ? 'quest-badge-orange' : 'quest-badge-blue';
+          const label = isApp ? 'Approved ✓' : isPending ? 'Pending Review ⏳' : 'Needs Redo ⚠️';
+
+          return `
+            <div class="admin-submission-item">
+              <div class="admin-sub-row-top">
+                <div class="admin-sub-student">
+                  <div class="admin-sub-avatar">${(d.studentName || 'S').charAt(0).toUpperCase()}</div>
+                  <div>
+                    <div style="font-size:13.5px; font-weight:800; color:#0F172A;">${d.studentName || 'Anonymous Scholar'}</div>
+                    <div style="font-size:10.5px; color:#64748B;">${d.studentPhone || 'No Phone'}</div>
+                  </div>
+                </div>
+                <span class="quest-status-badge ${badgeClass}">${label}</span>
+              </div>
+
+              <div>
+                <div style="font-size:13px; font-weight:700; color:#1E293B;">${d.subject}</div>
+                <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${d.caption || 'Daily problem set submission'}</div>
+              </div>
+
+              ${d.mediaUrls && d.mediaUrls.length > 0 ? `
+                <div style="display:flex; gap:6px; overflow-x:auto;">
+                  ${d.mediaUrls.map(u => `
+                    <img src="${u}" style="width:44px; height:44px; border-radius:8px; object-fit:cover; border:1px solid #CBD5E1;" />
+                  `).join('')}
+                </div>
+              ` : ''}
+
+              ${d.adminFeedback ? `
+                <div style="background:#F8FAFC; border-left:3px solid #6366F1; border-radius:6px; padding:8px 10px; font-size:11px; color:#334155;">
+                  <strong>Feedback:</strong> ${d.adminFeedback}
+                </div>
+              ` : ''}
+
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:8px; border-top:1px solid #F1F5F9;">
+                <span style="font-size:11px; font-weight:800; color:#2563EB;">Award: +${d.creditsAwarded || 100} XP</span>
+                <button class="admin-btn-grade" data-review-id="${d.id}">
+                  <span>Review & Grade</span>
+                  <span>➔</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    // Listeners
+    document.getElementById('btn-exit-admin')?.addEventListener('click', () => {
+      this.currentMode = 'student';
+      this.renderApp();
+    });
+
+    container.querySelectorAll('[data-af-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.adminFilterTab = btn.dataset.afTab;
+        this.renderAdminDashboardScreen(container);
+      });
+    });
+
+    document.getElementById('input-admin-search')?.addEventListener('input', (e) => {
+      this.adminSearchQuery = e.target.value;
+      this.renderAdminDashboardScreen(container);
+    });
+
+    container.querySelectorAll('[data-review-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.reviewId;
+        const sub = allDesserts.find(x => x.id === id);
+        this.openAdminReviewModal(sub);
+      });
+    });
+  }
+
+  // Review & Grade Drawer Modal (admin_review_screen.dart)
+  openAdminReviewModal(sub) {
+    if (!sub) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    let credits = sub.creditsAwarded || 50;
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:92vh; overflow-y:auto;">
+        <div class="modal-header">
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#0F172A;">Grade Homework: ${sub.studentName}</div>
+            <div style="font-size:11.5px; color:#64748B;">${sub.subject}</div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-review">✕</button>
+        </div>
+
+        <!-- Media Image Viewer -->
+        ${sub.mediaUrls && sub.mediaUrls.length > 0 ? `
+          <div style="text-align:center; background:#0B0F19; border-radius:12px; padding:8px; margin-bottom:12px;">
+            <img src="${sub.mediaUrls[0]}" style="max-height:220px; width:auto; border-radius:8px; object-fit:contain;" />
+            <div style="color:#94A3B8; font-size:10px; margin-top:4px;">Attached Answer Sheet</div>
+          </div>
+        ` : ''}
+
+        <!-- Student Remarks -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px; margin-bottom:12px; font-size:11.5px; color:#334155;">
+          <strong>Student Remarks:</strong> ${sub.caption || 'None provided.'}
+        </div>
+
+        <!-- XP Credit Award Picker -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:800; color:#0F172A; margin-bottom:6px;">Award XP Credits:</div>
+          <div style="display:flex; gap:6px;">
+            ${[10, 25, 50, 100].map(amt => `
+              <button class="topic-chip ${credits === amt ? 'active' : ''}" data-credit-val="${amt}" style="flex:1;">
+                +${amt} XP
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Teacher Feedback Presets -->
+        <div style="margin-bottom:8px;">
+          <div style="font-size:12px; font-weight:800; color:#0F172A; margin-bottom:6px;">Quick Feedback Presets:</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <button class="history-filter-chip" data-preset="Great work! Free-body diagram is crystal clear. ✅">
+              🌟 Great Work
+            </button>
+            <button class="history-filter-chip" data-preset="Calculation is correct, but add units to the final answer. ⚠️">
+              📏 Missing Units
+            </button>
+            <button class="history-filter-chip" data-preset="Sign error in force components on line 3. Please revise. ❌">
+              📐 Sign Error
+            </button>
+          </div>
+        </div>
+
+        <!-- Teacher Feedback Custom Textarea -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px; font-weight:800; color:#0F172A; margin-bottom:4px;">Feedback / Correction Notes:</div>
+          <textarea id="admin-feedback-text" class="form-textarea" rows="2" placeholder="Write personalized teacher feedback...">${sub.adminFeedback || ''}</textarea>
+        </div>
+
+        <!-- Approve vs Reject Actions -->
+        <div style="display:flex; gap:10px;">
+          <button class="btn-primary" id="btn-admin-reject-sub" style="background:#EF4444; flex:1; padding:12px;">
+            ❌ Request Redo
+          </button>
+          <button class="btn-primary" id="btn-admin-approve-sub" style="background:#10B981; flex:1.3; padding:12px;">
+            ✅ Approve (+${credits} XP)
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelectorAll('[data-credit-val]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        credits = Number(btn.dataset.creditVal);
+        modal.querySelectorAll('[data-credit-val]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const approveBtn = document.getElementById('btn-admin-approve-sub');
+        if (approveBtn) approveBtn.textContent = `✅ Approve (+${credits} XP)`;
+      });
+    });
+
+    modal.querySelectorAll('[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const area = document.getElementById('admin-feedback-text');
+        if (area) area.value = btn.dataset.preset;
+      });
+    });
+
+    document.getElementById('btn-close-review')?.addEventListener('click', () => modal.remove());
+
+    document.getElementById('btn-admin-approve-sub')?.addEventListener('click', async () => {
+      const fb = document.getElementById('admin-feedback-text')?.value || 'Great work! ✅';
+      await dbService.reviewDessert(sub.id, {
+        status: 'approved',
+        adminFeedback: fb,
+        creditsAwarded: credits,
+        reviewedBy: 'Lead Physics Faculty'
+      });
+      notificationService.showInAppBanner('Submission Approved! ✅', `Awarded +${credits} XP to ${sub.studentName}.`, 'success');
+      modal.remove();
+      const vp = document.getElementById('admin-main-viewport');
+      if (vp) this.renderAdminDashboardScreen(vp);
+    });
+
+    document.getElementById('btn-admin-reject-sub')?.addEventListener('click', async () => {
+      const fb = document.getElementById('admin-feedback-text')?.value || 'Needs improvement. Please try again. ❌';
+      await dbService.reviewDessert(sub.id, {
+        status: 'rejected',
+        adminFeedback: fb,
+        creditsAwarded: 10,
+        reviewedBy: 'Lead Physics Faculty'
+      });
+      notificationService.showInAppBanner('Revision Requested ⚠️', `Sent correction notes to ${sub.studentName}.`, 'warning');
+      modal.remove();
+      const vp = document.getElementById('admin-main-viewport');
+      if (vp) this.renderAdminDashboardScreen(vp);
+    });
+  }
+
+  // 2. Admin Papers Screen (admin_paper_sessions_screen.dart)
+  async renderAdminPapersScreen(container) {
+    const papers = await dbService.getPaperSessions();
+
+    container.innerHTML = `
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#EEF2FF; color:#4F46E5;">📋</div>
+          <div>
+            <div class="appbar-title">Manage Exam Papers</div>
+            <div class="appbar-subtitle">Create sessions, schedule slots & proctor exams</div>
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-create-paper-dialog" style="width:auto; padding:8px 12px; font-size:12px;">
+          + New Paper
+        </button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+        ${papers.map(p => `
+          <div class="hero-card" style="padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="phase-pill ${p.isLive ? 'phase-live' : 'phase-upcoming'}">
+                ${p.isLive ? '🔴 Writing in Progress' : '⏰ Scheduled'}
+              </span>
+              <span style="font-size:12px; font-weight:800; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
+            </div>
+
+            <div style="font-size:14.5px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
+            <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${p.subject}</div>
+
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <button class="btn-primary" style="flex:1; background:${p.isLive ? '#EF4444' : '#10B981'}; padding:10px; font-size:12px;" data-toggle-paper="${p.id}">
+                ${p.isLive ? '⏹ End Live Session' : '▶ Start Live Writing'}
+              </button>
+              <button class="btn-primary" style="background:#F1F5F9; color:#334155; width:auto; padding:10px 14px; font-size:12px;" data-view-proctor="${p.id}">
+                🎥 Proctor Hall
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('btn-create-paper-dialog')?.addEventListener('click', () => {
+      this.openAdminCreatePaperModal();
+    });
+
+    container.querySelectorAll('[data-toggle-paper]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = papers.find(x => x.id === btn.dataset.togglePaper);
+        if (p) {
+          p.isLive = !p.isLive;
+          notificationService.showInAppBanner('Paper Status Updated', `${p.title} is now ${p.isLive ? 'LIVE' : 'ENDED'}.`, 'info');
+          this.renderAdminPapersScreen(container);
+        }
+      });
+    });
+
+    container.querySelectorAll('[data-view-proctor]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openExamRoom(btn.dataset.viewProctor);
+      });
+    });
+  }
+
+  // Create New Paper Dialog
+  openAdminCreatePaperModal() {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <div style="font-size:15px; font-weight:800; color:#0F172A;">Create Paper Session</div>
+          <button class="modal-close-btn" id="btn-close-new-paper">✕</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div>
+            <div class="form-label">Paper Title:</div>
+            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Physics Term Paper 02" />
+          </div>
+
+          <div>
+            <div class="form-label">Units / Syllabus:</div>
+            <input type="text" id="new-paper-units" class="form-textarea" style="height:40px;" placeholder="e.g. Mechanics, Waves & Oscillations" />
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div>
+              <div class="form-label">Duration (Mins):</div>
+              <input type="number" id="new-paper-duration" class="form-textarea" style="height:40px;" value="120" />
+            </div>
+            <div>
+              <div class="form-label">Total Marks:</div>
+              <input type="number" id="new-paper-marks" class="form-textarea" style="height:40px;" value="100" />
+            </div>
+          </div>
+
+          <button class="btn-primary" id="btn-save-new-paper" style="margin-top:10px; padding:12px;">
+            🚀 Publish Paper to Students
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-new-paper')?.addEventListener('click', () => modal.remove());
+
+    document.getElementById('btn-save-new-paper')?.addEventListener('click', async () => {
+      const title = document.getElementById('new-paper-title')?.value;
+      const subject = document.getElementById('new-paper-units')?.value;
+      const duration = Number(document.getElementById('new-paper-duration')?.value) || 120;
+      const marks = Number(document.getElementById('new-paper-marks')?.value) || 100;
+
+      if (!title) {
+        alert('Please enter a paper title.');
+        return;
+      }
+
+      await dbService.savePaperSession({
+        title,
+        subject: subject || 'A/L Physics',
+        durationMinutes: duration,
+        totalMarks: marks,
+        isLive: true,
+        proctoringRequired: true,
+        slots: [
+          { id: 'slot_1', name: 'Morning (08:30 AM)', seatsLeft: 50 },
+          { id: 'slot_2', name: 'Evening (04:00 PM)', seatsLeft: 50 }
+        ]
+      });
+
+      notificationService.showInAppBanner('Paper Created! 📋', `${title} published to student portal.`, 'success');
+      modal.remove();
+      const vp = document.getElementById('admin-main-viewport');
+      if (vp) this.renderAdminPapersScreen(vp);
+    });
+  }
+
+  // 3. Admin Sprints Screen (admin_mcq_sprint_screen.dart)
+  renderAdminSprintsScreen(container) {
+    const sprint = dbService.getDailySprint('today');
+
+    container.innerHTML = `
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#FFF7ED; color:#EA580C;">⚡</div>
+          <div>
+            <div class="appbar-title">Daily MCQ Sprints</div>
+            <div class="appbar-subtitle">5 Rapid Questions • Maintain Student Streaks</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+        <div class="hero-card" style="padding:16px;">
+          <div style="font-size:12px; font-weight:800; color:#EA580C;">CURRENT ACTIVE SPRINT</div>
+          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:4px;">${sprint.title}</div>
+          <div style="font-size:11.5px; color:#64748B;">Date: Today • Reward: +${sprint.xpBonus} XP</div>
+        </div>
+
+        <div style="font-size:13px; font-weight:800; color:#0F172A; margin-top:6px;">Questions Bank (5 Items):</div>
+
+        ${sprint.questions.map((q, i) => `
+          <div class="hero-card" style="padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:12px; font-weight:800; color:#2563EB;">Question 0${i + 1}</span>
+              <span style="font-size:11px; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:800;">Correct: Option ${String.fromCharCode(65 + q.correctIndex)}</span>
+            </div>
+            <div style="font-size:12.5px; font-weight:700; color:#1E293B; margin-top:6px; line-height:1.4;">${q.text}</div>
+            <div style="margin-top:8px; padding:8px; background:#EFF6FF; border-left:3px solid #3B82F6; border-radius:6px; font-size:11px; color:#1E40AF;">
+              <strong>Explanation:</strong> ${q.explanation}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // 4. Admin Students Screen (admin_students_screen.dart)
+  async renderAdminStudentsScreen(container) {
+    this.studentBatchFilter = this.studentBatchFilter || 'All Batches';
+    this.studentSearchQuery = this.studentSearchQuery || '';
+
+    const allStudents = await dbService.getAllStudents();
+
+    let filtered = allStudents;
+    if (this.studentBatchFilter !== 'All Batches') {
+      filtered = filtered.filter(s => s.examYear === this.studentBatchFilter);
+    }
+    if (this.studentSearchQuery.trim()) {
+      const q = this.studentSearchQuery.toLowerCase();
+      filtered = filtered.filter(s => s.name.toLowerCase().includes(q) || s.phone.includes(q));
+    }
+
+    container.innerHTML = `
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">👥</div>
+          <div>
+            <div class="appbar-title">Student Directory</div>
+            <div class="appbar-subtitle">${filtered.length} Enrolled Scholars</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Batch Filter & Search -->
+      <div style="display:flex; gap:8px; margin:12px 0 10px;">
+        <select id="select-admin-student-batch" class="form-textarea" style="height:38px; width:130px; padding:6px 8px; font-size:12px;">
+          ${['All Batches', '2026 A/L', '2027 A/L', '2028 A/L'].map(b => `
+            <option value="${b}" ${this.studentBatchFilter === b ? 'selected' : ''}>${b}</option>
+          `).join('')}
+        </select>
+        <input type="text" id="input-admin-student-search" placeholder="Search student..." value="${this.studentSearchQuery}"
+          style="flex:1; padding:8px 12px; border-radius:10px; border:1px solid #CBD5E1; font-size:12px;" />
+      </div>
+
+      <!-- Student Cards List -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${filtered.map(st => `
+          <div class="admin-student-card">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="admin-sub-avatar">${st.name.charAt(0).toUpperCase()}</div>
+              <div>
+                <div style="font-size:13.5px; font-weight:800; color:#0F172A;">${st.name}</div>
+                <div style="font-size:11px; color:#64748B;">${st.phone} • <span style="color:#2563EB; font-weight:700;">${st.examYear}</span></div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:12px; font-weight:900; color:#F59E0B;">${st.credits} XP</span>
+              <button class="admin-verify-badge ${st.isVerified ? 'verified' : 'unverified'}" data-verify-id="${st.id}">
+                ${st.isVerified ? 'Verified ✓' : 'Verify'}
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('select-admin-student-batch')?.addEventListener('change', (e) => {
+      this.studentBatchFilter = e.target.value;
+      this.renderAdminStudentsScreen(container);
+    });
+
+    document.getElementById('input-admin-student-search')?.addEventListener('input', (e) => {
+      this.studentSearchQuery = e.target.value;
+      this.renderAdminStudentsScreen(container);
+    });
+
+    container.querySelectorAll('[data-verify-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const st = allStudents.find(x => x.id === btn.dataset.verifyId);
+        if (st) {
+          st.isVerified = !st.isVerified;
+          notificationService.showInAppBanner('Verification Updated', `${st.name} is now ${st.isVerified ? 'Verified' : 'Unverified'}.`, 'info');
+          this.renderAdminStudentsScreen(container);
+        }
+      });
+    });
+  }
+
+  // 5. Admin Broadcasts Screen (admin_announcements_screen.dart)
+  renderAdminBroadcastsScreen(container) {
+    this.broadcastLogs = this.broadcastLogs || [
+      { id: 1, title: 'Exam Hall Open', message: 'Morning session for Model Paper 04 is now open for students.', time: '1 hour ago' },
+      { id: 2, title: 'New Homework Feedback', message: 'Wave Optics submissions have been evaluated and XP awarded.', time: 'Yesterday' }
+    ];
+
+    container.innerHTML = `
+      <div class="screen-appbar">
+        <div class="appbar-left">
+          <div class="appbar-icon-box" style="background:#F0FDF4; color:#16A34A;">📢</div>
+          <div>
+            <div class="appbar-title">Push Broadcaster</div>
+            <div class="appbar-subtitle">Send Instant Alerts to iOS & Android Devices</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-card" style="padding:16px; margin-top:12px;">
+        <div class="form-label">Announcement Title:</div>
+        <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. 🔴 Paper 04 Live Exam Started!" />
+
+        <div class="form-label">Notification Message Body:</div>
+        <textarea id="bc-body" class="form-textarea" rows="3" style="margin-bottom:10px;" placeholder="Enter message to broadcast to all student home screens..."></textarea>
+
+        <div class="form-label">Target Audience:</div>
+        <select id="bc-audience" class="form-textarea" style="height:40px; margin-bottom:14px; padding:6px 10px;">
+          <option value="All Batches">All Enrolled Batches</option>
+          <option value="2026 A/L">2026 A/L Batch Only</option>
+          <option value="2027 A/L">2027 A/L Batch Only</option>
+        </select>
+
+        <button class="btn-primary" id="btn-send-broadcast" style="padding:14px;">
+          🚀 Send Broadcast with Chime Audio
+        </button>
+      </div>
+
+      <div style="font-size:13px; font-weight:800; color:#0F172A; margin:16px 0 8px;">
+        📜 Recent Broadcasts Sent:
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${this.broadcastLogs.map(b => `
+          <div class="hero-card" style="padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:13px; font-weight:800; color:#0F172A;">${b.title}</span>
+              <span style="font-size:10.5px; color:#64748B;">${b.time}</span>
+            </div>
+            <div style="font-size:11.5px; color:#475569; margin-top:4px;">${b.message}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('btn-send-broadcast')?.addEventListener('click', () => {
+      const title = document.getElementById('bc-title')?.value;
+      const body = document.getElementById('bc-body')?.value;
+
+      if (!title || !body) {
+        alert('Please fill in both title and message body.');
+        return;
+      }
+
+      this.broadcastLogs.unshift({
+        id: Date.now(),
+        title,
+        message: body,
+        time: 'Just now'
+      });
+
+      notificationService.playChime();
+      notificationService.showInAppBanner(title, body, 'info');
+
+      alert('🚀 Broadcast successfully dispatched to all student devices via Web Push!');
+      this.renderAdminBroadcastsScreen(container);
+    });
   }
 }
 
