@@ -4764,7 +4764,7 @@ class AppController {
         title: 'Physics Mock Exam',
         subject: 'Physics',
         durationMinutes: 150,
-        currentPhase: 'writing',
+        currentPhase: 'waiting',
         status: 'live',
         slot1: { name: 'Slot 1 (08:30 AM)', startTime: '08:30' },
         slot2: { name: 'Slot 2 (04:00 PM)', startTime: '16:00' }
@@ -4967,6 +4967,22 @@ class AppController {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
+            <!-- Instant Phase Switcher Bar -->
+            <div style="display:flex; background:#0F172A; border:1px solid #334155; border-radius:12px; padding:2px; gap:2px;">
+              <button class="btn-phase-tab" data-phase="waiting" style="background:${times.isWaiting ? '#6366F1' : 'transparent'}; color:${times.isWaiting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                ⏳ Waiting Room
+              </button>
+              <button class="btn-phase-tab" data-phase="package_opening" style="background:${times.isPackageOpening ? '#F59E0B' : 'transparent'}; color:${times.isPackageOpening ? '#000000' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                📦 Parcel Open (10m)
+              </button>
+              <button class="btn-phase-tab" data-phase="writing" style="background:${times.isWriting ? '#22C55E' : 'transparent'}; color:${times.isWriting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                📝 Writing Session
+              </button>
+              <button class="btn-phase-tab" data-phase="scanner" style="background:transparent; color:#38BDF8; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                📄 Answer Submission
+              </button>
+            </div>
+
             ${!times.isWaiting ? `
               <button id="btn-appbar-flip" title="Flip Camera" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; padding:6px; display:flex; align-items:center;">
                 🔄
@@ -5265,6 +5281,25 @@ class AppController {
 
       roomContainer.querySelector('#btn-bottom-submit')?.addEventListener('click', () => {
         openDocumentScanner();
+      });
+
+      // Instant Phase Switcher Clicks
+      roomContainer.querySelectorAll('.btn-phase-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const targetPhase = tab.dataset.phase;
+          if (targetPhase === 'scanner') {
+            openDocumentScanner();
+            return;
+          }
+          session.currentPhase = targetPhase;
+          if (targetPhase === 'package_opening') {
+            session.packageOpeningStartedAt = new Date().toISOString();
+          } else if (targetPhase === 'writing') {
+            session.writingStartedAt = new Date().toISOString();
+          }
+          renderRoom();
+        });
       });
     };
 
