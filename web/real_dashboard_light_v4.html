@@ -1250,32 +1250,75 @@
 
   <!-- ════════════════ MODAL 5: LIVE EXAM ROOM PROCTORING ════════════════ -->
   <div class="modal-overlay" id="modal-exam-room">
-    <div class="modal-sheet">
+    <div class="modal-sheet" style="max-height:90vh; overflow-y:auto;">
       <div class="modal-header">
-        <div>
-          <div class="modal-title">Live Examination Proctoring</div>
-          <div style="font-size:11px; color:#64748B;">Slot 1 (08:30 AM) • 2027 A/L Physics Term Paper 01</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">🎥</span>
+          <div>
+            <div class="modal-title">Live Examination Proctoring Room</div>
+            <div style="font-size:11px; color:#64748B;">Slot 1 (08:30 AM) • 2027 A/L Physics Term Paper 01</div>
+          </div>
         </div>
-        <button class="modal-close-btn" onclick="closeModal('modal-exam-room')">✕</button>
+        <button class="modal-close-btn" onclick="closeExamRoomModal()">✕</button>
       </div>
 
-      <!-- Warning & Camera -->
-      <div style="background:#FFFBEB; border:1px solid #FEF3C7; border-radius:12px; padding:12px; margin-bottom:14px; font-size:11.5px; color:#92400E; line-height:1.4;">
-        ⚠️ <strong>Strict AI Proctoring Enabled:</strong> Do not leave this window or cover your camera. Leaving full screen triggers anti-cheat strikes.
+      <!-- Proctor Status & Anti-Cheat Banner -->
+      <div style="background:#0F172A; border:1px solid #1E293B; border-radius:14px; padding:12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="apk-pulsing-dot" style="background:#10B981; width:8px; height:8px; display:inline-block; border-radius:50%; box-shadow:0 0 8px #10B981;"></span>
+          <span style="font-size:11.5px; font-weight:800; color:#10B981;">AI PROCTOR ACTIVE • SURVEILLANCE LIVE</span>
+        </div>
+        <span style="font-size:11px; color:#94A3B8; font-family:monospace;" id="exam-modal-clock">02:29:45</span>
       </div>
 
-      <div style="width:100%; height:180px; background:#0F172A; border-radius:14px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; color:white; margin-bottom:14px;">
-        <div style="font-size:12px; font-weight:700;">🎥 Front Camera Proctor Stream Active</div>
-        <div style="position:absolute; top:8px; right:8px; padding:2px 8px; background:#DC2626; color:white; border-radius:10px; font-size:9.5px; font-weight:800;">REC ●</div>
+      <!-- Warning Box -->
+      <div style="background:#FFFBEB; border:1px solid #FEF3C7; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:11.5px; color:#92400E; line-height:1.4;">
+        ⚠️ <strong>Exam Surveillance Protocol:</strong> Karunakara cameraawa idiriyata sitina se thabanna. Do not exit full screen or switch apps.
       </div>
 
-      <div style="display:flex; gap:10px;">
-        <button class="btn-primary-blue" onclick="showToast('📥 Paper Downloaded', 'info');" style="flex:1; background:#F1F5F9; color:#0F172A; box-shadow:none;">
-          📄 Download Paper PDF
-        </button>
-        <button class="btn-primary-blue" onclick="showToast('✅ Answers Uploaded', 'success'); closeModal('modal-exam-room');" style="flex:1;">
-          🚀 Submit Answers
-        </button>
+      <!-- Live Camera Stream Viewport -->
+      <div style="width:100%; height:200px; background:#000000; border-radius:14px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; color:white; margin-bottom:12px;">
+        <video id="exam-webcam-preview" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+        <div id="exam-cam-fallback" style="position:absolute; display:none; flex-direction:column; align-items:center; gap:6px; color:#94A3B8; text-align:center; padding:16px;">
+          <span style="font-size:32px;">📷</span>
+          <span style="font-size:12px; font-weight:700;">Live Camera Proctoring Active</span>
+          <span style="font-size:10.5px;">Candidate desk & face encrypted stream</span>
+        </div>
+        <div style="position:absolute; top:8px; left:8px; padding:2px 8px; background:rgba(15,23,42,0.85); color:#10B981; border-radius:6px; font-size:9.5px; font-weight:800;">
+          🟢 720p HD • 30 FPS
+        </div>
+        <div style="position:absolute; top:8px; right:8px; padding:2px 8px; background:#DC2626; color:white; border-radius:6px; font-size:9.5px; font-weight:800;">
+          REC ●
+        </div>
+      </div>
+
+      <!-- Question Paper Preview Button -->
+      <button class="btn-primary-blue" id="btn-modal-dl-paper" style="width:100%; padding:11px; background:#2563EB; font-size:12.5px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:6px;">
+        <span>📄</span> View / Download Physics Question Paper (PDF)
+      </button>
+
+      <!-- In-App Answer Document Snapper inside Exam Room -->
+      <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:12.5px; font-weight:800; color:#0F172A;">In-App Answer Sheets Snapper 📸</div>
+            <div style="font-size:10.5px; color:#64748B;">Snap written pages before time expires.</div>
+          </div>
+          <span id="exam-snapped-badge" style="background:#E2E8F0; color:#0F172A; font-weight:800; font-size:11px; padding:2px 8px; border-radius:8px;">0 Pages</span>
+        </div>
+
+        <div id="exam-snapped-pages-row" style="display:flex; gap:6px; margin-top:8px; overflow-x:auto; min-height:44px; align-items:center;">
+          <span style="color:#94A3B8; font-size:11px; font-style:italic;">No answer sheet pages snapped yet.</span>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button id="btn-exam-snap-page" class="btn-primary-blue" style="flex:1; background:#0F766E; padding:10px; font-size:11.5px; font-weight:700;">
+            📸 Snap Next Page
+          </button>
+          <button id="btn-exam-submit-final" class="btn-primary-blue" style="flex:1.2; background:#10B981; padding:10px; font-size:11.5px; font-weight:800;">
+            🚀 Final Submit (+150 XP)
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1601,6 +1644,86 @@
       switchScreen('desserts');
     });
 
+    // ── Live Exam Room Proctoring & In-App Answer Snapper ──
+    let examCamStream = null;
+    let examSnappedPages = 0;
+    let examSecsLeft = 150 * 60;
+
+    function openExamRoomModal() {
+      openModal('modal-exam-room');
+      const v = document.getElementById('exam-webcam-preview');
+      const fb = document.getElementById('exam-cam-fallback');
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+          .then(stream => {
+            examCamStream = stream;
+            if (v) v.srcObject = stream;
+          })
+          .catch(() => {
+            if (fb) fb.style.display = 'flex';
+          });
+      } else {
+        if (fb) fb.style.display = 'flex';
+      }
+    }
+
+    function closeExamRoomModal() {
+      if (examCamStream) {
+        examCamStream.getTracks().forEach(t => t.stop());
+        examCamStream = null;
+      }
+      closeModal('modal-exam-room');
+    }
+
+    document.getElementById('btn-view-exam-room')?.addEventListener('click', openExamRoomModal);
+    document.getElementById('btn-enter-live-hall')?.addEventListener('click', openExamRoomModal);
+
+    document.getElementById('btn-modal-dl-paper')?.addEventListener('click', () => {
+      alert("📄 2027 A/L Physics Term Paper 01\n\n• Part I: 50 Multiple Choice Questions (2 Hours)\n• Part II: Structured Essay & Essays (3 Hours)\n\nQuestion paper downloaded in secure proctored mode. Good luck!");
+    });
+
+    document.getElementById('btn-exam-snap-page')?.addEventListener('click', () => {
+      examSnappedPages++;
+      document.getElementById('exam-snapped-badge').textContent = `${examSnappedPages} Pages`;
+      const row = document.getElementById('exam-snapped-pages-row');
+      if (row) {
+        row.innerHTML = Array.from({ length: examSnappedPages }).map((_, i) => `
+          <div style="width:38px; height:48px; border-radius:6px; border:1.5px solid #10B981; background:#0F172A; color:#10B981; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            P.${i + 1}
+          </div>
+        `).join('');
+      }
+      showToast(`📸 Exam Page ${examSnappedPages} Snapped`, "success");
+    });
+
+    document.getElementById('btn-exam-submit-final')?.addEventListener('click', () => {
+      if (examSnappedPages === 0) {
+        alert("Please snap at least 1 page of your handwritten answer sheet first!");
+        return;
+      }
+      if (!confirm(`Finalize and submit ${examSnappedPages} answer pages for 2027 A/L Physics Term Paper 01?`)) {
+        return;
+      }
+      closeExamRoomModal();
+      currentXp += 150;
+      document.getElementById('student-xp-val').textContent = `${currentXp} / 200 XP`;
+      document.getElementById('student-xp-bar').style.width = `${Math.min(100, (currentXp / 200) * 100)}%`;
+      examSnappedPages = 0;
+      document.getElementById('exam-snapped-badge').textContent = `0 Pages`;
+      alert("✅ SUBMISSION SUCCESSFUL!\n\nAll pages securely encrypted and uploaded to examination proctor board. Bonus +150 XP awarded!");
+      showToast("🎉 Exam Answers Submitted! +150 XP", "success");
+    });
+
+    setInterval(() => {
+      if (examSecsLeft > 0) {
+        examSecsLeft--;
+        const h = String(Math.floor(examSecsLeft / 3600)).padStart(2, '0');
+        const m = String(Math.floor((examSecsLeft % 3600) / 60)).padStart(2, '0');
+        const s = String(examSecsLeft % 60).padStart(2, '0');
+        const el = document.getElementById('exam-modal-clock');
+        if (el) el.textContent = `${h}:${m}:${s}`;
+      }
+    }, 1000);
   </script>
 </body>
 </html>

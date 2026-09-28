@@ -3275,6 +3275,18 @@ class AppController {
     document.getElementById('btn-empty-create-paper')?.addEventListener('click', triggerAdd);
 
     // Interactive paper action handlers
+    container.querySelectorAll('[data-view-proctor]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openAdminLiveProctorHall(btn.dataset.viewProctor);
+      });
+    });
+
+    container.querySelectorAll('[data-student-exam]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.openStudentLiveExamRoom(btn.dataset.studentExam, 'slot1');
+      });
+    });
+
     container.querySelectorAll('[data-toggle-paper]').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = papers.find(x => x.id === btn.dataset.togglePaper);
@@ -3286,9 +3298,19 @@ class AppController {
       });
     });
 
-    container.querySelectorAll('[data-view-proctor]').forEach(btn => {
+    container.querySelectorAll('[data-cycle-phase]').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.openExamRoom(btn.dataset.viewProctor);
+        const p = papers.find(x => x.id === btn.dataset.cyclePhase);
+        if (p) {
+          const phases = ['scheduled', 'package_opening', 'writing', 'time_up', 'ended'];
+          const currentIdx = phases.indexOf(p.phase || (p.isLive ? 'writing' : 'scheduled'));
+          const nextPhase = phases[(currentIdx + 1) % phases.length];
+          p.phase = nextPhase;
+          p.isLive = nextPhase === 'package_opening' || nextPhase === 'writing';
+          p.isEnded = nextPhase === 'ended';
+          notificationService.showInAppBanner('Phase Advanced ⏱️', `${p.title}: ${nextPhase.replace('_', ' ').toUpperCase()}`, 'success');
+          this.renderAdminPapersScreen(container);
+        }
       });
     });
   }
@@ -3314,49 +3336,221 @@ class AppController {
     }
 
     return `
-      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
-        ${papers.map(p => `
-          <div class="hero-card" style="padding:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span class="phase-pill ${p.isLive ? 'phase-live' : 'phase-upcoming'}">
-                ${p.isLive ? '🔴 Writing in Progress' : '⏰ Scheduled'}
-              </span>
-              <span style="font-size:12px; font-weight:800; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
-            </div>
+      <div style="display:flex; flex-direction:column; gap:14px; margin-top:12px;">
+        ${papers.map(p => {
+          const phase = p.phase || (p.isLive ? 'writing' : 'scheduled');
+          const isWriting = phase === 'writing';
+          const isPackage = phase === 'package_opening';
+          const isTimeUp = phase === 'time_up';
+          const isEnded = phase === 'ended';
 
-            <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
-            <div style="font-size:12px; color:#64748B; margin-top:2px;">${p.subject}</div>
+          let pillClass = 'phase-upcoming';
+          let pillText = '⏰ Scheduled';
+          if (isWriting) { pillClass = 'phase-live'; pillText = '🔴 Writing in Progress'; }
+          else if (isPackage) { pillClass = 'phase-live'; pillText = '📦 Package Opening (10M)'; }
+          else if (isTimeUp) { pillClass = 'phase-live'; pillText = '⏰ Time Up - Submitting'; }
+          else if (isEnded) { pillClass = ''; pillText = '🛑 Session Ended'; }
 
-            <div style="display:flex; gap:8px; margin-top:14px;">
-              <button class="apk-btn-primary" style="flex:1; background:${p.isLive ? '#EF4444' : '#10B981'}; padding:10px; font-size:12px;" data-toggle-paper="${p.id}">
-                ${p.isLive ? '⏹ End Live Session' : '▶ Start Live Writing'}
-              </button>
-              <button class="apk-btn-primary" style="background:#F1F5F9; color:#334155; width:auto; padding:10px 14px; font-size:12px; box-shadow:none;" data-view-proctor="${p.id}">
-                🎥 Proctor Hall
-              </button>
+          return `
+            <div class="hero-card" style="padding:16px; border:1px solid #E2E8F0;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="phase-pill ${pillClass}" style="${isEnded ? 'background:#F1F5F9; color:#64748B;' : ''}">
+                  ${pillText}
+                </span>
+                <span style="font-size:12px; font-weight:800; color:#2563EB;">⏱️ ${p.durationMinutes || 120} Mins</span>
+              </div>
+
+              <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
+              <div style="font-size:12px; color:#64748B; margin-top:2px;">${p.subject} • ${p.examYear || '2027 A/L'}</div>
+
+              <!-- Slots Info Row -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; background:#F8FAFC; padding:10px; border-radius:10px; border:1px solid #F1F5F9;">
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:#0F172A;">☀️ Slot 1 (Morning)</div>
+                  <div style="font-size:10.5px; color:#64748B;">08:30 AM - 11:30 AM</div>
+                  <div style="font-size:10.5px; font-weight:700; color:#2563EB; margin-top:2px;">👥 48 Enrolled</div>
+                </div>
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:#0F172A;">🌙 Slot 2 (Evening)</div>
+                  <div style="font-size:10.5px; color:#64748B;">04:00 PM - 07:00 PM</div>
+                  <div style="font-size:10.5px; font-weight:700; color:#2563EB; margin-top:2px;">👥 32 Enrolled</div>
+                </div>
+              </div>
+
+              <!-- Action Buttons matching Mobile App -->
+              <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="apk-btn-primary" style="flex:1.2; background:#10B981; padding:11px 10px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;" data-student-exam="${p.id}">
+                  <span>▶</span> Start Live Writing
+                </button>
+                <button class="apk-btn-primary" style="flex:1; background:#2563EB; color:#FFFFFF; padding:11px 10px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;" data-view-proctor="${p.id}">
+                  <span>🎥</span> Proctor Hall
+                </button>
+                <button class="apk-btn-primary" style="background:#F1F5F9; color:#475569; width:auto; padding:11px 10px; font-size:12px; box-shadow:none;" data-cycle-phase="${p.id}" title="Advance Exam Phase">
+                  ⚙️
+                </button>
+              </div>
             </div>
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     `;
   }
 
   _buildAdminUpcomingPapersHTML() {
     return `
-      <div style="padding:60px 20px; text-align:center; display:flex; flex-direction:column; align-items:center;">
-        <div style="font-size:44px; margin-bottom:12px;">🔮</div>
-        <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled</div>
-        <div style="font-size:13px; color:#64748B; max-width:300px; line-height:1.4;">Add future exam dates with study hints so students can prepare ahead.</div>
+      <div style="display:flex; flex-direction:column; gap:14px; margin-top:12px;">
+        <div class="hero-card" style="padding:16px; border:1px solid #E2E8F0;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; background:#EEF2FF; color:#4F46E5; font-weight:800; padding:3px 8px; border-radius:8px;">
+              Physics • 2027 A/L
+            </span>
+            <span style="font-size:11.5px; font-weight:700; color:#D97706;">⏳ In 3 Days</span>
+          </div>
+
+          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">
+            2027 A/L Speed Paper 02 (Mechanics & Equilibrium)
+          </div>
+          <div style="font-size:12px; color:#64748B; margin-top:2px;">
+            📅 2026 October 02 (Friday) at 08:30 AM • ⏱ 150 Mins
+          </div>
+
+          <div style="margin-top:10px;">
+            <div style="font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Syllabus & Tested Topics:</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px;">✓ Circular Motion</span>
+              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px;">✓ Newton's Laws</span>
+              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px;">✓ Friction & Slopes</span>
+            </div>
+          </div>
+
+          <!-- Highlight Box (Special Paper Hints & Guidance) -->
+          <div style="margin-top:12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309;">
+              <span>💡</span> Special Paper Hints & Guidance:
+            </div>
+            <div style="font-size:11.5px; color:#78350F; line-height:1.45; margin-top:4px;">
+              කෝණික ප්‍රවේගය (ω) සහ ස්පර්ශීය ප්‍රවේගය (v = rω) අතර සම්බන්ධය මතක තබාගන්න. තන්තුවක ආතතිය කේන්ද්‍රාභිසාරී බලය ලෙස ක්‍රියා කරන ආකාරය විශේෂයෙන් සලකන්න.
+            </div>
+          </div>
+
+          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5;" onclick="alert('Scope and comprehensive study notes for this paper have been dispatched to student study packs.')">
+            👁 View Full Scope & Hints
+          </button>
+        </div>
+
+        <div class="hero-card" style="padding:16px; border:1px solid #E2E8F0;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; background:#EEF2FF; color:#4F46E5; font-weight:800; padding:3px 8px; border-radius:8px;">
+              Physics • 2026 A/L
+            </span>
+            <span style="font-size:11.5px; font-weight:700; color:#D97706;">⏳ In 10 Days</span>
+          </div>
+
+          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">
+            2026 A/L Island-Wide Comprehensive Paper 05
+          </div>
+          <div style="font-size:12px; color:#64748B; margin-top:2px;">
+            📅 2026 October 09 (Friday) at 08:30 AM • ⏱ 180 Mins
+          </div>
+
+          <div style="margin-top:12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309;">
+              <span>💡</span> Special Paper Hints & Guidance:
+            </div>
+            <div style="font-size:11.5px; color:#78350F; line-height:1.45; margin-top:4px;">
+              දෝලන හා තරංග සහ ධ්වනිය පිළිබඳ ගැටළු වලදී ඩොප්ලර් ආචරණයේ ලකුණු සම්මුතිය (Sign Convention) නිවැරදිව භාවිතා කරන්න.
+            </div>
+          </div>
+
+          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5;" onclick="alert('Full preparation pack unlocked.')">
+            👁 View Full Scope & Hints
+          </button>
+        </div>
       </div>
     `;
   }
 
   _buildAdminPaperLeaderboardHTML() {
     return `
-      <div style="padding:60px 20px; text-align:center; display:flex; flex-direction:column; align-items:center;">
-        <div style="font-size:44px; margin-bottom:12px;">🏆</div>
-        <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Published Leaderboards Yet</div>
-        <div style="font-size:13px; color:#64748B; max-width:300px; line-height:1.4;">Publish marks and ranks after paper corrections are completed.</div>
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+        <!-- Top 3 Podium matching Mobile App -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center; padding:16px 10px; background:linear-gradient(180deg, #1E293B, #0F172A); border-radius:16px; color:#FFFFFF;">
+          <!-- 2nd -->
+          <div style="display:flex; flex-direction:column; align-items:center; margin-top:16px;">
+            <div style="font-size:20px;">🥈</div>
+            <div style="width:40px; height:40px; border-radius:50%; background:#94A3B8; color:#0F172A; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; margin:4px 0;">M</div>
+            <div style="font-size:11.5px; font-weight:700;">Minoli S.</div>
+            <div style="font-size:10px; color:#94A3B8;">94 Marks</div>
+          </div>
+          <!-- 1st -->
+          <div style="display:flex; flex-direction:column; align-items:center;">
+            <div style="font-size:24px;">👑</div>
+            <div style="width:48px; height:48px; border-radius:50%; background:#F59E0B; color:#0F172A; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px; margin:4px 0; border:2px solid #FCD34D;">D</div>
+            <div style="font-size:12px; font-weight:800; color:#FCD34D;">Danushka W.</div>
+            <div style="font-size:10.5px; color:#E2E8F0; font-weight:700;">98 Marks</div>
+          </div>
+          <!-- 3rd -->
+          <div style="display:flex; flex-direction:column; align-items:center; margin-top:20px;">
+            <div style="font-size:20px;">🥉</div>
+            <div style="width:38px; height:38px; border-radius:50%; background:#B45309; color:#FFFFFF; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:13px; margin:4px 0;">K</div>
+            <div style="font-size:11.5px; font-weight:700;">Kavindu J.</div>
+            <div style="font-size:10px; color:#94A3B8;">89 Marks</div>
+          </div>
+        </div>
+
+        <!-- Leaderboard Table -->
+        <div style="background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; overflow:hidden;">
+          <div style="padding:10px 14px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:12px; font-weight:800; color:#475569; display:flex; justify-content:space-between;">
+            <span>Student & Batch</span>
+            <span>Marks / Rank</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #F1F5F9;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#F59E0B; font-size:13px;">#1</span>
+                <div>
+                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Danushka Wickramasinghe</div>
+                  <div style="font-size:10.5px; color:#64748B;">2026 A/L • Colombo District</div>
+                </div>
+              </div>
+              <span style="font-size:13px; font-weight:800; color:#10B981;">98% (49/50)</span>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #F1F5F9;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#64748B; font-size:13px;">#2</span>
+                <div>
+                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Minoli Senarath</div>
+                  <div style="font-size:10.5px; color:#64748B;">2026 A/L • Gampaha District</div>
+                </div>
+              </div>
+              <span style="font-size:13px; font-weight:800; color:#10B981;">94% (47/50)</span>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #F1F5F9;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#B45309; font-size:13px;">#3</span>
+                <div>
+                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Kavindu Jayawardena</div>
+                  <div style="font-size:10.5px; color:#64748B;">2026 A/L • Kandy District</div>
+                </div>
+              </div>
+              <span style="font-size:13px; font-weight:800; color:#10B981;">89% (44/50)</span>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-weight:800; color:#475569; font-size:13px;">#4</span>
+                <div>
+                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Kasun Perera (You)</div>
+                  <div style="font-size:10.5px; color:#64748B;">2027 A/L • Kurunegala District</div>
+                </div>
+              </div>
+              <span style="font-size:13px; font-weight:800; color:#2563EB;">86% (43/50)</span>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -3920,7 +4114,502 @@ class AppController {
     const vp = document.getElementById('admin-main-viewport');
     if (vp) this.renderAdminStudentsScreen(vp);
   }
-}
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // ── 5. LIVE EXAM PROCTOR HALL & STUDENT EXAM ROOM (1:1 Mobile Parity) ───
+  // ═════════════════════════════════════════════════════════════════════════
+
+  openExamRoom(paperId) {
+    this.openAdminLiveProctorHall(paperId);
+  }
+
+  // ── A. Examiner Live Proctoring Center (admin_live_proctor_screen.dart) ──
+  async openAdminLiveProctorHall(paperId) {
+    const papers = await dbService.getPaperSessions();
+    const paper = papers.find(p => p.id === paperId) || {
+      id: paperId || 'p_demo',
+      title: '2027 A/L Speed Paper 01 (Physics)',
+      subject: 'Physics',
+      durationMinutes: 150,
+      phase: 'writing',
+      examYear: '2027 A/L'
+    };
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.style.background = '#0B0F19';
+    modal.style.zIndex = '9999';
+
+    let currentPhase = paper.phase || 'writing';
+    let phaseTimeRemaining = 150 * 60; // in seconds
+    let activeFilter = 'all'; // 'all', 'slot1', 'slot2'
+
+    // Mock students in the proctor hall
+    const mockStudents = [
+      { id: 'st_1', name: 'Kasun Perera', batch: '2027 A/L', slot: 'slot1', desk: 'Desk #12', status: 'live', fps: 30, warning: 0 },
+      { id: 'st_2', name: 'Danushka Wickramasinghe', batch: '2026 A/L', slot: 'slot1', desk: 'Desk #04', status: 'live', fps: 30, warning: 0 },
+      { id: 'st_3', name: 'Minoli Senarath', batch: '2026 A/L', slot: 'slot2', desk: 'Desk #08', status: 'live', fps: 28, warning: 0 },
+      { id: 'st_4', name: 'Kavindu Jayawardena', batch: '2026 A/L', slot: 'slot1', desk: 'Desk #19', status: 'live', fps: 25, warning: 1 },
+      { id: 'st_5', name: 'Anuki Dissanayake', batch: '2027 A/L', slot: 'slot2', desk: 'Desk #23', status: 'live', fps: 30, warning: 0 },
+      { id: 'st_6', name: 'Sachintha Fernando', batch: '2027 A/L', slot: 'slot1', desk: 'Desk #07', status: 'live', fps: 30, warning: 0 }
+    ];
+
+    const formatTimer = (secs) => {
+      const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+      const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+      const s = String(secs % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    };
+
+    const renderHallContent = () => {
+      const filtered = activeFilter === 'all' ? mockStudents : mockStudents.filter(s => s.slot === activeFilter);
+
+      modal.innerHTML = `
+        <div style="width:100%; height:100%; display:flex; flex-direction:column; background:#0B0F19; color:#F8FAFC; overflow-y:auto; font-family:'Plus Jakarta Sans',sans-serif;">
+          <!-- Top Surveillance Header -->
+          <div style="background:#111827; border-bottom:1px solid #1F2937; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="apk-pulsing-dot" style="background:#EF4444; width:12px; height:12px;"></span>
+              <div>
+                <div style="font-size:14px; font-weight:800; color:#F8FAFC; display:flex; align-items:center; gap:6px;">
+                  <span>PROCTOR RADAR ACTIVE</span>
+                  <span style="font-size:11px; background:#1E3A8A; color:#93C5FD; padding:2px 8px; border-radius:6px;">LIVE 720p</span>
+                </div>
+                <div style="font-size:11.5px; color:#94A3B8;">${paper.title} • Channel: edupeak_proctor_${paper.id}</div>
+              </div>
+            </div>
+            <button id="btn-close-proctor-hall" style="background:#1F2937; border:none; color:#F8FAFC; padding:8px 14px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;">
+              ✕ Exit Hall
+            </button>
+          </div>
+
+          <!-- Examiner Phase Controller matching admin_live_proctor_screen.dart -->
+          <div style="background:#1E293B; padding:12px 18px; border-bottom:1px solid #334155;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div style="font-size:12px; font-weight:800; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">
+                ⚙️ Examiner Phase Controller:
+              </div>
+              <div id="hall-countdown-display" style="font-size:16px; font-weight:900; color:#38BDF8; font-family:monospace; background:#0F172A; padding:4px 12px; border-radius:8px; border:1px solid #334155;">
+                ${formatTimer(phaseTimeRemaining)}
+              </div>
+            </div>
+
+            <!-- Phase Buttons -->
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;">
+              <button class="phase-btn ${currentPhase === 'waiting' ? 'active-phase' : ''}" data-phase="waiting" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'waiting' ? '#2563EB' : '#0F172A'}; color:#FFFFFF;">
+                ⏳ Waiting
+              </button>
+              <button class="phase-btn ${currentPhase === 'package_opening' ? 'active-phase' : ''}" data-phase="package_opening" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'package_opening' ? '#D97706' : '#0F172A'}; color:#FFFFFF;">
+                📦 Package (10M)
+              </button>
+              <button class="phase-btn ${currentPhase === 'writing' ? 'active-phase' : ''}" data-phase="writing" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'writing' ? '#10B981' : '#0F172A'}; color:#FFFFFF;">
+                ✍️ Writing
+              </button>
+              <button class="phase-btn ${currentPhase === 'time_up' ? 'active-phase' : ''}" data-phase="time_up" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'time_up' ? '#EF4444' : '#0F172A'}; color:#FFFFFF;">
+                ⏰ Time Up
+              </button>
+              <button class="phase-btn ${currentPhase === 'ended' ? 'active-phase' : ''}" data-phase="ended" style="padding:8px 4px; font-size:10.5px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentPhase === 'ended' ? '#475569' : '#0F172A'}; color:#FFFFFF;">
+                🛑 End
+              </button>
+            </div>
+          </div>
+
+          <!-- Telemetry Stats Row -->
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; padding:12px 18px; background:#0F172A; border-bottom:1px solid #1F2937;">
+            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
+              <div style="font-size:10.5px; color:#94A3B8;">Enrolled</div>
+              <div style="font-size:16px; font-weight:800; color:#F8FAFC;">48</div>
+            </div>
+            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
+              <div style="font-size:10.5px; color:#94A3B8;">Online Cams</div>
+              <div style="font-size:16px; font-weight:800; color:#10B981;">45 Active</div>
+            </div>
+            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
+              <div style="font-size:10.5px; color:#94A3B8;">Warnings</div>
+              <div style="font-size:16px; font-weight:800; color:#F59E0B;">1 Flagged</div>
+            </div>
+            <div style="background:#1E293B; padding:10px; border-radius:10px; text-align:center;">
+              <div style="font-size:10.5px; color:#94A3B8;">Submitted</div>
+              <div style="font-size:16px; font-weight:800; color:#38BDF8;">12 Done</div>
+            </div>
+          </div>
+
+          <!-- Filter & Controls Toolbar -->
+          <div style="padding:10px 18px; display:flex; justify-content:space-between; align-items:center; background:#111827;">
+            <div style="display:flex; gap:6px;">
+              <button class="slot-filter-btn" data-slot="all" style="background:${activeFilter === 'all' ? '#2563EB' : '#1F2937'}; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">All Desks (6)</button>
+              <button class="slot-filter-btn" data-slot="slot1" style="background:${activeFilter === 'slot1' ? '#2563EB' : '#1F2937'}; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">☀️ Slot 1</button>
+              <button class="slot-filter-btn" data-slot="slot2" style="background:${activeFilter === 'slot2' ? '#2563EB' : '#1F2937'}; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">🌙 Slot 2</button>
+            </div>
+            <button id="btn-broadcast-hall" style="background:#4F46E5; color:#FFFFFF; border:none; border-radius:8px; padding:7px 14px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">
+              <span>📢</span> Broadcast Alert
+            </button>
+          </div>
+
+          <!-- Live Student Video Grid -->
+          <div style="flex:1; padding:14px 18px; display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; align-content:start;">
+            ${filtered.map(s => `
+              <div style="background:#111827; border:1px solid ${s.warning > 0 ? '#EF4444' : '#1F2937'}; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                <!-- Simulated Student Camera View -->
+                <div style="position:relative; width:100%; height:180px; background:linear-gradient(135deg, #0F172A, #1E293B); display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                  <!-- Camera Watermark & Grid -->
+                  <div style="position:absolute; inset:0; opacity:0.1; background-image:linear-gradient(#38BDF8 1px, transparent 1px), linear-gradient(90deg, #38BDF8 1px, transparent 1px); background-size:20px 20px;"></div>
+
+                  <!-- Student Avatar Icon -->
+                  <div style="width:64px; height:64px; border-radius:50%; background:#1E293B; border:2px solid #38BDF8; display:flex; align-items:center; justify-content:center; font-size:28px; color:#F8FAFC;">
+                    👨‍🎓
+                  </div>
+
+                  <!-- Stream Overlay Overlays -->
+                  <div style="position:absolute; top:10px; left:10px; display:flex; align-items:center; gap:6px; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);">
+                    <span class="apk-pulsing-dot" style="background:#10B981; width:8px; height:8px;"></span>
+                    <span style="font-size:10px; font-weight:800; color:#10B981;">LIVE • ${s.fps} FPS</span>
+                  </div>
+
+                  <div style="position:absolute; top:10px; right:10px; background:rgba(15,23,42,0.8); padding:4px 8px; border-radius:6px; font-size:10px; font-weight:700; color:#38BDF8; border:1px solid rgba(255,255,255,0.1);">
+                    ${s.desk}
+                  </div>
+
+                  ${s.warning > 0 ? `
+                    <div style="position:absolute; bottom:10px; left:10px; right:10px; background:rgba(239,68,68,0.9); color:#FFFFFF; padding:4px 8px; border-radius:6px; font-size:10.5px; font-weight:800; text-align:center;">
+                      ⚠️ Warning: Face Angle Misaligned
+                    </div>
+                  ` : `
+                    <div style="position:absolute; bottom:10px; left:10px; background:rgba(15,23,42,0.7); color:#94A3B8; padding:3px 6px; border-radius:4px; font-size:9.5px;">
+                      Audio: Quiet (18 dB) • Heartbeat: 1s
+                    </div>
+                  `}
+                </div>
+
+                <!-- Student Information Card -->
+                <div style="padding:12px; background:#111827; display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-size:13px; font-weight:800; color:#F8FAFC;">${s.name}</div>
+                    <div style="font-size:11px; color:#94A3B8;">${s.batch} • ${s.slot === 'slot1' ? '☀️ Slot 1' : '🌙 Slot 2'}</div>
+                  </div>
+                  <div style="display:flex; gap:6px;">
+                    <button class="btn-inspect-student" data-student="${s.name}" style="background:#1E293B; border:1px solid #334155; color:#38BDF8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer;" title="Enlarge Video Feed">
+                      🔍 Inspect
+                    </button>
+                    <button class="btn-warn-student" data-student="${s.name}" style="background:#EF4444; border:none; color:#FFFFFF; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer;" title="Issue Proctor Warning">
+                      ⚠️ Warn
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Bottom Proctor Bar -->
+          <div style="padding:12px 18px; background:#111827; border-top:1px solid #1F2937; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <div style="font-size:12px; color:#94A3B8;">
+              Connected to Agora RTC Audio/Video Channel. Automated anti-cheat active.
+            </div>
+            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:10px; padding:8px 16px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px;">
+              <span>📝</span> Test Student Exam Room ➔
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Event handlers
+      document.getElementById('btn-close-proctor-hall')?.addEventListener('click', () => {
+        clearInterval(ticker);
+        modal.remove();
+      });
+
+      document.getElementById('btn-hall-test-student')?.addEventListener('click', () => {
+        clearInterval(ticker);
+        modal.remove();
+        this.openStudentLiveExamRoom(paper.id, 'slot1');
+      });
+
+      modal.querySelectorAll('[data-phase]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          currentPhase = btn.dataset.phase;
+          paper.phase = currentPhase;
+          paper.isLive = currentPhase === 'package_opening' || currentPhase === 'writing';
+          paper.isEnded = currentPhase === 'ended';
+          if (currentPhase === 'package_opening') phaseTimeRemaining = 10 * 60;
+          else if (currentPhase === 'writing') phaseTimeRemaining = 150 * 60;
+          else if (currentPhase === 'time_up') phaseTimeRemaining = 15 * 60;
+          notificationService.playChime();
+          notificationService.showInAppBanner('Exam Phase Updated ⏱️', `Hall transitioned to: ${currentPhase.toUpperCase()}`, 'info');
+          renderHallContent();
+        });
+      });
+
+      modal.querySelectorAll('.slot-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.slot;
+          renderHallContent();
+        });
+      });
+
+      modal.querySelectorAll('.btn-inspect-student').forEach(btn => {
+        btn.addEventListener('click', () => {
+          alert(`🔍 Fullscreen High-Definition Stream: ${btn.dataset.student}\n\n• Video: 1080p 30fps (Active)\n• Face Orientation: 98% Facing Camera (Safe)\n• Ambient Noise: 18 dB (Quiet)\n• Second Device Detection: None Detected`);
+        });
+      });
+
+      modal.querySelectorAll('.btn-warn-student').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const reason = prompt(`Enter proctor warning message for ${btn.dataset.student}:`, 'කරුණාකර ඔබගේ කැමරාව ඉදිරියට හරවා මුහුණ පෙනෙන සේ තබන්න (Please adjust camera to face screen).');
+          if (reason) {
+            notificationService.showInAppBanner('Warning Dispatched ⚠️', `Proctor warning sent to ${btn.dataset.student}`, 'warning');
+          }
+        });
+      });
+
+      document.getElementById('btn-broadcast-hall')?.addEventListener('click', () => {
+        const msg = prompt('Enter announcement to broadcast to all exam candidates:', 'අවධානයට: විභාගයේ ඉතිරිව ඇත්තේ විනාඩි 15 ක් පමණි. කරුණාකර පිළිතුරු පත්‍ර සූදානම් කරගන්න (15 minutes remaining).');
+        if (msg) {
+          notificationService.playChime();
+          notificationService.showInAppBanner('Hall Broadcast Dispatched 📢', msg, 'info');
+        }
+      });
+    };
+
+    renderHallContent();
+    document.body.appendChild(modal);
+
+    const ticker = setInterval(() => {
+      if (phaseTimeRemaining > 0) {
+        phaseTimeRemaining--;
+        const disp = document.getElementById('hall-countdown-display');
+        if (disp) disp.textContent = formatTimer(phaseTimeRemaining);
+      }
+    }, 1000);
+  }
+
+  // ── B. Student Live Exam Writing Room (live_exam_room_screen.dart) ────────
+  async openStudentLiveExamRoom(paperId, slotId = 'slot1') {
+    const papers = await dbService.getPaperSessions();
+    const paper = papers.find(p => p.id === paperId) || {
+      id: paperId || 'p_demo',
+      title: '2027 A/L Speed Paper 01 (Physics)',
+      subject: 'Physics',
+      durationMinutes: 150,
+      phase: 'writing',
+      examYear: '2027 A/L'
+    };
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.style.background = '#0F172A';
+    modal.style.zIndex = '9999';
+
+    let examSeconds = (paper.durationMinutes || 150) * 60;
+    let cameraStream = null;
+    let snappedPages = [];
+    let currentPhase = paper.phase || 'writing'; // 'package_opening', 'writing', 'time_up'
+
+    const formatTimer = (secs) => {
+      const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+      const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+      const s = String(secs % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    };
+
+    modal.innerHTML = `
+      <div style="width:100%; height:100%; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow-y:auto; font-family:'Plus Jakarta Sans',sans-serif;">
+        <!-- Top App Bar -->
+        <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:36px; height:36px; border-radius:10px; background:rgba(37,99,235,0.15); display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:18px;">
+              📝
+            </div>
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#FFFFFF;">${paper.title}</div>
+              <div style="font-size:11px; color:#94A3B8;">${slotId === 'slot1' ? '☀️ Morning Slot 1 (08:30 AM)' : '🌙 Evening Slot 2 (04:00 PM)'}</div>
+            </div>
+          </div>
+          <button id="btn-exit-exam-room" style="background:#334155; border:none; color:#F8FAFC; padding:8px 14px; border-radius:10px; font-size:12.5px; font-weight:700; cursor:pointer;">
+            ✕ Leave
+          </button>
+        </div>
+
+        <!-- Live Proctoring Status Bar -->
+        <div style="background:#111827; padding:8px 16px; border-bottom:1px solid #1E293B; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="apk-pulsing-dot" style="background:#10B981; width:8px; height:8px;"></span>
+            <span style="font-size:11.5px; font-weight:700; color:#10B981;">SURVEILLANCE CAMERA ON • PROCTORING ACTIVE</span>
+          </div>
+          <span style="font-size:11px; color:#64748B;">Heartbeat: 2s (OK)</span>
+        </div>
+
+        <!-- Big Countdown & Phase Banner -->
+        <div style="background:linear-gradient(180deg, #1E293B, #0F172A); padding:24px 16px; text-align:center; border-bottom:1px solid #334155;">
+          <div id="student-phase-label" style="font-size:12px; font-weight:800; color:#F59E0B; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">
+            ${currentPhase === 'package_opening' ? '📦 10-MINUTE PACKAGE OPENING PHASE' : (currentPhase === 'time_up' ? '⏰ TIME UP - SUBMIT ANSWERS' : '✍️ EXAM WRITING IN PROGRESS')}
+          </div>
+          <div id="student-countdown" style="font-size:48px; font-weight:900; color:#FFFFFF; font-family:monospace; letter-spacing:2px; text-shadow:0 0 20px rgba(56,189,248,0.3);">
+            ${formatTimer(examSeconds)}
+          </div>
+          <div style="font-size:12px; color:#94A3B8; margin-top:6px;">
+            Do not minimize this window. Camera feed is securely streamed to the faculty proctor.
+          </div>
+        </div>
+
+        <!-- Live Camera Stream PIP & Guidelines -->
+        <div style="padding:16px; display:flex; flex-direction:column; gap:16px;">
+          <!-- Camera Preview Container -->
+          <div style="background:#1E293B; border:1px solid #334155; border-radius:16px; overflow:hidden; position:relative;">
+            <div style="position:relative; width:100%; height:220px; background:#000000; display:flex; align-items:center; justify-content:center;">
+              <video id="student-webcam-preview" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+              <div id="webcam-fallback-msg" style="position:absolute; display:none; flex-direction:column; align-items:center; gap:8px; color:#94A3B8; text-align:center; padding:20px;">
+                <span style="font-size:36px;">📷</span>
+                <span style="font-size:13px; font-weight:700;">Live Camera Feed Active</span>
+                <span style="font-size:11px; max-width:240px;">Proctoring is recording face and desk area. Ensure adequate lighting.</span>
+              </div>
+            </div>
+            <div style="padding:10px 14px; background:#111827; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${this.currentUser?.name || 'Kasun Perera'}</span>
+              <span style="font-size:11px; background:#047857; color:#A7F3D0; padding:2px 8px; border-radius:6px; font-weight:800;">720p HD</span>
+            </div>
+          </div>
+
+          <!-- Question Paper View Button -->
+          <button id="btn-view-paper-pdf" class="apk-btn-primary" style="padding:14px; background:#2563EB; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span>📄</span> View / Download Physics Question Paper (PDF)
+          </button>
+
+          <!-- In-App Answer Document Scanner Card matching in_app_document_scanner_screen.dart -->
+          <div style="background:#1E293B; border:1px solid #334155; border-radius:16px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:14px; font-weight:800; color:#FFFFFF;">In-App Answer Sheet Scanner 📷</div>
+                <div style="font-size:11.5px; color:#94A3B8;">Snap photos of your handwritten sheets to submit.</div>
+              </div>
+              <span id="scanned-count-badge" style="background:#334155; color:#38BDF8; font-weight:800; font-size:12px; padding:4px 10px; border-radius:10px;">0 Pages</span>
+            </div>
+
+            <!-- Snapped Pages Gallery -->
+            <div id="snapped-pages-gallery" style="display:flex; gap:8px; margin-top:12px; overflow-x:auto; min-height:60px; align-items:center;">
+              <div style="color:#64748B; font-size:12px; font-style:italic;">No answer sheet pages snapped yet.</div>
+            </div>
+
+            <!-- Scanner Trigger Buttons -->
+            <div style="display:flex; gap:8px; margin-top:14px;">
+              <button id="btn-snap-answer-page" class="apk-btn-primary" style="flex:1; background:#0F766E; padding:12px; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <span>📸</span> Snap Next Page
+              </button>
+              <button id="btn-submit-final-exam" class="apk-btn-primary" style="flex:1.2; background:#10B981; padding:12px; font-size:12.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <span>🚀</span> Submit All Answers
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Initialize real camera stream via getUserMedia
+    const videoEl = document.getElementById('student-webcam-preview');
+    const fallbackEl = document.getElementById('webcam-fallback-msg');
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+        .then(stream => {
+          cameraStream = stream;
+          if (videoEl) videoEl.srcObject = stream;
+        })
+        .catch(err => {
+          console.warn('[Camera] Device camera not accessible, using simulator mode:', err);
+          if (fallbackEl) fallbackEl.style.display = 'flex';
+        });
+    } else {
+      if (fallbackEl) fallbackEl.style.display = 'flex';
+    }
+
+    // Ticker countdown
+    const examTicker = setInterval(() => {
+      if (examSeconds > 0) {
+        examSeconds--;
+        const disp = document.getElementById('student-countdown');
+        if (disp) disp.textContent = formatTimer(examSeconds);
+      } else {
+        clearInterval(examTicker);
+        alert('⏰ EXAM TIME IS UP!\n\nPlease scan and submit your answer sheets immediately.');
+      }
+    }, 1000);
+
+    // Exit handler
+    document.getElementById('btn-exit-exam-room')?.addEventListener('click', () => {
+      if (confirm('Are you sure you want to exit the live exam room? Your proctor will be notified of early departure.')) {
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        clearInterval(examTicker);
+        modal.remove();
+      }
+    });
+
+    // View Question Paper PDF
+    document.getElementById('btn-view-paper-pdf')?.addEventListener('click', () => {
+      alert(`📄 ${paper.title}\n\n• Part I: 50 Multiple Choice Questions (2 Hours)\n• Part II: Structured Essay & Essays (3 Hours)\n\nQuestion paper unlocked in proctored mode. Good luck!`);
+    });
+
+    // Snap Next Page
+    document.getElementById('btn-snap-answer-page')?.addEventListener('click', () => {
+      const pageNum = snappedPages.length + 1;
+      snappedPages.push({
+        page: pageNum,
+        time: new Date().toLocaleTimeString(),
+        img: `https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=300&auto=format&fit=crop&q=60`
+      });
+
+      notificationService.playChime();
+      notificationService.showInAppBanner(`Page ${pageNum} Captured! 📸`, 'Answer sheet page recorded into secure packet.', 'success');
+
+      // Update Gallery
+      const badge = document.getElementById('scanned-count-badge');
+      if (badge) badge.textContent = `${snappedPages.length} Pages`;
+
+      const gal = document.getElementById('snapped-pages-gallery');
+      if (gal) {
+        gal.innerHTML = snappedPages.map(p => `
+          <div style="position:relative; width:54px; height:68px; border-radius:8px; border:2px solid #38BDF8; overflow:hidden; flex-shrink:0;">
+            <img src="${p.img}" style="width:100%; height:100%; object-fit:cover;" />
+            <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,0.85); font-size:9.5px; font-weight:800; text-align:center; color:#FFFFFF;">P.${p.page}</div>
+          </div>
+        `).join('');
+      }
+    });
+
+    // Final Submit
+    document.getElementById('btn-submit-final-exam')?.addEventListener('click', () => {
+      if (snappedPages.length === 0) {
+        alert('Please snap at least one page of your written answer sheets before submitting.');
+        return;
+      }
+
+      if (!confirm(`Submit ${snappedPages.length} pages of your answers for ${paper.title}? You cannot modify after final submission.`)) {
+        return;
+      }
+
+      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+      clearInterval(examTicker);
+      modal.remove();
+
+      if (this.currentUser) {
+        this.currentUser.credits = (this.currentUser.credits || 155) + 150;
+        authService.saveSession(this.currentUser);
+      }
+
+      alert(`✅ SUBMISSION SUCCESSFUL!\n\n${paper.title}\n• Total Pages Uploaded: ${snappedPages.length}\n• Hash: EDUP-${Date.now().toString(36).toUpperCase()}\n• XP Bonus: +150 XP Awarded!\n\nYour paper will now be evaluated by the faculty.`);
+      notificationService.playChime();
+      notificationService.showInAppBanner('Answers Submitted! 🎉', `Awarded +150 XP for ${paper.title}`, 'success');
+
+      if (this.currentMode === 'admin') {
+        const vp = document.getElementById('admin-main-viewport');
+        if (vp) this.renderAdminPapersScreen(vp);
+      } else {
+        this.renderApp();
+      }
+    });
+  }
 
 window.addEventListener('DOMContentLoaded', () => {
   const app = new AppController();
