@@ -4714,235 +4714,1023 @@ class AppController {
     document.body.appendChild(modal);
   }
 
-  // ── B. Student Live Exam Writing Room (live_exam_room_screen.dart) ────────
+  // ── B. Student Live Exam Writing Room (1:1 with live_exam_room_screen.dart & in_app_document_scanner_screen.dart) ──
   async openStudentLiveExamRoom(paperId, slotId = 'slot1') {
-    const papers = await dbService.getPaperSessions();
-    const paper = papers.find(p => p.id === paperId) || {
-      id: paperId || 'p_demo',
-      title: '2027 A/L Speed Paper 01 (Physics)',
-      subject: 'Physics',
-      durationMinutes: 150,
-      phase: 'writing',
-      examYear: '2027 A/L'
-    };
+    const student = this.currentUser || { id: 's_default', name: 'Student', phone: '' };
 
-    const modal = document.createElement('div');
-    modal.className = 'app-modal';
-    modal.style.display = 'flex';
-    modal.style.justifyContent = 'center';
-    modal.style.alignItems = 'center';
-    modal.style.background = 'rgba(11, 15, 25, 0.88)';
-    modal.style.backdropFilter = 'blur(12px)';
-    modal.style.zIndex = '9999';
-
-    let examSeconds = (paper.durationMinutes || 150) * 60;
-    let cameraStream = null;
-    let snappedPages = [];
-    let currentPhase = paper.phase || 'writing'; // 'package_opening', 'writing', 'time_up'
-
-    const formatTimer = (secs) => {
-      const h = String(Math.floor(secs / 3600)).padStart(2, '0');
-      const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-      const s = String(secs % 60).padStart(2, '0');
-      return `${h}:${m}:${s}`;
-    };
-
-    modal.innerHTML = `
-      <div style="width:100%; max-width:430px; height:92vh; max-height:860px; border-radius:28px; border:1px solid #334155; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow-y:auto; font-family:'Plus Jakarta Sans',sans-serif; box-shadow:0 24px 60px rgba(0,0,0,0.7); position:relative;">
-        <!-- Top App Bar -->
-        <div style="background:#1E293B; border-bottom:1px solid #334155; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:36px; height:36px; border-radius:10px; background:rgba(37,99,235,0.15); display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:18px;">
-              📝
-            </div>
-            <div>
-              <div style="font-size:13.5px; font-weight:800; color:#FFFFFF;">${paper.title}</div>
-              <div style="font-size:11px; color:#94A3B8;">${slotId === 'slot1' ? '☀️ Morning Slot 1 (08:30 AM)' : '🌙 Evening Slot 2 (04:00 PM)'}</div>
-            </div>
+    // 1. Check if student already submitted this paper (matching _checkIfAlreadySubmitted)
+    const existingReg = await dbService.getStudentRegistration(paperId, student.id);
+    if (existingReg && (existingReg.isSubmitted || existingReg.status === 'submitted')) {
+      const alreadySubmittedModal = document.createElement('div');
+      alreadySubmittedModal.className = 'app-modal';
+      alreadySubmittedModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:99999;';
+      alreadySubmittedModal.innerHTML = `
+        <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:24px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+            <div style="color:#22C55E; font-size:26px;">✓</div>
+            <h3 style="font-size:16px; font-weight:700; color:#FFFFFF; margin:0;">Paper Already Submitted</h3>
           </div>
-          <button id="btn-exit-exam-room" style="background:#334155; border:none; color:#F8FAFC; padding:8px 14px; border-radius:10px; font-size:12.5px; font-weight:700; cursor:pointer;">
-            ✕ Leave
-          </button>
-        </div>
-
-        <!-- Live Proctoring Status Bar -->
-        <div style="background:#111827; padding:8px 16px; border-bottom:1px solid #1E293B; display:flex; justify-content:space-between; align-items:center;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="apk-pulsing-dot" style="background:#10B981; width:8px; height:8px;"></span>
-            <span style="font-size:11.5px; font-weight:700; color:#10B981;">SURVEILLANCE CAMERA ON • PROCTORING ACTIVE</span>
-          </div>
-          <span style="font-size:11px; color:#64748B;">Heartbeat: 2s (OK)</span>
-        </div>
-
-        <!-- Big Countdown & Phase Banner -->
-        <div style="background:linear-gradient(180deg, #1E293B, #0F172A); padding:24px 16px; text-align:center; border-bottom:1px solid #334155;">
-          <div id="student-phase-label" style="font-size:12px; font-weight:800; color:#F59E0B; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">
-            ${currentPhase === 'package_opening' ? '📦 10-MINUTE PACKAGE OPENING PHASE' : (currentPhase === 'time_up' ? '⏰ TIME UP - SUBMIT ANSWERS' : '✍️ EXAM WRITING IN PROGRESS')}
-          </div>
-          <div id="student-countdown" style="font-size:48px; font-weight:900; color:#FFFFFF; font-family:monospace; letter-spacing:2px; text-shadow:0 0 20px rgba(56,189,248,0.3);">
-            ${formatTimer(examSeconds)}
-          </div>
-          <div style="font-size:12px; color:#94A3B8; margin-top:6px;">
-            Do not minimize this window. Camera feed is securely streamed to the faculty proctor.
+          <p style="font-size:13px; color:#CBD5E1; line-height:1.5; margin:0 0 20px 0;">
+            ඔබ මෙම විභාගයේ පිළිතුරු පත්‍ර දැනටමත් සාර්ථකව භාරදී ඇත. නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.
+          </p>
+          <div style="display:flex; justify-content:flex-end;">
+            <button id="btn-submitted-ok" style="background:#22C55E; color:#FFFFFF; border:none; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">
+              හරි (OK)
+            </button>
           </div>
         </div>
-
-        <!-- Live Camera Stream PIP & Guidelines -->
-        <div style="padding:16px; display:flex; flex-direction:column; gap:16px;">
-          <!-- Camera Preview Container -->
-          <div style="background:#1E293B; border:1px solid #334155; border-radius:16px; overflow:hidden; position:relative;">
-            <div style="position:relative; width:100%; height:220px; background:#000000; display:flex; align-items:center; justify-content:center;">
-              <video id="student-webcam-preview" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
-              <div id="webcam-fallback-msg" style="position:absolute; display:none; flex-direction:column; align-items:center; gap:8px; color:#94A3B8; text-align:center; padding:20px;">
-                <span style="font-size:36px;">📷</span>
-                <span style="font-size:13px; font-weight:700;">Live Camera Feed Active</span>
-                <span style="font-size:11px; max-width:240px;">Proctoring is recording face and desk area. Ensure adequate lighting.</span>
-              </div>
-            </div>
-            <div style="padding:10px 14px; background:#111827; display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${this.currentUser?.name || 'Kasun Perera'}</span>
-              <span style="font-size:11px; background:#047857; color:#A7F3D0; padding:2px 8px; border-radius:6px; font-weight:800;">720p HD</span>
-            </div>
-          </div>
-
-          <!-- Question Paper View Button -->
-          <button id="btn-view-paper-pdf" class="apk-btn-primary" style="padding:14px; background:#2563EB; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;">
-            <span>📄</span> View / Download Physics Question Paper (PDF)
-          </button>
-
-          <!-- In-App Answer Document Scanner Card matching in_app_document_scanner_screen.dart -->
-          <div style="background:#1E293B; border:1px solid #334155; border-radius:16px; padding:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <div style="font-size:14px; font-weight:800; color:#FFFFFF;">In-App Answer Sheet Scanner 📷</div>
-                <div style="font-size:11.5px; color:#94A3B8;">Snap photos of your handwritten sheets to submit.</div>
-              </div>
-              <span id="scanned-count-badge" style="background:#334155; color:#38BDF8; font-weight:800; font-size:12px; padding:4px 10px; border-radius:10px;">0 Pages</span>
-            </div>
-
-            <!-- Snapped Pages Gallery -->
-            <div id="snapped-pages-gallery" style="display:flex; gap:8px; margin-top:12px; overflow-x:auto; min-height:60px; align-items:center;">
-              <div style="color:#64748B; font-size:12px; font-style:italic;">No answer sheet pages snapped yet.</div>
-            </div>
-
-            <!-- Scanner Trigger Buttons -->
-            <div style="display:flex; gap:8px; margin-top:14px;">
-              <button id="btn-snap-answer-page" class="apk-btn-primary" style="flex:1; background:#0F766E; padding:12px; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <span>📸</span> Snap Next Page
-              </button>
-              <button id="btn-submit-final-exam" class="apk-btn-primary" style="flex:1.2; background:#10B981; padding:12px; font-size:12.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <span>🚀</span> Submit All Answers
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    // Initialize real camera stream via getUserMedia
-    const videoEl = document.getElementById('student-webcam-preview');
-    const fallbackEl = document.getElementById('webcam-fallback-msg');
-
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-        .then(stream => {
-          cameraStream = stream;
-          if (videoEl) videoEl.srcObject = stream;
-        })
-        .catch(err => {
-          console.warn('[Camera] Device camera not accessible, using simulator mode:', err);
-          if (fallbackEl) fallbackEl.style.display = 'flex';
-        });
-    } else {
-      if (fallbackEl) fallbackEl.style.display = 'flex';
+      `;
+      document.body.appendChild(alreadySubmittedModal);
+      alreadySubmittedModal.querySelector('#btn-submitted-ok')?.addEventListener('click', () => {
+        alreadySubmittedModal.remove();
+      });
+      return;
     }
 
-    // Ticker countdown
-    const examTicker = setInterval(() => {
-      if (examSeconds > 0) {
-        examSeconds--;
-        const disp = document.getElementById('student-countdown');
-        if (disp) disp.textContent = formatTimer(examSeconds);
-      } else {
-        clearInterval(examTicker);
-        alert('⏰ EXAM TIME IS UP!\n\nPlease scan and submit your answer sheets immediately.');
-      }
-    }, 1000);
-
-    // Exit handler
-    document.getElementById('btn-exit-exam-room')?.addEventListener('click', () => {
-      if (confirm('Are you sure you want to exit the live exam room? Your proctor will be notified of early departure.')) {
-        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-        clearInterval(examTicker);
-        modal.remove();
-      }
+    // Auto-register student if not yet registered (matching _ensureStudentRegistered)
+    await dbService.registerStudentSlot({
+      paperId,
+      studentId: student.id,
+      studentName: student.name,
+      studentPhone: student.phone || '',
+      slotId: slotId || 'slot1'
     });
 
-    // View Question Paper PDF
-    document.getElementById('btn-view-paper-pdf')?.addEventListener('click', () => {
-      alert(`📄 ${paper.title}\n\n• Part I: 50 Multiple Choice Questions (2 Hours)\n• Part II: Structured Essay & Essays (3 Hours)\n\nQuestion paper unlocked in proctored mode. Good luck!`);
-    });
+    // 2. Fetch session from Firestore
+    let session = await dbService.getPaperSession(paperId);
+    if (!session) {
+      session = {
+        id: paperId,
+        title: 'Physics Mock Exam',
+        subject: 'Physics',
+        durationMinutes: 150,
+        currentPhase: 'writing',
+        status: 'live',
+        slot1: { name: 'Slot 1 (08:30 AM)', startTime: '08:30' },
+        slot2: { name: 'Slot 2 (04:00 PM)', startTime: '16:00' }
+      };
+    }
 
-    // Snap Next Page
-    document.getElementById('btn-snap-answer-page')?.addEventListener('click', () => {
-      const pageNum = snappedPages.length + 1;
-      snappedPages.push({
-        page: pageNum,
-        time: new Date().toLocaleTimeString(),
-        img: `https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=300&auto=format&fit=crop&q=60`
+    // Fullscreen View Container matching Flutter Scaffold
+    const roomContainer = document.createElement('div');
+    roomContainer.id = 'live-exam-room-root';
+    roomContainer.style.cssText = `
+      position: fixed; inset: 0; background: #0F172A; z-index: 99999;
+      display: flex; flex-direction: column; color: #F8FAFC;
+      font-family: 'Poppins', sans-serif; overflow: hidden;
+    `;
+
+    // State Variables
+    let cameraStream = null;
+    let cameraActive = false;
+    let heartbeatInterval = null;
+    let syncInterval = null;
+    let timerInterval = null;
+    let isBigTimerMinimized = false;
+    let facingMode = 'user'; // front / user camera
+    let now = new Date();
+    let shownAlertIds = new Set();
+
+    // Time calculations matching Flutter
+    const getSlot = () => (slotId === 'slot2' && session.slot2 ? session.slot2 : (session.slot1 || { name: 'Morning Slot 1', startTime: '08:30' }));
+    
+    // Heartbeat function matching Flutter _sendHeartbeat
+    const sendHeartbeat = async (isActive) => {
+      try {
+        await dbService.updateCameraHeartbeat({
+          paperId,
+          studentId: student.id,
+          studentName: student.name,
+          studentPhone: student.phone || '',
+          slotId: slotId || 'slot1',
+          isCameraActive: isActive,
+          status: 'in_exam'
+        });
+      } catch (e) {
+        console.warn('Heartbeat error:', e);
+      }
+    };
+
+    // Camera Init using WebRTC getUserMedia
+    const initCamera = async () => {
+      try {
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(t => t.stop());
+        }
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        cameraActive = true;
+        const videoEls = roomContainer.querySelectorAll('.proctor-video-feed');
+        videoEls.forEach(v => {
+          v.srcObject = cameraStream;
+          v.play().catch(() => {});
+        });
+        updateCameraStatusBadges(true);
+        sendHeartbeat(true);
+      } catch (err) {
+        console.warn('Camera init error:', err);
+        cameraActive = false;
+        updateCameraStatusBadges(false);
+        sendHeartbeat(false);
+      }
+    };
+
+    const updateCameraStatusBadges = (online) => {
+      const badges = roomContainer.querySelectorAll('.camera-status-pill');
+      badges.forEach(b => {
+        if (online) {
+          b.style.background = 'rgba(34, 197, 94, 0.2)';
+          b.style.border = '1px solid #22C55E';
+          b.style.color = '#4ADE80';
+          b.textContent = '🟢 Online';
+        } else {
+          b.style.background = 'rgba(239, 68, 68, 0.2)';
+          b.style.border = '1px solid #EF4444';
+          b.style.color = '#FCA5A5';
+          b.textContent = '🔴 Offline';
+        }
+      });
+    };
+
+    // Calculate time metrics matching live_exam_room_screen.dart
+    const calculateTimes = () => {
+      const isEnded = session.status === 'completed' || session.currentPhase === 'ended';
+      const isTimeUp = session.isTimeUp || session.currentPhase === 'time_up';
+      const isWaiting = session.currentPhase === 'waiting' || session.status === 'scheduled';
+      const isPackageOpening = session.currentPhase === 'package_opening';
+      const isWriting = session.currentPhase === 'writing' || (!isWaiting && !isPackageOpening && !isTimeUp && !isEnded);
+
+      // Package opening 10 mins countdown (600s)
+      let pkgSecsLeft = 600;
+      if (isPackageOpening && session.packageOpeningStartedAt) {
+        const started = new Date(session.packageOpeningStartedAt);
+        const elapsed = Math.max(0, Math.floor((new Date() - started) / 1000));
+        pkgSecsLeft = Math.max(0, 600 - elapsed);
+      }
+
+      // Exam Writing countdown
+      const totalWritingSecs = (session.durationMinutes || 150) * 60;
+      let writingSecsLeft = totalWritingSecs;
+      let isOvertime = false;
+      let overtimeSecs = 0;
+
+      if (isWriting) {
+        let startTime = session.writingStartedAt ? new Date(session.writingStartedAt) : null;
+        if (!startTime) {
+          const cached = localStorage.getItem(`paper_writing_start_${session.id}`);
+          if (cached) startTime = new Date(cached);
+          else {
+            startTime = new Date();
+            localStorage.setItem(`paper_writing_start_${session.id}`, startTime.toISOString());
+          }
+        }
+        const elapsed = Math.max(0, Math.floor((new Date() - startTime) / 1000));
+        if (elapsed > totalWritingSecs) {
+          isOvertime = true;
+          overtimeSecs = elapsed - totalWritingSecs;
+          writingSecsLeft = 0;
+        } else {
+          writingSecsLeft = totalWritingSecs - elapsed;
+        }
+      }
+
+      return { isEnded, isTimeUp, isWaiting, isPackageOpening, isWriting, isOvertime, pkgSecsLeft, writingSecsLeft, overtimeSecs };
+    };
+
+    // Render Room Function
+    const renderRoom = () => {
+      const times = calculateTimes();
+      const slot = getSlot();
+
+      // Top live timer pill text and colors matching Flutter
+      let timerText = '⏳ Waiting';
+      let timerColor = '#818CF8';
+      let timerIcon = '⏳';
+
+      if (times.isEnded) {
+        timerText = 'Ended';
+        timerColor = '#EF4444';
+        timerIcon = '✕';
+      } else if (times.isTimeUp) {
+        timerText = '⏰ Time Up';
+        timerColor = '#EF4444';
+        timerIcon = '⏰';
+      } else if (times.isWaiting) {
+        timerText = '⏳ Waiting';
+        timerColor = '#818CF8';
+        timerIcon = '⏳';
+      } else if (times.isPackageOpening) {
+        const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');
+        const s = String(times.pkgSecsLeft % 60).padStart(2, '0');
+        timerText = times.pkgSecsLeft <= 0 ? '📦 00:00' : `📦 Open: ${m}:${s}`;
+        timerColor = '#F59E0B';
+        timerIcon = '📦';
+      } else if (times.isWriting) {
+        if (!times.isOvertime) {
+          const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
+          const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
+          const s = String(times.writingSecsLeft % 60).padStart(2, '0');
+          timerText = Math.floor(times.writingSecsLeft / 3600) > 0 ? `📝 ${h}:${m}:${s}` : `📝 ${m}:${s}`;
+          timerColor = times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E';
+          timerIcon = '📝';
+        } else {
+          const m = String(Math.floor(times.overtimeSecs / 60)).padStart(2, '0');
+          const s = String(times.overtimeSecs % 60).padStart(2, '0');
+          timerText = `⏱️ Extra: +${m}:${s}`;
+          timerColor = '#F59E0B';
+          timerIcon = '⏱️';
+        }
+      }
+
+      // Subtitle matching Flutter
+      let subtitleText = `${slot.name || 'Slot 1'} • සජීවී විභාගය`;
+      if (times.isWaiting) subtitleText = 'පොරොත්තු ශාලාව (Waiting)';
+      else if (times.isPackageOpening) subtitleText = 'පාර්සල් විවෘත කිරීම';
+
+      // Build HTML
+      roomContainer.innerHTML = `
+        <!-- AppBar matching Flutter AppBar -->
+        <div style="background:#1E293B; height:56px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="btn-appbar-back" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; display:flex; align-items:center; padding:4px;">
+              ❮
+            </button>
+            <div>
+              <div style="font-size:14px; font-weight:600; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px;">
+                ${session.title}
+              </div>
+              <div style="font-size:11px; color:#94A3B8;">
+                ${subtitleText}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${!times.isWaiting ? `
+              <button id="btn-appbar-flip" title="Flip Camera" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; padding:6px; display:flex; align-items:center;">
+                🔄
+              </button>
+            ` : ''}
+            <!-- Upgraded Live Timer Pill -->
+            <div style="background:${timerColor}38; border:1.8px solid ${timerColor}; box-shadow:0 0 10px ${timerColor}4D; border-radius:20px; padding:5px 12px; display:flex; align-items:center; gap:6px;">
+              <span style="font-size:14px;">${timerIcon}</span>
+              <span style="font-size:13.5px; font-weight:800; color:${timerColor}; letter-spacing:0.5px;">${timerText}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Body matching live_exam_room_screen.dart -->
+        <div style="flex:1; position:relative; overflow:hidden; display:flex; flex-direction:column;">
+          ${times.isWaiting ? `
+            <!-- ── A. WAITING ROOM VIEW (_buildWaitingRoomView) ── -->
+            <div style="flex:1; overflow-y:auto; padding:16px; max-width:680px; width:100%; margin:0 auto;">
+              <!-- 1. Top Waiting Notice Card -->
+              <div style="padding:16px; border-radius:16px; background:linear-gradient(135deg, rgba(99,102,241,0.25), #0F172A); border:1px solid rgba(99,102,241,0.4); display:flex; gap:14px; align-items:flex-start;">
+                <div style="width:44px; height:44px; border-radius:50%; background:rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:22px; color:#A5B4FC; flex-shrink:0;">
+                  ⏳
+                </div>
+                <div>
+                  <div style="font-size:14px; font-weight:700; color:#FFFFFF; margin-bottom:4px;">
+                    විභාග පොරොත්තු ශාලාව (Waiting Room)
+                  </div>
+                  <div style="font-size:12px; font-weight:600; color:#38BDF8; margin-bottom:6px;">
+                    නියමිත වේලාව: ${slot.startTime || '08:30'} (${slot.name || 'Slot 1'})
+                  </div>
+                  <div style="font-size:11px; color:#CBD5E1; line-height:1.45;">
+                    විභාගය නියමිත වේලාවට ස්වයංක්‍රීයව ආරම්භ නොවේ. විභාග පරීක්ෂක විසින් විභාගය ආරම්භ කරන තෙක් කරුණාකර මෙම තිරයේ රැඳී සිටින්න. ඔවුන් සැසිය ආරම්භ කළ වහාම තිරය සජීවී විභාගයට මාරු වේ.
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Camera Self-Check Box -->
+              <div style="margin-top:16px; background:#1E293B; border-radius:16px; border:1px solid #334155; overflow:hidden;">
+                <div style="padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="color:#22C55E; font-size:16px;">📹</span>
+                    <span style="font-size:12px; font-weight:600; color:#FFFFFF;">කැමරා පූර්ව පරීක්ෂාව (Self-Check)</span>
+                  </div>
+                  <div class="camera-status-pill" style="padding:3px 8px; border-radius:10px; font-size:10px; font-weight:700; ${cameraActive ? 'background:rgba(34,197,94,0.2); border:1px solid #22C55E; color:#4ADE80;' : 'background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5;'}">
+                    ${cameraActive ? '🟢 Online' : '🔴 Offline'}
+                  </div>
+                </div>
+                <div style="height:220px; width:100%; background:#000000; position:relative; display:flex; align-items:center; justify-content:center;">
+                  <video class="proctor-video-feed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+                  ${!cameraActive ? `
+                    <div style="position:absolute; display:flex; flex-direction:column; align-items:center; gap:8px; color:#94A3B8; text-align:center; padding:16px;">
+                      <div style="font-size:24px;">📷</div>
+                      <div style="font-size:11px;">කැමරාව ආරම්භ වෙමින් පවතී...</div>
+                      <button id="btn-retry-camera" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer;">නැවත උත්සාහ කරන්න (Retry)</button>
+                    </div>
+                  ` : ''}
+                </div>
+                <div style="padding:12px; display:flex; align-items:center; justify-content:space-between;">
+                  <div style="display:flex; align-items:center; gap:6px; font-size:10.5px; color:#94A3B8;">
+                    <span style="color:#22C55E;">✓</span>
+                    <span>ඔබගේ මුහුණ සහ විභාග මේසය පැහැදිලිව පෙනෙන සේ තබන්න.</span>
+                  </div>
+                  <button id="btn-flip-self-check" style="background:transparent; border:none; color:#818CF8; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    🔄 Flip
+                  </button>
+                </div>
+              </div>
+
+              <!-- 3. Exam Preparations Checklist -->
+              <div style="margin-top:16px; background:#1E293B; border-radius:16px; border:1px solid #334155; padding:16px;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+                  <span style="color:#F59E0B; font-size:18px;">📋</span>
+                  <span style="font-size:13px; font-weight:700; color:#FFFFFF;">විභාග උපදෙස් (Exam Checklist)</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                  <div style="display:flex; gap:10px; align-items:flex-start;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(245,158,11,0.15); display:flex; align-items:center; justify-content:center; color:#F59E0B; font-size:13px; flex-shrink:0;">📦</div>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">මුද්‍රා තැබූ ප්‍රශ්න පත්‍ර පාර්සලය මේසය මත තබාගන්න</div>
+                      <div style="font-size:10px; color:#94A3B8;">පරීක්ෂක විසින් විධානය දෙන තුරු කිසිසේත්ම විවෘත නොකරන්න.</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:10px; align-items:flex-start;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(56,189,248,0.15); display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:13px; flex-shrink:0;">✂️</div>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">පාර්සලය විවෘත කිරීමට කතුරක්/බ්ලේඩයක් සූදානම් කරගන්න</div>
+                      <div style="font-size:10px; color:#94A3B8;">කැමරාව ඉදිරියේ පළමු මිනිත්තු 10 තුළ විවෘත කළ යුතුය.</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:10px; align-items:flex-start;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(34,197,94,0.15); display:flex; align-items:center; justify-content:center; color:#22C55E; font-size:13px; flex-shrink:0;">💡</div>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">ප්‍රමාණවත් ආලෝකය සහ ස්ථාවර ආධාරකයක් භාවිතා කරන්න</div>
+                      <div style="font-size:10px; color:#94A3B8;">දුරකථනය නොසෙල්වෙන සේ මේසය මත රඳවා තබන්න.</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:10px; align-items:flex-start;">
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(165,180,252,0.15); display:flex; align-items:center; justify-content:center; color:#A5B4FC; font-size:13px; flex-shrink:0;">🔒</div>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">මෙම තිරයෙන් ඉවත් නොවන්න</div>
+                      <div style="font-size:10px; color:#94A3B8;">තිරය ස්වයංක්‍රීයව ක්‍රියා විරහිත නොවන පරිදි සකසා ඇත.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4. Pulse Status -->
+              <div style="margin:20px 0; text-align:center;">
+                <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#0F172A; border:1px solid #334155; border-radius:20px; font-size:11px; color:#94A3B8;">
+                  <span style="width:8px; height:8px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
+                  <span>📡 Examiner Connection: Active • Waiting to Start...</span>
+                </div>
+              </div>
+            </div>
+          ` : `
+            <!-- ── B. LIVE SURVEILLANCE STACK (_buildFullScreenCameraView) ── -->
+            <div style="position:absolute; inset:0; background:#000000; overflow:hidden;">
+              <video class="proctor-video-feed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+              <!-- Candidate details pill -->
+              <div style="position:absolute; top:16px; left:16px; background:rgba(15,23,42,0.85); backdrop-filter:blur(6px); border:1px solid #334155; border-radius:10px; padding:6px 12px; display:flex; align-items:center; gap:8px; z-index:10;">
+                <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${student.name}</span>
+                <span style="font-size:10px; background:#047857; color:#A7F3D0; padding:2px 6px; border-radius:6px; font-weight:800;">720p HD</span>
+              </div>
+            </div>
+
+            <!-- Top Phase Notice Banner (_buildPhaseNoticeBanner) -->
+            <div style="position:absolute; top:54px; left:16px; right:16px; z-index:20; max-width:680px; margin:0 auto;">
+              ${times.isPackageOpening ? `
+                <!-- 10-Minute Package Opening Banner -->
+                <div style="background:rgba(15,23,42,0.95); border:2px solid ${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'}; border-radius:16px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div style="width:36px; height:36px; border-radius:50%; background:${times.pkgSecsLeft <= 0 ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                        📦
+                      </div>
+                      <div>
+                        <div style="font-size:12px; font-weight:700; color:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'};">
+                          ${times.pkgSecsLeft <= 0 ? '⏱️ විනාඩි 10 අවසන් (Time Stopped)' : '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)'}
+                        </div>
+                        <div style="font-size:10px; color:#E2E8F0;">
+                          ${times.pkgSecsLeft <= 0 ? 'පරීක්ෂකවරයා විභාගය ආරම්භ කරන තෙක් රැඳී සිටින්න' : 'කැමරාව ඉදිරියේ පමණක් පාර්සලය විවෘත කරන්න'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style="background:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'}; color:${times.pkgSecsLeft <= 0 ? '#FFFFFF' : '#000000'}; padding:4px 8px; border-radius:8px; font-size:12px; font-weight:800;">
+                      ${String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0')}:${String(times.pkgSecsLeft % 60).padStart(2, '0')}
+                    </div>
+                  </div>
+                  <div style="background:#1E293B; border-radius:8px; border:1px solid #334155; padding:8px 10px; font-size:10px; color:#FFFFFF; line-height:1.6;">
+                    <div>1. 🏷️ මුද්‍රා තැබූ පාර්සලය කැමරාවට පෙන්වන්න (Show sealed parcel)</div>
+                    <div>2. ✂️ කැමරාව ඉදිරියේම කපා විවෘත කරන්න (Cut open on camera)</div>
+                    <div style="color:${times.pkgSecsLeft <= 0 ? '#FBBF24' : '#4ADE80'}; font-weight:${times.pkgSecsLeft <= 0 ? '700' : '400'};">
+                      3. 📄 පත්‍රය මේසය මත තබා ලිවීමට සූදානම් වන්න (Place on desk)
+                    </div>
+                  </div>
+                </div>
+              ` : times.isWriting ? `
+                <!-- Giant High-Contrast Digital Digits HUD -->
+                ${isBigTimerMinimized ? `
+                  <div style="background:rgba(15,23,42,0.92); border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; border-radius:14px; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 6px 20px rgba(0,0,0,0.5);">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="width:10px; height:10px; border-radius:50%; background:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; display:inline-block;"></span>
+                      <span style="font-size:11.5px; font-weight:600; color:#FFFFFF;">✍️ ලිවීම සක්‍රීයයි • ඉතිරි කාලය:</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <span style="font-size:16px; font-weight:800; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                        ${String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0')}:${String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0')}:${String(times.writingSecsLeft % 60).padStart(2, '0')}
+                      </span>
+                      <button id="btn-toggle-hud" style="background:rgba(255,255,255,0.12); border:none; color:#FFFFFF; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer;">
+                        ⌵
+                      </button>
+                    </div>
+                  </div>
+                ` : `
+                  <div style="background:rgba(11,19,43,0.94); border:2px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; border-radius:20px; padding:12px 16px; box-shadow:0 0 20px rgba(34,197,94,0.25); text-align:center;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="width:10px; height:10px; border-radius:50%; background:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; box-shadow:0 0 6px ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'};"></span>
+                        <span style="font-size:11px; font-weight:700; color:#E2E8F0; letter-spacing:0.5px;">📝 පිළිතුරු ලිවීම සක්‍රීයයි (WRITING ACTIVE)</span>
+                      </div>
+                      <button id="btn-toggle-hud" style="background:rgba(255,255,255,0.1); border:none; color:#94A3B8; border-radius:6px; padding:3px 8px; font-size:10px; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <span>සුළු කරන්න</span> <span>⌃</span>
+                      </button>
+                    </div>
+                    <!-- Digit Tiles -->
+                    <div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0;">
+                      <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                          ${String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0')}
+                        </div>
+                        <span style="font-size:8.5px; font-weight:600; color:#64748B; margin-top:3px;">HOURS</span>
+                      </div>
+                      <span style="font-size:24px; font-weight:bold; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'};">:</span>
+                      <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                          ${String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0')}
+                        </div>
+                        <span style="font-size:8.5px; font-weight:600; color:#64748B; margin-top:3px;">MINUTES</span>
+                      </div>
+                      <span style="font-size:24px; font-weight:bold; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'};">:</span>
+                      <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                          ${String(times.writingSecsLeft % 60).padStart(2, '0')}
+                        </div>
+                        <span style="font-size:8.5px; font-weight:600; color:#64748B; margin-top:3px;">SECONDS</span>
+                      </div>
+                    </div>
+                    <div style="font-size:10px; color:#94A3B8; margin-top:6px;">
+                      කැමරාව ඉදිරියේ ඔබගේ ලිවීම් මේසය සහ පිළිතුරු පත්‍රය තබා ගන්න
+                    </div>
+                  </div>
+                `}
+              ` : times.isTimeUp ? `
+                <!-- Urgent Time Up Banner -->
+                <div style="background:rgba(239,68,68,0.95); border:1.5px solid rgba(255,255,255,0.4); border-radius:14px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 0 16px rgba(239,68,68,0.5);">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:24px;">⏰</span>
+                    <div>
+                      <div style="font-size:12px; font-weight:700; color:#FFFFFF;">⏰ වේලාව අවසන් විය! (TIME IS UP)</div>
+                      <div style="font-size:10px; color:#FEE2E2;">ලිවීම නවතා පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න.</div>
+                    </div>
+                  </div>
+                  <button id="btn-phase-scan" style="background:#FFFFFF; color:#EF4444; border:none; padding:8px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                    Scan & Submit
+                  </button>
+                </div>
+              ` : times.isEnded ? `
+                <div style="background:rgba(239,68,68,0.95); border-radius:14px; padding:12px; color:#FFFFFF; font-size:12px; font-weight:600; text-align:center;">
+                  මෙම විභාග සැසිය ගුරුභවතුන් විසින් අවසන් කරන ලදී (Session ended by Admin).
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Bottom Exam Control Bar (_buildBottomExamControlBar) -->
+            <div style="position:absolute; bottom:20px; left:16px; right:16px; z-index:20; max-width:680px; margin:0 auto;">
+              <div style="background:rgba(30,41,59,0.92); border:1px solid ${times.isTimeUp ? '#EF4444' : '#334155'}; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:36px; height:36px; border-radius:50%; background:${times.isTimeUp ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; display:flex; align-items:center; justify-content:center; color:${times.isTimeUp ? '#EF4444' : '#4ADE80'}; font-size:18px;">
+                    ${times.isTimeUp ? '⏰' : '🛡️'}
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:600; color:${times.isTimeUp ? '#FCA5A5' : '#FFFFFF'};">
+                      ${times.isTimeUp ? 'වේලාව අවසන් කර ඇත' : 'කැමරා අධීක්ෂණය සක්‍රීයයි'}
+                    </div>
+                    <div style="font-size:10px; color:#94A3B8;">
+                      ${times.isTimeUp ? 'පිළිතුරු පත්‍ර Submit කරන්න' : 'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි'}
+                    </div>
+                  </div>
+                </div>
+                <button id="btn-bottom-submit" style="background:${times.isEnded ? '#334155' : (times.isTimeUp ? '#22C55E' : '#6366F1')}; color:#FFFFFF; border:none; padding:10px 16px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                  <span>${times.isTimeUp ? '📄' : '📤'}</span>
+                  <span>${times.isTimeUp ? 'Scan & Submit' : 'Submit Paper'}</span>
+                </button>
+              </div>
+            </div>
+          `}
+        </div>
+      `;
+
+      // Re-attach video stream
+      if (cameraStream) {
+        const videoEls = roomContainer.querySelectorAll('.proctor-video-feed');
+        videoEls.forEach(v => {
+          v.srcObject = cameraStream;
+          v.play().catch(() => {});
+        });
+      }
+
+      // Event Listeners
+      roomContainer.querySelector('#btn-appbar-back')?.addEventListener('click', () => {
+        showExitWarningDialog();
       });
 
-      notificationService.playChime();
-      notificationService.showInAppBanner(`Page ${pageNum} Captured! 📸`, 'Answer sheet page recorded into secure packet.', 'success');
+      roomContainer.querySelector('#btn-appbar-flip')?.addEventListener('click', () => {
+        facingMode = facingMode === 'user' ? 'environment' : 'user';
+        initCamera();
+      });
 
-      // Update Gallery
-      const badge = document.getElementById('scanned-count-badge');
-      if (badge) badge.textContent = `${snappedPages.length} Pages`;
+      roomContainer.querySelector('#btn-flip-self-check')?.addEventListener('click', () => {
+        facingMode = facingMode === 'user' ? 'environment' : 'user';
+        initCamera();
+      });
 
-      const gal = document.getElementById('snapped-pages-gallery');
-      if (gal) {
-        gal.innerHTML = snappedPages.map(p => `
-          <div style="position:relative; width:54px; height:68px; border-radius:8px; border:2px solid #38BDF8; overflow:hidden; flex-shrink:0;">
-            <img src="${p.img}" style="width:100%; height:100%; object-fit:cover;" />
-            <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,0.85); font-size:9.5px; font-weight:800; text-align:center; color:#FFFFFF;">P.${p.page}</div>
+      roomContainer.querySelector('#btn-retry-camera')?.addEventListener('click', () => {
+        initCamera();
+      });
+
+      roomContainer.querySelector('#btn-toggle-hud')?.addEventListener('click', () => {
+        isBigTimerMinimized = !isBigTimerMinimized;
+        renderRoom();
+      });
+
+      roomContainer.querySelector('#btn-phase-scan')?.addEventListener('click', () => {
+        openDocumentScanner();
+      });
+
+      roomContainer.querySelector('#btn-bottom-submit')?.addEventListener('click', () => {
+        openDocumentScanner();
+      });
+    };
+
+    // Exit Warning Dialog matching _showExitWarningDialog()
+    const showExitWarningDialog = () => {
+      const exitModal = document.createElement('div');
+      exitModal.className = 'app-modal';
+      exitModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:999999;';
+      exitModal.innerHTML = `
+        <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:400px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
+          <h3 style="font-size:15px; font-weight:700; color:#FFFFFF; margin:0 0 10px 0;">
+            විභාග ශාලාවෙන් පිටවීම?
+          </h3>
+          <p style="font-size:12px; color:#CBD5E1; line-height:1.5; margin:0 0 20px 0;">
+            විභාග සැසිය අතරතුර පිටවීම ගුරුභවතුන්ට සටහන් වේ. ඔබට පිටවීමට අවශ්‍යද?
+          </p>
+          <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button id="btn-exit-cancel" style="background:transparent; border:none; color:#94A3B8; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer;">
+              නැත (Stay)
+            </button>
+            <button id="btn-exit-confirm" style="background:#EF4444; border:none; color:#FFFFFF; padding:8px 16px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;">
+              පිටවෙන්න (Exit)
+            </button>
           </div>
-        `).join('');
+        </div>
+      `;
+      document.body.appendChild(exitModal);
+
+      exitModal.querySelector('#btn-exit-cancel')?.addEventListener('click', () => exitModal.remove());
+      exitModal.querySelector('#btn-exit-confirm')?.addEventListener('click', () => {
+        exitModal.remove();
+        cleanupAndExit();
+      });
+    };
+
+    // Cleanup and Exit
+    const cleanupAndExit = () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      if (syncInterval) clearInterval(syncInterval);
+      if (timerInterval) clearInterval(timerInterval);
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
       }
-    });
+      sendHeartbeat(false);
+      roomContainer.remove();
+      this.renderApp();
+    };
 
-    // Final Submit
-    document.getElementById('btn-submit-final-exam')?.addEventListener('click', () => {
-      if (snappedPages.length === 0) {
-        alert('Please snap at least one page of your written answer sheets before submitting.');
-        return;
+    // In-App Document Scanner (1:1 with in_app_document_scanner_screen.dart)
+    const openDocumentScanner = () => {
+      const scannerModal = document.createElement('div');
+      scannerModal.id = 'scanner-modal-root';
+      scannerModal.style.cssText = `
+        position: fixed; inset: 0; background: #000000; z-index: 1000000;
+        display: flex; flex-direction: column; color: #FFFFFF; font-family: 'Poppins', sans-serif;
+      `;
+
+      let scannedPages = [];
+      let scannerStream = null;
+      let driveLink = '';
+      let isCapturing = false;
+
+      // Start rear or user camera for document scanner
+      const startScannerCamera = async () => {
+        try {
+          scannerStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false
+          });
+        } catch (_) {
+          try {
+            scannerStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          } catch (e) {
+            console.warn('Scanner camera error:', e);
+          }
+        }
+        const sv = scannerModal.querySelector('#scanner-camera-view');
+        if (sv && scannerStream) {
+          sv.srcObject = scannerStream;
+          sv.play().catch(() => {});
+        }
+      };
+
+      const renderScanner = () => {
+        scannerModal.innerHTML = `
+          <!-- Top Control Bar (_buildTopControlBar) -->
+          <div style="background:rgba(15,23,42,0.9); border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; z-index:20;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <button id="btn-close-scanner" style="background:transparent; border:none; color:#FFFFFF; font-size:20px; cursor:pointer;">
+                ✕
+              </button>
+              <div>
+                <div style="font-size:13.5px; font-weight:700; color:#FFFFFF;">In-App Document Scanner</div>
+                <div style="font-size:10.5px; color:#94A3B8;">පිළිතුරු පත්‍ර ස්කෑන් කරන්න</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="scanner-pages-badge" style="background:#1E293B; border:1px solid #22C55E; color:#4ADE80; font-size:11px; font-weight:700; padding:4px 10px; border-radius:12px;">
+                ${scannedPages.length} Pages
+              </span>
+            </div>
+          </div>
+
+          <!-- Camera Viewfinder & A4 Frame (_buildA4DocumentScannerFrame) -->
+          <div style="flex:1; position:relative; overflow:hidden; background:#000000; display:flex; align-items:center; justify-content:center;">
+            <video id="scanner-camera-view" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+            <canvas id="scanner-capture-canvas" style="display:none;"></canvas>
+
+            <!-- A4 Document Scanner Viewport Guide Frame -->
+            <div style="position:absolute; width:82%; max-width:380px; height:68%; border:1.5px solid rgba(34,197,94,0.5); border-radius:12px; pointer-events:none;">
+              <!-- Top Left Corner Bracket -->
+              <div style="position:absolute; top:0; left:0; width:28px; height:28px; border-top:4px solid #22C55E; border-left:4px solid #22C55E;"></div>
+              <!-- Top Right Corner Bracket -->
+              <div style="position:absolute; top:0; right:0; width:28px; height:28px; border-top:4px solid #22C55E; border-right:4px solid #22C55E;"></div>
+              <!-- Bottom Left Corner Bracket -->
+              <div style="position:absolute; bottom:0; left:0; width:28px; height:28px; border-bottom:4px solid #22C55E; border-left:4px solid #22C55E;"></div>
+              <!-- Bottom Right Corner Bracket -->
+              <div style="position:absolute; bottom:0; right:0; width:28px; height:28px; border-bottom:4px solid #22C55E; border-right:4px solid #22C55E;"></div>
+
+              <!-- Center Guidance Badge -->
+              <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.2); border-radius:20px; padding:6px 14px; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+                <span style="color:#4ADE80; font-size:14px;">📄</span>
+                <span style="font-size:10px; color:#FFFFFF; font-weight:500;">A4 කඩදාසිය රාමුවට ගැලපෙන සේ තබන්න</span>
+              </div>
+            </div>
+
+            <!-- Shutter Flash Overlay -->
+            <div id="scanner-flash-overlay" style="position:absolute; inset:0; background:#FFFFFF; opacity:0; pointer-events:none; transition:opacity 0.15s ease;"></div>
+          </div>
+
+          <!-- Bottom Thumbnail Tray & Controls (_buildBottomScannerControls) -->
+          <div style="background:#0F172A; border-top:1px solid #334155; padding:14px 16px; display:flex; flex-direction:column; gap:12px; z-index:20;">
+            <!-- Scanned Pages Thumbnail Tray -->
+            <div id="scanner-thumbnail-tray" style="display:flex; gap:10px; overflow-x:auto; min-height:64px; align-items:center; padding:4px 0;">
+              ${scannedPages.length === 0 ? `
+                <div style="font-size:11px; color:#64748B; font-style:italic;">පිටු කිසිවක් ස්කෑන් කර නොමැත. කැමරා බොත්තම ඔබා ඡායාරූප ලබාගන්න.</div>
+              ` : scannedPages.map((p, idx) => `
+                <div style="position:relative; width:52px; height:68px; border-radius:8px; border:2px solid #22C55E; overflow:hidden; flex-shrink:0; cursor:pointer;" data-preview-idx="${idx}">
+                  <img src="${p.dataUrl}" style="width:100%; height:100%; object-fit:cover;" />
+                  <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,0.85); font-size:9px; font-weight:800; text-align:center; color:#FFFFFF;">P.${idx + 1}</div>
+                  <button class="btn-delete-page" data-del-idx="${idx}" style="position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:#EF4444; border:none; color:#FFFFFF; font-size:9px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- Optional Google Drive Link Input -->
+            <div style="display:flex; align-items:center; background:#1E293B; border:1px solid #334155; border-radius:10px; padding:0 12px;">
+              <span style="font-size:14px; margin-right:8px;">📁</span>
+              <input id="scanner-drive-input" type="text" placeholder="Google Drive Link (විකල්ප - Optional)" value="${driveLink}" style="flex:1; background:transparent; border:none; color:#FFFFFF; font-size:11.5px; padding:10px 0; outline:none;" />
+            </div>
+
+            <!-- Action Buttons: Shutter & Submit -->
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button id="btn-shutter-snap" style="flex:1; background:#0F766E; border:none; color:#FFFFFF; padding:12px; border-radius:12px; font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <span>📸</span> <span>Snap Page (${scannedPages.length + 1})</span>
+              </button>
+              <button id="btn-scanner-submit-all" style="flex:1.4; background:#22C55E; border:none; color:#FFFFFF; padding:12px; border-radius:12px; font-size:12.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <span>🚀</span> <span>Submit All Answers</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        // Re-attach video stream
+        const sv = scannerModal.querySelector('#scanner-camera-view');
+        if (sv && scannerStream) {
+          sv.srcObject = scannerStream;
+          sv.play().catch(() => {});
+        }
+
+        // Attach listeners
+        scannerModal.querySelector('#btn-close-scanner')?.addEventListener('click', () => {
+          if (scannerStream) scannerStream.getTracks().forEach(t => t.stop());
+          scannerModal.remove();
+        });
+
+        // Snap Page action
+        scannerModal.querySelector('#btn-shutter-snap')?.addEventListener('click', () => {
+          if (isCapturing) return;
+          isCapturing = true;
+
+          // Flash animation
+          const flash = scannerModal.querySelector('#scanner-flash-overlay');
+          if (flash) {
+            flash.style.opacity = '0.8';
+            setTimeout(() => { flash.style.opacity = '0'; }, 140);
+          }
+
+          // Capture frame to canvas
+          const video = scannerModal.querySelector('#scanner-camera-view');
+          const canvas = scannerModal.querySelector('#scanner-capture-canvas');
+          if (video && canvas) {
+            canvas.width = video.videoWidth || 1280;
+            canvas.height = video.videoHeight || 720;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+            scannedPages.push({
+              page: scannedPages.length + 1,
+              dataUrl,
+              timestamp: new Date().toISOString()
+            });
+
+            isCapturing = false;
+            renderScanner();
+          } else {
+            isCapturing = false;
+          }
+        });
+
+        // Delete Page
+        scannerModal.querySelectorAll('.btn-delete-page').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.delIdx);
+            scannedPages.splice(idx, 1);
+            renderScanner();
+          });
+        });
+
+        // Preview Page Dialog
+        scannerModal.querySelectorAll('[data-preview-idx]').forEach(el => {
+          el.addEventListener('click', () => {
+            const idx = parseInt(el.dataset.previewIdx);
+            const previewModal = document.createElement('div');
+            previewModal.className = 'app-modal';
+            previewModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(0,0,0,0.9); z-index:10000000;';
+            previewModal.innerHTML = `
+              <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:16px; max-width:500px; width:90%; color:#FFFFFF; font-family:'Poppins',sans-serif;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                  <span style="background:#6366F1; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">Page ${idx + 1} of ${scannedPages.length}</span>
+                  <button id="btn-close-preview" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer;">✕</button>
+                </div>
+                <div style="max-height:60vh; overflow:hidden; border-radius:8px; background:#000000;">
+                  <img src="${scannedPages[idx].dataUrl}" style="width:100%; height:100%; object-fit:contain;" />
+                </div>
+              </div>
+            `;
+            document.body.appendChild(previewModal);
+            previewModal.querySelector('#btn-close-preview')?.addEventListener('click', () => previewModal.remove());
+          });
+        });
+
+        // Drive link change listener
+        const driveInp = scannerModal.querySelector('#scanner-drive-input');
+        if (driveInp) {
+          driveInp.addEventListener('input', (e) => {
+            driveLink = e.target.value.trim();
+          });
+        }
+
+        // Final Submit All Answers matching _submitAllAnswers()
+        scannerModal.querySelector('#btn-scanner-submit-all')?.addEventListener('click', async () => {
+          if (scannedPages.length === 0 && !driveLink) {
+            alert('කරුණාකර අවම වශයෙන් එක් පිළිතුරු පත්‍රයක්වත් Scan කරන්න හෝ Drive Link එකක් ඇතුලත් කරන්න.');
+            return;
+          }
+
+          // Confirmation Dialog matching Flutter
+          const confirmModal = document.createElement('div');
+          confirmModal.className = 'app-modal';
+          confirmModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:10000001;';
+          confirmModal.innerHTML = `
+            <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                <span style="color:#22C55E; font-size:24px;">☁️</span>
+                <h3 style="font-size:16px; font-weight:700; color:#FFFFFF; margin:0;">Submit Answer Sheets?</h3>
+              </div>
+              <p style="font-size:13px; color:#E2E8F0; line-height:1.5; margin:0 0 14px 0;">
+                ඔබ විසින් Scan කරන ලද පිටු ${scannedPages.length} ක් ගුරුභවතුන් වෙත භාරදීමට සූදානම්ද?
+              </p>
+              <div style="background:#0F172A; border:1px solid #334155; border-radius:8px; padding:10px; display:flex; align-items:center; gap:8px; margin-bottom:18px;">
+                <span style="color:#22C55E;">✓</span>
+                <span style="font-size:11px; font-weight:600; color:#4ADE80;">${scannedPages.length} Pages Verified & Ready</span>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="btn-confirm-cancel" style="background:transparent; border:none; color:#94A3B8; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer;">
+                  Cancel
+                </button>
+                <button id="btn-confirm-yes" style="background:#22C55E; border:none; color:#FFFFFF; padding:8px 16px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;">
+                  Yes, Submit Now
+                </button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(confirmModal);
+
+          confirmModal.querySelector('#btn-confirm-cancel')?.addEventListener('click', () => confirmModal.remove());
+          confirmModal.querySelector('#btn-confirm-yes')?.addEventListener('click', async () => {
+            confirmModal.remove();
+
+            // Show Submitting Progress Overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; z-index:10000002; font-family:"Poppins",sans-serif;';
+            overlay.innerHTML = `
+              <div style="background:#1E293B; border-radius:16px; border:1px solid rgba(34,197,94,0.5); padding:28px; text-align:center; color:#FFFFFF;">
+                <div class="apk-spinner" style="margin:0 auto 16px auto; width:36px; height:36px; border-width:3px; border-color:#22C55E; border-top-color:transparent;"></div>
+                <div style="font-size:14px; font-weight:700; margin-bottom:6px;">පිළිතුරු පත්‍ර Upload වෙමින් පවතී...</div>
+                <div style="font-size:12px; color:#38BDF8;">Saving submission records to Cloud...</div>
+              </div>
+            `;
+            document.body.appendChild(overlay);
+
+            try {
+              const photoUrls = scannedPages.map(p => p.dataUrl);
+              if (driveLink) photoUrls.push(driveLink);
+
+              // Update Firestore paper_registrations record
+              await dbService.updateCameraHeartbeat({
+                paperId,
+                studentId: student.id,
+                studentName: student.name,
+                studentPhone: student.phone || '',
+                slotId: slotId || 'slot1',
+                isCameraActive: false,
+                status: 'submitted',
+                submissionPhotos: photoUrls
+              });
+
+              overlay.remove();
+              if (scannerStream) scannerStream.getTracks().forEach(t => t.stop());
+              scannerModal.remove();
+
+              // Show success message and exit
+              alert(`🎉 පිළිතුරු පත්‍ර (${photoUrls.length} Pages) සාර්ථකව භාරදෙන ලදී!`);
+              cleanupAndExit();
+            } catch (err) {
+              console.error('Submission save error:', err);
+              overlay.remove();
+              alert('Submission error: ' + err.message);
+            }
+          });
+        });
+      };
+
+      document.body.appendChild(scannerModal);
+      renderScanner();
+      startScannerCamera();
+    };
+
+    // Realtime Proctor Alerts Listener
+    const listenToProctorAlerts = () => {
+      try {
+        if (typeof dbService.streamStudentAlerts === 'function') {
+          dbService.streamStudentAlerts(paperId, student.id, (alerts) => {
+            alerts.forEach(alert => {
+              if (!alert.isRead && !shownAlertIds.has(alert.id)) {
+                shownAlertIds.add(alert.id);
+                showProctorAlertDialog(alert);
+              }
+            });
+          });
+        }
+      } catch (e) {
+        console.warn('Alerts listener error:', e);
+      }
+    };
+
+    // Show Proctor Alert Modal matching _showProctorAlertDialog()
+    const showProctorAlertDialog = (alert) => {
+      const alertModal = document.createElement('div');
+      alertModal.className = 'app-modal';
+      alertModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:999999;';
+      alertModal.innerHTML = `
+        <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <div style="background:rgba(245,158,11,0.2); padding:8px; border-radius:8px; font-size:20px; color:#F59E0B;">⚠️</div>
+            <div>
+              <div style="font-size:15px; font-weight:700; color:#FFFFFF;">විභාග පරීක්ෂක පණිවිඩය</div>
+              <div style="font-size:11px; color:#94A3B8;">From: ${alert.senderName || 'Faculty Proctor'}</div>
+            </div>
+          </div>
+          <div style="background:#0F172A; border-radius:10px; border:1px solid #F59E0B; padding:12px; font-size:13px; color:#E2E8F0; line-height:1.5; margin-bottom:18px;">
+            ${alert.message}
+          </div>
+          <button id="btn-ack-alert" style="width:100%; background:#6366F1; color:#FFFFFF; border:none; padding:12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;">
+            තේරුම් ගතිමි (Acknowledge)
+          </button>
+        </div>
+      `;
+      document.body.appendChild(alertModal);
+      alertModal.querySelector('#btn-ack-alert')?.addEventListener('click', () => {
+        alertModal.remove();
+        if (typeof dbService.markAlertRead === 'function') {
+          dbService.markAlertRead(alert.id);
+        }
+      });
+    };
+
+    // Initialize View
+    document.body.appendChild(roomContainer);
+    renderRoom();
+    await initCamera();
+    listenToProctorAlerts();
+
+    // Periodic Heartbeat every 4 seconds (matching _heartbeatTimer)
+    heartbeatInterval = setInterval(() => {
+      sendHeartbeat(cameraActive);
+    }, 4000);
+
+    // Periodic Session Sync every 3 seconds (matching _sessionSyncTimer)
+    syncInterval = setInterval(async () => {
+      try {
+        const s = await dbService.getPaperSession(paperId);
+        if (s) {
+          const changed = session.currentPhase !== s.currentPhase || session.status !== s.status || session.isTimeUp !== s.isTimeUp;
+          session = s;
+          if (changed) renderRoom();
+        }
+      } catch (e) {
+        console.warn('Session sync error:', e);
+      }
+    }, 3000);
+
+    // 1-second Countdown Ticker (matching _examCountdownTimer)
+    timerInterval = setInterval(() => {
+      now = new Date();
+      // Only re-render header & HUD countdowns to preserve smooth 60fps video
+      const times = calculateTimes();
+      let timerText = '⏳ Waiting';
+      let timerColor = '#818CF8';
+      let timerIcon = '⏳';
+
+      if (times.isEnded) {
+        timerText = 'Ended';
+        timerColor = '#EF4444';
+        timerIcon = '✕';
+      } else if (times.isTimeUp) {
+        timerText = '⏰ Time Up';
+        timerColor = '#EF4444';
+        timerIcon = '⏰';
+      } else if (times.isWaiting) {
+        timerText = '⏳ Waiting';
+        timerColor = '#818CF8';
+        timerIcon = '⏳';
+      } else if (times.isPackageOpening) {
+        const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');
+        const s = String(times.pkgSecsLeft % 60).padStart(2, '0');
+        timerText = times.pkgSecsLeft <= 0 ? '📦 00:00' : `📦 Open: ${m}:${s}`;
+        timerColor = '#F59E0B';
+        timerIcon = '📦';
+      } else if (times.isWriting) {
+        if (!times.isOvertime) {
+          const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
+          const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
+          const s = String(times.writingSecsLeft % 60).padStart(2, '0');
+          timerText = Math.floor(times.writingSecsLeft / 3600) > 0 ? `📝 ${h}:${m}:${s}` : `📝 ${m}:${s}`;
+          timerColor = times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E';
+          timerIcon = '📝';
+        } else {
+          const m = String(Math.floor(times.overtimeSecs / 60)).padStart(2, '0');
+          const s = String(times.overtimeSecs % 60).padStart(2, '0');
+          timerText = `⏱️ Extra: +${m}:${s}`;
+          timerColor = '#F59E0B';
+          timerIcon = '⏱️';
+        }
       }
 
-      if (!confirm(`Submit ${snappedPages.length} pages of your answers for ${paper.title}? You cannot modify after final submission.`)) {
-        return;
+      // Update timer pill in AppBar
+      const pill = roomContainer.querySelector('#btn-appbar-flip')?.nextElementSibling || roomContainer.querySelectorAll('#btn-appbar-back')[0]?.closest('div')?.parentElement?.children[1]?.lastElementChild;
+      if (pill) {
+        const span = pill.querySelector('span:last-child');
+        if (span) span.textContent = timerText;
       }
-
-      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-      clearInterval(examTicker);
-      modal.remove();
-
-      if (this.currentUser) {
-        this.currentUser.credits = (this.currentUser.credits || 155) + 150;
-        authService.saveSession(this.currentUser);
-      }
-
-      alert(`✅ SUBMISSION SUCCESSFUL!\n\n${paper.title}\n• Total Pages Uploaded: ${snappedPages.length}\n• Hash: EDUP-${Date.now().toString(36).toUpperCase()}\n• XP Bonus: +150 XP Awarded!\n\nYour paper will now be evaluated by the faculty.`);
-      notificationService.playChime();
-      notificationService.showInAppBanner('Answers Submitted! 🎉', `Awarded +150 XP for ${paper.title}`, 'success');
-
-      if (this.currentMode === 'admin') {
-        const vp = document.getElementById('admin-main-viewport');
-        if (vp) this.renderAdminPapersScreen(vp);
-      } else {
-        this.renderApp();
-      }
-    });
+    }, 1000);
   }
 }
 
