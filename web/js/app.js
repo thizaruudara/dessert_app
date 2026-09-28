@@ -2738,7 +2738,7 @@ class AppController {
     root.innerHTML = `
       <!-- iOS Status Bar -->
       <div class="ios-status-bar">
-        <span class="status-time" id="status-clock">8:15</span>
+        <span class="status-time" id="status-clock">10:26</span>
         <div class="status-icons">
           <span>●●●</span>
           <span>📶</span>
@@ -2746,35 +2746,13 @@ class AppController {
         </div>
       </div>
 
-      <!-- Sticky Executive Header across all Admin Screens -->
-      <div style="padding: 44px 14px 6px; background: #0F172A; flex-shrink: 0; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
-        <div class="admin-executive-header" style="margin-bottom:0; padding:10px 12px; border-radius:14px; background:transparent; box-shadow:none;">
-          <div>
-            <div style="font-size:14.5px; font-weight:900; letter-spacing:-0.02em; color:#FFFFFF;">EduPeak Admin Shell</div>
-            <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
-              <span class="admin-badge-faculty">🛡️ Physics Faculty</span>
-              <span style="font-size:10.5px; opacity:0.8; color:#CBD5E1;">A/L Lead Proctor</span>
-            </div>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button class="btn-switch-to-student" id="btn-global-exit-admin">
-              <span>🎓</span>
-              <span>Student App</span>
-            </button>
-            <button class="btn-switch-to-student" style="background:#EF4444; border-color:#DC2626;" id="btn-admin-logout" title="Sign Out">
-              <span>🚪</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- Main Scrollable Viewport -->
-      <div class="main-viewport" id="admin-main-viewport"></div>
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;"></div>
 
-      <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart) -->
-      <nav class="bottom-nav-bar" id="admin-bottom-nav">
+      <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart NavigationBar) -->
+      <nav class="bottom-nav-bar" id="admin-bottom-nav" style="background:#FFFFFF; border-top:1px solid #E2E8F0;">
         <button class="nav-tab-btn ${this.adminTab === 'dashboard' ? 'active' : ''}" data-admin-tab="dashboard">
-          <div class="nav-pill-icon">📊</div>
+          <div class="nav-pill-icon">⊞</div>
           <span>Dashboard</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'papers' ? 'active' : ''}" data-admin-tab="papers">
@@ -2783,29 +2761,20 @@ class AppController {
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'sprints' ? 'active' : ''}" data-admin-tab="sprints">
           <div class="nav-pill-icon">⚡</div>
-          <span>Sprints</span>
+          <span>MCQ Sprints</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'students' ? 'active' : ''}" data-admin-tab="students">
           <div class="nav-pill-icon">👥</div>
           <span>Students</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'broadcasts' ? 'active' : ''}" data-admin-tab="broadcasts">
-          <div class="nav-pill-icon">📢</div>
+          <div class="nav-pill-icon">✈️</div>
           <span>Broadcasts</span>
         </button>
       </nav>
     `;
 
     this.updateClock();
-
-    document.getElementById('btn-global-exit-admin')?.addEventListener('click', () => {
-      this.currentMode = 'student';
-      this.renderApp();
-    });
-
-    document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
-      this.confirmLogout();
-    });
 
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2846,164 +2815,221 @@ class AppController {
     }
   }
 
-  // 1. Admin Dashboard (Submissions Review Workspace - admin_home_screen.dart)
+  // ═════════════════════════════════════════════════════════════════════════
+  // ── 1. SCREEN 1: ADMIN HOME SCREEN (admin_home_screen.dart) ──────────────
+  // ═════════════════════════════════════════════════════════════════════════
   async renderAdminDashboardScreen(container) {
-    this.adminFilterTab = this.adminFilterTab ?? 'pending';
+    this.adminFilterTab = this.adminFilterTab ?? 'pending'; // 'pending', 'approved', 'rejected'
     this.adminSearchQuery = this.adminSearchQuery ?? '';
 
     const allDesserts = await dbService.getAllDessertsForAdmin();
-    const students = await dbService.getAllStudents();
-
     const pending = allDesserts.filter(d => (d.status || '').toLowerCase() === 'pending');
     const approved = allDesserts.filter(d => (d.status || '').toLowerCase() === 'approved');
     const rejected = allDesserts.filter(d => (d.status || '').toLowerCase() === 'rejected');
 
     let currentList = this.adminFilterTab === 'pending' ? pending :
-                      this.adminFilterTab === 'approved' ? approved :
-                      this.adminFilterTab === 'rejected' ? rejected : allDesserts;
+                      this.adminFilterTab === 'approved' ? approved : rejected;
 
     if (this.adminSearchQuery.trim()) {
       const q = this.adminSearchQuery.toLowerCase();
-      currentList = currentList.filter(d => 
+      currentList = currentList.filter(d =>
         (d.studentName || '').toLowerCase().includes(q) ||
         (d.subject || '').toLowerCase().includes(q) ||
-        (d.studentPhone || '').includes(q)
+        (d.studentPhone || '').includes(q) ||
+        (d.caption || '').toLowerCase().includes(q)
       );
     }
 
+    const adminName = this.currentUser?.name || 'ThiZaru';
+    const initial = adminName.charAt(0).toUpperCase();
+
     container.innerHTML = `
-      <!-- Real-Time Overview Metrics Grid -->
-      <div class="admin-metrics-grid">
-        <div class="admin-metric-card" style="border-left:4px solid #F59E0B;">
-          <div class="metric-top">
-            <span class="metric-lbl">Pending Submissions</span>
-            <div class="metric-icon" style="background:#FEF3C7; color:#D97706;">⏳</div>
+      <div class="apk-admin-screen-container">
+        <!-- ── 1. Executive Top Header (lines 185-344) ── -->
+        <div class="apk-admin-exec-card">
+          <div class="apk-admin-exec-top-row">
+            <div class="apk-admin-portal-badge">
+              <span class="apk-pulsing-dot"></span>
+              <span>Admin Portal • ${adminName}</span>
+            </div>
+            <div class="apk-admin-exec-actions">
+              <button class="apk-btn-student-view" id="btn-admin-student-view">
+                <span>🎓</span>
+                <span>Student View</span>
+              </button>
+              <button class="apk-btn-logout-icon" id="btn-admin-logout" title="Sign Out">
+                <span>🚪</span>
+              </button>
+            </div>
           </div>
-          <div class="metric-val" style="color:#D97706;">${pending.length}</div>
+
+          <!-- Greeting Row -->
+          <div class="apk-admin-greeting-row">
+            <div class="apk-admin-avatar">${initial}</div>
+            <div class="apk-admin-greeting-text">
+              <h2>Welcome back, ${adminName} 👋</h2>
+              <p>${pending.length > 0 ? `${pending.length} dessert submission(s) need your review today` : 'All reviews up to date! System is running smoothly'}</p>
+            </div>
+          </div>
         </div>
 
-        <div class="admin-metric-card" style="border-left:4px solid #10B981;">
-          <div class="metric-top">
-            <span class="metric-lbl">Approved Submissions</span>
-            <div class="metric-icon" style="background:#DCFCE7; color:#059669;">✅</div>
+        <!-- ── 2. Real-Time Overview Metrics Row (lines 347-394) ── -->
+        <div class="apk-metrics-row">
+          <div class="apk-metric-card ${this.adminFilterTab === 'pending' ? 'active-pending' : ''}" data-metric-tab="pending">
+            <div class="apk-metric-icon-circle" style="background:rgba(245, 158, 11, 0.12); color:#F59E0B;">⏳</div>
+            <div class="apk-metric-num" style="color:#F59E0B;">${pending.length}</div>
+            <div class="apk-metric-lbl">Pending Review</div>
           </div>
-          <div class="metric-val" style="color:#059669;">${approved.length}</div>
+
+          <div class="apk-metric-card ${this.adminFilterTab === 'approved' ? 'active-approved' : ''}" data-metric-tab="approved">
+            <div class="apk-metric-icon-circle" style="background:rgba(16, 185, 129, 0.12); color:#10B981;">✓</div>
+            <div class="apk-metric-num" style="color:#10B981;">${approved.length}</div>
+            <div class="apk-metric-lbl">Approved</div>
+          </div>
+
+          <div class="apk-metric-card ${this.adminFilterTab === 'rejected' ? 'active-rejected' : ''}" data-metric-tab="rejected">
+            <div class="apk-metric-icon-circle" style="background:rgba(239, 68, 68, 0.12); color:#EF4444;">⊘</div>
+            <div class="apk-metric-num" style="color:#EF4444;">${rejected.length}</div>
+            <div class="apk-metric-lbl">Rejected</div>
+          </div>
         </div>
 
-        <div class="admin-metric-card" style="border-left:4px solid #EF4444;">
-          <div class="metric-top">
-            <span class="metric-lbl">Revisions Needed</span>
-            <div class="metric-icon" style="background:#FEE2E2; color:#DC2626;">❌</div>
+        <!-- ── 3. Quick Action Command Hub (lines 492-575) ── -->
+        <div class="apk-command-center-box">
+          <div class="apk-command-center-title">
+            <span style="color:#2563EB;">⚡</span>
+            <span>Admin Command Center</span>
           </div>
-          <div class="metric-val" style="color:#DC2626;">${rejected.length}</div>
+          <div class="apk-command-grid">
+            <button class="apk-command-btn purple" id="btn-cmd-countdowns">
+              <div class="apk-command-icon-box" style="background:rgba(139, 92, 246, 0.12); color:#8B5CF6;">⏱️</div>
+              <div class="apk-command-info">
+                <div class="title">Exam Dates ⌛</div>
+                <div class="subtitle">Target count down</div>
+              </div>
+            </button>
+
+            <button class="apk-command-btn blue" id="btn-cmd-papers">
+              <div class="apk-command-icon-box" style="background:rgba(37, 99, 235, 0.12); color:#2563EB;">📋</div>
+              <div class="apk-command-info">
+                <div class="title">Paper Sessions 📝</div>
+                <div class="subtitle">Live proctoring</div>
+              </div>
+            </button>
+
+            <button class="apk-command-btn amber" id="btn-cmd-sprints">
+              <div class="apk-command-icon-box" style="background:rgba(245, 158, 11, 0.12); color:#F59E0B;">⚡</div>
+              <div class="apk-command-info">
+                <div class="title">MCQ Sprints ⚡</div>
+                <div class="subtitle">Rapid quiz sets</div>
+              </div>
+            </button>
+
+            <button class="apk-command-btn cyan" id="btn-cmd-broadcasts">
+              <div class="apk-command-icon-box" style="background:rgba(6, 182, 212, 0.12); color:#06B6D4;">✈️</div>
+              <div class="apk-command-info">
+                <div class="title">Broadcasts 📢</div>
+                <div class="subtitle">Send telegram</div>
+              </div>
+            </button>
+          </div>
         </div>
 
-        <div class="admin-metric-card" style="border-left:4px solid #6366F1;">
-          <div class="metric-top">
-            <span class="metric-lbl">Enrolled Scholars</span>
-            <div class="metric-icon" style="background:#EEF2FF; color:#4F46E5;">👥</div>
+        <!-- ── 4. Dessert Submissions Queue Section (lines 99-178) ── -->
+        <div class="apk-queue-section">
+          <div class="apk-queue-header-row">
+            <div class="apk-queue-title">
+              <span style="color:#2563EB; font-size:18px;">☑️</span>
+              <span>Dessert Submissions Queue</span>
+            </div>
+            <span class="apk-queue-badge">Physics A/L</span>
           </div>
-          <div class="metric-val" style="color:#4F46E5;">${students.length}</div>
-        </div>
-      </div>
 
-      <!-- Submissions Review Workspace -->
-      <div style="font-size:14px; font-weight:800; color:#0F172A; margin:6px 0 10px; display:flex; justify-content:space-between; align-items:center;">
-        <span>📝 Homework Submissions Workspace</span>
-        <span style="font-size:11px; color:#64748B;">Live Sync</span>
-      </div>
-
-      <!-- Filter Tabs -->
-      <div class="admin-tab-nav">
-        <button class="admin-tab-btn ${this.adminFilterTab === 'pending' ? 'active' : ''}" data-af-tab="pending">
-          Pending (${pending.length})
-        </button>
-        <button class="admin-tab-btn ${this.adminFilterTab === 'approved' ? 'active' : ''}" data-af-tab="approved">
-          Approved (${approved.length})
-        </button>
-        <button class="admin-tab-btn ${this.adminFilterTab === 'rejected' ? 'active' : ''}" data-af-tab="rejected">
-          Rejected (${rejected.length})
-        </button>
-        <button class="admin-tab-btn ${this.adminFilterTab === 'all' ? 'active' : ''}" data-af-tab="all">
-          All (${allDesserts.length})
-        </button>
-      </div>
-
-      <!-- Search Box -->
-      <div style="position:relative; margin-bottom:12px;">
-        <input type="text" id="input-admin-search" placeholder="Search by student name or phone..." value="${this.adminSearchQuery}"
-          style="width:100%; box-sizing:border-box; padding:10px 12px 10px 34px; border-radius:12px; border:1px solid #CBD5E1; font-size:12.5px; font-family:inherit;" />
-        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:14px; color:#94A3B8;">🔍</span>
-      </div>
-
-      <!-- Submissions List -->
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        ${currentList.length === 0 ? `
-          <div style="text-align:center; padding:32px 16px; background:#FFFFFF; border-radius:16px; border:1px dashed #CBD5E1; color:#64748B;">
-            <div style="font-size:28px; margin-bottom:6px;">🎉</div>
-            <div style="font-weight:700; font-size:13.5px; color:#0F172A;">All Clear!</div>
-            <div style="font-size:11.5px; margin-top:2px;">No submissions found in this tab.</div>
+          <!-- Segmented Tab Switcher -->
+          <div class="apk-segmented-tabs">
+            <button class="apk-segmented-tab-btn ${this.adminFilterTab === 'pending' ? 'active' : ''}" data-queue-tab="pending">
+              <span>Pending</span>
+              <span class="apk-segmented-pill-badge ${this.adminFilterTab === 'pending' ? 'orange' : 'grey'}">${pending.length}</span>
+            </button>
+            <button class="apk-segmented-tab-btn ${this.adminFilterTab === 'approved' ? 'active' : ''}" data-queue-tab="approved">
+              <span>Approved</span>
+              <span class="apk-segmented-pill-badge ${this.adminFilterTab === 'approved' ? 'green' : 'grey'}">${approved.length}</span>
+            </button>
+            <button class="apk-segmented-tab-btn ${this.adminFilterTab === 'rejected' ? 'active' : ''}" data-queue-tab="rejected">
+              <span>Rejected</span>
+              <span class="apk-segmented-pill-badge ${this.adminFilterTab === 'rejected' ? 'red' : 'grey'}">${rejected.length}</span>
+            </button>
           </div>
-        ` : currentList.map(d => {
-          const isPending = (d.status || '').toLowerCase() === 'pending';
-          const isApp = (d.status || '').toLowerCase() === 'approved';
-          const badgeClass = isApp ? 'quest-badge-green' : isPending ? 'quest-badge-orange' : 'quest-badge-blue';
-          const label = isApp ? 'Approved ✓' : isPending ? 'Pending Review ⏳' : 'Needs Redo ⚠️';
 
-          return `
-            <div class="admin-submission-item">
-              <div class="admin-sub-row-top">
-                <div class="admin-sub-student">
-                  <div class="admin-sub-avatar">${(d.studentName || 'S').charAt(0).toUpperCase()}</div>
-                  <div>
-                    <div style="font-size:13.5px; font-weight:800; color:#0F172A;">${d.studentName || 'Anonymous Scholar'}</div>
-                    <div style="font-size:10.5px; color:#64748B;">${d.studentPhone || 'No Phone'}</div>
+          <!-- Search Bar -->
+          <div class="apk-search-bar">
+            <input type="text" id="input-admin-search" placeholder="Search by student name, phone or notes..." value="${this.adminSearchQuery}" />
+            <span class="apk-search-icon">🔍</span>
+          </div>
+
+          <!-- Submissions List or Empty State -->
+          ${currentList.length === 0 ? `
+            <div class="apk-empty-card">
+              <div class="apk-empty-icon-circle">✓</div>
+              <div class="apk-empty-title">All Caught Up! 🎉</div>
+              <div class="apk-empty-subtitle">There are no pending dessert submissions waiting for review.</div>
+              <button class="apk-btn-primary" id="btn-queue-manage-papers">Manage Paper Sessions</button>
+            </div>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              ${currentList.map(d => `
+                <div class="admin-submission-item" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:16px; padding:14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <div class="apk-admin-avatar" style="width:34px; height:34px; font-size:14px;">${(d.studentName || 'S').charAt(0).toUpperCase()}</div>
+                      <div>
+                        <div style="font-size:13px; font-weight:800; color:#0F172A;">${d.studentName || 'Anonymous Student'}</div>
+                        <div style="font-size:11px; color:#64748B;">${d.studentPhone || ''}</div>
+                      </div>
+                    </div>
+                    <span class="quest-status-badge ${d.status === 'approved' ? 'quest-badge-green' : d.status === 'rejected' ? 'quest-badge-orange' : 'quest-badge-blue'}">
+                      ${d.status === 'approved' ? 'Approved ✓' : d.status === 'rejected' ? 'Needs Redo ⚠️' : 'Pending Review ⏳'}
+                    </span>
+                  </div>
+                  <div style="font-size:12.5px; font-weight:700; color:#1E293B;">${d.subject || 'Physics Problem Set'}</div>
+                  <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${d.caption || 'Daily problem set submission'}</div>
+                  ${d.mediaUrls && d.mediaUrls.length > 0 ? `
+                    <div style="display:flex; gap:6px; margin:8px 0; overflow-x:auto;">
+                      ${d.mediaUrls.map(u => `<img src="${u}" style="width:48px; height:48px; border-radius:8px; object-fit:cover; border:1px solid #CBD5E1;" />`).join('')}
+                    </div>
+                  ` : ''}
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding-top:8px; border-top:1px solid #F1F5F9;">
+                    <span style="font-size:11.5px; font-weight:800; color:#2563EB;">Award: +${d.creditsAwarded || 50} XP</span>
+                    <button class="apk-btn-primary" data-review-id="${d.id}" style="padding:6px 14px; font-size:11.5px;">Review & Grade ➔</button>
                   </div>
                 </div>
-                <span class="quest-status-badge ${badgeClass}">${label}</span>
-              </div>
-
-              <div>
-                <div style="font-size:13px; font-weight:700; color:#1E293B;">${d.subject}</div>
-                <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${d.caption || 'Daily problem set submission'}</div>
-              </div>
-
-              ${d.mediaUrls && d.mediaUrls.length > 0 ? `
-                <div style="display:flex; gap:6px; overflow-x:auto;">
-                  ${d.mediaUrls.map(u => `
-                    <img src="${u}" style="width:44px; height:44px; border-radius:8px; object-fit:cover; border:1px solid #CBD5E1;" />
-                  `).join('')}
-                </div>
-              ` : ''}
-
-              ${d.adminFeedback ? `
-                <div style="background:#F8FAFC; border-left:3px solid #6366F1; border-radius:6px; padding:8px 10px; font-size:11px; color:#334155;">
-                  <strong>Feedback:</strong> ${d.adminFeedback}
-                </div>
-              ` : ''}
-
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:8px; border-top:1px solid #F1F5F9;">
-                <span style="font-size:11px; font-weight:800; color:#2563EB;">Award: +${d.creditsAwarded || 100} XP</span>
-                <button class="admin-btn-grade" data-review-id="${d.id}">
-                  <span>Review & Grade</span>
-                  <span>➔</span>
-                </button>
-              </div>
+              `).join('')}
             </div>
-          `;
-        }).join('')}
+          `}
+        </div>
       </div>
     `;
 
     // Listeners
-    document.getElementById('btn-exit-admin')?.addEventListener('click', () => {
+    document.getElementById('btn-admin-student-view')?.addEventListener('click', () => {
       this.currentMode = 'student';
       this.renderApp();
     });
 
-    container.querySelectorAll('[data-af-tab]').forEach(btn => {
+    document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
+      this.confirmLogout();
+    });
+
+    container.querySelectorAll('[data-metric-tab]').forEach(card => {
+      card.addEventListener('click', () => {
+        this.adminFilterTab = card.dataset.metricTab;
+        this.renderAdminDashboardScreen(container);
+      });
+    });
+
+    container.querySelectorAll('[data-queue-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.adminFilterTab = btn.dataset.afTab;
+        this.adminFilterTab = btn.dataset.queueTab;
         this.renderAdminDashboardScreen(container);
       });
     });
@@ -3011,6 +3037,24 @@ class AppController {
     document.getElementById('input-admin-search')?.addEventListener('input', (e) => {
       this.adminSearchQuery = e.target.value;
       this.renderAdminDashboardScreen(container);
+    });
+
+    document.getElementById('btn-queue-manage-papers')?.addEventListener('click', () => {
+      this.switchAdminTab('papers');
+    });
+
+    // Command Center Quick Jump Buttons
+    document.getElementById('btn-cmd-countdowns')?.addEventListener('click', () => {
+      this.openExamCountdownsModal();
+    });
+    document.getElementById('btn-cmd-papers')?.addEventListener('click', () => {
+      this.switchAdminTab('papers');
+    });
+    document.getElementById('btn-cmd-sprints')?.addEventListener('click', () => {
+      this.switchAdminTab('sprints');
+    });
+    document.getElementById('btn-cmd-broadcasts')?.addEventListener('click', () => {
+      this.switchAdminTab('broadcasts');
     });
 
     container.querySelectorAll('[data-review-id]').forEach(btn => {
@@ -3153,52 +3197,84 @@ class AppController {
 
   // 2. Admin Papers Screen (admin_paper_sessions_screen.dart)
   async renderAdminPapersScreen(container) {
+    this.adminPaperTab = this.adminPaperTab ?? 0; // 0: Live Sessions, 1: Upcoming Papers, 2: Leaderboard
     const papers = await dbService.getPaperSessions();
 
+    const subtitle = this.adminPaperTab === 0
+      ? 'සජීවී විභාග සැසි සහ කැමරා අධීක්ෂණය'
+      : (this.adminPaperTab === 1 ? 'ඉදිරි විභාග සහ Hints කළමනාකරණය' : 'Paper ප්‍රතිඵල සහ Leaderboard නිර්මාණය');
+
     container.innerHTML = `
-      <div class="screen-appbar">
-        <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#EEF2FF; color:#4F46E5;">📋</div>
+      <!-- Screen AppBar -->
+      <div class="apk-screen-appbar">
+        <div class="apk-appbar-left">
+          <div class="apk-appbar-icon-box">
+            <span style="font-size:18px;">☑️</span>
+          </div>
           <div>
-            <div class="appbar-title">Manage Exam Papers</div>
-            <div class="appbar-subtitle">Create sessions, schedule slots & proctor exams</div>
+            <div class="apk-appbar-title">Paper Examination Hub</div>
+            <div class="apk-appbar-subtitle">${subtitle}</div>
           </div>
         </div>
-        <button class="btn-primary" id="btn-create-paper-dialog" style="width:auto; padding:8px 12px; font-size:12px;">
-          + New Paper
-        </button>
+        <div class="apk-appbar-actions">
+          <button class="apk-icon-action-btn" id="btn-admin-countdowns" title="A/L Exam Target Dates & Countdowns">⏱️</button>
+          <button class="apk-icon-action-btn" id="btn-admin-add-paper-head" title="Create" style="font-size:22px; color:#2563EB;">⊕</button>
+        </div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
-        ${papers.map(p => `
-          <div class="hero-card" style="padding:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span class="phase-pill ${p.isLive ? 'phase-live' : 'phase-upcoming'}">
-                ${p.isLive ? '🔴 Writing in Progress' : '⏰ Scheduled'}
-              </span>
-              <span style="font-size:12px; font-weight:800; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
-            </div>
-
-            <div style="font-size:14.5px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
-            <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${p.subject}</div>
-
-            <div style="display:flex; gap:8px; margin-top:12px;">
-              <button class="btn-primary" style="flex:1; background:${p.isLive ? '#EF4444' : '#10B981'}; padding:10px; font-size:12px;" data-toggle-paper="${p.id}">
-                ${p.isLive ? '⏹ End Live Session' : '▶ Start Live Writing'}
-              </button>
-              <button class="btn-primary" style="background:#F1F5F9; color:#334155; width:auto; padding:10px 14px; font-size:12px;" data-view-proctor="${p.id}">
-                🎥 Proctor Hall
-              </button>
-            </div>
-          </div>
-        `).join('')}
+      <!-- Segmented 3-Tab Selector -->
+      <div style="padding:12px 16px 8px;">
+        <div style="background:#FFFFFF; border-radius:16px; padding:4px; border:1px solid #E2E8F0; display:flex; box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+          <button class="apk-segmented-tab-btn ${this.adminPaperTab === 0 ? 'active' : ''}" data-paper-tab="0" style="${this.adminPaperTab === 0 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
+            🔴 Live Sessions
+          </button>
+          <button class="apk-segmented-tab-btn ${this.adminPaperTab === 1 ? 'active' : ''}" data-paper-tab="1" style="${this.adminPaperTab === 1 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
+            🔮 Upcoming Papers
+          </button>
+          <button class="apk-segmented-tab-btn ${this.adminPaperTab === 2 ? 'active' : ''}" data-paper-tab="2" style="${this.adminPaperTab === 2 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
+            🏆 Leaderboard
+          </button>
+        </div>
       </div>
+
+      <!-- Tab Viewport -->
+      <div id="admin-papers-content" style="padding:0 16px 90px;">
+        ${this.adminPaperTab === 0 ? this._buildAdminLiveSessionsHTML(papers) : ''}
+        ${this.adminPaperTab === 1 ? this._buildAdminUpcomingPapersHTML() : ''}
+        ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML() : ''}
+      </div>
+
+      <!-- FAB (Floating Action Button) -->
+      <button class="apk-fab-button" id="btn-fab-admin-paper">
+        <span style="font-size:18px;">+</span> ${this.adminPaperTab === 0 ? 'Add Live Session' : (this.adminPaperTab === 1 ? 'Add Upcoming Paper' : 'Create Leaderboard')}
+      </button>
     `;
 
-    document.getElementById('btn-create-paper-dialog')?.addEventListener('click', () => {
-      this.openAdminCreatePaperModal();
+    // Tab switcher events
+    container.querySelectorAll('[data-paper-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.adminPaperTab = Number(btn.dataset.paperTab);
+        this.renderAdminPapersScreen(container);
+      });
     });
 
+    // Countdown button
+    document.getElementById('btn-admin-countdowns')?.addEventListener('click', () => {
+      this.openExamCountdownsModal();
+    });
+
+    // Add buttons
+    const triggerAdd = () => {
+      if (this.adminPaperTab === 0) this.openAdminCreatePaperModal();
+      else if (this.adminPaperTab === 1) this.openAdminCreatePaperModal();
+      else this.openAdminCreatePaperModal();
+    };
+
+    document.getElementById('btn-admin-add-paper-head')?.addEventListener('click', triggerAdd);
+    document.getElementById('btn-fab-admin-paper')?.addEventListener('click', triggerAdd);
+    document.getElementById('btn-empty-create-paper')?.addEventListener('click', triggerAdd);
+
+    // Interactive paper action handlers
     container.querySelectorAll('[data-toggle-paper]').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = papers.find(x => x.id === btn.dataset.togglePaper);
@@ -3217,28 +3293,493 @@ class AppController {
     });
   }
 
-  // Create New Paper Dialog
+  _buildAdminLiveSessionsHTML(papers) {
+    if (!papers || papers.length === 0) {
+      return `
+        <div style="padding:60px 20px 20px; text-align:center; display:flex; flex-direction:column; align-items:center;">
+          <div style="width:76px; height:76px; border-radius:50%; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; color:#2563EB; font-size:36px; margin-bottom:18px;">
+            📄⁺
+          </div>
+          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:8px;">
+            තවම Paper Sessions නිර්මාණය කර නොමැත
+          </div>
+          <div style="font-size:13px; color:#64748B; max-width:320px; line-height:1.45; margin-bottom:24px;">
+            නව විභාග සැසියක් නිර්මාණය කර Slot 1 සහ Slot 2 වේලාවන් සකසන්න.
+          </div>
+          <button class="apk-btn-primary" id="btn-empty-create-paper" style="display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:12px;">
+            <span style="font-size:16px;">+</span> Create First Paper Session
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+        ${papers.map(p => `
+          <div class="hero-card" style="padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="phase-pill ${p.isLive ? 'phase-live' : 'phase-upcoming'}">
+                ${p.isLive ? '🔴 Writing in Progress' : '⏰ Scheduled'}
+              </span>
+              <span style="font-size:12px; font-weight:800; color:#2563EB;">⏱️ ${p.durationMinutes} Mins</span>
+            </div>
+
+            <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">${p.title}</div>
+            <div style="font-size:12px; color:#64748B; margin-top:2px;">${p.subject}</div>
+
+            <div style="display:flex; gap:8px; margin-top:14px;">
+              <button class="apk-btn-primary" style="flex:1; background:${p.isLive ? '#EF4444' : '#10B981'}; padding:10px; font-size:12px;" data-toggle-paper="${p.id}">
+                ${p.isLive ? '⏹ End Live Session' : '▶ Start Live Writing'}
+              </button>
+              <button class="apk-btn-primary" style="background:#F1F5F9; color:#334155; width:auto; padding:10px 14px; font-size:12px; box-shadow:none;" data-view-proctor="${p.id}">
+                🎥 Proctor Hall
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  _buildAdminUpcomingPapersHTML() {
+    return `
+      <div style="padding:60px 20px; text-align:center; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-size:44px; margin-bottom:12px;">🔮</div>
+        <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled</div>
+        <div style="font-size:13px; color:#64748B; max-width:300px; line-height:1.4;">Add future exam dates with study hints so students can prepare ahead.</div>
+      </div>
+    `;
+  }
+
+  _buildAdminPaperLeaderboardHTML() {
+    return `
+      <div style="padding:60px 20px; text-align:center; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-size:44px; margin-bottom:12px;">🏆</div>
+        <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Published Leaderboards Yet</div>
+        <div style="font-size:13px; color:#64748B; max-width:300px; line-height:1.4;">Publish marks and ranks after paper corrections are completed.</div>
+      </div>
+    `;
+  }
+
+  // 3. Admin Sprints Screen (admin_mcq_sprint_screen.dart)
+  renderAdminSprintsScreen(container) {
+    this.adminSprintTab = this.adminSprintTab ?? 0; // 0: Sprint Sets, 1: Live Leaderboard
+    this.adminSprintDate = this.adminSprintDate || new Date().toISOString().split('T')[0];
+    this.customSprints = this.customSprints || [];
+
+    const dateStr = this.adminSprintDate;
+
+    container.innerHTML = `
+      <!-- Screen AppBar -->
+      <div class="apk-screen-appbar">
+        <div class="apk-appbar-left">
+          <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
+            <span>🔥</span> Daily MCQ Sprints
+          </div>
+        </div>
+        <div class="apk-appbar-actions">
+          <button class="apk-icon-action-btn" id="btn-pick-sprint-date" title="Pick Date">📅</button>
+        </div>
+      </div>
+
+      <!-- Underline Tabs -->
+      <div class="apk-tabbar-underline">
+        <button class="apk-tabbar-tab ${this.adminSprintTab === 0 ? 'active' : ''}" data-sprint-tab="0">
+          <span>❓</span> Sprint Sets (දවසේ 5)
+        </button>
+        <button class="apk-tabbar-tab ${this.adminSprintTab === 1 ? 'active' : ''}" data-sprint-tab="1">
+          <span>📊</span> Live Leaderboard
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div id="admin-sprint-content" style="padding-bottom:90px;">
+        ${this.adminSprintTab === 0 ? this._buildAdminSprintsTabHTML(dateStr) : this._buildAdminSprintLeaderboardHTML(dateStr)}
+      </div>
+
+      <!-- FAB -->
+      <button class="apk-fab-button" id="btn-fab-create-sprint">
+        <span style="font-size:18px;">+</span> Create 5-MCQ Sprint
+      </button>
+    `;
+
+    // Tab Switcher
+    container.querySelectorAll('[data-sprint-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.adminSprintTab = Number(btn.dataset.sprintTab);
+        this.renderAdminSprintsScreen(container);
+      });
+    });
+
+    // Date Picker action
+    const pickDateAction = () => {
+      const newDate = prompt('Enter viewing date (YYYY-MM-DD):', this.adminSprintDate);
+      if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+        this.adminSprintDate = newDate;
+        this.renderAdminSprintsScreen(container);
+      }
+    };
+    document.getElementById('btn-pick-sprint-date')?.addEventListener('click', pickDateAction);
+    document.getElementById('btn-change-sprint-date')?.addEventListener('click', pickDateAction);
+
+    // Load Demo Sprint
+    document.getElementById('btn-load-demo-sprint')?.addEventListener('click', () => {
+      this.customSprints.push({
+        id: 'sprint_demo_' + Date.now(),
+        title: 'A/L Mechanics High-Yield Sprint',
+        subject: 'Physics',
+        targetDate: this.adminSprintDate,
+        examYear: '2026 A/L',
+        questionsCount: 5
+      });
+      notificationService.showInAppBanner('Demo Sprint Loaded! ⚡', 'Physics Mechanics 5-MCQ Set is ready.', 'success');
+      this.renderAdminSprintsScreen(container);
+    });
+
+    // Create Sprint FAB
+    document.getElementById('btn-fab-create-sprint')?.addEventListener('click', () => {
+      this.openCreateSprintSheet();
+    });
+  }
+
+  _buildAdminSprintsTabHTML(dateStr) {
+    const sprintsForDate = this.customSprints.filter(s => s.targetDate === dateStr);
+
+    return `
+      <!-- Date Filter Bar -->
+      <div style="margin:16px 16px 14px; padding:12px 16px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:16px; color:#2563EB;">📅</span>
+          <span style="font-size:13.5px; font-weight:700; color:#0F172A;">Viewing: ${dateStr}</span>
+        </div>
+        <button id="btn-change-sprint-date" style="background:none; border:none; color:#2563EB; font-weight:700; font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:4px;">
+          <span>📅</span> Change
+        </button>
+      </div>
+
+      <!-- Sprints Content -->
+      ${sprintsForDate.length === 0 ? `
+        <!-- Empty State matching Screenshot 3 -->
+        <div style="margin:0 16px; padding:28px 20px; background:#FFFFFF; border-radius:16px; border:1px solid #E2E8F0; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+          <div style="font-size:44px;">📝</div>
+          <div style="font-size:15.5px; font-weight:800; color:#0F172A;">No Custom MCQ Sprints Created Yet</div>
+          <div style="font-size:12.5px; color:#64748B; max-width:320px; line-height:1.45;">
+            Telegram bot is currently using the high-yield A/L Mechanics fallback set. Create custom daily 5-MCQ sets below!
+          </div>
+          <button class="apk-btn-primary" id="btn-load-demo-sprint" style="margin-top:8px; display:inline-flex; align-items:center; gap:6px;">
+            <span>⚡</span> Load Demo A/L Physics Sprint Set
+          </button>
+        </div>
+      ` : `
+        <div style="display:flex; flex-direction:column; gap:12px; padding:0 16px;">
+          ${sprintsForDate.map(s => `
+            <div class="hero-card" style="padding:16px; border: 1.5px solid #2563EB; background: rgba(37,99,235,0.04);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12px; font-weight:800; color:#2563EB;">🔥 ${s.examYear}</span>
+                <span style="font-size:11px; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:800;">5 Questions Ready</span>
+              </div>
+              <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:6px;">${s.title}</div>
+              <div style="font-size:12px; color:#64748B; margin-top:2px;">Target: ${s.targetDate} • ${s.subject}</div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    `;
+  }
+
+  _buildAdminSprintLeaderboardHTML(dateStr) {
+    return `
+      <!-- Empty Leaderboard matching Screenshot 4 -->
+      <div style="padding:80px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="font-size:44px;">🏆</div>
+        <div style="font-size:16px; font-weight:800; color:#0F172A;">No completions for ${dateStr} yet</div>
+        <div style="font-size:13px; color:#64748B; max-width:320px; line-height:1.45;">
+          Students who complete the Sprint on Telegram will appear here live!
+        </div>
+      </div>
+    `;
+  }
+
+  // 4. Admin Students Screen (admin_students_screen.dart)
+  async renderAdminStudentsScreen(container) {
+    this.adminStudentBatchFilter = this.adminStudentBatchFilter || 'All';
+    this.adminStudentSearchQuery = this.adminStudentSearchQuery || '';
+
+    const allStudents = await dbService.getAllStudents();
+
+    let filtered = allStudents;
+    if (this.adminStudentBatchFilter !== 'All') {
+      filtered = filtered.filter(s => (s.examYear || '').trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
+    }
+    if (this.adminStudentSearchQuery.trim()) {
+      const q = this.adminStudentSearchQuery.toLowerCase();
+      filtered = filtered.filter(s =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.phone || '').includes(q) ||
+        (s.studentId || '').toLowerCase().includes(q)
+      );
+    }
+
+    const batches = ['All', '2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
+
+    container.innerHTML = `
+      <!-- Screen AppBar -->
+      <div class="apk-screen-appbar">
+        <div class="apk-appbar-left">
+          <div style="font-size:16px; font-weight:800; color:#0F172A;">
+            Registered Students 👥
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Stats & Search Header matching Screenshot 5 -->
+      <div style="background:#FFFFFF; padding:12px 16px 14px; border-bottom:1px solid #E2E8F0;">
+        <!-- Stats Row -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:18px; color:#2563EB;">👥</span>
+            <div>
+              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Students</div>
+              <div style="font-size:16px; font-weight:800; color:#0F172A;">${allStudents.length}</div>
+            </div>
+          </div>
+          <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:18px; color:#6366F1;">⚡</span>
+            <div>
+              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Showing</div>
+              <div style="font-size:16px; font-weight:800; color:#0F172A;">${filtered.length}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Field -->
+        <div class="apk-search-bar" style="margin-bottom:10px;">
+          <span class="apk-search-icon">🔍</span>
+          <input type="text" id="input-admin-student-search" placeholder="Search by name, phone or ID..." value="${this.adminStudentSearchQuery}">
+        </div>
+
+        <!-- Batch Filter Chips -->
+        <div class="apk-chips-scroll-row">
+          ${batches.map(b => {
+            const isSel = this.adminStudentBatchFilter === b;
+            return `
+              <button class="apk-filter-chip ${isSel ? 'active' : ''}" data-batch="${b}">
+                ${isSel ? '✓ ' : ''}${b}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Students List View -->
+      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;">
+        ${filtered.length === 0 ? `
+          <!-- Empty State matching Screenshot 5 -->
+          <div style="padding:70px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
+            <div style="font-size:44px;">🔍</div>
+            <div style="font-size:16px; font-weight:800; color:#0F172A;">
+              ${allStudents.length === 0 ? 'No students registered yet' : 'No students found matching filters'}
+            </div>
+            <div style="font-size:13px; color:#64748B; max-width:320px; line-height:1.45;">
+              When students register with phone number, they appear here.
+            </div>
+          </div>
+        ` : `
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${filtered.map(st => `
+              <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <div class="admin-sub-avatar" style="width:40px; height:40px; font-size:16px;">${(st.name || 'S').charAt(0).toUpperCase()}</div>
+                  <div>
+                    <div style="font-size:14px; font-weight:800; color:#0F172A;">${st.name || 'Student'}</div>
+                    <div style="font-size:11.5px; color:#64748B;">${st.phone || 'No phone'} • <span style="color:#2563EB; font-weight:700;">${st.examYear || '2026 A/L'}</span></div>
+                  </div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; font-size:16px;">
+                    ✉️
+                  </button>
+                  <button class="apk-icon-action-btn" title="Delete Account" data-delete-student="${st.id}" style="color:#EF4444; font-size:16px;">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    `;
+
+    // Search Input event
+    document.getElementById('input-admin-student-search')?.addEventListener('input', (e) => {
+      this.adminStudentSearchQuery = e.target.value;
+      this.renderAdminStudentsScreen(container);
+    });
+
+    // Batch Chips events
+    container.querySelectorAll('[data-batch]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        this.adminStudentBatchFilter = chip.dataset.batch;
+        this.renderAdminStudentsScreen(container);
+      });
+    });
+
+    // Custom Message
+    container.querySelectorAll('[data-msg-student]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const st = allStudents.find(x => x.id === btn.dataset.msgStudent);
+        if (st) this.openSendCustomMessageModal(st);
+      });
+    });
+
+    // Delete Student
+    container.querySelectorAll('[data-delete-student]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const st = allStudents.find(x => x.id === btn.dataset.deleteStudent);
+        if (st) this.confirmDeleteStudent(st);
+      });
+    });
+  }
+
+  // 5. Admin Broadcasts Screen (admin_announcements_screen.dart)
+  renderAdminBroadcastsScreen(container) {
+    this.broadcastLogs = this.broadcastLogs || [
+      { id: 1, title: 'Exam Hall Open', message: 'Morning session for Model Paper 04 is now open for students.', time: '1 hour ago' },
+      { id: 2, title: 'New Homework Feedback', message: 'Wave Optics submissions have been evaluated and XP awarded.', time: 'Yesterday' }
+    ];
+
+    container.innerHTML = `
+      <div class="apk-screen-appbar">
+        <div class="apk-appbar-left">
+          <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
+            <span>📢</span> Push Broadcaster & Telegram
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:16px 16px 90px;">
+        <div class="hero-card" style="padding:16px;">
+          <div class="form-label">Announcement Title:</div>
+          <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. 🔴 Paper 04 Live Exam Started!" />
+
+          <div class="form-label">Notification Message Body:</div>
+          <textarea id="bc-body" class="form-textarea" rows="3" style="margin-bottom:10px;" placeholder="Enter message to broadcast to all student home screens & Telegram..."></textarea>
+
+          <div class="form-label">Target Audience:</div>
+          <select id="bc-audience" class="form-textarea" style="height:40px; margin-bottom:14px; padding:6px 10px;">
+            <option value="All Batches">All Enrolled Batches</option>
+            <option value="2026 A/L">2026 A/L Batch Only</option>
+            <option value="2027 A/L">2027 A/L Batch Only</option>
+          </select>
+
+          <button class="apk-btn-primary" id="btn-send-broadcast" style="width:100%; padding:14px; font-size:14px;">
+            🚀 Send Instant Broadcast
+          </button>
+        </div>
+
+        <div style="font-size:13.5px; font-weight:800; color:#0F172A; margin:18px 0 10px;">
+          📜 Recent Broadcasts Sent:
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${this.broadcastLogs.map(b => `
+            <div class="hero-card" style="padding:12px 14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13px; font-weight:800; color:#0F172A;">${b.title}</span>
+                <span style="font-size:10.5px; color:#64748B;">${b.time}</span>
+              </div>
+              <div style="font-size:11.5px; color:#475569; margin-top:4px;">${b.message}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-send-broadcast')?.addEventListener('click', () => {
+      const title = document.getElementById('bc-title')?.value;
+      const body = document.getElementById('bc-body')?.value;
+
+      if (!title || !body) {
+        alert('Please fill in both title and message body.');
+        return;
+      }
+
+      this.broadcastLogs.unshift({
+        id: Date.now(),
+        title,
+        message: body,
+        time: 'Just now'
+      });
+
+      notificationService.playChime();
+      notificationService.showInAppBanner(title, body, 'info');
+
+      alert('🚀 Broadcast successfully dispatched to all student devices via Web Push and Telegram!');
+      this.renderAdminBroadcastsScreen(container);
+    });
+  }
+
+  // ── Helper Modal Dialogs ───────────────────────────────────────────────
+  openExamCountdownsModal() {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:85vh; overflow-y:auto;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:20px;">⏱️</span>
+            <div>
+              <div style="font-size:15px; font-weight:800; color:#0F172A;">A/L Exam Target Dates</div>
+              <div style="font-size:11px; color:#64748B;">Official countdowns to national examination</div>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-countdown">✕</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
+          <div class="hero-card" style="padding:16px; border:1px solid #DBEAFE; background:#EFF6FF;">
+            <div style="font-size:12px; font-weight:800; color:#2563EB;">2026 G.C.E. A/L EXAMINATION</div>
+            <div style="font-size:18px; font-weight:900; color:#1E3A8A; margin-top:4px;">November 2026</div>
+            <div style="font-size:12px; color:#3B82F6; margin-top:2px;">Target date countdown active for all registered 2026 students.</div>
+          </div>
+
+          <div class="hero-card" style="padding:16px; border:1px solid #E0E7FF; background:#EEF2FF;">
+            <div style="font-size:12px; font-weight:800; color:#4F46E5;">2027 G.C.E. A/L EXAMINATION</div>
+            <div style="font-size:18px; font-weight:900; color:#312E81; margin-top:4px;">November 2027</div>
+            <div style="font-size:12px; color:#6366F1; margin-top:2px;">Target date countdown active for 2027 batch.</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-countdown')?.addEventListener('click', () => modal.remove());
+  }
+
   openAdminCreatePaperModal() {
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.style.display = 'flex';
 
     modal.innerHTML = `
-      <div class="modal-sheet">
+      <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
         <div class="modal-header">
-          <div style="font-size:15px; font-weight:800; color:#0F172A;">Create Paper Session</div>
+          <div style="font-size:16px; font-weight:800; color:#0F172A;">Create Paper Session</div>
           <button class="modal-close-btn" id="btn-close-new-paper">✕</button>
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
           <div>
             <div class="form-label">Paper Title:</div>
-            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Physics Term Paper 02" />
+            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2026 A/L Physics Model Paper 04" />
           </div>
 
           <div>
-            <div class="form-label">Units / Syllabus:</div>
-            <input type="text" id="new-paper-units" class="form-textarea" style="height:40px;" placeholder="e.g. Mechanics, Waves & Oscillations" />
+            <div class="form-label">Units / Syllabus Covered:</div>
+            <input type="text" id="new-paper-units" class="form-textarea" style="height:40px;" placeholder="e.g. Mechanics, Oscillations & Waves" />
           </div>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
@@ -3252,8 +3793,16 @@ class AppController {
             </div>
           </div>
 
-          <button class="btn-primary" id="btn-save-new-paper" style="margin-top:10px; padding:12px;">
-            🚀 Publish Paper to Students
+          <div>
+            <div class="form-label">Exam Slots (Slot 1 & Slot 2):</div>
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px; font-size:12px; color:#475569;">
+              <div>• <strong>Slot 1:</strong> 08:30 AM - 10:30 AM (50 Seats)</div>
+              <div style="margin-top:4px;">• <strong>Slot 2:</strong> 04:00 PM - 06:00 PM (50 Seats)</div>
+            </div>
+          </div>
+
+          <button class="apk-btn-primary" id="btn-save-new-paper" style="margin-top:10px; padding:14px; font-size:14px;">
+            🚀 Publish Paper Session to Students
           </button>
         </div>
       </div>
@@ -3293,209 +3842,88 @@ class AppController {
     });
   }
 
-  // 3. Admin Sprints Screen (admin_mcq_sprint_screen.dart)
-  renderAdminSprintsScreen(container) {
-    const sprint = dbService.getDailySprint('today');
+  openCreateSprintSheet() {
+    const title = prompt('Enter Sprint Title:', 'Daily 5-MCQ Sprint (A/L Physics)');
+    if (!title) return;
 
-    container.innerHTML = `
-      <div class="screen-appbar">
-        <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#FFF7ED; color:#EA580C;">⚡</div>
-          <div>
-            <div class="appbar-title">Daily MCQ Sprints</div>
-            <div class="appbar-subtitle">5 Rapid Questions • Maintain Student Streaks</div>
-          </div>
-        </div>
-      </div>
+    this.customSprints.push({
+      id: 'sprint_' + Date.now(),
+      title,
+      subject: 'Physics',
+      targetDate: this.adminSprintDate,
+      examYear: '2026 A/L',
+      questionsCount: 5
+    });
 
-      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
-        <div class="hero-card" style="padding:16px;">
-          <div style="font-size:12px; font-weight:800; color:#EA580C;">CURRENT ACTIVE SPRINT</div>
-          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:4px;">${sprint.title}</div>
-          <div style="font-size:11.5px; color:#64748B;">Date: Today • Reward: +${sprint.xpBonus} XP</div>
-        </div>
-
-        <div style="font-size:13px; font-weight:800; color:#0F172A; margin-top:6px;">Questions Bank (5 Items):</div>
-
-        ${sprint.questions.map((q, i) => `
-          <div class="hero-card" style="padding:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:12px; font-weight:800; color:#2563EB;">Question 0${i + 1}</span>
-              <span style="font-size:11px; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:800;">Correct: Option ${String.fromCharCode(65 + q.correctIndex)}</span>
-            </div>
-            <div style="font-size:12.5px; font-weight:700; color:#1E293B; margin-top:6px; line-height:1.4;">${q.text}</div>
-            <div style="margin-top:8px; padding:8px; background:#EFF6FF; border-left:3px solid #3B82F6; border-radius:6px; font-size:11px; color:#1E40AF;">
-              <strong>Explanation:</strong> ${q.explanation}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
+    notificationService.showInAppBanner('Sprint Created! ⚡', `${title} scheduled for ${this.adminSprintDate}.`, 'success');
+    const vp = document.getElementById('admin-main-viewport');
+    if (vp) this.renderAdminSprintsScreen(vp);
   }
 
-  // 4. Admin Students Screen (admin_students_screen.dart)
-  async renderAdminStudentsScreen(container) {
-    this.studentBatchFilter = this.studentBatchFilter || 'All Batches';
-    this.studentSearchQuery = this.studentSearchQuery || '';
+  openSendCustomMessageModal(student) {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
 
-    const allStudents = await dbService.getAllStudents();
-
-    let filtered = allStudents;
-    if (this.studentBatchFilter !== 'All Batches') {
-      filtered = filtered.filter(s => s.examYear === this.studentBatchFilter);
-    }
-    if (this.studentSearchQuery.trim()) {
-      const q = this.studentSearchQuery.toLowerCase();
-      filtered = filtered.filter(s => s.name.toLowerCase().includes(q) || s.phone.includes(q));
-    }
-
-    container.innerHTML = `
-      <div class="screen-appbar">
-        <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">👥</div>
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-header">
           <div>
-            <div class="appbar-title">Student Directory</div>
-            <div class="appbar-subtitle">${filtered.length} Enrolled Scholars</div>
+            <div style="font-size:15px; font-weight:800; color:#0F172A;">Send Custom Message</div>
+            <div style="font-size:11.5px; color:#64748B;">To: ${student.name} (${student.phone})</div>
           </div>
+          <button class="modal-close-btn" id="btn-close-msg-dialog">✕</button>
         </div>
-      </div>
 
-      <!-- Batch Filter & Search -->
-      <div style="display:flex; gap:8px; margin:12px 0 10px;">
-        <select id="select-admin-student-batch" class="form-textarea" style="height:38px; width:130px; padding:6px 8px; font-size:12px;">
-          ${['All Batches', '2026 A/L', '2027 A/L', '2028 A/L'].map(b => `
-            <option value="${b}" ${this.studentBatchFilter === b ? 'selected' : ''}>${b}</option>
-          `).join('')}
-        </select>
-        <input type="text" id="input-admin-student-search" placeholder="Search student..." value="${this.studentSearchQuery}"
-          style="flex:1; padding:8px 12px; border-radius:10px; border:1px solid #CBD5E1; font-size:12px;" />
-      </div>
-
-      <!-- Student Cards List -->
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        ${filtered.map(st => `
-          <div class="admin-student-card">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div class="admin-sub-avatar">${st.name.charAt(0).toUpperCase()}</div>
-              <div>
-                <div style="font-size:13.5px; font-weight:800; color:#0F172A;">${st.name}</div>
-                <div style="font-size:11px; color:#64748B;">${st.phone} • <span style="color:#2563EB; font-weight:700;">${st.examYear}</span></div>
-              </div>
-            </div>
-
-            <div style="display:flex; align-items:center; gap:10px;">
-              <span style="font-size:12px; font-weight:900; color:#F59E0B;">${st.credits} XP</span>
-              <button class="admin-verify-badge ${st.isVerified ? 'verified' : 'unverified'}" data-verify-id="${st.id}">
-                ${st.isVerified ? 'Verified ✓' : 'Verify'}
-              </button>
-            </div>
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+          <div>
+            <div class="form-label">Message Title:</div>
+            <input type="text" id="cust-msg-title" class="form-textarea" style="height:38px;" placeholder="Enter title..." />
           </div>
-        `).join('')}
+
+          <div>
+            <div class="form-label">Message Content:</div>
+            <textarea id="cust-msg-body" class="form-textarea" rows="3" placeholder="Type instructions or feedback here..."></textarea>
+          </div>
+
+          <button class="apk-btn-primary" id="btn-send-cust-msg" style="padding:12px;">
+            📨 Send to Student via Telegram
+          </button>
+        </div>
       </div>
     `;
 
-    document.getElementById('select-admin-student-batch')?.addEventListener('change', (e) => {
-      this.studentBatchFilter = e.target.value;
-      this.renderAdminStudentsScreen(container);
-    });
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-msg-dialog')?.addEventListener('click', () => modal.remove());
 
-    document.getElementById('input-admin-student-search')?.addEventListener('input', (e) => {
-      this.studentSearchQuery = e.target.value;
-      this.renderAdminStudentsScreen(container);
-    });
-
-    container.querySelectorAll('[data-verify-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const st = allStudents.find(x => x.id === btn.dataset.verifyId);
-        if (st) {
-          st.isVerified = !st.isVerified;
-          notificationService.showInAppBanner('Verification Updated', `${st.name} is now ${st.isVerified ? 'Verified' : 'Unverified'}.`, 'info');
-          this.renderAdminStudentsScreen(container);
-        }
-      });
-    });
-  }
-
-  // 5. Admin Broadcasts Screen (admin_announcements_screen.dart)
-  renderAdminBroadcastsScreen(container) {
-    this.broadcastLogs = this.broadcastLogs || [
-      { id: 1, title: 'Exam Hall Open', message: 'Morning session for Model Paper 04 is now open for students.', time: '1 hour ago' },
-      { id: 2, title: 'New Homework Feedback', message: 'Wave Optics submissions have been evaluated and XP awarded.', time: 'Yesterday' }
-    ];
-
-    container.innerHTML = `
-      <div class="screen-appbar">
-        <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#F0FDF4; color:#16A34A;">📢</div>
-          <div>
-            <div class="appbar-title">Push Broadcaster</div>
-            <div class="appbar-subtitle">Send Instant Alerts to iOS & Android Devices</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="hero-card" style="padding:16px; margin-top:12px;">
-        <div class="form-label">Announcement Title:</div>
-        <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. 🔴 Paper 04 Live Exam Started!" />
-
-        <div class="form-label">Notification Message Body:</div>
-        <textarea id="bc-body" class="form-textarea" rows="3" style="margin-bottom:10px;" placeholder="Enter message to broadcast to all student home screens..."></textarea>
-
-        <div class="form-label">Target Audience:</div>
-        <select id="bc-audience" class="form-textarea" style="height:40px; margin-bottom:14px; padding:6px 10px;">
-          <option value="All Batches">All Enrolled Batches</option>
-          <option value="2026 A/L">2026 A/L Batch Only</option>
-          <option value="2027 A/L">2027 A/L Batch Only</option>
-        </select>
-
-        <button class="btn-primary" id="btn-send-broadcast" style="padding:14px;">
-          🚀 Send Broadcast with Chime Audio
-        </button>
-      </div>
-
-      <div style="font-size:13px; font-weight:800; color:#0F172A; margin:16px 0 8px;">
-        📜 Recent Broadcasts Sent:
-      </div>
-
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        ${this.broadcastLogs.map(b => `
-          <div class="hero-card" style="padding:12px 14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:13px; font-weight:800; color:#0F172A;">${b.title}</span>
-              <span style="font-size:10.5px; color:#64748B;">${b.time}</span>
-            </div>
-            <div style="font-size:11.5px; color:#475569; margin-top:4px;">${b.message}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-
-    document.getElementById('btn-send-broadcast')?.addEventListener('click', () => {
-      const title = document.getElementById('bc-title')?.value;
-      const body = document.getElementById('bc-body')?.value;
+    document.getElementById('btn-send-cust-msg')?.addEventListener('click', () => {
+      const title = document.getElementById('cust-msg-title')?.value;
+      const body = document.getElementById('cust-msg-body')?.value;
 
       if (!title || !body) {
-        alert('Please fill in both title and message body.');
+        alert('Please enter title and content.');
         return;
       }
 
-      this.broadcastLogs.unshift({
-        id: Date.now(),
-        title,
-        message: body,
-        time: 'Just now'
-      });
-
-      notificationService.playChime();
-      notificationService.showInAppBanner(title, body, 'info');
-
-      alert('🚀 Broadcast successfully dispatched to all student devices via Web Push!');
-      this.renderAdminBroadcastsScreen(container);
+      notificationService.showInAppBanner('Message Delivered! 📨', `Delivered to ${student.name} on Telegram.`, 'success');
+      modal.remove();
     });
+  }
+
+  confirmDeleteStudent(student) {
+    if (!confirm(`Are you sure you want to permanently delete the account of ${student.name} (${student.phone})? This will purge all associated submissions and records.`)) {
+      return;
+    }
+
+    dbService.deleteStudent(student.id);
+    notificationService.showInAppBanner('Account Purged 🗑️', `All data for ${student.name} removed.`, 'warning');
+    const vp = document.getElementById('admin-main-viewport');
+    if (vp) this.renderAdminStudentsScreen(vp);
   }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   const app = new AppController();
+  window.app = app;
   app.init();
 });

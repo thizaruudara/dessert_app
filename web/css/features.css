@@ -1686,3 +1686,602 @@
   background: #F1F5F9;
   border: 1px solid #E2E8F0;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   ── EXACT 1:1 ANDROID APK ADMIN REPLICA STYLES (Flutter Admin Parity) ──
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.apk-admin-screen-container {
+  padding-bottom: 90px;
+  background: #F8FAFC;
+  min-height: 100%;
+}
+
+/* ── 1. Executive Top Header (admin_home_screen.dart) ── */
+.apk-admin-exec-card {
+  margin: 12px 16px;
+  padding: 18px;
+  background: #FFFFFF;
+  border-radius: 22px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.apk-admin-exec-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.apk-admin-portal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: #2563EB;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.apk-pulsing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  animation: apkPulse 2s infinite;
+}
+
+@keyframes apkPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.apk-admin-exec-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.apk-btn-student-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.apk-btn-student-view:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.apk-btn-logout-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  color: #64748B;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+.apk-btn-logout-icon:hover {
+  background: #FEE2E2;
+  color: #EF4444;
+  border-color: #FECACA;
+}
+
+.apk-admin-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.apk-admin-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.apk-admin-greeting-text h2 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.apk-admin-greeting-text p {
+  font-size: 12.5px;
+  color: #64748B;
+  margin: 2px 0 0;
+}
+
+/* ── 2. Real-Time Overview Metrics Row (3 Cards) ── */
+.apk-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.apk-metric-card {
+  padding: 14px;
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.apk-metric-card.active-pending {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1.5px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);
+}
+.apk-metric-card.active-approved {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1.5px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.12);
+}
+.apk-metric-card.active-rejected {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1.5px solid rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+}
+
+.apk-metric-icon-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.apk-metric-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.1;
+}
+
+.apk-metric-lbl {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748B;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 3. Admin Command Center (2x2 Grid) ── */
+.apk-command-center-box {
+  margin: 0 16px 16px;
+  padding: 16px;
+  background: #FFFFFF;
+  border-radius: 18px;
+  border: 1px solid #E2E8F0;
+}
+
+.apk-command-center-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 12px;
+}
+
+.apk-command-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.apk-command-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+.apk-command-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.apk-command-btn.purple { background: rgba(139, 92, 246, 0.06); border-color: rgba(139, 92, 246, 0.25); }
+.apk-command-btn.blue { background: rgba(37, 99, 235, 0.06); border-color: rgba(37, 99, 235, 0.25); }
+.apk-command-btn.amber { background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.25); }
+.apk-command-btn.cyan { background: rgba(6, 182, 212, 0.06); border-color: rgba(6, 182, 212, 0.25); }
+
+.apk-command-icon-box {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.apk-command-info .title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.2;
+}
+
+.apk-command-info .subtitle {
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+/* ── 4. Dessert Submissions Queue Section ── */
+.apk-queue-section {
+  padding: 0 16px 24px;
+}
+
+.apk-queue-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.apk-queue-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.apk-queue-badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #2563EB;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Segmented Tab Switcher */
+.apk-segmented-tabs {
+  display: flex;
+  background: #F1F5F9;
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.apk-segmented-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apk-segmented-tab-btn.active {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.apk-segmented-pill-badge {
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.apk-segmented-pill-badge.orange { background: #F59E0B; color: #FFFFFF; }
+.apk-segmented-pill-badge.green { background: #10B981; color: #FFFFFF; }
+.apk-segmented-pill-badge.red { background: #EF4444; color: #FFFFFF; }
+.apk-segmented-pill-badge.grey { background: #CBD5E1; color: #475569; }
+
+/* Quick Search Bar */
+.apk-search-bar {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.apk-search-bar input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px 10px 38px;
+  border-radius: 12px;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: #0F172A;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.apk-search-bar input:focus {
+  border-color: #2563EB;
+}
+
+.apk-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+/* Empty State Card */
+.apk-empty-card {
+  padding: 36px 20px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.apk-empty-icon-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #DBEAFE;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.apk-empty-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.apk-empty-subtitle {
+  font-size: 12.5px;
+  color: #64748B;
+  max-width: 260px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.apk-btn-primary {
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+}
+.apk-btn-primary:hover {
+  background: #1D4ED8;
+  transform: translateY(-1px);
+}
+
+/* ── Floating Action Button (FAB) ── */
+.apk-fab-button {
+  position: fixed;
+  bottom: 86px;
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 30px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+.apk-fab-button:hover {
+  background: #1D4ED8;
+  transform: translateY(-2px);
+}
+
+/* ── Screen AppBars ── */
+.apk-screen-appbar {
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.apk-appbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.apk-appbar-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #2563EB;
+}
+
+.apk-appbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.apk-appbar-subtitle {
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 1px;
+}
+
+.apk-appbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.apk-icon-action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.apk-icon-action-btn:hover {
+  background: #EFF6FF;
+}
+
+/* ── Sprints TabBar Underline ── */
+.apk-tabbar-underline {
+  display: flex;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.apk-tabbar-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.apk-tabbar-tab.active {
+  color: #2563EB;
+  font-weight: 700;
+}
+
+.apk-tabbar-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 2.5px;
+  background: #2563EB;
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── Filter Chips Horizontal ── */
+.apk-chips-scroll-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+.apk-chips-scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+.apk-filter-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apk-filter-chip.active {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: #2563EB;
+  color: #2563EB;
+  font-weight: 700;
+}
+
