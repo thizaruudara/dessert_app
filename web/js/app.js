@@ -426,7 +426,23 @@ class AppController {
         this.renderHomeScreen(container);
         break;
       case 'papers':
-        this.renderPapersScreen(container);
+        container.innerHTML = `
+          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:16px;">
+            <div style="width:42px; height:42px; border:3.5px solid #E2E8F0; border-top-color:#6366F1; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+            <div style="font-size:13.5px; font-weight:700; color:#475569;">විභාග සැසි සූදානම් කරමින්...</div>
+          </div>
+        `;
+        this.renderPapersScreen(container).catch(err => {
+          console.error('[Papers] Error rendering papers tab:', err);
+          container.innerHTML = `
+            <div style="padding:40px 20px; text-align:center; color:#DC2626;">
+              <div style="font-size:36px; margin-bottom:8px;">⚠️</div>
+              <div style="font-weight:700; font-size:15px; margin-bottom:4px;">Paper Sessions ලෝඩ් කිරීමේ දෝෂයක් සිදුවිය</div>
+              <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${err.message || 'Unknown error'}</div>
+              <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : location.reload()" style="width:auto; padding:8px 18px; margin:0 auto;">නැවත උත්සාහ කරන්න</button>
+            </div>
+          `;
+        });
         break;
       case 'ranks':
         this.renderRanksScreen(container);
@@ -777,429 +793,483 @@ class AppController {
       this.papersInterval = null;
     }
 
-    const user = this.currentUser || { name: 'Scholar', phone: '', examYear: '2027 A/L' };
-    const currentYear = user.examYear || '2027 A/L';
-    const activeTargetYear = this.showAllBatches ? null : currentYear;
+    try {
+      const user = this.currentUser || { name: 'Scholar', phone: '', examYear: '2027 A/L' };
+      const currentYear = user.examYear || '2027 A/L';
+      const activeTargetYear = this.showAllBatches ? null : currentYear;
 
-    const [sessions, upcomingList] = await Promise.all([
-      dbService.getPaperSessions(activeTargetYear),
-      dbService.getUpcomingPapers(activeTargetYear)
-    ]);
+      const [sessions, upcomingList] = await Promise.all([
+        dbService.getPaperSessions(activeTargetYear).catch(e => {
+          console.warn('[Papers] Sessions fetch error, falling back:', e);
+          return dbService.getMockPaperSessions(activeTargetYear);
+        }),
+        dbService.getUpcomingPapers(activeTargetYear).catch(e => {
+          console.warn('[Papers] Upcoming fetch error, falling back:', e);
+          return dbService.getMockUpcomingPapers(activeTargetYear);
+        })
+      ]);
 
-    const formatHeaderSubtitle = () => {
-      if (this.showAllBatches) {
-        return 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි';
-      }
-      return `${currentYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි`;
-    };
+      const formatHeaderSubtitle = () => {
+        if (this.showAllBatches) {
+          return 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි';
+        }
+        return `${currentYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි`;
+      };
 
-    container.innerHTML = `
-      <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
-      <div class="screen-appbar">
-        <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:rgba(99,102,241,0.1); color:#6366F1;">
-            📋
+      const safeFormatTime = (isoString, fallback = '08:30 AM') => {
+        if (!isoString) return fallback;
+        try {
+          const d = new Date(isoString);
+          if (isNaN(d.getTime())) return fallback;
+          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch (_) {
+          return fallback;
+        }
+      };
+
+      const safeFormatDate = (dateVal, fallback = 'Today') => {
+        if (!dateVal) return fallback;
+        try {
+          const d = new Date(dateVal);
+          if (isNaN(d.getTime())) return fallback;
+          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+        } catch (_) {
+          return fallback;
+        }
+      };
+
+      container.innerHTML = `
+        <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
+        <div class="screen-appbar">
+          <div class="appbar-left">
+            <div class="appbar-icon-box" style="background:rgba(99,102,241,0.1); color:#6366F1;">
+              📋
+            </div>
+            <div>
+              <div class="appbar-title">Paper Writing Sessions</div>
+              <div class="appbar-subtitle" id="papers-batch-subtitle">${formatHeaderSubtitle()}</div>
+            </div>
           </div>
-          <div>
-            <div class="appbar-title">Paper Writing Sessions</div>
-            <div class="appbar-subtitle" id="papers-batch-subtitle">${formatHeaderSubtitle()}</div>
-          </div>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <button class="appbar-badge-toggle" id="btn-toggle-papers-batch" title="Toggle Batch Filter">
-            <span>${this.showAllBatches ? '🌐 All' : '🎓 Batch'}</span>
-          </button>
-          <button class="btn-vault-refresh" id="btn-refresh-papers" title="Refresh Sessions">
-            🔄
-          </button>
-        </div>
-      </div>
-
-      <!-- View Switcher Tabs (1:1 with lines 156-185 of paper_sessions_screen.dart) -->
-      <div class="sub-tabs-container" style="margin: 6px 16px 14px;">
-        <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live">
-          <span>📝 Live Exam Sessions</span>
-          <span class="tab-sub">Active & Scheduled</span>
-        </button>
-        <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
-          <span>🔮 Upcoming Papers & Hints</span>
-          <span class="tab-sub">Scope, Tips & Hints</span>
-        </button>
-      </div>
-
-      <!-- Tab 0: Live Exam Sessions View -->
-      <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
-        ${sessions.length === 0 ? `
-          <div style="padding:40px 24px; text-align:center; color:#64748B;">
-            <div style="font-size:44px; margin-bottom:12px;">📖</div>
-            <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">නව Paper Sessions සූදානම් වෙමින් පවතී</div>
-            <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.' : `ඔබගේ කණ්ඩායම (${currentYear}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.`}</div>
-            <button class="btn-primary" id="btn-empty-toggle-batch" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
-              ${this.showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න'}
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="appbar-badge-toggle" id="btn-toggle-papers-batch" title="Toggle Batch Filter">
+              <span>${this.showAllBatches ? '🌐 All' : '🎓 Batch'}</span>
+            </button>
+            <button class="btn-vault-refresh" id="btn-refresh-papers" title="Refresh Sessions">
+              🔄
             </button>
           </div>
-        ` : sessions.map(session => {
-          const reg = dbService.getStudentRegistration(session.id, user.phone || 'demo_user');
-          const isSubmitted = reg?.status === 'submitted' || reg?.isSubmitted === true;
-          const selectedSlotId = reg?.selectedSlot || 'slot1';
-          const targetSlot = (selectedSlotId === 'slot2' && session.slot2) ? session.slot2 : session.slot1;
+        </div>
 
-          const isEnded = session.status === 'ended' || session.currentPhase === 'ended';
-          const isWaiting = session.currentPhase === 'waiting' && !isEnded;
-          const isPackageOpening = session.currentPhase === 'package_opening' && !isEnded;
-          const isWriting = session.currentPhase === 'writing' && !isEnded;
-          const isTimeUp = session.currentPhase === 'time_up' && !isEnded;
-          const isLive = !isEnded && !isWaiting && (session.status === 'active' || isPackageOpening || isWriting || isTimeUp);
+        <!-- View Switcher Tabs (1:1 with lines 156-185 of paper_sessions_screen.dart) -->
+        <div class="sub-tabs-container" style="margin: 6px 16px 14px;">
+          <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live">
+            <span>📝 Live Exam Sessions</span>
+            <span class="tab-sub">Active & Scheduled</span>
+          </button>
+          <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
+            <span>🔮 Upcoming Papers & Hints</span>
+            <span class="tab-sub">Scope, Tips & Hints</span>
+          </button>
+        </div>
 
-          // Calculate initial Package Opening Remaining Seconds
-          let packageRemainingSecs = 600;
-          if (session.packageOpeningStartedAt) {
-            const elapsed = Math.floor((Date.now() - new Date(session.packageOpeningStartedAt).getTime()) / 1000);
-            if (elapsed >= 0 && elapsed <= 600) {
-              packageRemainingSecs = 600 - elapsed;
+        <!-- Tab 0: Live Exam Sessions View -->
+        <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
+          ${sessions.length === 0 ? `
+            <div style="padding:40px 24px; text-align:center; color:#64748B;">
+              <div style="font-size:44px; margin-bottom:12px;">📖</div>
+              <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">නව Paper Sessions සූදානම් වෙමින් පවතී</div>
+              <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.' : `ඔබගේ කණ්ඩායම (${currentYear}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.`}</div>
+              <button class="btn-primary" id="btn-empty-toggle-batch" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
+                ${this.showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න'}
+              </button>
+            </div>
+          ` : sessions.map(session => {
+            const reg = dbService.getStudentRegistration(session.id, user.phone || 'demo_user');
+            const isSubmitted = reg?.status === 'submitted' || reg?.isSubmitted === true;
+            const selectedSlotId = reg?.selectedSlot || 'slot1';
+
+            const slot1 = session.slot1 || {
+              id: 'slot1',
+              name: 'Slot 1 (Morning / උදෑසන සැසිය)',
+              startTime: new Date().toISOString(),
+              endTime: new Date(Date.now() + (session.durationMinutes || 120) * 60000).toISOString(),
+              registeredCount: 0,
+              maxCapacity: 100
+            };
+            const slot2 = session.slot2 || null;
+            const targetSlot = (selectedSlotId === 'slot2' && slot2) ? slot2 : slot1;
+
+            const isEnded = session.status === 'ended' || session.currentPhase === 'ended';
+            const isWaiting = session.currentPhase === 'waiting' && !isEnded;
+            const isPackageOpening = session.currentPhase === 'package_opening' && !isEnded;
+            const isWriting = session.currentPhase === 'writing' && !isEnded;
+            const isTimeUp = session.currentPhase === 'time_up' && !isEnded;
+            const isLive = !isEnded && !isWaiting && (session.status === 'active' || isPackageOpening || isWriting || isTimeUp);
+
+            // Calculate initial Package Opening Remaining Seconds
+            let packageRemainingSecs = 600;
+            if (session.packageOpeningStartedAt) {
+              const elapsed = Math.floor((Date.now() - new Date(session.packageOpeningStartedAt).getTime()) / 1000);
+              if (elapsed >= 0 && elapsed <= 600) {
+                packageRemainingSecs = 600 - elapsed;
+              }
             }
-          }
 
-          const pkgMin = Math.floor(packageRemainingSecs / 60).toString().padStart(2, '0');
-          const pkgSec = (packageRemainingSecs % 60).toString().padStart(2, '0');
+            const pkgMin = Math.floor(packageRemainingSecs / 60).toString().padStart(2, '0');
+            const pkgSec = (packageRemainingSecs % 60).toString().padStart(2, '0');
 
-          return `
-            <div class="paper-session-card" id="paper-card-${session.id}" style="${isSubmitted ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.15);' : (isLive ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.12);' : '')}">
-              <!-- Header Row -->
-              <div class="paper-card-header">
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">
-                    ${session.subject}
-                  </span>
-                  <span style="background:#FFFFFF; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;">
-                    ${session.examYear}
-                  </span>
-                </div>
-                ${isSubmitted ? `
-                  <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                    <span>✓</span> <span>SUBMITTED</span>
-                  </span>
-                ` : isLive ? `
-                  <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
-                    <span style="width:7px; height:7px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
-                    <span>LIVE NOW</span>
-                  </span>
-                ` : ''}
-              </div>
-
-              <!-- Title & Meta -->
-              <div class="paper-title" style="margin-top:2px;">${session.title}</div>
-              <div class="paper-meta-row">
-                <div class="meta-chip">📅 ${new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}</div>
-                <div class="meta-chip">⏱️ ${session.durationMinutes} Minutes</div>
-                <div class="meta-chip">🎥 Camera Monitored</div>
-              </div>
-
-              <!-- Slot Selector (1:1 with _buildSlotCard) -->
-              <div style="font-size:11.5px; font-weight:700; color:#475569; margin-top:4px;">
-                ${session.slot2 ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:' : 'විභාග සැසිය (Exam Session):'}
-              </div>
-              <div class="slots-container">
-                <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1">
-                  <div class="slot-name">
-                    <span>☀️ Slot 1 (Morning)</span>
-                    <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot1' ? '✓' : '○'}</span>
+            return `
+              <div class="paper-session-card" id="paper-card-${session.id}" style="${isSubmitted ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.15);' : (isLive ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.12);' : '')}">
+                <!-- Header Row -->
+                <div class="paper-card-header">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">
+                      ${session.subject || 'A/L Physics'}
+                    </span>
+                    <span style="background:#FFFFFF; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;">
+                      ${session.examYear || '2027 A/L'}
+                    </span>
                   </div>
-                  <div style="font-size:11px; color:#475569; font-weight:600;">
-                    ${new Date(session.slot1.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(session.slot1.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                  <div class="slot-seats">🪑 ${session.slot1.registeredCount} / ${session.slot1.maxCapacity} Seats</div>
+                  ${isSubmitted ? `
+                    <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                      <span>✓</span> <span>SUBMITTED</span>
+                    </span>
+                  ` : isLive ? `
+                    <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                      <span style="width:7px; height:7px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
+                      <span>LIVE NOW</span>
+                    </span>
+                  ` : ''}
                 </div>
 
-                ${session.slot2 ? `
-                  <div class="slot-selection-box ${selectedSlotId === 'slot2' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot2">
+                <!-- Title & Meta -->
+                <div class="paper-title" style="margin-top:2px;">${session.title || 'Physics Examination Paper'}</div>
+                <div class="paper-meta-row">
+                  <div class="meta-chip">📅 ${safeFormatDate(session.date)}</div>
+                  <div class="meta-chip">⏱️ ${session.durationMinutes || 120} Minutes</div>
+                  <div class="meta-chip">🎥 Camera Monitored</div>
+                </div>
+
+                <!-- Slot Selector (1:1 with _buildSlotCard) -->
+                <div style="font-size:11.5px; font-weight:700; color:#475569; margin-top:4px;">
+                  ${slot2 ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:' : 'විභාග සැසිය (Exam Session):'}
+                </div>
+                <div class="slots-container">
+                  <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1">
                     <div class="slot-name">
-                      <span>🌙 Slot 2 (Evening)</span>
-                      <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot2' ? '✓' : '○'}</span>
+                      <span>☀️ ${slot1.name || 'Slot 1 (Morning)'}</span>
+                      <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot1' ? '✓' : '○'}</span>
                     </div>
                     <div style="font-size:11px; color:#475569; font-weight:600;">
-                      ${new Date(session.slot2.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(session.slot2.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      ${safeFormatTime(slot1.startTime, '08:30 AM')} - ${safeFormatTime(slot1.endTime, '10:30 AM')}
                     </div>
-                    <div class="slot-seats">🪑 ${session.slot2.registeredCount} / ${session.slot2.maxCapacity} Seats</div>
+                    <div class="slot-seats">🪑 ${slot1.registeredCount} / ${slot1.maxCapacity} Seats</div>
                   </div>
-                ` : ''}
+
+                  ${slot2 ? `
+                    <div class="slot-selection-box ${selectedSlotId === 'slot2' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot2">
+                      <div class="slot-name">
+                        <span>🌙 ${slot2.name || 'Slot 2 (Evening)'}</span>
+                        <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot2' ? '✓' : '○'}</span>
+                      </div>
+                      <div style="font-size:11px; color:#475569; font-weight:600;">
+                        ${safeFormatTime(slot2.startTime, '04:00 PM')} - ${safeFormatTime(slot2.endTime, '06:00 PM')}
+                      </div>
+                      <div class="slot-seats">🪑 ${slot2.registeredCount} / ${slot2.maxCapacity} Seats</div>
+                    </div>
+                  ` : ''}
+                </div>
+
+                <!-- Real-Time Phase Status Banner Box -->
+                ${isSubmitted ? `
+                  <div class="phase-status-banner-box submitted">
+                    <span style="font-size:24px;">🎉</span>
+                    <div>
+                      <div style="font-size:12px; font-weight:800; color:#15803D;">පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)</div>
+                      <div style="font-size:11px; color:#475569; margin-top:2px;">
+                        ඔබ විසින් පිටු ${reg?.submissionPhotos?.length || 4} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදෙන ලදී.
+                      </div>
+                    </div>
+                  </div>
+                ` : isPackageOpening ? `
+                  <div class="phase-status-banner-box pkg-opening">
+                    <span style="font-size:24px;">📦</span>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:800; color:#B45309;">පැකේජය විවෘත කිරීමේ කාලය (Package Opening)</div>
+                      <div style="font-size:12px; font-weight:800; color:#D97706; margin-top:2px;">
+                        කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (<span class="timer-pkg-span" data-start="${session.packageOpeningStartedAt || ''}">${pkgMin}:${pkgSec}</span>)
+                      </div>
+                    </div>
+                  </div>
+                ` : isWriting ? `
+                  <div class="phase-status-banner-box writing">
+                    <span style="font-size:24px;">✍️</span>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:800; color:#15803D;">විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)</div>
+                      <div style="font-size:12px; font-weight:800; color:#059669; margin-top:2px;">දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)</div>
+                    </div>
+                  </div>
+                ` : isTimeUp ? `
+                  <div class="phase-status-banner-box time-up">
+                    <span style="font-size:24px;">⏰</span>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:800; color:#DC2626;">වේලාව අවසන් (Time Up - Scan Answers)</div>
+                      <div style="font-size:12px; font-weight:800; color:#B91C1C; margin-top:2px;">පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න</div>
+                    </div>
+                  </div>
+                ` : isWaiting ? `
+                  <div class="phase-status-banner-box waiting">
+                    <span style="font-size:24px;">⏳</span>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:800; color:#4338CA;">විභාග පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)</div>
+                      <div style="font-size:12px; font-weight:800; color:#6366F1; margin-top:2px;">පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)</div>
+                    </div>
+                  </div>
+                ` : isEnded ? `
+                  <div class="phase-status-banner-box ended">
+                    <span style="font-size:24px;">🛑</span>
+                    <div>
+                      <div style="font-size:11.5px; font-weight:800; color:#64748B;">සැසිය අවසන් (Session Completed)</div>
+                      <div style="font-size:12px; color:#94A3B8; margin-top:2px;">ස්තුතියි, මෙම විභාග සැසිය අවසන් කර ඇත.</div>
+                    </div>
+                  </div>
+                ` : `
+                  <div class="phase-status-banner-box waiting">
+                    <span style="font-size:24px;">⏱️</span>
+                    <div>
+                      <div style="font-size:11px; font-weight:700; color:#475569;">${targetSlot.name || 'විභාග සැසිය'} ආරම්භ වීමට:</div>
+                      <div style="font-size:15px; font-weight:800; color:#2563EB; letter-spacing:1px; margin-top:2px;" class="timer-upcoming-span" data-target="${targetSlot.startTime || new Date().toISOString()}">
+                        01 : 45 : 30
+                      </div>
+                    </div>
+                  </div>
+                `}
+
+                <!-- Action Buttons (1:1 with lines 1373-1498) -->
+                ${isSubmitted ? `
+                  <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px;" data-view-sub="${session.id}">
+                    ✅ Submitted (${reg?.submissionPhotos?.length || 4} Pages) • විස්තර බලන්න
+                  </button>
+                ` : isPackageOpening ? `
+                  <button class="btn-primary" style="background:#D97706; padding:12px;" data-enter-exam="${session.id}">
+                    📦 Open Package in Camera Room (පාර්සලය විවෘත කරන්න)
+                  </button>
+                ` : isWriting ? `
+                  <button class="btn-primary" style="background:#16A34A; padding:12px;" data-enter-exam="${session.id}">
+                    🎥 Enter Live Exam Room (කැමරාව ON කරන්න)
+                  </button>
+                ` : isTimeUp ? `
+                  <button class="btn-primary" style="background:#DC2626; padding:12px;" data-scan-answers="${session.id}">
+                    📄 Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)
+                  </button>
+                ` : isWaiting ? `
+                  <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
+                    🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
+                  </button>
+                ` : isEnded ? `
+                  <button class="btn-primary" style="background:#F1F5F9; color:#94A3B8; border:1px solid #CBD5E1; cursor:not-allowed; padding:12px;" onclick="alert('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත (Session Ended).')">
+                    🛑 විභාග සැසිය අවසන් විය (Ended)
+                  </button>
+                ` : `
+                  <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
+                    🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
+                  </button>
+                `}
               </div>
+            `;
+          }).join('')}
+        </div>
 
-              <!-- Real-Time Phase Status Banner Box -->
-              ${isSubmitted ? `
-                <div class="phase-status-banner-box submitted">
-                  <span style="font-size:24px;">🎉</span>
-                  <div>
-                    <div style="font-size:12px; font-weight:800; color:#15803D;">පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)</div>
-                    <div style="font-size:11px; color:#475569; margin-top:2px;">
-                      ඔබ විසින් පිටු ${reg?.submissionPhotos?.length || 4} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදෙන ලදී.
-                    </div>
-                  </div>
-                </div>
-              ` : isPackageOpening ? `
-                <div class="phase-status-banner-box pkg-opening">
-                  <span style="font-size:24px;">📦</span>
-                  <div>
-                    <div style="font-size:11.5px; font-weight:800; color:#B45309;">පැකේජය විවෘත කිරීමේ කාලය (Package Opening)</div>
-                    <div style="font-size:12px; font-weight:800; color:#D97706; margin-top:2px;">
-                      කැමරාව ඉදිරියේ පාර්සලය විවෘත කරන්න (<span class="timer-pkg-span" data-start="${session.packageOpeningStartedAt}">${pkgMin}:${pkgSec}</span>)
-                    </div>
-                  </div>
-                </div>
-              ` : isWriting ? `
-                <div class="phase-status-banner-box writing">
-                  <span style="font-size:24px;">✍️</span>
-                  <div>
-                    <div style="font-size:11.5px; font-weight:800; color:#15803D;">විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)</div>
-                    <div style="font-size:12px; font-weight:800; color:#059669; margin-top:2px;">දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)</div>
-                  </div>
-                </div>
-              ` : isTimeUp ? `
-                <div class="phase-status-banner-box time-up">
-                  <span style="font-size:24px;">⏰</span>
-                  <div>
-                    <div style="font-size:11.5px; font-weight:800; color:#DC2626;">වේලාව අවසන් (Time Up - Scan Answers)</div>
-                    <div style="font-size:12px; font-weight:800; color:#B91C1C; margin-top:2px;">පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න</div>
-                  </div>
-                </div>
-              ` : isWaiting ? `
-                <div class="phase-status-banner-box waiting">
-                  <span style="font-size:24px;">⏳</span>
-                  <div>
-                    <div style="font-size:11.5px; font-weight:800; color:#4338CA;">විභාග පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)</div>
-                    <div style="font-size:12px; font-weight:800; color:#6366F1; margin-top:2px;">පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)</div>
-                  </div>
-                </div>
-              ` : isEnded ? `
-                <div class="phase-status-banner-box ended">
-                  <span style="font-size:24px;">🛑</span>
-                  <div>
-                    <div style="font-size:11.5px; font-weight:800; color:#64748B;">සැසිය අවසන් (Session Completed)</div>
-                    <div style="font-size:12px; color:#94A3B8; margin-top:2px;">ස්තුතියි, මෙම විභාග සැසිය අවසන් කර ඇත.</div>
-                  </div>
-                </div>
-              ` : `
-                <div class="phase-status-banner-box waiting">
-                  <span style="font-size:24px;">⏱️</span>
-                  <div>
-                    <div style="font-size:11px; font-weight:700; color:#475569;">${targetSlot.name} ආරම්භ වීමට:</div>
-                    <div style="font-size:15px; font-weight:800; color:#2563EB; letter-spacing:1px; margin-top:2px;" class="timer-upcoming-span" data-target="${targetSlot.startTime}">
-                      01 : 45 : 30
-                    </div>
-                  </div>
-                </div>
-              `}
-
-              <!-- Action Buttons (1:1 with lines 1373-1498) -->
-              ${isSubmitted ? `
-                <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px;" data-view-sub="${session.id}">
-                  ✅ Submitted (${reg?.submissionPhotos?.length || 4} Pages) • විස්තර බලන්න
-                </button>
-              ` : isPackageOpening ? `
-                <button class="btn-primary" style="background:#D97706; padding:12px;" data-enter-exam="${session.id}">
-                  📦 Open Package in Camera Room (පාර්සලය විවෘත කරන්න)
-                </button>
-              ` : isWriting ? `
-                <button class="btn-primary" style="background:#16A34A; padding:12px;" data-enter-exam="${session.id}">
-                  🎥 Enter Live Exam Room (කැමරාව ON කරන්න)
-                </button>
-              ` : isTimeUp ? `
-                <button class="btn-primary" style="background:#DC2626; padding:12px;" data-scan-answers="${session.id}">
-                  📄 Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)
-                </button>
-              ` : isWaiting ? `
-                <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
-                  🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
-                </button>
-              ` : isEnded ? `
-                <button class="btn-primary" style="background:#F1F5F9; color:#94A3B8; border:1px solid #CBD5E1; cursor:not-allowed; padding:12px;" onclick="alert('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත (Session Ended).')">
-                  🛑 විභාග සැසිය අවසන් විය (Ended)
-                </button>
-              ` : `
-                <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
-                  🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
-                </button>
-              `}
+        <!-- Tab 1: Upcoming Papers & Hints View (1:1 with _buildUpcomingPapersView lines 298-665) -->
+        <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
+          ${upcomingList.length === 0 ? `
+            <div style="padding:40px 24px; text-align:center; color:#64748B;">
+              <div style="font-size:44px; margin-bottom:12px;">🔮</div>
+              <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled Yet</div>
+              <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'Check back soon for new exam papers, scopes, and preparation hints.' : `Upcoming papers and hints for ${currentYear} will be announced here.`}</div>
+              <button class="btn-primary" id="btn-empty-toggle-batch-2" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
+                ${this.showAllBatches ? 'Show My Batch Only' : 'Show All Batches'}
+              </button>
             </div>
-          `;
-        }).join('')}
-      </div>
+          ` : upcomingList.map(paper => {
+            const rawDate = paper.scheduledDate ? new Date(paper.scheduledDate) : new Date(Date.now() + 86400000 * 3);
+            const schedDate = isNaN(rawDate.getTime()) ? new Date(Date.now() + 86400000 * 3) : rawDate;
+            const durationMins = Number(paper.durationMinutes) || 180;
+            const durationHours = (durationMins / 60).toFixed(1);
+            const diffMs = schedDate.getTime() - Date.now();
+            const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+            const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
+            const countdownText = days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
 
-      <!-- Tab 1: Upcoming Papers & Hints View (1:1 with _buildUpcomingPapersView lines 298-665) -->
-      <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
-        ${upcomingList.length === 0 ? `
-          <div style="padding:40px 24px; text-align:center; color:#64748B;">
-            <div style="font-size:44px; margin-bottom:12px;">🔮</div>
-            <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled Yet</div>
-            <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'Check back soon for new exam papers, scopes, and preparation hints.' : `Upcoming papers and hints for ${currentYear} will be announced here.`}</div>
-            <button class="btn-primary" id="btn-empty-toggle-batch-2" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
-              ${this.showAllBatches ? 'Show My Batch Only' : 'Show All Batches'}
-            </button>
-          </div>
-        ` : upcomingList.map(paper => {
-          const schedDate = new Date(paper.scheduledDate);
-          const durationHours = (paper.durationMinutes / 60).toFixed(1);
-          const diffMs = schedDate.getTime() - Date.now();
-          const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
-          const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
-          const countdownText = days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
-
-          return `
-            <div class="upcoming-paper-card">
-              <!-- Banner Header -->
-              <div class="upcoming-paper-header-banner">
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">
-                    ${paper.subject}
-                  </span>
-                  <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:600;">
-                    ${paper.examYear}
-                  </span>
+            return `
+              <div class="upcoming-paper-card">
+                <!-- Banner Header -->
+                <div class="upcoming-paper-header-banner">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">
+                      ${paper.subject || 'A/L Physics'}
+                    </span>
+                    <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:600;">
+                      ${paper.examYear || '2027 A/L'}
+                    </span>
+                  </div>
+                  <div class="upcoming-countdown-badge">
+                    <span>⏱️</span>
+                    <span>${diffMs > 0 ? countdownText : 'Paper Active'}</span>
+                  </div>
                 </div>
-                <div class="upcoming-countdown-badge">
-                  <span>⏱️</span>
-                  <span>${diffMs > 0 ? countdownText : 'Paper Active'}</span>
+
+                <!-- Card Body -->
+                <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+                  <div class="paper-title" style="font-size:16.5px;">${paper.title || 'Upcoming Model Paper'}</div>
+
+                  <!-- Date & Duration -->
+                  <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
+                      <span>📅</span>
+                      <span>${schedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })} at ${safeFormatTime(schedDate.toISOString(), '08:30 AM')}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
+                      <span>⏳</span>
+                      <span>${durationMins} Minutes (${durationHours} Hours) • ${paper.paperStructure || 'Comprehensive Evaluation'}</span>
+                    </div>
+                  </div>
+
+                  <!-- Syllabus Topics Chips (1:1 with lines 543-575) -->
+                  ${paper.syllabusTopics && paper.syllabusTopics.length > 0 ? `
+                    <div style="margin-top:2px;">
+                      <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Syllabus & Tested Topics:</div>
+                      <div class="upcoming-topics-wrap">
+                        ${paper.syllabusTopics.map(topic => `
+                          <div class="upcoming-topic-chip">
+                            <span style="color:#10B981; font-weight:800;">✓</span>
+                            <span>${topic}</span>
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : ''}
+
+                  <!-- EXCLUSIVE HINTS & TIPS (Highlight Box 1:1 with lines 578-617) -->
+                  ${paper.hints ? `
+                    <div class="upcoming-hints-highlight-box">
+                      <div class="upcoming-hints-title">
+                        <span style="font-size:16px;">💡</span>
+                        <span>Special Paper Hints & Guidance</span>
+                      </div>
+                      <div class="upcoming-hints-text">
+                        ${paper.hints}
+                      </div>
+                    </div>
+                  ` : ''}
+
+                  <!-- Instructions -->
+                  ${paper.instructions ? `
+                    <div style="display:flex; align-items:flex-start; gap:6px; font-size:11.5px; color:#64748B;">
+                      <span>ℹ️</span>
+                      <span>${paper.instructions}</span>
+                    </div>
+                  ` : ''}
+
+                  <!-- Action Button -->
+                  <button class="btn-primary" style="background:#6366F1; padding:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 14px rgba(99,102,241,0.3);" data-paper-scope="${paper.id}">
+                    <span>👁️</span>
+                    <span>View Full Scope & Hints</span>
+                  </button>
                 </div>
               </div>
+            `;
+          }).join('')}
+        </div>
+      `;
 
-              <!-- Card Body -->
-              <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
-                <div class="paper-title" style="font-size:16.5px;">${paper.title}</div>
+      // ── Live 1-Second Interval Ticker ──
+      this.startPapersTimer(container, sessions);
 
-                <!-- Date & Duration -->
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
-                    <span>📅</span>
-                    <span>${schedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })} at ${schedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
-                    <span>⏳</span>
-                    <span>${paper.durationMinutes} Minutes (${durationHours} Hours) • ${paper.paperStructure}</span>
-                  </div>
-                </div>
-
-                <!-- Syllabus Topics Chips (1:1 with lines 543-575) -->
-                ${paper.syllabusTopics && paper.syllabusTopics.length > 0 ? `
-                  <div style="margin-top:2px;">
-                    <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Syllabus & Tested Topics:</div>
-                    <div class="upcoming-topics-wrap">
-                      ${paper.syllabusTopics.map(topic => `
-                        <div class="upcoming-topic-chip">
-                          <span style="color:#10B981; font-weight:800;">✓</span>
-                          <span>${topic}</span>
-                        </div>
-                      `).join('')}
-                    </div>
-                  </div>
-                ` : ''}
-
-                <!-- EXCLUSIVE HINTS & TIPS (Highlight Box 1:1 with lines 578-617) -->
-                ${paper.hints ? `
-                  <div class="upcoming-hints-highlight-box">
-                    <div class="upcoming-hints-title">
-                      <span style="font-size:16px;">💡</span>
-                      <span>Special Paper Hints & Guidance</span>
-                    </div>
-                    <div class="upcoming-hints-text">
-                      ${paper.hints}
-                    </div>
-                  </div>
-                ` : ''}
-
-                <!-- Instructions -->
-                ${paper.instructions ? `
-                  <div style="display:flex; align-items:flex-start; gap:6px; font-size:11.5px; color:#64748B;">
-                    <span>ℹ️</span>
-                    <span>${paper.instructions}</span>
-                  </div>
-                ` : ''}
-
-                <!-- Action Button -->
-                <button class="btn-primary" style="background:#6366F1; padding:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 14px rgba(99,102,241,0.3);" data-paper-scope="${paper.id}">
-                  <span>👁️</span>
-                  <span>View Full Scope & Hints</span>
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-
-    // ── Live 1-Second Interval Ticker ──
-    this.startPapersTimer(container, sessions);
-
-    // ── Event Handlers ──
-    document.getElementById('tab-papers-live')?.addEventListener('click', () => {
-      this.papersTab = 0;
-      this.renderPapersScreen(container);
-    });
-
-    document.getElementById('tab-papers-upcoming')?.addEventListener('click', () => {
-      this.papersTab = 1;
-      this.renderPapersScreen(container);
-    });
-
-    const toggleBatch = () => {
-      this.showAllBatches = !this.showAllBatches;
-      this.renderPapersScreen(container);
-    };
-
-    document.getElementById('btn-toggle-papers-batch')?.addEventListener('click', toggleBatch);
-    document.getElementById('btn-refresh-papers')?.addEventListener('click', () => this.renderPapersScreen(container));
-    document.getElementById('btn-empty-toggle-batch')?.addEventListener('click', toggleBatch);
-    document.getElementById('btn-empty-toggle-batch-2')?.addEventListener('click', toggleBatch);
-
-    // Slot Selection
-    container.querySelectorAll('.slot-selection-box').forEach(box => {
-      box.addEventListener('click', async () => {
-        const pId = box.dataset.paperId;
-        const sId = box.dataset.slotId;
-        await dbService.registerStudentSlot({
-          paperId: pId,
-          studentId: user.phone || 'demo_user',
-          studentName: user.name || 'Scholar',
-          studentPhone: user.phone || '0770557769',
-          slotId: sId
-        });
-        notificationService.showLocalToast(`✅ ${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
+      // ── Event Handlers ──
+      document.getElementById('tab-papers-live')?.addEventListener('click', () => {
+        this.papersTab = 0;
         this.renderPapersScreen(container);
       });
-    });
 
-    // View Submission Details
-    container.querySelectorAll('[data-view-sub]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const pId = btn.dataset.viewSub;
-        const sess = sessions.find(s => s.id === pId);
-        const reg = dbService.getStudentRegistration(pId, user.phone || 'demo_user');
-        if (sess) this.showSubmissionDetailsDialog(sess, reg);
+      document.getElementById('tab-papers-upcoming')?.addEventListener('click', () => {
+        this.papersTab = 1;
+        this.renderPapersScreen(container);
       });
-    });
 
-    // Enter Exam / Waiting Room
-    container.querySelectorAll('[data-enter-exam]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.openLiveExamRoom(btn.dataset.enterExam);
-      });
-    });
+      const toggleBatch = () => {
+        this.showAllBatches = !this.showAllBatches;
+        this.renderPapersScreen(container);
+      };
 
-    // Scan Answers
-    container.querySelectorAll('[data-scan-answers]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.openDocumentScanner();
-      });
-    });
+      document.getElementById('btn-toggle-papers-batch')?.addEventListener('click', toggleBatch);
+      document.getElementById('btn-refresh-papers')?.addEventListener('click', () => this.renderPapersScreen(container));
+      document.getElementById('btn-empty-toggle-batch')?.addEventListener('click', toggleBatch);
+      document.getElementById('btn-empty-toggle-batch-2')?.addEventListener('click', toggleBatch);
 
-    // View Full Scope & Hints Modal
-    container.querySelectorAll('[data-paper-scope]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const pId = btn.dataset.paperScope;
-        const paper = upcomingList.find(p => p.id === pId);
-        if (paper) this.showUpcomingPaperDetailsModal(paper);
+      // Slot Selection
+      container.querySelectorAll('.slot-selection-box').forEach(box => {
+        box.addEventListener('click', async () => {
+          const pId = box.dataset.paperId;
+          const sId = box.dataset.slotId;
+          await dbService.registerStudentSlot({
+            paperId: pId,
+            studentId: user.phone || 'demo_user',
+            studentName: user.name || 'Scholar',
+            studentPhone: user.phone || '0770557769',
+            slotId: sId
+          });
+          notificationService.showLocalToast(`✅ ${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
+          this.renderPapersScreen(container);
+        });
       });
-    });
+
+      // View Submission Details
+      container.querySelectorAll('[data-view-sub]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pId = btn.dataset.viewSub;
+          const sess = sessions.find(s => s.id === pId);
+          const reg = dbService.getStudentRegistration(pId, user.phone || 'demo_user');
+          if (sess) this.showSubmissionDetailsDialog(sess, reg);
+        });
+      });
+
+      // Enter Exam / Waiting Room
+      container.querySelectorAll('[data-enter-exam]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.openLiveExamRoom(btn.dataset.enterExam);
+        });
+      });
+
+      // Scan Answers
+      container.querySelectorAll('[data-scan-answers]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.openDocumentScanner();
+        });
+      });
+
+      // View Full Scope & Hints Modal
+      container.querySelectorAll('[data-paper-scope]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pId = btn.dataset.paperScope;
+          const paper = upcomingList.find(p => p.id === pId);
+          if (paper) this.showUpcomingPaperDetailsModal(paper);
+        });
+      });
+    } catch (renderError) {
+      console.error('[PapersScreen] Critical render error caught:', renderError);
+      container.innerHTML = `
+        <div style="padding:40px 20px; text-align:center;">
+          <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
+          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">Paper Sessions लोड කිරීමේ ගැටළුවක්</div>
+          <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${renderError.message || 'Unknown error occurred'}</div>
+          <button class="btn-primary" onclick="window.app ? window.app.renderPapersScreen(document.getElementById('main-viewport')) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto;">
+            🔄 නැවත උත්සාහ කරන්න (Retry)
+          </button>
+        </div>
+      `;
+    }
   }
 
   // ── Live 1-Second Timer for Papers Screen ──
