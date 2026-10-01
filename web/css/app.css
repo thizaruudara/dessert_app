@@ -46,6 +46,34 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Google Material Symbols Rounded (1:1 with Flutter Icons) */
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.material-symbols-rounded.filled {
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
 /* Master Phone / Mobile App Container */
 #app-root {
   width: 100%;
@@ -1128,6 +1156,17 @@ body {
   color: #2563EB;
   transform: scale(1.08);
   box-shadow: 0 2px 10px rgba(37, 99, 235, 0.14);
+}
+
+.nav-tab-btn .material-symbols-rounded {
+  font-size: 22px;
+  color: #64748B;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-tab-btn.active .material-symbols-rounded {
+  color: #2563EB;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
 }
 
 .nav-tab-btn.active span {

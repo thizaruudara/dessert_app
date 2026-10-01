@@ -110,10 +110,10 @@ class AppController {
         <!-- Status Bar -->
         <div class="ios-status-bar" style="background:transparent; color:#FFFFFF;">
           <span class="status-time" id="status-clock">8:15</span>
-          <div class="status-icons">
-            <span>●●●</span>
-            <span>📶</span>
-            <span>🔋</span>
+          <div class="status-icons" style="display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px;">signal_cellular_alt</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">wifi</span>
+            <span class="material-symbols-rounded" style="font-size:18px;">battery_full</span>
           </div>
         </div>
 
@@ -122,17 +122,22 @@ class AppController {
             <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" onerror="this.src='./icons/icon-192.png'" />
           </div>
           <div class="auth-title">EduPeak Learning Platform</div>
-          <div class="auth-brand-tag">AI & Advanced Level Institute ⚛️</div>
+          <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+            <span>AI & Advanced Level Institute</span>
+            <span class="material-symbols-rounded" style="font-size:15px; color:#818CF8;">science</span>
+          </div>
           <div class="auth-subtitle">A/L Physics Examination & Proctoring Suite</div>
         </div>
 
         <!-- Auth Tabs (Login vs Register) -->
         <div class="auth-tabs-bar">
-          <button class="auth-tab-btn ${this.authTab === 0 ? 'active' : ''}" id="tab-auth-login">
-            🔑 Login with Password
+          <button class="auth-tab-btn ${this.authTab === 0 ? 'active' : ''}" id="tab-auth-login" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px;">lock</span>
+            <span>Login with Password</span>
           </button>
-          <button class="auth-tab-btn ${this.authTab === 1 ? 'active' : ''}" id="tab-auth-register">
-            📝 Register
+          <button class="auth-tab-btn ${this.authTab === 1 ? 'active' : ''}" id="tab-auth-register" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px;">person_add</span>
+            <span>Register</span>
           </button>
         </div>
 
@@ -153,14 +158,17 @@ class AppController {
                 <label class="auth-field-label">Password (මුරපදය)</label>
                 <div class="auth-input-wrapper">
                   <input type="password" class="auth-input" id="input-login-password" placeholder="••••••••" value="demo1234" required />
-                  <button type="button" class="auth-pw-toggle" id="btn-toggle-login-pw">👁️</button>
+                  <button type="button" class="auth-pw-toggle" id="btn-toggle-login-pw">
+                    <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
+                  </button>
                 </div>
               </div>
 
               <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
 
-              <button type="submit" class="auth-btn-submit" id="btn-submit-login">
-                Sign In (ඇතුල් වන්න) ➔
+              <button type="submit" class="auth-btn-submit" id="btn-submit-login" style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                <span>Sign In (ඇතුල් වන්න)</span>
+                <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
               </button>
             </form>
           ` : `
@@ -193,14 +201,17 @@ class AppController {
                 <label class="auth-field-label">Password (මුරපදය)</label>
                 <div class="auth-input-wrapper">
                   <input type="password" class="auth-input" id="input-reg-password" placeholder="Create password" required />
-                  <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-pw">👁️</button>
+                  <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-pw">
+                    <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
+                  </button>
                 </div>
               </div>
 
               <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
 
-              <button type="submit" class="auth-btn-submit" id="btn-submit-reg">
-                Create Account & Claim +50 Bonus XP ➔
+              <button type="submit" class="auth-btn-submit" id="btn-submit-reg" style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                <span>Create Account & Claim +50 Bonus XP</span>
+                <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
               </button>
             </form>
           `}
@@ -208,16 +219,29 @@ class AppController {
 
         <!-- Quick 1-Tap Demo Switcher -->
         <div class="auth-quick-demo-section">
-          <div style="font-size:11.5px; font-weight:700; color:#64748B; text-align:center;">
-            ⚡ Quick 1-Tap Login for Testing & Evaluation:
+          <div style="font-size:11.5px; font-weight:700; color:#64748B; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">bolt</span>
+            <span>Quick 1-Tap Login for Testing & Evaluation:</span>
           </div>
           <button class="auth-quick-btn" id="btn-quick-student">
-            <span>👨‍🎓 Student Demo (ThiZaru • 2027 A/L)</span>
-            <span style="color:#818CF8; font-weight:800;">Log In ➔</span>
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#818CF8;">school</span>
+              <span>Student Demo (ThiZaru • 2027 A/L)</span>
+            </span>
+            <span style="color:#818CF8; font-weight:800; display:inline-flex; align-items:center; gap:2px;">
+              <span>Log In</span>
+              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+            </span>
           </button>
           <button class="auth-quick-btn" id="btn-quick-admin">
-            <span>👑 Teacher / Admin Demo (Prof. Senanayake)</span>
-            <span style="color:#F59E0B; font-weight:800;">Log In ➔</span>
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#F59E0B;">admin_panel_settings</span>
+              <span>Teacher / Admin Demo (Prof. Senanayake)</span>
+            </span>
+            <span style="color:#F59E0B; font-weight:800; display:inline-flex; align-items:center; gap:2px;">
+              <span>Log In</span>
+              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+            </span>
           </button>
         </div>
       </div>
@@ -345,10 +369,10 @@ class AppController {
       <!-- iOS Status Bar (8:15 battery/wifi) -->
       <div class="ios-status-bar">
         <span class="status-time" id="status-clock">8:15</span>
-        <div class="status-icons">
-          <span>●●●</span>
-          <span>📶</span>
-          <span>🔋</span>
+        <div class="status-icons" style="display:flex; align-items:center; gap:5px;">
+          <span class="material-symbols-rounded filled" style="font-size:14px;">signal_cellular_alt</span>
+          <span class="material-symbols-rounded" style="font-size:14px;">wifi</span>
+          <span class="material-symbols-rounded filled" style="font-size:16px;">battery_full</span>
         </div>
       </div>
 
@@ -358,23 +382,23 @@ class AppController {
       <!-- Bottom Navigation Bar (Matching student_shell.dart & real_dashboard_light_v4.html) -->
       <nav class="bottom-nav-bar">
         <button class="nav-tab-btn active" data-tab="home">
-          <div class="nav-pill-icon">🏠</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">home</span></div>
           <span>Home</span>
         </button>
         <button class="nav-tab-btn" data-tab="papers">
-          <div class="nav-pill-icon">📋</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">assignment</span></div>
           <span>Papers</span>
         </button>
         <button class="nav-tab-btn" data-tab="ranks">
-          <div class="nav-pill-icon">🏆</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">emoji_events</span></div>
           <span>Ranks</span>
         </button>
         <button class="nav-tab-btn" data-tab="desserts">
-          <div class="nav-pill-icon">📁</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">folder_special</span></div>
           <span>Desserts</span>
         </button>
         <button class="nav-tab-btn" data-tab="profile">
-          <div class="nav-pill-icon">👤</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">person</span></div>
           <span>Profile</span>
         </button>
       </nav>
@@ -436,7 +460,7 @@ class AppController {
           console.error('[Papers] Error rendering papers tab:', err);
           container.innerHTML = `
             <div style="padding:40px 20px; text-align:center; color:#DC2626;">
-              <div style="font-size:36px; margin-bottom:8px;">⚠️</div>
+              <span class="material-symbols-rounded filled" style="font-size:42px; color:#DC2626; margin-bottom:8px;">warning</span>
               <div style="font-weight:700; font-size:15px; margin-bottom:4px;">Paper Sessions ලෝඩ් කිරීමේ දෝෂයක් සිදුවිය</div>
               <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${err.message || 'Unknown error'}</div>
               <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : location.reload()" style="width:auto; padding:8px 18px; margin:0 auto;">නැවත උත්සාහ කරන්න</button>
@@ -482,13 +506,13 @@ class AppController {
             <span class="greeting-text">Good Evening</span>
             <div class="student-name-row">
               <span class="student-name">${studentName}</span>
-              <span class="verified-icon">✓</span>
+              <span class="material-symbols-rounded filled" style="font-size:16px; color:#2563EB;">verified</span>
             </div>
             <span class="candidate-tag">2027 A/L Candidate</span>
           </div>
         </div>
-        <div class="streak-pill">
-          <span>🔥</span>
+        <div class="streak-pill" style="display:inline-flex; align-items:center; gap:4px;">
+          <span class="material-symbols-rounded filled" style="font-size:16px; color:#EA580C;">local_fire_department</span>
           <span>3 Days</span>
         </div>
       </div>
@@ -496,8 +520,9 @@ class AppController {
       <!-- 2. Hero Level Card (Level 2 Cadet, 155 / 200 XP, 3 Mission Checkboxes) -->
       <div class="hero-card">
         <div class="hero-top">
-          <div class="hero-title">
-            <span>⚡ Level 2 Cadet</span>
+          <div class="hero-title" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">bolt</span>
+            <span>Level 2 Cadet</span>
           </div>
           <span class="hero-pts">155 / 200 XP</span>
         </div>
@@ -505,16 +530,19 @@ class AppController {
           <div class="progress-bar-fill"></div>
         </div>
         <div class="mission-checkboxes-row">
-          <div class="mission-check-pill completed">
-            <span class="mission-check-title">☑ Daily MCQ</span>
+          <div class="mission-check-pill completed" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span>
+            <span class="mission-check-title">Daily MCQ</span>
             <span class="mission-check-xp">+50 XP</span>
           </div>
-          <div class="mission-check-pill">
-            <span class="mission-check-title">☐ Review Tip</span>
+          <div class="mission-check-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span>
+            <span class="mission-check-title">Review Tip</span>
             <span class="mission-check-xp">+20 XP</span>
           </div>
-          <div class="mission-check-pill">
-            <span class="mission-check-title">☐ Homework</span>
+          <div class="mission-check-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span>
+            <span class="mission-check-title">Homework</span>
             <span class="mission-check-xp">+100 XP</span>
           </div>
         </div>
@@ -528,7 +556,7 @@ class AppController {
             <div class="inspiration-dot"></div>
             <span class="inspiration-badge-text">DAILY INSPIRATION</span>
           </div>
-          <span class="quote-mark">“</span>
+          <span class="material-symbols-rounded" style="font-size:22px; color:rgba(255,255,255,0.7);">format_quote</span>
         </div>
         <div class="inspiration-quote" id="inspiration-quote-text">
           “Success is the sum of small efforts repeated day in and day out.”
@@ -538,7 +566,10 @@ class AppController {
       <!-- 4. Original 4-Digit Box Countdown (Days, Hours, Mins, Secs) -->
       <div class="cd-card">
         <div class="cd-top">
-          <div class="cd-target-pill">⏳ A/L TARGET</div>
+          <div class="cd-target-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:13px;">timer</span>
+            <span>A/L TARGET</span>
+          </div>
           <span class="cd-exam-name">2027 A/L Physics Final Exam</span>
           <div class="pulse-dot"></div>
         </div>
@@ -568,55 +599,72 @@ class AppController {
       <!-- 5. Quick Actions (4 Columns with Colorful Squares) -->
       <div class="actions-grid">
         <div class="action-card-item action-box-mcq" id="act-daily-mcq">
-          <div class="action-icon-badge icon-mcq">⚡</div>
+          <div class="action-icon-badge icon-mcq">
+            <span class="material-symbols-rounded" style="font-size:22px;">bolt</span>
+          </div>
           <span class="action-card-name">Daily MCQ</span>
-          <span class="action-card-sub">5 Sprints 🔥</span>
+          <span class="action-card-sub">5 Sprints</span>
         </div>
         <div class="action-card-item action-box-tutor" id="act-ai-tutor">
-          <div class="action-icon-badge icon-tutor">💬</div>
+          <div class="action-icon-badge icon-tutor">
+            <span class="material-symbols-rounded" style="font-size:22px;">forum</span>
+          </div>
           <span class="action-card-name">AI Tutor</span>
-          <span class="action-card-sub">Instant 💬</span>
+          <span class="action-card-sub">Instant</span>
         </div>
         <div class="action-card-item action-box-hw" id="act-submit-hw">
-          <div class="action-icon-badge icon-hw">📷</div>
+          <div class="action-icon-badge icon-hw">
+            <span class="material-symbols-rounded" style="font-size:22px;">camera_alt</span>
+          </div>
           <span class="action-card-name">Submit HW</span>
-          <span class="action-card-sub">Earn XP 🚀</span>
+          <span class="action-card-sub">Earn XP</span>
         </div>
         <div class="action-card-item action-box-ranks" id="act-ranks">
-          <div class="action-icon-badge icon-ranks">👑</div>
+          <div class="action-icon-badge icon-ranks">
+            <span class="material-symbols-rounded" style="font-size:22px;">emoji_events</span>
+          </div>
           <span class="action-card-name">Ranks</span>
-          <span class="action-card-sub">Podium 👑</span>
+          <span class="action-card-sub">Podium</span>
         </div>
       </div>
 
       <!-- 6. Daily MCQ Sprint Spotlight Card -->
       <div class="sprint-box">
         <div class="sprint-header">
-          <div class="sprint-pill-tag">🔥 TODAY'S SPRINT</div>
+          <div class="sprint-pill-tag" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:13px;">local_fire_department</span>
+            <span>TODAY'S SPRINT</span>
+          </div>
           <span class="sprint-subtext">5 Quick MCQs</span>
         </div>
         <div class="sprint-topic">Dynamics & Newton's Laws</div>
         <div class="sprint-desc">
           Solve 5 questions daily to maintain your streak and earn +50 XP towards your island rank.
         </div>
-        <div class="sprint-start-btn" id="btn-start-sprint-action">
-          <span>Start Sprint (+50 XP) ➔</span>
+        <div class="sprint-start-btn" id="btn-start-sprint-action" style="display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span>Start Sprint (+50 XP)</span>
+          <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
         </div>
       </div>
 
       <!-- 7. Weekly Study Quests (Gamified Challenge Hub) -->
       <div class="quests-card">
         <div class="quests-top">
-          <div class="quests-title">
-            <span>🎯</span>
+          <div class="quests-title" style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">track_changes</span>
             <span>Weekly Study Quests</span>
           </div>
-          <span class="quests-badge">2 / 3 Completed 🏆</span>
+          <span class="quests-badge" style="display:inline-flex; align-items:center; gap:4px;">
+            <span>2 / 3 Completed</span>
+            <span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">emoji_events</span>
+          </span>
         </div>
 
         <!-- Mission 1 -->
         <div class="quest-item">
-          <div class="quest-circle quest-circle-mcq">⚡</div>
+          <div class="quest-circle quest-circle-mcq">
+            <span class="material-symbols-rounded" style="font-size:18px;">bolt</span>
+          </div>
           <div class="quest-info">
             <div class="quest-name">Complete 5 Daily MCQs</div>
             <div class="quest-sub">3 of 5 sprints solved (60%)</div>
@@ -629,7 +677,9 @@ class AppController {
 
         <!-- Mission 2 -->
         <div class="quest-item">
-          <div class="quest-circle quest-circle-hw">📝</div>
+          <div class="quest-circle quest-circle-hw">
+            <span class="material-symbols-rounded" style="font-size:18px;">description</span>
+          </div>
           <div class="quest-info">
             <div class="quest-name">Submit Weekly Homework</div>
             <div class="quest-sub">1 submission in review</div>
@@ -637,12 +687,17 @@ class AppController {
               <div class="quest-bar-fill" style="width: 100%; background: #2563EB;"></div>
             </div>
           </div>
-          <span class="quest-status-badge quest-badge-blue">In Review ⏳</span>
+          <span class="quest-status-badge quest-badge-blue" style="display:inline-flex; align-items:center; gap:3px;">
+            <span>In Review</span>
+            <span class="material-symbols-rounded" style="font-size:13px;">schedule</span>
+          </span>
         </div>
 
         <!-- Mission 3 -->
         <div class="quest-item">
-          <div class="quest-circle quest-circle-streak">🔥</div>
+          <div class="quest-circle quest-circle-streak">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">local_fire_department</span>
+          </div>
           <div class="quest-info">
             <div class="quest-name">Keep 3-Day Study Streak</div>
             <div class="quest-sub">Streak goal achieved!</div>
@@ -650,11 +705,14 @@ class AppController {
               <div class="quest-bar-fill" style="width: 100%; background: #059669;"></div>
             </div>
           </div>
-          <span class="quest-status-badge quest-badge-green">Claimed! 🌟</span>
+          <span class="quest-status-badge quest-badge-green" style="display:inline-flex; align-items:center; gap:3px;">
+            <span>Claimed!</span>
+            <span class="material-symbols-rounded filled" style="font-size:12px;">star</span>
+          </span>
         </div>
 
-        <div class="quests-footer-note">
-          <span>⭐</span>
+        <div class="quests-footer-note" style="display:flex; align-items:center; gap:4px;">
+          <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">star</span>
           <span>Complete all 3 missions to unlock +100 Bonus XP on Sunday!</span>
         </div>
       </div>
@@ -666,31 +724,45 @@ class AppController {
             <div class="eval-dot"></div>
             <span class="eval-badge-text">UPCOMING EVALUATION</span>
           </div>
-          <span class="evaluation-proctor-label">Live Proctoring 🎥</span>
+          <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
+            <span>Live Proctoring</span>
+            <span class="material-symbols-rounded filled" style="font-size:14px;">videocam</span>
+          </span>
         </div>
         <div class="evaluation-title">2027 A/L Physics Term Paper 01</div>
         <div class="evaluation-sub">Full Examination Syllabus • Real-time AI Proctoring & Timed Slots</div>
         <div class="evaluation-pills-row">
-          <div class="eval-pill">⏱️ 2h 30m Duration</div>
-          <div class="eval-pill">📝 MCQ + Essays</div>
-          <div class="eval-pill">🏆 Island Rank</div>
+          <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+            <span>2h 30m Duration</span>
+          </div>
+          <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
+            <span>MCQ + Essays</span>
+          </div>
+          <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px;">emoji_events</span>
+            <span>Island Rank</span>
+          </div>
         </div>
-        <button class="btn-view-exam-room" id="btn-enter-eval-room">
+        <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px;">
           <span>View Exam Room & Select Slot</span>
-          <span>➔</span>
+          <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
         </button>
       </div>
 
       <!-- 9. High-Yield Physics Concept & Formula Vault (Bilingual) -->
       <div class="insight-vault-card">
         <div class="vault-top">
-          <div class="vault-pill">
-            <span>⚛️</span>
+          <div class="vault-pill" style="display:inline-flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px;">science</span>
             <span>PHYSICS MICRO-INSIGHT</span>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
             <span class="vault-tag-pill">අද දවසේ සූත්‍රය • Daily</span>
-            <button class="btn-vault-refresh" id="btn-shuffle-insight" title="Shuffle">🔄</button>
+            <button class="btn-vault-refresh" id="btn-shuffle-insight" title="Shuffle">
+              <span class="material-symbols-rounded" style="font-size:16px;">refresh</span>
+            </button>
           </div>
         </div>
         <div class="vault-topic-meta" id="home-vault-meta">${insight.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'} • ${insight.unitEnglish || 'Mechanics'}</div>
@@ -701,8 +773,8 @@ class AppController {
           ${insight.formula || 'W_net  =  ΔK  =  ½ m v²  -  ½ m u²'}
         </div>
         <div class="vault-exam-tip-box">
-          <div class="tip-header">
-            <span>💡</span>
+          <div class="tip-header" style="display:flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#F59E0B;">lightbulb</span>
             <span>විභාග උපදෙස (Exam Tip):</span>
           </div>
           <div class="tip-sinhala" id="home-vault-tip-si">
@@ -712,36 +784,48 @@ class AppController {
             En: ${insight.tipEnglish || 'Always compute work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.'}
           </div>
         </div>
-        <div class="btn-ask-ai-tutor" id="btn-ask-tutor-insight">
-          <span>💬</span>
+        <div class="btn-ask-ai-tutor" id="btn-ask-tutor-insight" style="display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">chat</span>
           <span>මේ ගැන AI Tutor ගෙන් අසන්න (Ask AI Tutor)</span>
         </div>
       </div>
 
       <!-- 10. AI Tutor Quick Inquiries List -->
       <div class="ai-inquiries-card">
-        <div class="inquiries-top-title">
-          <span>🧠</span>
+        <div class="inquiries-top-title" style="display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">psychology</span>
           <span>AI Tutor Quick Inquiries</span>
         </div>
         <div class="inquiries-desc">
           ඔබට අපැහැදිලි ඕනෑම A/L භෞතික විද්‍යා සංකල්පයක් පිළිබඳව AI Tutor ගෙන් ක්ෂණික පැහැදිලි කිරීමක් ලබාගන්න:
         </div>
         <div class="inquiry-item-btn" data-topic="Lenz's Law">
-          <span class="inquiry-text">⚡ ලෙන්ස්ගේ නියමය සහ ප්‍රේරණය (Lenz's Law)</span>
-          <span class="inquiry-arrow">➔</span>
+          <span class="inquiry-text" style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#F59E0B;">bolt</span>
+            <span>ලෙන්ස්ගේ නියමය සහ ප්‍රේරණය (Lenz's Law)</span>
+          </span>
+          <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">arrow_forward</span>
         </div>
         <div class="inquiry-item-btn" data-topic="Banking of Roads">
-          <span class="inquiry-text">🎯 වක්‍ර මාර්ගවල බැංකු නැංවීම (Banking of Roads)</span>
-          <span class="inquiry-arrow">➔</span>
+          <span class="inquiry-text" style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">track_changes</span>
+            <span>වක්‍ර මාර්ගවල බැංකු නැංවීම (Banking of Roads)</span>
+          </span>
+          <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">arrow_forward</span>
         </div>
         <div class="inquiry-item-btn" data-topic="Doppler Shifts">
-          <span class="inquiry-text">💡 ඩොප්ලර් ආචරණය (Doppler Frequency Shifts)</span>
-          <span class="inquiry-arrow">➔</span>
+          <span class="inquiry-text" style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#EAB308;">lightbulb</span>
+            <span>ඩොප්ලර් ආචරණය (Doppler Frequency Shifts)</span>
+          </span>
+          <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">arrow_forward</span>
         </div>
         <div class="inquiry-item-btn" data-topic="Photoelectric Effect">
-          <span class="inquiry-text">⚛️ ප්‍රකාශ විද්‍යුත් ආචරණය (Photoelectric Effect)</span>
-          <span class="inquiry-arrow">➔</span>
+          <span class="inquiry-text" style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#6366F1;">science</span>
+            <span>ප්‍රකාශ විද්‍යුත් ආචරණය (Photoelectric Effect)</span>
+          </span>
+          <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">arrow_forward</span>
         </div>
       </div>
     `;
@@ -766,7 +850,7 @@ class AppController {
       if (tipSi) tipSi.innerText = p.tipSinhala;
       const tipEn = document.getElementById('home-vault-tip-en');
       if (tipEn) tipEn.innerText = `En: ${p.tipEnglish}`;
-      notificationService.showInAppToast('⚛️ Shuffled Concept: ' + p.titleEnglish, 'info');
+      notificationService.showInAppToast('Shuffled Concept: ' + p.titleEnglish, 'info');
     });
 
     // Event Listeners
@@ -843,7 +927,7 @@ class AppController {
         <div class="screen-appbar">
           <div class="appbar-left">
             <div class="appbar-icon-box" style="background:rgba(99,102,241,0.1); color:#6366F1;">
-              📋
+              <span class="material-symbols-rounded">assignment</span>
             </div>
             <div>
               <div class="appbar-title">Paper Writing Sessions</div>
@@ -852,10 +936,13 @@ class AppController {
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <button class="appbar-badge-toggle" id="btn-toggle-papers-batch" title="Toggle Batch Filter">
-              <span>${this.showAllBatches ? '🌐 All' : '🎓 Batch'}</span>
+              <span style="display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px;">${this.showAllBatches ? 'public' : 'school'}</span>
+                <span>${this.showAllBatches ? 'All' : 'Batch'}</span>
+              </span>
             </button>
             <button class="btn-vault-refresh" id="btn-refresh-papers" title="Refresh Sessions">
-              🔄
+              <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
             </button>
           </div>
         </div>
@@ -863,11 +950,17 @@ class AppController {
         <!-- View Switcher Tabs (1:1 with lines 156-185 of paper_sessions_screen.dart) -->
         <div class="sub-tabs-container" style="margin: 6px 16px 14px;">
           <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live">
-            <span>📝 Live Exam Sessions</span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
+              <span>Live Exam Sessions</span>
+            </span>
             <span class="tab-sub">Active & Scheduled</span>
           </button>
           <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
-            <span>🔮 Upcoming Papers & Hints</span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">lightbulb</span>
+              <span>Upcoming Papers & Hints</span>
+            </span>
             <span class="tab-sub">Scope, Tips & Hints</span>
           </button>
         </div>
@@ -876,7 +969,9 @@ class AppController {
         <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
           ${sessions.length === 0 ? `
             <div style="padding:40px 24px; text-align:center; color:#64748B;">
-              <div style="font-size:44px; margin-bottom:12px;">📖</div>
+              <div style="margin-bottom:12px; display:flex; justify-content:center;">
+                <span class="material-symbols-rounded" style="font-size:48px; color:#94A3B8;">menu_book</span>
+              </div>
               <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">නව Paper Sessions සූදානම් වෙමින් පවතී</div>
               <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.' : `ඔබගේ කණ්ඩායම (${currentYear}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.`}</div>
               <button class="btn-primary" id="btn-empty-toggle-batch" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
@@ -933,7 +1028,7 @@ class AppController {
                   </div>
                   ${isSubmitted ? `
                     <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                      <span>✓</span> <span>SUBMITTED</span>
+                      <span class="material-symbols-rounded filled" style="font-size:13px;">check_circle</span> <span>SUBMITTED</span>
                     </span>
                   ` : isLive ? `
                     <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
@@ -946,9 +1041,18 @@ class AppController {
                 <!-- Title & Meta -->
                 <div class="paper-title" style="margin-top:2px;">${session.title || 'Physics Examination Paper'}</div>
                 <div class="paper-meta-row">
-                  <div class="meta-chip">📅 ${safeFormatDate(session.date)}</div>
-                  <div class="meta-chip">⏱️ ${session.durationMinutes || 120} Minutes</div>
-                  <div class="meta-chip">🎥 Camera Monitored</div>
+                  <div class="meta-chip">
+                    <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">calendar_today</span>
+                    <span>${safeFormatDate(session.date)}</span>
+                  </div>
+                  <div class="meta-chip">
+                    <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">timer</span>
+                    <span>${session.durationMinutes || 120} Minutes</span>
+                  </div>
+                  <div class="meta-chip">
+                    <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">videocam</span>
+                    <span>Camera Monitored</span>
+                  </div>
                 </div>
 
                 <!-- Slot Selector (1:1 with _buildSlotCard) -->
@@ -958,25 +1062,41 @@ class AppController {
                 <div class="slots-container">
                   <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1">
                     <div class="slot-name">
-                      <span>☀️ ${slot1.name || 'Slot 1 (Morning)'}</span>
-                      <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot1' ? '✓' : '○'}</span>
+                      <span style="display:inline-flex; align-items:center; gap:5px;">
+                        <span class="material-symbols-rounded" style="font-size:16px; color:#F59E0B;">wb_sunny</span>
+                        <span>${slot1.name || 'Slot 1 (Morning)'}</span>
+                      </span>
+                      <span class="material-symbols-rounded ${selectedSlotId === 'slot1' ? 'filled' : ''}" style="font-size:18px; color:#6366F1;">
+                        ${selectedSlotId === 'slot1' ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
                     </div>
                     <div style="font-size:11px; color:#475569; font-weight:600;">
                       ${safeFormatTime(slot1.startTime, '08:30 AM')} - ${safeFormatTime(slot1.endTime, '10:30 AM')}
                     </div>
-                    <div class="slot-seats">🪑 ${slot1.registeredCount} / ${slot1.maxCapacity} Seats</div>
+                    <div class="slot-seats" style="display:inline-flex; align-items:center; gap:4px;">
+                      <span class="material-symbols-rounded" style="font-size:13px;">chair</span>
+                      <span>${slot1.registeredCount} / ${slot1.maxCapacity} Seats</span>
+                    </div>
                   </div>
 
                   ${slot2 ? `
                     <div class="slot-selection-box ${selectedSlotId === 'slot2' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot2">
                       <div class="slot-name">
-                        <span>🌙 ${slot2.name || 'Slot 2 (Evening)'}</span>
-                        <span style="color:#6366F1; font-weight:800;">${selectedSlotId === 'slot2' ? '✓' : '○'}</span>
+                        <span style="display:inline-flex; align-items:center; gap:5px;">
+                          <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">bedtime</span>
+                          <span>${slot2.name || 'Slot 2 (Evening)'}</span>
+                        </span>
+                        <span class="material-symbols-rounded ${selectedSlotId === 'slot2' ? 'filled' : ''}" style="font-size:18px; color:#6366F1;">
+                          ${selectedSlotId === 'slot2' ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
                       </div>
                       <div style="font-size:11px; color:#475569; font-weight:600;">
                         ${safeFormatTime(slot2.startTime, '04:00 PM')} - ${safeFormatTime(slot2.endTime, '06:00 PM')}
                       </div>
-                      <div class="slot-seats">🪑 ${slot2.registeredCount} / ${slot2.maxCapacity} Seats</div>
+                      <div class="slot-seats" style="display:inline-flex; align-items:center; gap:4px;">
+                        <span class="material-symbols-rounded" style="font-size:13px;">chair</span>
+                        <span>${slot2.registeredCount} / ${slot2.maxCapacity} Seats</span>
+                      </div>
                     </div>
                   ` : ''}
                 </div>
@@ -984,7 +1104,7 @@ class AppController {
                 <!-- Real-Time Phase Status Banner Box -->
                 ${isSubmitted ? `
                   <div class="phase-status-banner-box submitted">
-                    <span style="font-size:24px;">🎉</span>
+                    <span class="material-symbols-rounded filled" style="font-size:26px; color:#15803D;">verified</span>
                     <div>
                       <div style="font-size:12px; font-weight:800; color:#15803D;">පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)</div>
                       <div style="font-size:11px; color:#475569; margin-top:2px;">
@@ -994,7 +1114,7 @@ class AppController {
                   </div>
                 ` : isPackageOpening ? `
                   <div class="phase-status-banner-box pkg-opening">
-                    <span style="font-size:24px;">📦</span>
+                    <span class="material-symbols-rounded" style="font-size:26px; color:#D97706;">inventory_2</span>
                     <div>
                       <div style="font-size:11.5px; font-weight:800; color:#B45309;">පැකේජය විවෘත කිරීමේ කාලය (Package Opening)</div>
                       <div style="font-size:12px; font-weight:800; color:#D97706; margin-top:2px;">
@@ -1004,7 +1124,7 @@ class AppController {
                   </div>
                 ` : (isWriting || isLive) ? `
                   <div class="phase-status-banner-box writing">
-                    <span style="font-size:24px;">✍️</span>
+                    <span class="material-symbols-rounded filled" style="font-size:26px; color:#15803D;">sensors</span>
                     <div>
                       <div style="font-size:11.5px; font-weight:800; color:#15803D;">විභාගය ක්‍රියාත්මකයි (Exam Writing in Progress)</div>
                       <div style="font-size:12px; font-weight:800; color:#059669; margin-top:2px;">දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න (Exam Live)</div>
@@ -1012,7 +1132,7 @@ class AppController {
                   </div>
                 ` : isTimeUp ? `
                   <div class="phase-status-banner-box time-up">
-                    <span style="font-size:24px;">⏰</span>
+                    <span class="material-symbols-rounded" style="font-size:26px; color:#DC2626;">alarm</span>
                     <div>
                       <div style="font-size:11.5px; font-weight:800; color:#DC2626;">වේලාව අවසන් (Time Up - Scan Answers)</div>
                       <div style="font-size:12px; font-weight:800; color:#B91C1C; margin-top:2px;">පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න</div>
@@ -1020,7 +1140,7 @@ class AppController {
                   </div>
                 ` : isWaiting ? `
                   <div class="phase-status-banner-box waiting">
-                    <span style="font-size:24px;">⏳</span>
+                    <span class="material-symbols-rounded" style="font-size:26px; color:#4338CA;">meeting_room</span>
                     <div>
                       <div style="font-size:11.5px; font-weight:800; color:#4338CA;">විභාග පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)</div>
                       <div style="font-size:12px; font-weight:800; color:#6366F1; margin-top:2px;">පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)</div>
@@ -1028,7 +1148,7 @@ class AppController {
                   </div>
                 ` : isEnded ? `
                   <div class="phase-status-banner-box ended">
-                    <span style="font-size:24px;">🛑</span>
+                    <span class="material-symbols-rounded" style="font-size:26px; color:#64748B;">cancel</span>
                     <div>
                       <div style="font-size:11.5px; font-weight:800; color:#64748B;">සැසිය අවසන් (Session Completed)</div>
                       <div style="font-size:12px; color:#94A3B8; margin-top:2px;">ස්තුතියි, මෙම විභාග සැසිය අවසන් කර ඇත.</div>
@@ -1036,7 +1156,7 @@ class AppController {
                   </div>
                 ` : `
                   <div class="phase-status-banner-box waiting">
-                    <span style="font-size:24px;">⏱️</span>
+                    <span class="material-symbols-rounded" style="font-size:26px; color:#2563EB;">schedule</span>
                     <div>
                       <div style="font-size:11px; font-weight:700; color:#475569;">${targetSlot.name || 'විභාග සැසිය'} ආරම්භ වීමට:</div>
                       <div style="font-size:15px; font-weight:800; color:#2563EB; letter-spacing:1px; margin-top:2px;" class="timer-upcoming-span" data-target="${targetSlot.startTime || new Date().toISOString()}">
@@ -1048,32 +1168,39 @@ class AppController {
 
                 <!-- Action Buttons (1:1 with lines 1373-1498) -->
                 ${isSubmitted ? `
-                  <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px;" data-view-sub="${session.id}">
-                    ✅ Submitted (${reg?.submissionPhotos?.length || 4} Pages) • විස්තර බලන්න
+                  <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${session.id}">
+                    <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
+                    <span>Submitted (${reg?.submissionPhotos?.length || 4} Pages) • විස්තර බලන්න</span>
                   </button>
                 ` : isPackageOpening ? `
-                  <button class="btn-primary" style="background:#D97706; padding:12px;" data-enter-exam="${session.id}">
-                    📦 Open Package in Camera Room (පාර්සලය විවෘත කරන්න)
+                  <button class="btn-primary" style="background:#D97706; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
+                    <span class="material-symbols-rounded" style="font-size:18px;">inventory_2</span>
+                    <span>Open Package in Camera Room (පාර්සලය විවෘත කරන්න)</span>
                   </button>
                 ` : (isWriting || isLive) ? `
-                  <button class="btn-primary" style="background:#16A34A; padding:12px;" data-enter-exam="${session.id}">
-                    🎥 Enter Live Exam Room (කැමරාව ON කරන්න)
+                  <button class="btn-primary" style="background:#16A34A; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
+                    <span class="material-symbols-rounded filled" style="font-size:18px;">videocam</span>
+                    <span>Enter Live Exam Room (කැමරාව ON කරන්න)</span>
                   </button>
                 ` : isTimeUp ? `
-                  <button class="btn-primary" style="background:#DC2626; padding:12px;" data-scan-answers="${session.id}">
-                    📄 Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)
+                  <button class="btn-primary" style="background:#DC2626; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-scan-answers="${session.id}">
+                    <span class="material-symbols-rounded" style="font-size:18px;">document_scanner</span>
+                    <span>Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)</span>
                   </button>
                 ` : isWaiting ? `
-                  <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
-                    🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
+                  <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
+                    <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
+                    <span>Enter Waiting Room (පොරොත්තු ශාලාව)</span>
                   </button>
                 ` : isEnded ? `
-                  <button class="btn-primary" style="background:#F1F5F9; color:#94A3B8; border:1px solid #CBD5E1; cursor:not-allowed; padding:12px;" onclick="alert('🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත (Session Ended).')">
-                    🛑 විභාග සැසිය අවසන් විය (Ended)
+                  <button class="btn-primary" style="background:#F1F5F9; color:#94A3B8; border:1px solid #CBD5E1; cursor:not-allowed; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="alert('මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත (Session Ended).')">
+                    <span class="material-symbols-rounded" style="font-size:18px;">cancel</span>
+                    <span>විභාග සැසිය අවසන් විය (Ended)</span>
                   </button>
                 ` : `
-                  <button class="btn-primary" style="background:#6366F1; padding:12px;" data-enter-exam="${session.id}">
-                    🚪 Enter Waiting Room (පොරොත්තු ශාලාව)
+                  <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
+                    <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
+                    <span>Enter Waiting Room (පොරොත්තු ශාලාව)</span>
                   </button>
                 `}
               </div>
@@ -1085,7 +1212,9 @@ class AppController {
         <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
           ${upcomingList.length === 0 ? `
             <div style="padding:40px 24px; text-align:center; color:#64748B;">
-              <div style="font-size:44px; margin-bottom:12px;">🔮</div>
+              <div style="margin-bottom:12px; display:flex; justify-content:center;">
+                <span class="material-symbols-rounded" style="font-size:48px; color:#94A3B8;">lightbulb</span>
+              </div>
               <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled Yet</div>
               <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'Check back soon for new exam papers, scopes, and preparation hints.' : `Upcoming papers and hints for ${currentYear} will be announced here.`}</div>
               <button class="btn-primary" id="btn-empty-toggle-batch-2" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
@@ -1116,7 +1245,7 @@ class AppController {
                     </span>
                   </div>
                   <div class="upcoming-countdown-badge">
-                    <span>⏱️</span>
+                    <span class="material-symbols-rounded" style="font-size:14px; margin-right:3px;">schedule</span>
                     <span>${diffMs > 0 ? countdownText : 'Paper Active'}</span>
                   </div>
                 </div>
@@ -1128,11 +1257,11 @@ class AppController {
                   <!-- Date & Duration -->
                   <div style="display:flex; flex-direction:column; gap:6px;">
                     <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
-                      <span>📅</span>
+                      <span class="material-symbols-rounded" style="font-size:15px; color:#64748B;">calendar_today</span>
                       <span>${schedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })} at ${safeFormatTime(schedDate.toISOString(), '08:30 AM')}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
-                      <span>⏳</span>
+                      <span class="material-symbols-rounded" style="font-size:15px; color:#64748B;">timer</span>
                       <span>${durationMins} Minutes (${durationHours} Hours) • ${paper.paperStructure || 'Comprehensive Evaluation'}</span>
                     </div>
                   </div>
@@ -1144,7 +1273,7 @@ class AppController {
                       <div class="upcoming-topics-wrap">
                         ${paper.syllabusTopics.map(topic => `
                           <div class="upcoming-topic-chip">
-                            <span style="color:#10B981; font-weight:800;">✓</span>
+                            <span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span>
                             <span>${topic}</span>
                           </div>
                         `).join('')}
@@ -1156,7 +1285,7 @@ class AppController {
                   ${paper.hints ? `
                     <div class="upcoming-hints-highlight-box">
                       <div class="upcoming-hints-title">
-                        <span style="font-size:16px;">💡</span>
+                        <span class="material-symbols-rounded" style="font-size:18px; color:#D97706;">lightbulb</span>
                         <span>Special Paper Hints & Guidance</span>
                       </div>
                       <div class="upcoming-hints-text">
@@ -1168,14 +1297,14 @@ class AppController {
                   <!-- Instructions -->
                   ${paper.instructions ? `
                     <div style="display:flex; align-items:flex-start; gap:6px; font-size:11.5px; color:#64748B;">
-                      <span>ℹ️</span>
+                      <span class="material-symbols-rounded" style="font-size:16px; color:#64748B; flex-shrink:0;">info</span>
                       <span>${paper.instructions}</span>
                     </div>
                   ` : ''}
 
                   <!-- Action Button -->
                   <button class="btn-primary" style="background:#6366F1; padding:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 14px rgba(99,102,241,0.3);" data-paper-scope="${paper.id}">
-                    <span>👁️</span>
+                    <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
                     <span>View Full Scope & Hints</span>
                   </button>
                 </div>
@@ -1221,7 +1350,7 @@ class AppController {
             studentPhone: user.phone || '0770557769',
             slotId: sId
           });
-          notificationService.showLocalToast(`✅ ${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
+          notificationService.showLocalToast(`${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
           this.renderPapersScreen(container);
         });
       });
@@ -1262,11 +1391,12 @@ class AppController {
       console.error('[PapersScreen] Critical render error caught:', renderError);
       container.innerHTML = `
         <div style="padding:40px 20px; text-align:center;">
-          <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
-          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">Paper Sessions लोड කිරීමේ ගැටළුවක්</div>
+          <span class="material-symbols-rounded filled" style="font-size:48px; color:#EF4444; margin-bottom:12px;">error</span>
+          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">Paper Sessions ලෝඩ් කිරීමේ ගැටළුවක්</div>
           <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${renderError.message || 'Unknown error occurred'}</div>
-          <button class="btn-primary" onclick="window.app ? window.app.renderPapersScreen(document.getElementById('main-viewport')) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto;">
-            🔄 නැවත උත්සාහ කරන්න (Retry)
+          <button class="btn-primary" onclick="window.app ? window.app.renderPapersScreen(document.getElementById('main-viewport')) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto; display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
+            <span>නැවත උත්සාහ කරන්න (Retry)</span>
           </button>
         </div>
       `;
@@ -1340,7 +1470,7 @@ class AppController {
           <!-- Date & Time Card (lines 739-760) -->
           <div style="background:#1E293B; border:1px solid #334155; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; align-items:center; gap:10px;">
-              <span style="font-size:20px;">📅</span>
+              <span class="material-symbols-rounded filled" style="font-size:22px; color:#818CF8;">calendar_today</span>
               <div>
                 <div style="font-size:11px; color:#94A3B8;">Scheduled Date & Time</div>
                 <div style="font-size:13px; font-weight:700; color:#F8FAFC;">
@@ -1355,7 +1485,7 @@ class AppController {
             <div style="height:1px; background:#334155;"></div>
 
             <div style="display:flex; align-items:center; gap:10px;">
-              <span style="font-size:20px;">⏱️</span>
+              <span class="material-symbols-rounded filled" style="font-size:22px; color:#F59E0B;">timer</span>
               <div>
                 <div style="font-size:11px; color:#94A3B8;">Exam Duration & Structure</div>
                 <div style="font-size:13px; font-weight:700; color:#F8FAFC;">
@@ -1377,7 +1507,7 @@ class AppController {
               <div style="display:flex; flex-direction:column; gap:6px;">
                 ${paper.syllabusTopics.map((topic, idx) => `
                   <div style="display:flex; align-items:center; gap:8px; background:#1E293B; padding:9px 12px; border-radius:10px; border:1px solid #334155; font-size:12px; color:#E2E8F0;">
-                    <span style="color:#10B981; font-weight:800;">✓</span>
+                    <span class="material-symbols-rounded filled" style="color:#10B981; font-size:16px;">check_circle</span>
                     <span>${topic}</span>
                   </div>
                 `).join('')}
@@ -1389,7 +1519,7 @@ class AppController {
           ${paper.hints ? `
             <div>
               <div style="font-size:13.5px; font-weight:800; color:#F59E0B; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                <span>💡</span>
+                <span class="material-symbols-rounded filled" style="font-size:20px; color:#F59E0B;">lightbulb</span>
                 <span>Exclusive Teacher Guidance & Exam Hints</span>
               </div>
               <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4); border-radius:16px; padding:16px; color:#FEF3C7; font-size:12.5px; line-height:1.55;">
@@ -1440,7 +1570,7 @@ class AppController {
     overlay.innerHTML = `
       <div class="app-dialog-box" style="max-width:380px;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:26px; color:#22C55E;">✅</span>
+          <span class="material-symbols-rounded filled" style="font-size:26px; color:#22C55E;">check_circle</span>
           <div class="app-dialog-title" style="font-size:16px;">Submission Confirmed</div>
         </div>
 
@@ -1484,11 +1614,11 @@ class AppController {
 
     const leaders = await dbService.getLeaderboard();
     const leagues = [
-      { name: 'All Scholars', emoji: '🌐' },
-      { name: 'Diamond', emoji: '💎' },
-      { name: 'Gold', emoji: '🥇' },
-      { name: 'Silver', emoji: '🥈' },
-      { name: 'Bronze', emoji: '🥉' }
+      { name: 'All Scholars', icon: 'public' },
+      { name: 'Diamond', icon: 'diamond' },
+      { name: 'Gold', icon: 'military_tech' },
+      { name: 'Silver', icon: 'military_tech' },
+      { name: 'Bronze', icon: 'military_tech' }
     ];
 
     const filtered = leaders.filter(s => {
@@ -1507,9 +1637,11 @@ class AppController {
       <!-- Screen Top Bar -->
       <div class="screen-appbar">
         <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#FEF3C7; color:#B45309;">🏆</div>
+          <div class="appbar-icon-box" style="background:#FEF3C7; color:#B45309;">
+            <span class="material-symbols-rounded filled">emoji_events</span>
+          </div>
           <div>
-            <div class="appbar-title">${this.ranksBoardType === 0 ? 'Dessert Leaderboard 🧁' : 'Paper Leaderboard 📝'}</div>
+            <div class="appbar-title">${this.ranksBoardType === 0 ? 'Dessert Leaderboard' : 'Paper Leaderboard'}</div>
             <div class="appbar-subtitle">${this.ranksBoardType === 0 ? 'XP Credits & Activity Leagues' : 'Exam Marks & Island Rankings'}</div>
           </div>
         </div>
@@ -1518,11 +1650,11 @@ class AppController {
       <!-- Segmented Switcher: Dessert vs Paper -->
       <div class="sub-tabs-container">
         <button class="sub-tab-btn ${this.ranksBoardType === 0 ? 'active' : ''}" id="btn-ranks-dessert-mode">
-          <span>🧁 Dessert Leaderboard</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded filled" style="font-size:16px;">emoji_events</span> Dessert Leaderboard</span>
           <span class="tab-sub">XP & Activity Leagues</span>
         </button>
         <button class="sub-tab-btn ${this.ranksBoardType === 1 ? 'active' : ''}" id="btn-ranks-paper-mode">
-          <span>📝 Paper Leaderboard</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded" style="font-size:16px;">assignment</span> Paper Leaderboard</span>
           <span class="tab-sub">Exam Marks & Ranks</span>
         </button>
       </div>
@@ -1532,7 +1664,7 @@ class AppController {
         <div class="leagues-scroll-row">
           ${leagues.map(l => `
             <button class="league-chip ${this.selectedLeague === l.name ? 'active' : ''}" data-league="${l.name}">
-              <span>${l.emoji}</span>
+              <span class="material-symbols-rounded filled" style="font-size:16px;">${l.icon}</span>
               <span>${l.name}</span>
             </button>
           `).join('')}
@@ -1557,7 +1689,7 @@ class AppController {
           <!-- Rank 2 -->
           ${top3[1] ? `
             <div class="podium-card">
-              <div class="podium-medal">🥈</div>
+              <div class="podium-medal"><span class="material-symbols-rounded filled" style="color:#94A3B8; font-size:24px;">military_tech</span></div>
               <div class="podium-name">${top3[1].name.split(' ')[0]}</div>
               <div class="podium-xp">${top3[1].credits} XP</div>
               <span style="font-size:10px; color:#64748B;">#2 Rank</span>
@@ -1567,7 +1699,7 @@ class AppController {
           <!-- Rank 1 Gold (Elevated) -->
           ${top3[0] ? `
             <div class="podium-card podium-card-gold">
-              <div class="podium-medal-gold">👑</div>
+              <div class="podium-medal-gold"><span class="material-symbols-rounded filled" style="color:#B45309; font-size:28px;">emoji_events</span></div>
               <div class="podium-name">${top3[0].name.split(' ')[0]}</div>
               <div class="podium-xp">${top3[0].credits} XP</div>
               <span style="font-size:11px; font-weight:800; color:#B45309;">#1 Island Rank</span>
@@ -1577,7 +1709,7 @@ class AppController {
           <!-- Rank 3 -->
           ${top3[2] ? `
             <div class="podium-card">
-              <div class="podium-medal">🥉</div>
+              <div class="podium-medal"><span class="material-symbols-rounded filled" style="color:#B45309; font-size:24px;">military_tech</span></div>
               <div class="podium-name">${top3[2].name.split(' ')[0]}</div>
               <div class="podium-xp">${top3[2].credits} XP</div>
               <span style="font-size:10px; color:#64748B;">#3 Rank</span>
@@ -1595,13 +1727,13 @@ class AppController {
                 <div class="rank-name-box">
                   <div class="rank-student-name">
                     <span>${r.name}</span>
-                    <span style="color:#2563EB; font-size:11px;">✓</span>
+                    <span class="material-symbols-rounded filled" style="color:#2563EB; font-size:14px; vertical-align:middle;">verified</span>
                   </div>
                   <div class="rank-batch-tag">${r.examYear} Candidate</div>
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:11.5px;">🔥 3d</span>
+                <span style="display:inline-flex; align-items:center; gap:3px; font-size:11.5px; font-weight:700;"><span class="material-symbols-rounded filled" style="color:#EA580C; font-size:14px;">local_fire_department</span> 3d</span>
                 <span class="rank-xp-pill">${r.credits} XP</span>
               </div>
             </div>
@@ -1627,13 +1759,13 @@ class AppController {
               <div>
                 <div style="font-size:14.5px; font-weight:800; color:#0F172A;">2027 A/L Physics Term Paper 01</div>
                 <div class="paper-board-stats">
-                  <span>📅 Sept 2026</span>
-                  <span>📊 Avg: 68.4</span>
-                  <span>🏆 Highest: 98</span>
-                  <span>👥 142 Students</span>
+                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded" style="font-size:13px;">calendar_today</span> Sept 2026</span>
+                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded" style="font-size:13px;">analytics</span> Avg: 68.4</span>
+                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">emoji_events</span> Highest: 98</span>
+                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded" style="font-size:13px;">group</span> 142 Students</span>
                 </div>
               </div>
-              <span style="font-size:18px; color:#2563EB;">▼</span>
+              <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">expand_more</span>
             </div>
 
             <div class="paper-scores-table" id="pb1-table">
@@ -1661,7 +1793,7 @@ class AppController {
                     <span style="font-weight:700; color:#1E293B;">${s.name}</span>
                   </div>
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:10.5px; color:#64748B;">⏱️ ${s.time}</span>
+                    <span style="display:inline-flex; align-items:center; gap:3px; font-size:10.5px; color:#64748B;"><span class="material-symbols-rounded" style="font-size:12px;">timer</span> ${s.time}</span>
                     <span class="grade-badge grade-${s.grade}">${s.grade}</span>
                     <span style="font-weight:800; color:#2563EB;">${s.marks}</span>
                   </div>
@@ -1725,7 +1857,9 @@ class AppController {
       <!-- Screen Top Bar -->
       <div class="screen-appbar">
         <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">📁</div>
+          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">
+            <span class="material-symbols-rounded">folder_special</span>
+          </div>
           <div>
             <div class="appbar-title">Dessert Homework System</div>
             <div class="appbar-subtitle">A/L Physics Daily Problem Sets & Submissions</div>
@@ -1736,11 +1870,11 @@ class AppController {
       <!-- Sub-Tabs: Submit Homework vs Submissions History -->
       <div class="sub-tabs-container">
         <button class="sub-tab-btn ${this.dessertsTab === 0 ? 'active' : ''}" id="tab-dessert-submit">
-          <span>📤 Submit Homework</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded" style="font-size:16px;">upload_file</span> Submit Homework</span>
           <span class="tab-sub">Scan & Upload Pages</span>
         </button>
         <button class="sub-tab-btn ${this.dessertsTab === 1 ? 'active' : ''}" id="tab-dessert-history">
-          <span>📁 Submission History</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded" style="font-size:16px;">history</span> Submission History</span>
           <span class="tab-sub">Marks & Teacher Feedback</span>
         </button>
       </div>
@@ -1765,11 +1899,11 @@ class AppController {
             <div class="form-label" style="margin-bottom:8px;">2. පිළිතුරු පත්‍ර ඡායාරූප (Capture Homework Pages):</div>
             <div class="capture-buttons-row">
               <button class="capture-btn" id="btn-dessert-open-cam">
-                <span style="font-size:24px;">📷</span>
+                <span class="material-symbols-rounded" style="font-size:26px;">photo_camera</span>
                 <span>In-App Camera</span>
               </button>
               <label class="capture-btn" for="input-hw-gallery" style="margin-bottom:0;">
-                <span style="font-size:24px;">🖼️</span>
+                <span class="material-symbols-rounded" style="font-size:26px;">photo_library</span>
                 <span>Gallery / Files</span>
                 <input type="file" id="input-hw-gallery" accept="image/*" multiple style="display:none;" />
               </label>
@@ -1785,7 +1919,9 @@ class AppController {
                   <div class="photo-thumb-card">
                     <img src="${url}" alt="Page ${i + 1}" />
                     <span class="photo-page-num">P${i + 1}</span>
-                    <button class="photo-delete-btn" data-del-photo="${i}">✕</button>
+                    <button class="photo-delete-btn" data-del-photo="${i}" style="display:inline-flex; align-items:center; justify-content:center;">
+                      <span class="material-symbols-rounded" style="font-size:12px;">close</span>
+                    </button>
                   </div>
                 `).join('')}
               </div>
@@ -1805,7 +1941,10 @@ class AppController {
           <!-- Telegram Alternative Guide -->
           <div class="telegram-guide-card">
             <div>
-              <div style="font-size:12.5px; font-weight:800;">🤖 Submit via Telegram AI Bot</div>
+              <div style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800;">
+                <span class="material-symbols-rounded" style="font-size:18px;">smart_toy</span>
+                Submit via Telegram AI Bot
+              </div>
               <div style="font-size:10.5px; opacity:0.9; margin-top:2px;">Prefer Telegram? Forward images directly to @edupeakbot</div>
             </div>
             <a href="https://t.me/edupeakbot" target="_blank" style="background:#FFFFFF; color:#0369A1; padding:6px 12px; border-radius:20px; font-size:11.5px; font-weight:800; text-decoration:none;">
@@ -1814,8 +1953,9 @@ class AppController {
           </div>
 
           <!-- Submit Button -->
-          <button class="btn-primary" id="btn-submit-dessert-final" style="padding:14px; font-size:15px; margin-top:4px;">
-            🚀 Submit Homework (+100 XP)
+          <button class="btn-primary" id="btn-submit-dessert-final" style="padding:14px; font-size:15px; margin-top:4px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
+            <span>Submit Homework (+100 XP)</span>
           </button>
         </div>
       ` : `
@@ -1840,7 +1980,7 @@ class AppController {
               if (filtered.length === 0) {
                 return `
                   <div style="text-align:center; padding:32px 16px; background:#FFFFFF; border-radius:16px; border:1px dashed #CBD5E1; color:#64748B;">
-                    <div style="font-size:32px; margin-bottom:8px;">📁</div>
+                    <div style="margin-bottom:8px;"><span class="material-symbols-rounded" style="font-size:40px; color:#94A3B8;">folder_open</span></div>
                     <div style="font-weight:700; font-size:14px; color:#0F172A;">No Submissions Found</div>
                     <div style="font-size:11.5px; margin-top:4px;">No ${this.dessertHistoryFilter} submissions yet. Submit your homework in Tab 1 to earn XP!</div>
                   </div>
@@ -1850,7 +1990,11 @@ class AppController {
                 const isApp = d.status === 'approved';
                 const isPend = d.status === 'pending';
                 const badgeClass = isApp ? 'quest-badge-green' : isPend ? 'quest-badge-orange' : 'quest-badge-blue';
-                const label = isApp ? 'Approved ✓' : isPend ? 'In Review ⏳' : 'Needs Redo ⚠️';
+                const label = isApp 
+                  ? '<span class="material-symbols-rounded filled" style="font-size:13px; vertical-align:middle;">check_circle</span> Approved' 
+                  : isPend 
+                  ? '<span class="material-symbols-rounded filled" style="font-size:13px; vertical-align:middle;">hourglass_top</span> In Review' 
+                  : '<span class="material-symbols-rounded filled" style="font-size:13px; vertical-align:middle;">warning</span> Needs Redo';
 
                 return `
                   <div class="hero-card" style="padding:16px; cursor:pointer;" data-view-dessert="${d.id}">
@@ -1872,7 +2016,7 @@ class AppController {
 
                     ${d.adminFeedback ? `
                       <div style="margin-top:10px; padding:10px; background:#EFF6FF; border-left:3px solid #2563EB; border-radius:8px; font-size:11.5px; color:#1E3A8A; line-height:1.4;">
-                        <strong>👨‍🏫 Teacher Feedback:</strong> ${d.adminFeedback}
+                        <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">school</span> Teacher Feedback:</strong> ${d.adminFeedback}
                       </div>
                     ` : ''}
                   </div>
@@ -1940,7 +2084,7 @@ class AppController {
       const btn = document.getElementById('btn-submit-dessert-final');
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Uploading to Teacher... ⏳';
+        btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">hourglass_top</span> Uploading to Teacher...';
       }
 
       await dbService.submitDessert({
@@ -1953,7 +2097,7 @@ class AppController {
       });
 
       this.capturedHomeworkPhotos = [];
-      notificationService.showInAppBanner('Homework Submitted! 🍰', '+100 XP awarded to your profile.', 'success');
+      notificationService.showInAppBanner('Homework Submitted!', '+100 XP awarded to your profile.', 'success');
       this.dessertsTab = 1;
       this.renderDessertsScreen(container);
     });
@@ -1998,7 +2142,9 @@ class AppController {
       <!-- Screen Top Bar -->
       <div class="screen-appbar">
         <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">👤</div>
+          <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">
+            <span class="material-symbols-rounded">person</span>
+          </div>
           <div>
             <div class="appbar-title">Student Profile</div>
             <div class="appbar-subtitle">Account Details, Batch & Preferences</div>
@@ -2014,43 +2160,56 @@ class AppController {
           ` : `
             <div class="profile-avatar-img">${user.name ? user.name.charAt(0).toUpperCase() : 'K'}</div>
           `}
-          <button class="profile-cam-btn" id="btn-change-avatar" title="Change Profile Photo">📷</button>
+          <button class="profile-cam-btn" id="btn-change-avatar" title="Change Profile Photo">
+            <span class="material-symbols-rounded" style="font-size:16px;">photo_camera</span>
+          </button>
         </div>
 
         <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
           <span style="font-size:20px; font-weight:800; color:#0F172A;" id="profile-display-name">${user.name || 'Kasun Perera'}</span>
-          <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:15px;" title="Edit Name">✏️</button>
+          <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:15px; display:inline-flex; align-items:center;" title="Edit Name">
+            <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
+          </button>
         </div>
 
         <div style="font-size:12.5px; color:#64748B; margin-top:2px;">
-          ${user.phone || '+94 77 123 4567'} • <span style="color:#059669; font-weight:700;">Verified Student ✓</span>
+          ${user.phone || '+94 77 123 4567'} • <span style="color:#059669; font-weight:700;">Verified Student <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; color:#059669;">verified</span></span>
         </div>
 
         <!-- Student ID Badge -->
         <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; padding:3px 10px; background:#F1F5F9; border-radius:12px; font-size:11px; font-weight:700; color:#475569;">
-          <span>🆔</span>
+          <span class="material-symbols-rounded" style="font-size:14px; color:#475569;">badge</span>
           <span>${user.studentId || ('EP-' + (user.phone ? user.phone.slice(-4) : '2026'))}</span>
         </div>
 
         <div style="margin-top:10px; padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800; background: ${isStandalone ? '#ECFDF5' : '#FEF3C7'}; color: ${isStandalone ? '#047857' : '#B45309'}; border: 1px solid ${isStandalone ? '#A7F3D0' : '#FDE68A'};">
-          ${isStandalone ? '🟢 iPhone Home Screen (PWA Standalone Mode)' : '⚠️ Safari Browser Tab'}
+          ${isStandalone ? '<span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle;">check_circle</span> iPhone Home Screen (PWA Standalone Mode)' : '<span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">tab</span> Web Browser Mode'}
         </div>
       </div>
 
       <!-- 3-Item Stats Card (Credits, Approved, Pending) -->
       <div class="stats-trio-card">
         <div>
-          <div class="stat-number" style="color:#F59E0B;">⭐ ${creditsXP}</div>
+          <div class="stat-number" style="color:#F59E0B; display:flex; align-items:center; justify-content:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px; color:#F59E0B;">star</span>
+            <span>${creditsXP}</span>
+          </div>
           <div class="stat-label">Credits (XP)</div>
         </div>
         <div class="stat-divider"></div>
         <div>
-          <div class="stat-number" style="color:#10B981;">✅ ${approvedCount}</div>
+          <div class="stat-number" style="color:#10B981; display:flex; align-items:center; justify-content:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px; color:#10B981;">check_circle</span>
+            <span>${approvedCount}</span>
+          </div>
           <div class="stat-label">Approved</div>
         </div>
         <div class="stat-divider"></div>
         <div>
-          <div class="stat-number" style="color:#EA580C;">⏳ ${pendingCount}</div>
+          <div class="stat-number" style="color:#EA580C; display:flex; align-items:center; justify-content:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px; color:#EA580C;">hourglass_top</span>
+            <span>${pendingCount}</span>
+          </div>
           <div class="stat-label">Pending</div>
         </div>
       </div>
@@ -2059,7 +2218,7 @@ class AppController {
       <div class="hero-card" style="padding:16px 18px; margin-top:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:18px;">🎯</span>
+            <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">track_changes</span>
             <div>
               <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Target Examination Batch</div>
               <div style="font-size:11px; color:#64748B;">Select your A/L year for countdown & papers</div>
@@ -2086,19 +2245,22 @@ class AppController {
       <div class="hero-card" style="padding:14px 18px; margin-top:14px;">
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #E2E8F0;">
           <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
-            <span>🎓 Role:</span>
+            <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">school</span>
+            <span>Role:</span>
           </div>
           <span style="font-size:12px; font-weight:800; color:#2563EB;">Student (A/L Physics & Dessert)</span>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #E2E8F0;">
           <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
-            <span>📅 Member Since:</span>
+            <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">calendar_today</span>
+            <span>Member Since:</span>
           </div>
           <span style="font-size:12px; font-weight:600; color:#64748B;">${memberSinceStr}</span>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0;">
           <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
-            <span>📁 Total Submissions:</span>
+            <span class="material-symbols-rounded" style="font-size:16px; color:#64748B;">folder_special</span>
+            <span>Total Submissions:</span>
           </div>
           <span style="font-size:12px; font-weight:800; color:#0F172A;">${totalCount} Problem Sets</span>
         </div>
@@ -2109,19 +2271,19 @@ class AppController {
         <!-- Trophy Room -->
         <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer;" id="btn-open-trophy-room">
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:24px;">🏆</span>
+            <span class="material-symbols-rounded filled" style="font-size:24px; color:#F59E0B;">emoji_events</span>
             <div style="text-align:left;">
               <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Trophy Room & Flex Zone</div>
               <div style="font-size:11px; color:#64748B;">View 8 Unlockable Badges & Achievements</div>
             </div>
           </div>
-          <span style="color:#2563EB; font-weight:800;">➔</span>
+          <span class="material-symbols-rounded" style="color:#64748B; font-size:20px;">chevron_right</span>
         </button>
 
         <!-- Dark Mode Toggle -->
         <div class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between;">
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:22px;">🌙</span>
+            <span class="material-symbols-rounded" style="font-size:22px; color:#64748B;">dark_mode</span>
             <div style="text-align:left;">
               <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Cyber Midnight Dark Mode</div>
               <div style="font-size:11px; color:#64748B;">Switch between Frost White & Dark</div>
@@ -2133,30 +2295,31 @@ class AppController {
         <!-- Push Notifications Center -->
         <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer;" id="btn-profile-notifs">
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:22px;">🔔</span>
+            <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">notifications</span>
             <div style="text-align:left;">
               <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Web Push Notifications</div>
               <div style="font-size:11px; color:#64748B;">Test Alert Banners & Audio Chime</div>
             </div>
           </div>
-          <span style="color:#2563EB; font-weight:800;">➔</span>
+          <span class="material-symbols-rounded" style="color:#64748B; font-size:20px;">chevron_right</span>
         </button>
 
         <!-- Teacher / Admin Console (Always accessible in Demo Mode) -->
         <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); border-color:#93C5FD;" id="btn-profile-admin">
           <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:22px;">👑</span>
+            <span class="material-symbols-rounded filled" style="font-size:22px; color:#2563EB;">admin_panel_settings</span>
             <div style="text-align:left;">
               <div style="font-size:13.5px; font-weight:800; color:#1E3A8A;">Teacher / Admin Console</div>
               <div style="font-size:11px; color:#2563EB;">Grade Submissions & Manage Exam Papers</div>
             </div>
           </div>
-          <span style="color:#2563EB; font-weight:800;">➔</span>
+          <span class="material-symbols-rounded" style="color:#2563EB; font-size:20px;">chevron_right</span>
         </button>
 
         <!-- Sign Out Button -->
-        <button class="btn-primary" style="background:#EF4444; margin-top:6px;" id="btn-profile-logout">
-          🚪 Sign Out
+        <button class="btn-primary" style="background:#EF4444; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" id="btn-profile-logout">
+          <span class="material-symbols-rounded" style="font-size:18px;">logout</span>
+          <span>Sign Out</span>
         </button>
       </div>
     `;
@@ -2181,7 +2344,7 @@ class AppController {
         if (newBatch === user.examYear) return;
         await authService.updateProfile({ examYear: newBatch });
         if (this.currentUser) this.currentUser.examYear = newBatch;
-        notificationService.showInAppBanner('Exam Batch Updated 🎯', `Switched to ${newBatch} curriculum & countdown!`, 'success');
+        notificationService.showInAppBanner('Exam Batch Updated', `Switched to ${newBatch} curriculum & countdown!`, 'success');
         this.renderProfileScreen(container);
       });
     });
@@ -2210,12 +2373,12 @@ class AppController {
   openAvatarPickerSheet(profileContainer) {
     const user = this.currentUser || {};
     const presets = [
-      { name: 'Albert Einstein', role: 'Relativity', emoji: '⚛️', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240' },
-      { name: 'Isaac Newton', role: 'Mechanics', emoji: '🍎', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240' },
-      { name: 'Nikola Tesla', role: 'Electricity', emoji: '⚡', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240' },
-      { name: 'Marie Curie', role: 'Nuclear', emoji: '🔬', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240' },
-      { name: 'Richard Feynman', role: 'Quantum', emoji: '🚀', url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240' },
-      { name: 'Pastry Prodigy', role: 'Dessert Master', emoji: '🍰', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240' }
+      { name: 'Albert Einstein', role: 'Relativity', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240' },
+      { name: 'Isaac Newton', role: 'Mechanics', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240' },
+      { name: 'Nikola Tesla', role: 'Electricity', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240' },
+      { name: 'Marie Curie', role: 'Nuclear', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240' },
+      { name: 'Richard Feynman', role: 'Quantum', url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240' },
+      { name: 'Pastry Prodigy', role: 'Dessert Master', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240' }
     ];
 
     const modal = document.createElement('div');
@@ -2228,23 +2391,25 @@ class AppController {
 
         <div class="modal-header">
           <div>
-            <h3 class="modal-title">Change Profile Photo 📸</h3>
+            <h3 class="modal-title">Change Profile Photo</h3>
             <div style="font-size:11.5px; color:#64748B;">Upload your portrait or choose a Physics genius</div>
           </div>
-          <button class="modal-close-btn" id="btn-close-avatar-sheet">✕</button>
+          <button class="modal-close-btn" id="btn-close-avatar-sheet">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <!-- Action Row (Camera vs Gallery) -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;">
           <!-- Camera Capture Button -->
           <button id="btn-snap-camera-avatar" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px 12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:14px; cursor:pointer;">
-            <span style="font-size:26px;">📷</span>
+            <span class="material-symbols-rounded" style="font-size:26px; color:#1D4ED8;">photo_camera</span>
             <span style="font-size:12.5px; font-weight:800; color:#1D4ED8;">Take Photo (Camera)</span>
           </button>
 
           <!-- Gallery Upload Button -->
           <label for="input-gallery-avatar" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px 12px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:14px; cursor:pointer;">
-            <span style="font-size:26px;">🖼️</span>
+            <span class="material-symbols-rounded" style="font-size:26px; color:#15803D;">photo_library</span>
             <span style="font-size:12.5px; font-weight:800; color:#15803D;">Choose from Gallery</span>
             <input type="file" id="input-gallery-avatar" accept="image/*" style="display:none;" />
           </label>
@@ -2254,8 +2419,9 @@ class AppController {
         <div id="avatar-camera-container" style="display:none; flex-direction:column; align-items:center; margin-top:14px; background:#0F172A; border-radius:16px; padding:12px;">
           <video id="avatar-webcam-preview" autoplay playsinline style="width:200px; height:200px; border-radius:50%; object-fit:cover; border:3px solid #2563EB;"></video>
           <div style="display:flex; gap:10px; margin-top:12px;">
-            <button id="btn-capture-snapshot" class="apk-btn-primary" style="padding:8px 18px; font-size:12px;">
-              📸 Capture Snapshot
+            <button id="btn-capture-snapshot" class="apk-btn-primary" style="padding:8px 18px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">photo_camera</span>
+              <span>Capture Snapshot</span>
             </button>
             <button id="btn-cancel-webcam" style="background:transparent; border:1px solid #475569; color:#CBD5E1; border-radius:8px; padding:8px 14px; font-size:12px; cursor:pointer;">
               Cancel
@@ -2265,8 +2431,9 @@ class AppController {
 
         <!-- Presets Row -->
         <div style="margin-top:18px;">
-          <div style="font-size:12px; font-weight:800; color:#334155; margin-bottom:8px;">
-            ⚛️ Or Choose a Physics Scholar Avatar:
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#334155; margin-bottom:8px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">science</span>
+            <span>Or Choose a Physics Scholar Avatar:</span>
           </div>
           <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
             ${presets.map((p, idx) => `
@@ -2307,7 +2474,7 @@ class AppController {
       stopWebcam();
       await authService.updateProfile({ avatarUrl: newUrl });
       if (this.currentUser) this.currentUser.avatarUrl = newUrl;
-      notificationService.showInAppBanner('Profile Photo Updated! 📸', 'Your portrait is now updated across all portals.', 'success');
+      notificationService.showInAppBanner('Profile Photo Updated!', 'Your portrait is now updated across all portals.', 'success');
       modal.remove();
       if (profileContainer) this.renderProfileScreen(profileContainer);
     };
@@ -2391,13 +2558,15 @@ class AppController {
       <div class="modal-sheet" style="max-width:380px;">
         <div class="modal-header">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:20px;">✏️</span>
+            <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">edit</span>
             <div>
               <h3 class="modal-title">Edit Name</h3>
               <div style="font-size:11px; color:#64748B;">සම්පූර්ණ නම සංස්කරණය කරන්න</div>
             </div>
           </div>
-          <button class="modal-close-btn" id="btn-close-name-modal">✕</button>
+          <button class="modal-close-btn" id="btn-close-name-modal">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="margin-top:14px;">
@@ -2429,7 +2598,7 @@ class AppController {
 
       await authService.updateProfile({ name: newName });
       if (this.currentUser) this.currentUser.name = newName;
-      notificationService.showInAppBanner('Name Updated ✏️', `Profile name updated to ${newName}!`, 'success');
+      notificationService.showInAppBanner('Name Updated', `Profile name updated to ${newName}!`, 'success');
       modal.remove();
       if (profileContainer) this.renderProfileScreen(profileContainer);
     });
@@ -2447,8 +2616,13 @@ class AppController {
     modal.innerHTML = `
       <div class="modal-sheet">
         <div class="modal-header">
-          <h3 class="modal-title">📁 Submission Details</h3>
-          <button class="modal-close-btn" id="btn-close-detail">✕</button>
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded">folder_special</span>
+            <span>Submission Details</span>
+          </h3>
+          <button class="modal-close-btn" id="btn-close-detail">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="font-size:15px; font-weight:800; color:#0F172A; margin-bottom:4px;">${d.subject}</div>
@@ -2488,18 +2662,25 @@ class AppController {
     modal.innerHTML = `
       <div class="modal-sheet">
         <div class="modal-header">
-          <h3 class="modal-title">👑 Teacher / Admin Console</h3>
-          <button class="modal-close-btn" id="btn-close-admin">✕</button>
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded filled" style="color:#2563EB;">admin_panel_settings</span>
+            <span>Teacher / Admin Console</span>
+          </h3>
+          <button class="modal-close-btn" id="btn-close-admin">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
         <div style="font-size:13px; color:#475569; line-height:1.5; margin-bottom:14px;">
           Welcome to the Teacher portal. Here you can grade submitted physics problem sets, set exam timers, and schedule new paper sessions.
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="btn-primary" style="background:#059669;" onclick="alert('Grading sheet loaded. 5 pending submissions marked as Approved (+100 XP).'); modal.remove();">
-            ✅ Approve All Pending Submissions (+100 XP)
+          <button class="btn-primary" style="background:#059669; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="alert('Grading sheet loaded. 5 pending submissions marked as Approved (+100 XP).'); modal.remove();">
+            <span class="material-symbols-rounded filled" style="font-size:16px;">check_circle</span>
+            <span>Approve All Pending Submissions (+100 XP)</span>
           </button>
-          <button class="btn-primary" style="background:#2563EB;" onclick="alert('New exam paper created for 2027 A/L batch.'); modal.remove();">
-            📝 Schedule New Model Paper
+          <button class="btn-primary" style="background:#2563EB; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="alert('New exam paper created for 2027 A/L batch.'); modal.remove();">
+            <span class="material-symbols-rounded" style="font-size:16px;">note_add</span>
+            <span>Schedule New Model Paper</span>
           </button>
         </div>
       </div>
@@ -2515,8 +2696,13 @@ class AppController {
     modal.innerHTML = `
       <div class="modal-sheet">
         <div class="modal-header">
-          <h3 class="modal-title">💬 AI Physics Tutor</h3>
-          <button class="modal-close-btn" id="btn-close-tutor-sheet">✕</button>
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded filled" style="color:#2563EB;">psychology</span>
+            <span>AI Physics Tutor</span>
+          </h3>
+          <button class="modal-close-btn" id="btn-close-tutor-sheet">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="background:#EFF6FF; border:1px solid #DBEAFE; border-radius:14px; padding:12px; margin-bottom:14px;">
@@ -2531,8 +2717,9 @@ class AppController {
           <textarea class="form-textarea" rows="3" placeholder="උදා: රෝලරයක් තල්ලු කිරීමට වඩා ඇදීම පහසු ඇයි?"></textarea>
         </div>
 
-        <button class="btn-primary" id="btn-send-tutor">
-          ⚡ Ask Instant Explanation
+        <button class="btn-primary" id="btn-send-tutor" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+          <span class="material-symbols-rounded filled" style="font-size:16px;">bolt</span>
+          <span>Ask Instant Explanation</span>
         </button>
       </div>
     `;
@@ -2565,13 +2752,15 @@ class AppController {
         <div class="modal-sheet" style="max-height:92vh;">
           <div class="modal-header">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:22px;">🔥</span>
+              <span class="material-symbols-rounded filled" style="font-size:22px; color:#EA580C;">local_fire_department</span>
               <div>
                 <h3 class="modal-title">Daily MCQ Sprint</h3>
                 <div style="font-size:11px; color:#64748B;">A/L Physics • දවසේ MCQ 5</div>
               </div>
             </div>
-            <button class="modal-close-btn" id="btn-close-sprint">✕</button>
+            <button class="modal-close-btn" id="btn-close-sprint">
+              <span class="material-symbols-rounded">close</span>
+            </button>
           </div>
 
           <!-- Stepper and Timer Bar -->
@@ -2584,7 +2773,7 @@ class AppController {
               `).join('')}
             </div>
             <div class="stopwatch-pill">
-              <span>⏱️</span>
+              <span class="material-symbols-rounded" style="font-size:15px;">timer</span>
               <span id="sprint-timer-val">${Math.floor(elapsedSeconds / 60).toString().padStart(2, '0')}:${(elapsedSeconds % 60).toString().padStart(2, '0')}</span>
             </div>
           </div>
@@ -2607,7 +2796,7 @@ class AppController {
           <!-- Explanation Box if answered -->
           ${selected !== undefined ? `
             <div style="background:#EFF6FF; border-left:3px solid #2563EB; border-radius:10px; padding:12px; margin-bottom:14px; font-size:12px; color:#1E3A8A; line-height:1.45;">
-              <strong>💡 විවරණය (Explanation):</strong><br>
+              <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">lightbulb</span> විවරණය (Explanation):</strong><br>
               ${q.explanation}
             </div>
           ` : ''}
@@ -2615,13 +2804,15 @@ class AppController {
           <!-- Navigation Buttons -->
           <div style="display:flex; gap:8px;">
             ${currentIdx > 0 ? `
-              <button class="btn-primary" style="background:#F1F5F9; color:#475569; width:auto; padding:12px 18px;" id="btn-sprint-prev">
-                ◀ Prev
+              <button class="btn-primary" style="background:#F1F5F9; color:#475569; width:auto; padding:12px 18px; display:inline-flex; align-items:center; gap:4px;" id="btn-sprint-prev">
+                <span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span>
+                <span>Prev</span>
               </button>
             ` : ''}
 
-            <button class="btn-primary" style="flex:1;" id="btn-sprint-next">
-              ${currentIdx === questions.length - 1 ? 'Finish Sprint & Claim +50 XP 🚀' : 'Next Question ▶'}
+            <button class="btn-primary" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px;" id="btn-sprint-next">
+              <span>${currentIdx === questions.length - 1 ? 'Finish Sprint & Claim +50 XP' : 'Next Question'}</span>
+              <span class="material-symbols-rounded" style="font-size:16px;">${currentIdx === questions.length - 1 ? 'check' : 'arrow_forward'}</span>
             </button>
           </div>
         </div>
@@ -2688,7 +2879,7 @@ class AppController {
           }
 
           notificationService.showInAppBanner(
-            isPerfect ? '🏆 PERFECT SCORE!' : 'Sprint Complete! 🔥',
+            isPerfect ? 'PERFECT SCORE!' : 'Sprint Complete!',
             `You scored ${correct}/${questions.length}. +${xpEarned} XP awarded!`,
             'success'
           );
@@ -2698,22 +2889,22 @@ class AppController {
             <div class="modal-sheet" style="max-height:92vh; overflow-y:auto; padding:20px 16px;">
               <!-- Celebration Card -->
               <div style="background:${isPerfect ? 'linear-gradient(135deg, #065F46, #047857)' : 'linear-gradient(135deg, #1E3A8A, #2563EB)'}; border-radius:20px; padding:20px; text-align:center; color:#FFFFFF; box-shadow:0 10px 24px rgba(0,0,0,0.25);">
-                <div style="font-size:14px; font-weight:800; letter-spacing:0.5px; opacity:0.9;">
-                  ${isPerfect ? '🏆 PERFECT SCORE!' : '🎉 SPRINT COMPLETED!'}
+                <div style="font-size:14px; font-weight:800; letter-spacing:0.5px; opacity:0.9; display:flex; align-items:center; justify-content:center; gap:6px;">
+                  ${isPerfect ? '<span class="material-symbols-rounded filled" style="font-size:20px; color:#FDE047;">emoji_events</span> PERFECT SCORE!' : '<span class="material-symbols-rounded filled" style="font-size:20px; color:#FDE047;">local_fire_department</span> SPRINT COMPLETED!'}
                 </div>
                 <div style="display:flex; align-items:baseline; justify-content:center; gap:4px; margin:8px 0 10px 0;">
                   <span style="font-size:48px; font-weight:900; line-height:1;">${correct}</span>
                   <span style="font-size:20px; font-weight:700; opacity:0.75;">/ ${questions.length}</span>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:6px;">
-                  <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700;">
-                    ⏱️ Time: ${timeFormatted}
+                  <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                    <span class="material-symbols-rounded" style="font-size:13px;">timer</span> Time: ${timeFormatted}
                   </span>
-                  <span style="background:rgba(251,191,36,0.3); color:#FEF3C7; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:800;">
-                    ⚡ +${xpEarned} XP Added
+                  <span style="background:rgba(251,191,36,0.3); color:#FEF3C7; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                    <span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">bolt</span> +${xpEarned} XP Added
                   </span>
-                  <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700;">
-                    📚 Mechanics & Newton Laws
+                  <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                    <span class="material-symbols-rounded" style="font-size:13px;">menu_book</span> Mechanics & Newton Laws
                   </span>
                 </div>
               </div>
@@ -2723,8 +2914,9 @@ class AppController {
                 <div style="font-size:14px; font-weight:800; color:#0F172A;">
                   Question Review & Explanations (විවරණ)
                 </div>
-                <button id="btn-sprint-view-ranks" style="background:none; border:none; color:#2563EB; font-size:12px; font-weight:700; cursor:pointer;">
-                  View Ranks 🏆
+                <button id="btn-sprint-view-ranks" style="background:none; border:none; color:#2563EB; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                  <span>View Ranks</span>
+                  <span class="material-symbols-rounded filled" style="font-size:14px; color:#2563EB;">emoji_events</span>
                 </button>
               </div>
 
@@ -2739,8 +2931,9 @@ class AppController {
                         <span style="background:${isCorrect ? '#DCFCE7' : '#FEE2E2'}; color:${isCorrect ? '#15803D' : '#B91C1C'}; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:800;">
                           Q${qIdx + 1}
                         </span>
-                        <span style="font-size:11.5px; font-weight:800; color:${isCorrect ? '#15803D' : '#B91C1C'};">
-                          ${isCorrect ? 'Correct (+10 XP) ✓' : 'Incorrect (0 XP) ✕'}
+                        <span style="font-size:11.5px; font-weight:800; color:${isCorrect ? '#15803D' : '#B91C1C'}; display:inline-flex; align-items:center; gap:4px;">
+                          <span class="material-symbols-rounded filled" style="font-size:14px;">${isCorrect ? 'check_circle' : 'cancel'}</span>
+                          <span>${isCorrect ? 'Correct (+10 XP)' : 'Incorrect (0 XP)'}</span>
                         </span>
                       </div>
 
@@ -2768,7 +2961,7 @@ class AppController {
                           return `
                             <div style="display:flex; align-items:center; justify-content:space-between; background:${bg}; border:1px solid ${border}; border-radius:8px; padding:7px 10px; font-size:12px; color:${color}; font-weight:${isAnswer ? '700' : '500'};">
                               <span>(${String.fromCharCode(65 + optIdx)}) ${opt}</span>
-                              ${isAnswer ? '<span style="color:#22C55E; font-weight:800;">✓ Correct</span>' : (isPicked ? '<span style="color:#EF4444; font-weight:800;">✕ Your Choice</span>' : '')}
+                              ${isAnswer ? '<span style="color:#22C55E; font-weight:800; display:inline-flex; align-items:center; gap:2px;"><span class="material-symbols-rounded filled" style="font-size:13px;">check_circle</span> Correct</span>' : (isPicked ? '<span style="color:#EF4444; font-weight:800; display:inline-flex; align-items:center; gap:2px;"><span class="material-symbols-rounded filled" style="font-size:13px;">cancel</span> Your Choice</span>' : '')}
                             </div>
                           `;
                         }).join('')}
@@ -2776,7 +2969,7 @@ class AppController {
 
                       <!-- Amber Explanation Box (විවරණය) -->
                       <div style="background:#FFFBEB; border-left:3px solid #F59E0B; border-radius:8px; padding:10px; font-size:11.5px; color:#92400E; line-height:1.45;">
-                        <strong>💡 විවරණය (Explanation):</strong><br>
+                        <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px; color:#F59E0B;">lightbulb</span> විවරණය (Explanation):</strong><br>
                         ${qu.explanation}
                       </div>
                     </div>
@@ -2828,12 +3021,16 @@ class AppController {
     modal.innerHTML = `
       <div class="scanner-top-bar">
         <div class="scanner-title">
-          <span>📷 Scan Homework</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded">document_scanner</span> Scan Homework</span>
           <span class="scanner-page-counter" id="scanner-page-count">0 Pages</span>
         </div>
         <div class="scanner-top-actions">
-          <button class="btn-scanner-icon" id="btn-toggle-torch" title="Flashlight">⚡</button>
-          <button class="btn-scanner-icon" id="btn-close-scanner" title="Close">✕</button>
+          <button class="btn-scanner-icon" id="btn-toggle-torch" title="Flashlight" style="display:inline-flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:18px;">flash_on</span>
+          </button>
+          <button class="btn-scanner-icon" id="btn-close-scanner" title="Close" style="display:inline-flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:20px;">close</span>
+          </button>
         </div>
       </div>
 
@@ -2856,7 +3053,7 @@ class AppController {
         <div class="scanner-thumbnails-strip" id="scanner-thumb-strip"></div>
         <div class="scanner-shutter-row">
           <label class="btn-upload-file-fallback" for="input-file-camera">
-            <span>📁 Gallery</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:18px;">photo_library</span> Gallery</span>
             <input type="file" id="input-file-camera" accept="image/*" capture="environment" style="display:none;" multiple />
           </label>
 
@@ -2865,9 +3062,9 @@ class AppController {
             <button class="btn-shutter" id="btn-trigger-shutter"></button>
           </div>
 
-          <button class="btn-done-scanning" id="btn-finish-scan" disabled>
+          <button class="btn-done-scanning" id="btn-finish-scan" disabled style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
             <span>Done</span>
-            <span>✓</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">check</span>
           </button>
         </div>
       </div>
@@ -2908,7 +3105,9 @@ class AppController {
         stripEl.innerHTML = pages.map((dataUrl, idx) => `
           <div class="thumb-card">
             <img src="${dataUrl}"/>
-            <button class="thumb-del-btn" data-del-idx="${idx}">✕</button>
+            <button class="thumb-del-btn" data-del-idx="${idx}" style="display:inline-flex; align-items:center; justify-content:center;">
+              <span class="material-symbols-rounded" style="font-size:12px;">close</span>
+            </button>
             <span class="thumb-page-badge">P${idx + 1}</span>
           </div>
         `).join('');
@@ -2972,7 +3171,9 @@ class AppController {
       <div class="modal-sheet">
         <div class="modal-header">
           <h3 class="modal-title">Confirm Homework Submission</h3>
-          <button class="modal-close-btn" id="btn-close-submit-dialog">✕</button>
+          <button class="modal-close-btn" id="btn-close-submit-dialog">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="font-size:12px; font-weight:700; color:#475569; margin-bottom:8px;">
@@ -2992,8 +3193,9 @@ class AppController {
           <textarea class="form-textarea" id="submit-note-input" rows="2" placeholder="Any questions or notes..."></textarea>
         </div>
 
-        <button class="btn-primary" id="btn-confirm-upload">
-          🚀 Submit Homework Now (+50 XP)
+        <button class="btn-primary" id="btn-confirm-upload" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+          <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
+          <span>Submit Homework Now (+50 XP)</span>
         </button>
       </div>
     `;
@@ -3003,7 +3205,7 @@ class AppController {
     document.getElementById('btn-confirm-upload')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-confirm-upload');
       btn.disabled = true;
-      btn.textContent = 'Uploading... ⏳';
+      btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Uploading...';
 
       await dbService.submitDessert({
         studentId: this.currentUser.studentId || 'EP-2027',
@@ -3015,7 +3217,7 @@ class AppController {
       });
 
       modal.remove();
-      notificationService.showInAppBanner('Homework Submitted! 🎉', 'Your teacher will review your submission and award marks.', 'success');
+      notificationService.showInAppBanner('Homework Submitted!', 'Your teacher will review your submission and award marks.', 'success');
       this.switchTab('desserts');
     });
   }
@@ -3031,7 +3233,9 @@ class AppController {
     modal.className = 'anti-cheat-modal';
     modal.innerHTML = `
       <div class="anti-cheat-card">
-        <div class="anti-cheat-icon">⚠️</div>
+        <div class="anti-cheat-icon">
+          <span class="material-symbols-rounded filled" style="font-size:36px; color:#EF4444;">warning</span>
+        </div>
         <h3 class="anti-cheat-title">Anti-Cheat Alert</h3>
         <p class="anti-cheat-msg">
           Minimizing or switching away from the proctored exam is strictly prohibited! (Violation ${this.antiCheatViolations}/3)
@@ -3051,8 +3255,13 @@ class AppController {
     modal.innerHTML = `
       <div class="modal-sheet">
         <div class="modal-header">
-          <h3 class="modal-title">🔔 Notification Center</h3>
-          <button class="modal-close-btn" id="btn-close-notif-sheet">✕</button>
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:22px; color:#6366F1;">notifications</span>
+            <span>Notification Center</span>
+          </h3>
+          <button class="modal-close-btn" id="btn-close-notif-sheet">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="font-size:13px; color:#475569; line-height:1.5; margin-bottom:14px;">
@@ -3063,8 +3272,9 @@ class AppController {
           Enable System Push Notifications
         </button>
 
-        <button class="btn-primary" id="btn-send-test-push" style="background:#059669;">
-          ⚡ Send Test Push Notification
+        <button class="btn-primary" id="btn-send-test-push" style="background:#059669; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+          <span class="material-symbols-rounded filled" style="font-size:16px;">flash_on</span>
+          <span>Send Test Push Notification</span>
         </button>
       </div>
     `;
@@ -3077,7 +3287,7 @@ class AppController {
     });
 
     document.getElementById('btn-send-test-push')?.addEventListener('click', () => {
-      notificationService.showLocalNotification('EduPeak Exam Alert 🏛️', {
+      notificationService.showLocalNotification('EduPeak Exam Alert', {
         body: '2027 A/L Physics Term Paper 01 is now active! Tap to join.',
         tag: 'exam-alert'
       });
@@ -3185,10 +3395,10 @@ class AppController {
       <!-- iOS Status Bar -->
       <div class="ios-status-bar">
         <span class="status-time" id="status-clock">10:26</span>
-        <div class="status-icons">
-          <span>●●●</span>
-          <span>📶</span>
-          <span>🔋</span>
+        <div class="status-icons" style="display:flex; align-items:center; gap:5px;">
+          <span class="material-symbols-rounded filled" style="font-size:14px;">signal_cellular_alt</span>
+          <span class="material-symbols-rounded" style="font-size:14px;">wifi</span>
+          <span class="material-symbols-rounded filled" style="font-size:16px;">battery_full</span>
         </div>
       </div>
 
@@ -3201,23 +3411,23 @@ class AppController {
       <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart NavigationBar) -->
       <nav class="bottom-nav-bar" id="admin-bottom-nav" style="background:#FFFFFF; border-top:1px solid #E2E8F0;">
         <button class="nav-tab-btn ${this.adminTab === 'dashboard' ? 'active' : ''}" data-admin-tab="dashboard">
-          <div class="nav-pill-icon">⊞</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">dashboard</span></div>
           <span>Dashboard</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'papers' ? 'active' : ''}" data-admin-tab="papers">
-          <div class="nav-pill-icon">📋</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">assignment</span></div>
           <span>Papers</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'sprints' ? 'active' : ''}" data-admin-tab="sprints">
-          <div class="nav-pill-icon">⚡</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">flash_on</span></div>
           <span>MCQ Sprints</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'students' ? 'active' : ''}" data-admin-tab="students">
-          <div class="nav-pill-icon">👥</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">people</span></div>
           <span>Students</span>
         </button>
         <button class="nav-tab-btn ${this.adminTab === 'broadcasts' ? 'active' : ''}" data-admin-tab="broadcasts">
-          <div class="nav-pill-icon">✈️</div>
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">send</span></div>
           <span>Broadcasts</span>
         </button>
       </nav>
@@ -3314,11 +3524,11 @@ class AppController {
             </div>
             <div class="apk-admin-exec-actions">
               <button class="apk-btn-student-view" id="btn-admin-student-view">
-                <span>🎓</span>
+                <span class="material-symbols-rounded" style="font-size:16px;">school</span>
                 <span>Student View</span>
               </button>
               <button class="apk-btn-logout-icon" id="btn-admin-logout" title="Sign Out">
-                <span>🚪</span>
+                <span class="material-symbols-rounded" style="font-size:18px;">logout</span>
               </button>
             </div>
           </div>
@@ -3327,7 +3537,7 @@ class AppController {
           <div class="apk-admin-greeting-row">
             <div class="apk-admin-avatar">${initial}</div>
             <div class="apk-admin-greeting-text">
-              <h2>Welcome back, ${adminName} 👋</h2>
+              <h2>Welcome back, ${adminName}</h2>
               <p>${pending.length > 0 ? `${pending.length} dessert submission(s) need your review today` : 'All reviews up to date! System is running smoothly'}</p>
             </div>
           </div>
@@ -3336,19 +3546,25 @@ class AppController {
         <!-- ── 2. Real-Time Overview Metrics Row (lines 347-394) ── -->
         <div class="apk-metrics-row">
           <div class="apk-metric-card ${this.adminFilterTab === 'pending' ? 'active-pending' : ''}" data-metric-tab="pending">
-            <div class="apk-metric-icon-circle" style="background:rgba(245, 158, 11, 0.12); color:#F59E0B;">⏳</div>
+            <div class="apk-metric-icon-circle" style="background:rgba(245, 158, 11, 0.12); color:#F59E0B;">
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:#F59E0B;">hourglass_top</span>
+            </div>
             <div class="apk-metric-num" style="color:#F59E0B;">${pending.length}</div>
             <div class="apk-metric-lbl">Pending Review</div>
           </div>
 
           <div class="apk-metric-card ${this.adminFilterTab === 'approved' ? 'active-approved' : ''}" data-metric-tab="approved">
-            <div class="apk-metric-icon-circle" style="background:rgba(16, 185, 129, 0.12); color:#10B981;">✓</div>
+            <div class="apk-metric-icon-circle" style="background:rgba(16, 185, 129, 0.12); color:#10B981;">
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:#10B981;">check_circle</span>
+            </div>
             <div class="apk-metric-num" style="color:#10B981;">${approved.length}</div>
             <div class="apk-metric-lbl">Approved</div>
           </div>
 
           <div class="apk-metric-card ${this.adminFilterTab === 'rejected' ? 'active-rejected' : ''}" data-metric-tab="rejected">
-            <div class="apk-metric-icon-circle" style="background:rgba(239, 68, 68, 0.12); color:#EF4444;">⊘</div>
+            <div class="apk-metric-icon-circle" style="background:rgba(239, 68, 68, 0.12); color:#EF4444;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#EF4444;">cancel</span>
+            </div>
             <div class="apk-metric-num" style="color:#EF4444;">${rejected.length}</div>
             <div class="apk-metric-lbl">Rejected</div>
           </div>
@@ -3357,46 +3573,56 @@ class AppController {
         <!-- ── 3. Quick Action Command Hub (lines 492-575) ── -->
         <div class="apk-command-center-box">
           <div class="apk-command-center-title">
-            <span style="color:#2563EB;">⚡</span>
+            <span class="material-symbols-rounded filled" style="color:#2563EB; font-size:20px;">flash_on</span>
             <span>Admin Command Center</span>
           </div>
           <div class="apk-command-grid">
             <button class="apk-command-btn purple" id="btn-cmd-countdowns">
-              <div class="apk-command-icon-box" style="background:rgba(139, 92, 246, 0.12); color:#8B5CF6;">⏱️</div>
+              <div class="apk-command-icon-box" style="background:rgba(139, 92, 246, 0.12); color:#8B5CF6;">
+                <span class="material-symbols-rounded" style="font-size:20px;">timer</span>
+              </div>
               <div class="apk-command-info">
-                <div class="title">Exam Dates ⌛</div>
+                <div class="title">Exam Dates</div>
                 <div class="subtitle">Target count down</div>
               </div>
             </button>
 
             <button class="apk-command-btn blue" id="btn-cmd-papers">
-              <div class="apk-command-icon-box" style="background:rgba(37, 99, 235, 0.12); color:#2563EB;">📋</div>
+              <div class="apk-command-icon-box" style="background:rgba(37, 99, 235, 0.12); color:#2563EB;">
+                <span class="material-symbols-rounded" style="font-size:20px;">assignment</span>
+              </div>
               <div class="apk-command-info">
-                <div class="title">Paper Sessions 📝</div>
+                <div class="title">Paper Sessions</div>
                 <div class="subtitle">Live proctoring</div>
               </div>
             </button>
 
             <button class="apk-command-btn amber" id="btn-cmd-sprints">
-              <div class="apk-command-icon-box" style="background:rgba(245, 158, 11, 0.12); color:#F59E0B;">⚡</div>
+              <div class="apk-command-icon-box" style="background:rgba(245, 158, 11, 0.12); color:#F59E0B;">
+                <span class="material-symbols-rounded filled" style="font-size:20px;">flash_on</span>
+              </div>
               <div class="apk-command-info">
-                <div class="title">MCQ Sprints ⚡</div>
+                <div class="title">MCQ Sprints</div>
                 <div class="subtitle">Rapid quiz sets</div>
               </div>
             </button>
 
             <button class="apk-command-btn cyan" id="btn-cmd-broadcasts">
-              <div class="apk-command-icon-box" style="background:rgba(6, 182, 212, 0.12); color:#06B6D4;">✈️</div>
+              <div class="apk-command-icon-box" style="background:rgba(6, 182, 212, 0.12); color:#06B6D4;">
+                <span class="material-symbols-rounded" style="font-size:20px;">send</span>
+              </div>
               <div class="apk-command-info">
-                <div class="title">Broadcasts 📢</div>
+                <div class="title">Broadcasts</div>
                 <div class="subtitle">Send telegram</div>
               </div>
             </button>
 
             <button class="apk-command-btn emerald" id="btn-cmd-daily-insight" style="grid-column: span 2;">
-              <div class="apk-command-icon-box" style="background:rgba(16, 185, 129, 0.12); color:#10B981;">⚛️</div>
+              <div class="apk-command-icon-box" style="background:rgba(16, 185, 129, 0.12); color:#10B981;">
+                <span class="material-symbols-rounded" style="font-size:20px;">science</span>
+              </div>
               <div class="apk-command-info">
-                <div class="title">Physics Micro-Insight ⚛️</div>
+                <div class="title">Physics Micro-Insight</div>
                 <div class="subtitle">Auto-rotate random or pin custom formula</div>
               </div>
             </button>
@@ -3407,7 +3633,7 @@ class AppController {
         <div class="apk-queue-section">
           <div class="apk-queue-header-row">
             <div class="apk-queue-title">
-              <span style="color:#2563EB; font-size:18px;">☑️</span>
+              <span class="material-symbols-rounded" style="color:#2563EB; font-size:20px;">assignment_turned_in</span>
               <span>Dessert Submissions Queue</span>
             </div>
             <span class="apk-queue-badge">Physics A/L</span>
@@ -3432,14 +3658,16 @@ class AppController {
           <!-- Search Bar -->
           <div class="apk-search-bar">
             <input type="text" id="input-admin-search" placeholder="Search by student name, phone or notes..." value="${this.adminSearchQuery}" />
-            <span class="apk-search-icon">🔍</span>
+            <span class="material-symbols-rounded apk-search-icon" style="font-size:18px;">search</span>
           </div>
 
           <!-- Submissions List or Empty State -->
           ${currentList.length === 0 ? `
             <div class="apk-empty-card">
-              <div class="apk-empty-icon-circle">✓</div>
-              <div class="apk-empty-title">All Caught Up! 🎉</div>
+              <div class="apk-empty-icon-circle">
+                <span class="material-symbols-rounded filled" style="font-size:24px; color:#10B981;">task_alt</span>
+              </div>
+              <div class="apk-empty-title">All Caught Up!</div>
               <div class="apk-empty-subtitle">There are no pending dessert submissions waiting for review.</div>
               <button class="apk-btn-primary" id="btn-queue-manage-papers">Manage Paper Sessions</button>
             </div>
@@ -3456,7 +3684,7 @@ class AppController {
                       </div>
                     </div>
                     <span class="quest-status-badge ${d.status === 'approved' ? 'quest-badge-green' : d.status === 'rejected' ? 'quest-badge-orange' : 'quest-badge-blue'}">
-                      ${d.status === 'approved' ? 'Approved ✓' : d.status === 'rejected' ? 'Needs Redo ⚠️' : 'Pending Review ⏳'}
+                      ${d.status === 'approved' ? '<span class="material-symbols-rounded filled" style="font-size:13px; vertical-align:middle;">check_circle</span> Approved' : d.status === 'rejected' ? '<span class="material-symbols-rounded filled" style="font-size:13px; vertical-align:middle;">cancel</span> Needs Redo' : '<span class="material-symbols-rounded filled" style="font-size:13px; vertical-align:middle;">hourglass_top</span> Pending Review'}
                     </span>
                   </div>
                   <div style="font-size:12.5px; font-weight:700; color:#1E293B;">${d.subject || 'Physics Problem Set'}</div>
@@ -3468,7 +3696,10 @@ class AppController {
                   ` : ''}
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding-top:8px; border-top:1px solid #F1F5F9;">
                     <span style="font-size:11.5px; font-weight:800; color:#2563EB;">Award: +${d.creditsAwarded || 50} XP</span>
-                    <button class="apk-btn-primary" data-review-id="${d.id}" style="padding:6px 14px; font-size:11.5px;">Review & Grade ➔</button>
+                    <button class="apk-btn-primary" data-review-id="${d.id}" style="padding:6px 14px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;">
+                      <span>Review & Grade</span>
+                      <span class="material-symbols-rounded" style="font-size:14px;">arrow_forward</span>
+                    </button>
                   </div>
                 </div>
               `).join('')}
@@ -3554,7 +3785,9 @@ class AppController {
             <div style="font-size:15px; font-weight:800; color:#0F172A;">Grade Homework: ${sub.studentName}</div>
             <div style="font-size:11.5px; color:#64748B;">${sub.subject}</div>
           </div>
-          <button class="modal-close-btn" id="btn-close-review">✕</button>
+          <button class="modal-close-btn" id="btn-close-review">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <!-- Media Image Viewer -->
@@ -3586,14 +3819,14 @@ class AppController {
         <div style="margin-bottom:8px;">
           <div style="font-size:12px; font-weight:800; color:#0F172A; margin-bottom:6px;">Quick Feedback Presets:</div>
           <div style="display:flex; flex-wrap:wrap; gap:6px;">
-            <button class="history-filter-chip" data-preset="Great work! Free-body diagram is crystal clear. ✅">
-              🌟 Great Work
+            <button class="history-filter-chip" data-preset="Great work! Free-body diagram is crystal clear.">
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded filled" style="font-size:14px; color:#F59E0B;">star</span> Great Work</span>
             </button>
-            <button class="history-filter-chip" data-preset="Calculation is correct, but add units to the final answer. ⚠️">
-              📏 Missing Units
+            <button class="history-filter-chip" data-preset="Calculation is correct, but add units to the final answer.">
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">straighten</span> Missing Units</span>
             </button>
-            <button class="history-filter-chip" data-preset="Sign error in force components on line 3. Please revise. ❌">
-              📐 Sign Error
+            <button class="history-filter-chip" data-preset="Sign error in force components on line 3. Please revise.">
+              <span style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">calculate</span> Sign Error</span>
             </button>
           </div>
         </div>
@@ -3606,11 +3839,13 @@ class AppController {
 
         <!-- Approve vs Reject Actions -->
         <div style="display:flex; gap:10px;">
-          <button class="btn-primary" id="btn-admin-reject-sub" style="background:#EF4444; flex:1; padding:12px;">
-            ❌ Request Redo
+          <button class="btn-primary" id="btn-admin-reject-sub" style="background:#EF4444; flex:1; padding:12px; display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:16px;">cancel</span>
+            <span>Request Redo</span>
           </button>
-          <button class="btn-primary" id="btn-admin-approve-sub" style="background:#10B981; flex:1.3; padding:12px;">
-            ✅ Approve (+${credits} XP)
+          <button class="btn-primary" id="btn-admin-approve-sub" style="background:#10B981; flex:1.3; padding:12px; display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:16px;">check_circle</span>
+            <span>Approve (+${credits} XP)</span>
           </button>
         </div>
       </div>
@@ -3624,7 +3859,7 @@ class AppController {
         modal.querySelectorAll('[data-credit-val]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const approveBtn = document.getElementById('btn-admin-approve-sub');
-        if (approveBtn) approveBtn.textContent = `✅ Approve (+${credits} XP)`;
+        if (approveBtn) approveBtn.innerHTML = `<span class="material-symbols-rounded filled" style="font-size:16px;">check_circle</span> <span>Approve (+${credits} XP)</span>`;
       });
     });
 
@@ -3638,28 +3873,28 @@ class AppController {
     document.getElementById('btn-close-review')?.addEventListener('click', () => modal.remove());
 
     document.getElementById('btn-admin-approve-sub')?.addEventListener('click', async () => {
-      const fb = document.getElementById('admin-feedback-text')?.value || 'Great work! ✅';
+      const fb = document.getElementById('admin-feedback-text')?.value || 'Great work!';
       await dbService.reviewDessert(sub.id, {
         status: 'approved',
         adminFeedback: fb,
         creditsAwarded: credits,
         reviewedBy: 'Lead Physics Faculty'
       });
-      notificationService.showInAppBanner('Submission Approved! ✅', `Awarded +${credits} XP to ${sub.studentName}.`, 'success');
+      notificationService.showInAppBanner('Submission Approved!', `Awarded +${credits} XP to ${sub.studentName}.`, 'success');
       modal.remove();
       const vp = document.getElementById('admin-main-viewport');
       if (vp) this.renderAdminDashboardScreen(vp);
     });
 
     document.getElementById('btn-admin-reject-sub')?.addEventListener('click', async () => {
-      const fb = document.getElementById('admin-feedback-text')?.value || 'Needs improvement. Please try again. ❌';
+      const fb = document.getElementById('admin-feedback-text')?.value || 'Needs improvement. Please try again.';
       await dbService.reviewDessert(sub.id, {
         status: 'rejected',
         adminFeedback: fb,
         creditsAwarded: 10,
         reviewedBy: 'Lead Physics Faculty'
       });
-      notificationService.showInAppBanner('Revision Requested ⚠️', `Sent correction notes to ${sub.studentName}.`, 'warning');
+      notificationService.showInAppBanner('Revision Requested', `Sent correction notes to ${sub.studentName}.`, 'warning');
       modal.remove();
       const vp = document.getElementById('admin-main-viewport');
       if (vp) this.renderAdminDashboardScreen(vp);
@@ -3680,7 +3915,7 @@ class AppController {
       <div class="apk-screen-appbar">
         <div class="apk-appbar-left">
           <div class="apk-appbar-icon-box">
-            <span style="font-size:18px;">☑️</span>
+            <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">fact_check</span>
           </div>
           <div>
             <div class="apk-appbar-title">Paper Examination Hub</div>
@@ -3688,8 +3923,12 @@ class AppController {
           </div>
         </div>
         <div class="apk-appbar-actions">
-          <button class="apk-icon-action-btn" id="btn-admin-countdowns" title="A/L Exam Target Dates & Countdowns">⏱️</button>
-          <button class="apk-icon-action-btn" id="btn-admin-add-paper-head" title="Create" style="font-size:22px; color:#2563EB;">⊕</button>
+          <button class="apk-icon-action-btn" id="btn-admin-countdowns" title="A/L Exam Target Dates & Countdowns">
+            <span class="material-symbols-rounded" style="font-size:20px; color:#64748B;">timer</span>
+          </button>
+          <button class="apk-icon-action-btn" id="btn-admin-add-paper-head" title="Create" style="color:#2563EB;">
+            <span class="material-symbols-rounded" style="font-size:24px;">add_circle</span>
+          </button>
         </div>
       </div>
 
@@ -3697,13 +3936,13 @@ class AppController {
       <div style="padding:12px 16px 8px;">
         <div style="background:#FFFFFF; border-radius:16px; padding:4px; border:1px solid #E2E8F0; display:flex; box-shadow:0 2px 8px rgba(15,23,42,0.04);">
           <button class="apk-segmented-tab-btn ${this.adminPaperTab === 0 ? 'active' : ''}" data-paper-tab="0" style="${this.adminPaperTab === 0 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
-            🔴 Live Sessions
+            <span class="material-symbols-rounded filled" style="font-size:16px; margin-right:4px;">sensors</span> Live Sessions
           </button>
           <button class="apk-segmented-tab-btn ${this.adminPaperTab === 1 ? 'active' : ''}" data-paper-tab="1" style="${this.adminPaperTab === 1 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
-            🔮 Upcoming Papers
+            <span class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">lightbulb</span> Upcoming Papers
           </button>
           <button class="apk-segmented-tab-btn ${this.adminPaperTab === 2 ? 'active' : ''}" data-paper-tab="2" style="${this.adminPaperTab === 2 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
-            🏆 Leaderboard
+            <span class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">emoji_events</span> Leaderboard
           </button>
         </div>
       </div>
@@ -3720,8 +3959,9 @@ class AppController {
     const fabSlot = document.getElementById('admin-fab-slot');
     if (fabSlot) {
       fabSlot.innerHTML = `
-        <button class="apk-fab-button" id="btn-fab-admin-paper">
-          <span style="font-size:18px;">+</span> ${this.adminPaperTab === 0 ? 'Add Live Session' : (this.adminPaperTab === 1 ? 'Add Upcoming Paper' : 'Create Leaderboard')}
+        <button class="apk-fab-button" id="btn-fab-admin-paper" style="display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:20px;">add</span>
+          <span>${this.adminPaperTab === 0 ? 'Add Live Session' : (this.adminPaperTab === 1 ? 'Add Upcoming Paper' : 'Create Leaderboard')}</span>
         </button>
       `;
     }
@@ -3837,8 +4077,8 @@ class AppController {
     if (!papers || papers.length === 0) {
       return `
         <div style="padding:60px 20px 20px; text-align:center; display:flex; flex-direction:column; align-items:center;">
-          <div style="width:76px; height:76px; border-radius:50%; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; color:#2563EB; font-size:36px; margin-bottom:18px;">
-            📄⁺
+          <div style="width:76px; height:76px; border-radius:50%; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; color:#2563EB; margin-bottom:18px;">
+            <span class="material-symbols-rounded" style="font-size:36px;">note_add</span>
           </div>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:8px;">
             තවම Paper Sessions නිර්මාණය කර නොමැත
@@ -3847,7 +4087,7 @@ class AppController {
             නව විභාග සැසියක් නිර්මාණය කර Slot 1 සහ Slot 2 වේලාවන් සකසන්න.
           </div>
           <button class="apk-btn-primary" id="btn-empty-create-paper" style="display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:12px;">
-            <span style="font-size:16px;">+</span> Create First Paper Session
+            <span class="material-symbols-rounded" style="font-size:18px;">add</span> Create First Paper Session
           </button>
         </div>
       `;
@@ -3866,18 +4106,21 @@ class AppController {
     const isLive = status === 'live';
     const isUpcoming = status === 'upcoming';
 
-    let badgeText = '🟡 Upcoming';
+    let badgeText = 'Upcoming';
+    let badgeIcon = 'schedule';
     let badgeBg = 'rgba(245, 158, 11, 0.12)';
     let badgeBorder = '#F59E0B';
     let badgeColor = '#D97706';
 
     if (isEnded) {
-      badgeText = '🔴 Ended';
+      badgeText = 'Ended';
+      badgeIcon = 'cancel';
       badgeBg = 'rgba(239, 68, 68, 0.12)';
       badgeBorder = '#EF4444';
       badgeColor = '#DC2626';
     } else if (isLive) {
-      badgeText = '🟢 Live';
+      badgeText = 'Live';
+      badgeIcon = 'sensors';
       badgeBg = 'rgba(34, 197, 94, 0.12)';
       badgeBorder = '#22C55E';
       badgeColor = '#16A34A';
@@ -3907,15 +4150,16 @@ class AppController {
             <span style="background:#FFFFFF; border:1px solid #E2E8F0; color:#64748B; font-size:11px; padding:4px 10px; border-radius:20px;">
               ${session.examYear || '2027 A/L'}
             </span>
-            <span style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 8px; border-radius:20px;">
-              ${badgeText}
+            <span style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded ${isLive ? 'filled' : ''}" style="font-size:13px;">${badgeIcon}</span>
+              <span>${badgeText}</span>
             </span>
             <div style="margin-left:auto; display:flex; align-items:center; gap:4px;">
               <button class="apk-icon-action-btn" data-edit-times="${session.id}" title="Change Session Times (Slot 1 / Slot 2)" style="color:#2563EB; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
-                📅
+                <span class="material-symbols-rounded" style="font-size:18px;">edit_calendar</span>
               </button>
               <button class="apk-icon-action-btn" data-delete-paper="${session.id}" title="Delete Paper Session (සැසිය මකා දැමීම)" style="color:#EF4444; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
-                🗑️
+                <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
               </button>
             </div>
           </div>
@@ -3925,11 +4169,13 @@ class AppController {
           </div>
 
           <div style="display:flex; align-items:center; gap:14px; margin-top:4px; font-size:11px; color:#64748B;">
-            <span style="display:inline-flex; align-items:center; gap:6px;">
-              <span>📅</span> ${dateFormatted}
+            <span style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">calendar_today</span>
+              <span>${dateFormatted}</span>
             </span>
-            <span style="display:inline-flex; align-items:center; gap:6px;">
-              <span>⏱️</span> ${session.durationMinutes || 180} Mins
+            <span style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">timer</span>
+              <span>${session.durationMinutes || 180} Mins</span>
             </span>
           </div>
         </div>
@@ -3940,26 +4186,30 @@ class AppController {
           <div style="display:grid; grid-template-columns: ${hasSlot2 ? '1fr 1fr' : '1fr'}; gap:12px;">
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
               <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#0F172A;">
-                <span style="color:#F59E0B;">☀️</span> ${slot1Name}
+                <span class="material-symbols-rounded" style="font-size:15px; color:#F59E0B;">wb_sunny</span>
+                <span>${slot1Name}</span>
               </div>
               <div style="font-size:11px; color:#64748B; margin-top:6px;">
                 ${slot1Start} - ${slot1End}
               </div>
-              <div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:4px;">
-                👥 ${slot1Count} Registered
+              <div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:4px; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px; color:#2563EB;">group</span>
+                <span>${slot1Count} Registered</span>
               </div>
             </div>
 
             ${hasSlot2 ? `
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
               <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#0F172A;">
-                <span style="color:#2563EB;">🌙</span> ${slot2Name}
+                <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">bedtime</span>
+                <span>${slot2Name}</span>
               </div>
               <div style="font-size:11px; color:#64748B; margin-top:6px;">
                 ${slot2Start} - ${slot2End}
               </div>
-              <div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:4px;">
-                👥 ${slot2Count} Registered
+              <div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:4px; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px; color:#2563EB;">group</span>
+                <span>${slot2Count} Registered</span>
               </div>
             </div>
             ` : ''}
@@ -3967,18 +4217,21 @@ class AppController {
 
           <!-- Primary Full-Width Proctor Button matching Flutter 1:1 -->
           <button class="apk-btn-primary" data-view-proctor="${session.id}" style="width:100%; height:46px; border-radius:12px; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:16px; background:#2563EB; color:#FFFFFF; box-shadow:0 4px 14px rgba(37,99,235,0.25);">
-            <span style="font-size:16px;">📹</span> Live Camera Proctor Monitor (අධීක්ෂණ මධ්‍යස්ථානය)
+            <span class="material-symbols-rounded filled" style="font-size:18px;">videocam</span>
+            <span>Live Camera Proctor Monitor (අධීක්ෂණ මධ්‍යස්ථානය)</span>
           </button>
 
           <!-- Secondary Row matching Flutter 1:1 -->
           <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
             ${!isEnded ? `
               <button data-end-session="${session.id}" style="flex:1; padding:10px; border-radius:10px; border:1px solid #EF4444; background:transparent; color:#EF4444; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
-                <span>⏹</span> End Session (සැසිය අවසන් කරන්න)
+                <span class="material-symbols-rounded" style="font-size:16px;">stop_circle</span>
+                <span>End Session (සැසිය අවසන් කරන්න)</span>
               </button>
               ${isUpcoming ? `
                 <button data-start-session="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #22C55E; background:transparent; color:#22C55E; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;">
-                  <span>▶</span> Start Now
+                  <span class="material-symbols-rounded" style="font-size:16px;">play_arrow</span>
+                  <span>Start Now</span>
                 </button>
               ` : ''}
             ` : `
@@ -3986,15 +4239,18 @@ class AppController {
                 සැසිය අවසන් කර ඇත (Session Ended)
               </div>
               <button data-reopen-session="${session.id}" style="padding:8px 12px; border-radius:8px; border:none; background:transparent; color:#2563EB; font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                <span>🔄</span> Reopen
+                <span class="material-symbols-rounded" style="font-size:16px;">replay</span>
+                <span>Reopen</span>
               </button>
             `}
           </div>
 
           <!-- Student Preview link -->
           <div style="text-align:right; margin-top:10px;">
-            <a href="javascript:void(0)" data-student-exam="${session.id}" style="font-size:11px; color:#64748B; text-decoration:none;">
-              👁 Enter Student Exam Room (Preview) ↗
+            <a href="javascript:void(0)" data-student-exam="${session.id}" style="font-size:11px; color:#64748B; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">visibility</span>
+              <span>Enter Student Exam Room (Preview)</span>
+              <span class="material-symbols-rounded" style="font-size:13px;">open_in_new</span>
             </a>
           </div>
         </div>
@@ -4016,7 +4272,9 @@ class AppController {
       <div class="modal-sheet" style="max-height:85vh; overflow-y:auto;">
         <div class="modal-header">
           <div style="font-size:15px; font-weight:700; color:#0F172A;">Change Session Times (වේලාවන් වෙනස් කිරීම)</div>
-          <button class="modal-close-btn" id="btn-close-edit-times">✕</button>
+          <button class="modal-close-btn" id="btn-close-edit-times">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; margin-top:8px;">
           <div>
@@ -4091,7 +4349,7 @@ class AppController {
       }
 
       await dbService.updateSlotTimes(session.id, { slot1: updatedSlot1, slot2: updatedSlot2 });
-      notificationService.showInAppBanner('Times Updated ✅', 'Session Times Updated Successfully!', 'success');
+      notificationService.showInAppBanner('Times Updated', 'Session Times Updated Successfully!', 'success');
       modal.remove();
       this.renderAdminPapersScreen(container);
     });
@@ -4104,8 +4362,8 @@ class AppController {
     modal.innerHTML = `
       <div class="modal-sheet" style="max-width:360px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-          <div style="background:rgba(239,68,68,0.15); color:#EF4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px;">
-            🗑️
+          <div style="background:rgba(239,68,68,0.15); color:#EF4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:20px;">delete</span>
           </div>
           <div style="font-size:16px; font-weight:700; color:#0F172A;">Delete Session?</div>
         </div>
@@ -4131,7 +4389,7 @@ class AppController {
     document.getElementById('btn-cancel-delete')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-confirm-delete')?.addEventListener('click', async () => {
       await dbService.deletePaperSession(session.id);
-      notificationService.showInAppBanner('Session Deleted 🗑️', 'Paper Session එක සාර්ථකව මකා දමන ලදී (Deleted).', 'warning');
+      notificationService.showInAppBanner('Session Deleted', 'Paper Session එක සාර්ථකව මකා දමන ලදී (Deleted).', 'warning');
       modal.remove();
       this.renderAdminPapersScreen(container);
     });
@@ -4144,8 +4402,8 @@ class AppController {
     modal.innerHTML = `
       <div class="modal-sheet" style="max-width:380px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-          <div style="background:rgba(239,68,68,0.15); color:#EF4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px;">
-            ⚠️
+          <div style="background:rgba(239,68,68,0.15); color:#EF4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:20px;">warning</span>
           </div>
           <div style="font-size:16px; font-weight:700; color:#0F172A;">End Paper Session?</div>
         </div>
@@ -4168,7 +4426,7 @@ class AppController {
     document.getElementById('btn-cancel-end')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-confirm-end')?.addEventListener('click', async () => {
       await dbService.endPaperSession(session.id);
-      notificationService.showInAppBanner('Session Ended 🛑', '✅ Paper Session එක සාර්ථකව අවසන් කරන ලදී (Session Ended).', 'info');
+      notificationService.showInAppBanner('Session Ended', 'Paper Session එක සාර්ථකව අවසන් කරන ලදී (Session Ended).', 'info');
       modal.remove();
       this.renderAdminPapersScreen(container);
     });
@@ -4176,13 +4434,13 @@ class AppController {
 
   async _startSessionNow(session, container) {
     await dbService.startPaperSession(session.id);
-    notificationService.showInAppBanner('Session Live 🚀', '🚀 සැසිය සක්‍රීය කරන ලදී (Session is now Live)!', 'success');
+    notificationService.showInAppBanner('Session Live', 'සැසිය සක්‍රීය කරන ලදී (Session is now Live)!', 'success');
     this.renderAdminPapersScreen(container);
   }
 
   async _reopenSession(session, container) {
     await dbService.reopenPaperSession(session.id);
-    notificationService.showInAppBanner('Session Reopened 🔄', '✅ සැසිය නැවත සක්‍රීය කරන ලදී (Session Re-opened).', 'info');
+    notificationService.showInAppBanner('Session Reopened', 'සැසිය නැවත සක්‍රීය කරන ලදී (Session Re-opened).', 'info');
     this.renderAdminPapersScreen(container);
   }
 
@@ -4194,37 +4452,59 @@ class AppController {
             <span style="font-size:11px; background:#EEF2FF; color:#4F46E5; font-weight:800; padding:3px 8px; border-radius:8px;">
               Physics • 2027 A/L
             </span>
-            <span style="font-size:11.5px; font-weight:700; color:#D97706;">⏳ In 3 Days</span>
+            <span style="font-size:11.5px; font-weight:700; color:#D97706; display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+              <span>In 3 Days</span>
+            </span>
           </div>
 
           <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">
             2027 A/L Speed Paper 02 (Mechanics & Equilibrium)
           </div>
-          <div style="font-size:12px; color:#64748B; margin-top:2px;">
-            📅 2026 October 02 (Friday) at 08:30 AM • ⏱ 150 Mins
+          <div style="font-size:12px; color:#64748B; margin-top:2px; display:inline-flex; align-items:center; gap:8px;">
+            <span style="display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
+              <span>2026 October 02 (Friday) at 08:30 AM</span>
+            </span>
+            <span>•</span>
+            <span style="display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>150 Mins</span>
+            </span>
           </div>
 
           <div style="margin-top:10px;">
             <div style="font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Syllabus & Tested Topics:</div>
             <div style="display:flex; flex-wrap:wrap; gap:6px;">
-              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px;">✓ Circular Motion</span>
-              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px;">✓ Newton's Laws</span>
-              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px;">✓ Friction & Slopes</span>
+              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">
+                <span class="material-symbols-rounded filled" style="font-size:12px; color:#10B981;">check_circle</span>
+                <span>Circular Motion</span>
+              </span>
+              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">
+                <span class="material-symbols-rounded filled" style="font-size:12px; color:#10B981;">check_circle</span>
+                <span>Newton's Laws</span>
+              </span>
+              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">
+                <span class="material-symbols-rounded filled" style="font-size:12px; color:#10B981;">check_circle</span>
+                <span>Friction & Slopes</span>
+              </span>
             </div>
           </div>
 
           <!-- Highlight Box (Special Paper Hints & Guidance) -->
           <div style="margin-top:12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
             <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309;">
-              <span>💡</span> Special Paper Hints & Guidance:
+              <span class="material-symbols-rounded" style="font-size:16px;">lightbulb</span>
+              <span>Special Paper Hints & Guidance:</span>
             </div>
             <div style="font-size:11.5px; color:#78350F; line-height:1.45; margin-top:4px;">
               කෝණික ප්‍රවේගය (ω) සහ ස්පර්ශීය ප්‍රවේගය (v = rω) අතර සම්බන්ධය මතක තබාගන්න. තන්තුවක ආතතිය කේන්ද්‍රාභිසාරී බලය ලෙස ක්‍රියා කරන ආකාරය විශේෂයෙන් සලකන්න.
             </div>
           </div>
 
-          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5;" onclick="alert('Scope and comprehensive study notes for this paper have been dispatched to student study packs.')">
-            👁 View Full Scope & Hints
+          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="alert('Scope and comprehensive study notes for this paper have been dispatched to student study packs.')">
+            <span class="material-symbols-rounded" style="font-size:16px;">visibility</span>
+            <span>View Full Scope & Hints</span>
           </button>
         </div>
 
@@ -4233,27 +4513,40 @@ class AppController {
             <span style="font-size:11px; background:#EEF2FF; color:#4F46E5; font-weight:800; padding:3px 8px; border-radius:8px;">
               Physics • 2026 A/L
             </span>
-            <span style="font-size:11.5px; font-weight:700; color:#D97706;">⏳ In 10 Days</span>
+            <span style="font-size:11.5px; font-weight:700; color:#D97706; display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+              <span>In 10 Days</span>
+            </span>
           </div>
 
           <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">
             2026 A/L Island-Wide Comprehensive Paper 05
           </div>
-          <div style="font-size:12px; color:#64748B; margin-top:2px;">
-            📅 2026 October 09 (Friday) at 08:30 AM • ⏱ 180 Mins
+          <div style="font-size:12px; color:#64748B; margin-top:2px; display:inline-flex; align-items:center; gap:8px;">
+            <span style="display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
+              <span>2026 October 09 (Friday) at 08:30 AM</span>
+            </span>
+            <span>•</span>
+            <span style="display:inline-flex; align-items:center; gap:3px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>180 Mins</span>
+            </span>
           </div>
 
           <div style="margin-top:12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
             <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309;">
-              <span>💡</span> Special Paper Hints & Guidance:
+              <span class="material-symbols-rounded" style="font-size:16px;">lightbulb</span>
+              <span>Special Paper Hints & Guidance:</span>
             </div>
             <div style="font-size:11.5px; color:#78350F; line-height:1.45; margin-top:4px;">
               දෝලන හා තරංග සහ ධ්වනිය පිළිබඳ ගැටළු වලදී ඩොප්ලර් ආචරණයේ ලකුණු සම්මුතිය (Sign Convention) නිවැරදිව භාවිතා කරන්න.
             </div>
           </div>
 
-          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5;" onclick="alert('Full preparation pack unlocked.')">
-            👁 View Full Scope & Hints
+          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="alert('Full preparation pack unlocked.')">
+            <span class="material-symbols-rounded" style="font-size:16px;">visibility</span>
+            <span>View Full Scope & Hints</span>
           </button>
         </div>
       </div>
@@ -4267,21 +4560,21 @@ class AppController {
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center; padding:16px 10px; background:linear-gradient(180deg, #1E293B, #0F172A); border-radius:16px; color:#FFFFFF;">
           <!-- 2nd -->
           <div style="display:flex; flex-direction:column; align-items:center; margin-top:16px;">
-            <div style="font-size:20px;">🥈</div>
+            <span class="material-symbols-rounded filled" style="font-size:22px; color:#94A3B8;">military_tech</span>
             <div style="width:40px; height:40px; border-radius:50%; background:#94A3B8; color:#0F172A; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; margin:4px 0;">M</div>
             <div style="font-size:11.5px; font-weight:700;">Minoli S.</div>
             <div style="font-size:10px; color:#94A3B8;">94 Marks</div>
           </div>
           <!-- 1st -->
           <div style="display:flex; flex-direction:column; align-items:center;">
-            <div style="font-size:24px;">👑</div>
+            <span class="material-symbols-rounded filled" style="font-size:26px; color:#F59E0B;">emoji_events</span>
             <div style="width:48px; height:48px; border-radius:50%; background:#F59E0B; color:#0F172A; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px; margin:4px 0; border:2px solid #FCD34D;">D</div>
             <div style="font-size:12px; font-weight:800; color:#FCD34D;">Danushka W.</div>
             <div style="font-size:10.5px; color:#E2E8F0; font-weight:700;">98 Marks</div>
           </div>
           <!-- 3rd -->
           <div style="display:flex; flex-direction:column; align-items:center; margin-top:20px;">
-            <div style="font-size:20px;">🥉</div>
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#CD7F32;">military_tech</span>
             <div style="width:38px; height:38px; border-radius:50%; background:#B45309; color:#FFFFFF; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:13px; margin:4px 0;">K</div>
             <div style="font-size:11.5px; font-weight:700;">Kavindu J.</div>
             <div style="font-size:10px; color:#94A3B8;">89 Marks</div>
@@ -4358,21 +4651,23 @@ class AppController {
       <div class="apk-screen-appbar">
         <div class="apk-appbar-left">
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
-            <span>🔥</span> Daily MCQ Sprints
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#EA580C;">local_fire_department</span> Daily MCQ Sprints
           </div>
         </div>
         <div class="apk-appbar-actions">
-          <button class="apk-icon-action-btn" id="btn-pick-sprint-date" title="Pick Date">📅</button>
+          <button class="apk-icon-action-btn" id="btn-pick-sprint-date" title="Pick Date">
+            <span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span>
+          </button>
         </div>
       </div>
 
       <!-- Underline Tabs -->
       <div class="apk-tabbar-underline">
         <button class="apk-tabbar-tab ${this.adminSprintTab === 0 ? 'active' : ''}" data-sprint-tab="0">
-          <span>❓</span> Sprint Sets (දවසේ 5)
+          <span class="material-symbols-rounded" style="font-size:18px;">quiz</span> Sprint Sets (දවසේ 5)
         </button>
         <button class="apk-tabbar-tab ${this.adminSprintTab === 1 ? 'active' : ''}" data-sprint-tab="1">
-          <span>📊</span> Live Leaderboard
+          <span class="material-symbols-rounded" style="font-size:18px;">leaderboard</span> Live Leaderboard
         </button>
       </div>
 
@@ -4387,7 +4682,7 @@ class AppController {
     if (fabSlot) {
       fabSlot.innerHTML = `
         <button class="apk-fab-button" id="btn-fab-create-sprint">
-          <span style="font-size:18px;">+</span> Create 5-MCQ Sprint
+          <span class="material-symbols-rounded" style="font-size:18px;">add</span> Create 5-MCQ Sprint
         </button>
       `;
     }
@@ -4421,7 +4716,7 @@ class AppController {
         examYear: '2026 A/L',
         questionsCount: 5
       });
-      notificationService.showInAppBanner('Demo Sprint Loaded! ⚡', 'Physics Mechanics 5-MCQ Set is ready.', 'success');
+      notificationService.showInAppBanner('Demo Sprint Loaded!', 'Physics Mechanics 5-MCQ Set is ready.', 'success');
       this.renderAdminSprintsScreen(container);
     });
 
@@ -4438,11 +4733,11 @@ class AppController {
       <!-- Date Filter Bar -->
       <div style="margin:16px 16px 14px; padding:12px 16px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:16px; color:#2563EB;">📅</span>
+          <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">calendar_today</span>
           <span style="font-size:13.5px; font-weight:700; color:#0F172A;">Viewing: ${dateStr}</span>
         </div>
         <button id="btn-change-sprint-date" style="background:none; border:none; color:#2563EB; font-weight:700; font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:4px;">
-          <span>📅</span> Change
+          <span class="material-symbols-rounded" style="font-size:16px;">calendar_today</span> Change
         </button>
       </div>
 
@@ -4450,13 +4745,13 @@ class AppController {
       ${sprintsForDate.length === 0 ? `
         <!-- Empty State matching Screenshot 3 -->
         <div style="margin:0 16px; padding:28px 20px; background:#FFFFFF; border-radius:16px; border:1px solid #E2E8F0; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-          <div style="font-size:44px;">📝</div>
+          <span class="material-symbols-rounded" style="font-size:44px; color:#94A3B8;">note_alt</span>
           <div style="font-size:15.5px; font-weight:800; color:#0F172A;">No Custom MCQ Sprints Created Yet</div>
           <div style="font-size:12.5px; color:#64748B; max-width:320px; line-height:1.45;">
             Telegram bot is currently using the high-yield A/L Mechanics fallback set. Create custom daily 5-MCQ sets below!
           </div>
           <button class="apk-btn-primary" id="btn-load-demo-sprint" style="margin-top:8px; display:inline-flex; align-items:center; gap:6px;">
-            <span>⚡</span> Load Demo A/L Physics Sprint Set
+            <span class="material-symbols-rounded filled" style="font-size:16px;">flash_on</span> Load Demo A/L Physics Sprint Set
           </button>
         </div>
       ` : `
@@ -4464,7 +4759,9 @@ class AppController {
           ${sprintsForDate.map(s => `
             <div class="hero-card" style="padding:16px; border: 1.5px solid #2563EB; background: rgba(37,99,235,0.04);">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:12px; font-weight:800; color:#2563EB;">🔥 ${s.examYear}</span>
+                <span style="font-size:12px; font-weight:800; color:#2563EB; display:inline-flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded filled" style="font-size:14px; color:#EA580C;">local_fire_department</span> ${s.examYear}
+                </span>
                 <span style="font-size:11px; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:800;">5 Questions Ready</span>
               </div>
               <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:6px;">${s.title}</div>
@@ -4480,7 +4777,7 @@ class AppController {
     return `
       <!-- Empty Leaderboard matching Screenshot 4 -->
       <div style="padding:80px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
-        <div style="font-size:44px;">🏆</div>
+        <span class="material-symbols-rounded filled" style="font-size:44px; color:#94A3B8;">emoji_events</span>
         <div style="font-size:16px; font-weight:800; color:#0F172A;">No completions for ${dateStr} yet</div>
         <div style="font-size:13px; color:#64748B; max-width:320px; line-height:1.45;">
           Students who complete the Sprint on Telegram will appear here live!
@@ -4515,8 +4812,8 @@ class AppController {
       <!-- Screen AppBar -->
       <div class="apk-screen-appbar">
         <div class="apk-appbar-left">
-          <div style="font-size:16px; font-weight:800; color:#0F172A;">
-            Registered Students 👥
+          <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span> Registered Students
           </div>
         </div>
       </div>
@@ -4526,14 +4823,14 @@ class AppController {
         <!-- Stats Row -->
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
           <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
-            <span style="font-size:18px; color:#2563EB;">👥</span>
+            <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span>
             <div>
               <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Students</div>
               <div style="font-size:16px; font-weight:800; color:#0F172A;">${allStudents.length}</div>
             </div>
           </div>
           <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
-            <span style="font-size:18px; color:#6366F1;">⚡</span>
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#6366F1;">flash_on</span>
             <div>
               <div style="font-size:10.5px; color:#64748B; font-weight:600;">Showing</div>
               <div style="font-size:16px; font-weight:800; color:#0F172A;">${filtered.length}</div>
@@ -4543,7 +4840,7 @@ class AppController {
 
         <!-- Search Field -->
         <div class="apk-search-bar" style="margin-bottom:10px;">
-          <span class="apk-search-icon">🔍</span>
+          <span class="material-symbols-rounded apk-search-icon" style="font-size:18px;">search</span>
           <input type="text" id="input-admin-student-search" placeholder="Search by name, phone or ID..." value="${this.adminStudentSearchQuery}">
         </div>
 
@@ -4553,7 +4850,7 @@ class AppController {
             const isSel = this.adminStudentBatchFilter === b;
             return `
               <button class="apk-filter-chip ${isSel ? 'active' : ''}" data-batch="${b}">
-                ${isSel ? '✓ ' : ''}${b}
+                ${isSel ? '<span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">check</span> ' : ''}${b}
               </button>
             `;
           }).join('')}
@@ -4565,7 +4862,7 @@ class AppController {
         ${filtered.length === 0 ? `
           <!-- Empty State matching Screenshot 5 -->
           <div style="padding:70px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
-            <div style="font-size:44px;">🔍</div>
+            <span class="material-symbols-rounded" style="font-size:44px; color:#94A3B8;">search</span>
             <div style="font-size:16px; font-weight:800; color:#0F172A;">
               ${allStudents.length === 0 ? 'No students registered yet' : 'No students found matching filters'}
             </div>
@@ -4587,10 +4884,10 @@ class AppController {
 
                 <div style="display:flex; align-items:center; gap:8px;">
                   <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; font-size:16px;">
-                    ✉️
+                    <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
                   </button>
                   <button class="apk-icon-action-btn" title="Delete Account" data-delete-student="${st.id}" style="color:#EF4444; font-size:16px;">
-                    🗑️
+                    <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
                   </button>
                 </div>
               </div>
@@ -4642,7 +4939,7 @@ class AppController {
       <div class="apk-screen-appbar">
         <div class="apk-appbar-left">
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
-            <span>📢</span> Push Broadcaster & Telegram
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#0284C7;">campaign</span> Push Broadcaster & Telegram
           </div>
         </div>
       </div>
@@ -4650,7 +4947,7 @@ class AppController {
       <div style="padding:16px 16px 90px;">
         <div class="hero-card" style="padding:16px;">
           <div class="form-label">Announcement Title:</div>
-          <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. 🔴 Paper 04 Live Exam Started!" />
+          <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. Paper 04 Live Exam Started!" />
 
           <div class="form-label">Notification Message Body:</div>
           <textarea id="bc-body" class="form-textarea" rows="3" style="margin-bottom:10px;" placeholder="Enter message to broadcast to all student home screens & Telegram..."></textarea>
@@ -4662,13 +4959,13 @@ class AppController {
             <option value="2027 A/L">2027 A/L Batch Only</option>
           </select>
 
-          <button class="apk-btn-primary" id="btn-send-broadcast" style="width:100%; padding:14px; font-size:14px;">
-            🚀 Send Instant Broadcast
+          <button class="apk-btn-primary" id="btn-send-broadcast" style="width:100%; padding:14px; font-size:14px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">send</span> Send Instant Broadcast
           </button>
         </div>
 
-        <div style="font-size:13.5px; font-weight:800; color:#0F172A; margin:18px 0 10px;">
-          📜 Recent Broadcasts Sent:
+        <div style="font-size:13.5px; font-weight:800; color:#0F172A; margin:18px 0 10px; display:flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:18px; color:#64748B;">history</span> Recent Broadcasts Sent:
         </div>
 
         <div style="display:flex; flex-direction:column; gap:8px;">
@@ -4704,7 +5001,7 @@ class AppController {
       notificationService.playChime();
       notificationService.showInAppBanner(title, body, 'info');
 
-      alert('🚀 Broadcast successfully dispatched to all student devices via Web Push and Telegram!');
+      alert('Broadcast successfully dispatched to all student devices via Web Push and Telegram!');
       this.renderAdminBroadcastsScreen(container);
     });
   }
@@ -4726,20 +5023,24 @@ class AppController {
         <div class="modal-sheet" style="max-height:90vh; overflow-y:auto; padding:18px;">
           <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
             <div style="display:flex; align-items:center; gap:10px;">
-              <div style="width:38px; height:38px; border-radius:12px; background:rgba(16, 185, 129, 0.12); display:flex; align-items:center; justify-content:center; font-size:20px; color:#10B981;">⚛️</div>
+              <div style="width:38px; height:38px; border-radius:12px; background:rgba(16, 185, 129, 0.12); display:flex; align-items:center; justify-content:center; color:#10B981;">
+                <span class="material-symbols-rounded" style="font-size:22px;">science</span>
+              </div>
               <div>
                 <div style="font-size:16px; font-weight:800; color:#0F172A;">Daily Physics Insight Manager</div>
                 <div style="font-size:11px; color:#64748B;">Control formula rotation & custom pinned concepts for students</div>
               </div>
             </div>
-            <button class="modal-close-btn" id="btn-close-insight-modal">✕</button>
+            <button class="modal-close-btn" id="btn-close-insight-modal">
+              <span class="material-symbols-rounded">close</span>
+            </button>
           </div>
 
           <!-- Mode Toggle Cards (1:1 with Flutter _isCustomMode) -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
             <div id="btn-mode-random" style="border:2px solid ${!isCustom ? '#10B981' : '#E2E8F0'}; background:${!isCustom ? '#ECFDF5' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s;">
               <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:16px;">🔄</span>
+                <span class="material-symbols-rounded" style="font-size:18px; color:${!isCustom ? '#065F46' : '#475569'};">sync</span>
                 <span style="font-size:12.5px; font-weight:700; color:${!isCustom ? '#065F46' : '#475569'};">Random Mode</span>
               </div>
               <div style="font-size:10.5px; color:${!isCustom ? '#047857' : '#94A3B8'}; margin-top:4px; line-height:1.35;">Auto-rotates daily across 10 official A/L formula presets.</div>
@@ -4747,7 +5048,7 @@ class AppController {
 
             <div id="btn-mode-custom" style="border:2px solid ${isCustom ? '#2563EB' : '#E2E8F0'}; background:${isCustom ? '#EFF6FF' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s;">
               <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:16px;">📌</span>
+                <span class="material-symbols-rounded" style="font-size:18px; color:${isCustom ? '#1E40AF' : '#475569'};">push_pin</span>
                 <span style="font-size:12.5px; font-weight:700; color:${isCustom ? '#1E40AF' : '#475569'};">Custom Pinned</span>
               </div>
               <div style="font-size:10.5px; color:${isCustom ? '#1D4ED8' : '#94A3B8'}; margin-top:4px; line-height:1.35;">Pin a specific formula, concept, or exam tip for all students.</div>
@@ -4758,7 +5059,9 @@ class AppController {
             <!-- Preset Selector (lines 89-102 of Flutter) -->
             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px; margin-bottom:14px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span style="font-size:11.5px; font-weight:700; color:#334155;">⚡ Preload From Curated Presets:</span>
+                <span style="font-size:11.5px; font-weight:700; color:#334155; display:inline-flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">flash_on</span> Preload From Curated Presets:
+                </span>
                 <span style="font-size:10px; color:#64748B;">10 Official Presets</span>
               </div>
               <select id="preset-select" class="form-textarea" style="height:38px; padding:6px 10px; font-size:12px;">
@@ -4810,7 +5113,7 @@ class AppController {
             </div>
           ` : `
             <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px; margin-bottom:14px; display:flex; align-items:flex-start; gap:10px;">
-              <span style="font-size:22px;">🔄</span>
+              <span class="material-symbols-rounded" style="font-size:22px; color:#166534;">sync</span>
               <div>
                 <div style="font-size:13px; font-weight:700; color:#166534;">Daily Random Mode is Currently Active</div>
                 <div style="font-size:11px; color:#15803D; margin-top:3px; line-height:1.4;">
@@ -4823,17 +5126,19 @@ class AppController {
           <!-- Live Preview Card (Matching Student Cockpit 1:1) -->
           <div style="margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <span style="font-size:11.5px; font-weight:700; color:#475569;">👁️ Live Student Cockpit Preview:</span>
+              <span style="font-size:11.5px; font-weight:700; color:#475569; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:16px;">visibility</span> Live Student Cockpit Preview:
+              </span>
               <span style="font-size:10px; color:#10B981; font-weight:700;">● Pixel-Perfect 1:1</span>
             </div>
 
             <div class="insight-vault-card" id="ins-preview-card" style="margin:0; box-shadow:0 4px 16px rgba(15,23,42,0.06);">
               <div class="vault-top">
                 <div class="vault-pill">
-                  <span>⚛️</span>
+                  <span class="material-symbols-rounded" style="font-size:14px;">science</span>
                   <span>PHYSICS MICRO-INSIGHT</span>
                 </div>
-                <span class="vault-tag-pill">${isCustom ? '📌 Custom Pinned' : 'අද දවසේ සූත්‍රය • Daily'}</span>
+                <span class="vault-tag-pill">${isCustom ? '<span class="material-symbols-rounded" style="font-size:12px; vertical-align:middle;">push_pin</span> Custom Pinned' : 'අද දවසේ සූත්‍රය • Daily'}</span>
               </div>
               <div class="vault-topic-meta" id="prev-unit">${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'} • ${current.unitEnglish || 'Mechanics'}</div>
               <div class="vault-concept-name" id="prev-title">
@@ -4844,7 +5149,7 @@ class AppController {
               </div>
               <div class="vault-exam-tip-box">
                 <div class="tip-header">
-                  <span>💡</span>
+                  <span class="material-symbols-rounded filled" style="font-size:16px; color:#D97706;">lightbulb</span>
                   <span>විභාග උපදෙස (Exam Tip):</span>
                 </div>
                 <div class="tip-sinhala" id="prev-tip-si">
@@ -4860,15 +5165,15 @@ class AppController {
           <!-- Action Buttons Row -->
           <div style="display:flex; gap:10px;">
             ${isCustom ? `
-              <button class="apk-paper-btn-secondary" id="btn-revert-random" style="flex:1; border-color:#EF4444; color:#EF4444; height:44px;">
-                <span>🔄 Revert to Random</span>
+              <button class="apk-paper-btn-secondary" id="btn-revert-random" style="flex:1; border-color:#EF4444; color:#EF4444; height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                <span class="material-symbols-rounded" style="font-size:16px;">sync</span> Revert to Random
               </button>
-              <button class="primary-btn" id="btn-save-custom-insight" style="flex:2; height:44px; margin-top:0;">
-                <span>💾 Save & Pin to Students</span>
+              <button class="primary-btn" id="btn-save-custom-insight" style="flex:2; height:44px; margin-top:0; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                <span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students
               </button>
             ` : `
-              <button class="apk-paper-btn-secondary" id="btn-switch-custom-mode" style="flex:1; border-color:#2563EB; color:#2563EB; height:44px;">
-                <span>✏️ Switch to Custom Pinned Mode</span>
+              <button class="apk-paper-btn-secondary" id="btn-switch-custom-mode" style="flex:1; border-color:#2563EB; color:#2563EB; height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                <span class="material-symbols-rounded" style="font-size:16px;">edit</span> Switch to Custom Pinned Mode
               </button>
             `}
           </div>
@@ -4945,7 +5250,7 @@ class AppController {
         const titleSi = document.getElementById('ins-title-si')?.value.trim();
         const formula = document.getElementById('ins-formula')?.value.trim();
         if (!titleSi || !formula) {
-          notificationService.showInAppToast('⚠️ කරුණාකර මාතෘකාව සහ සූත්‍රය ඇතුළත් කරන්න (Please fill title and formula)', 'warning');
+          notificationService.showInAppToast('කරුණාකර මාතෘකාව සහ සූත්‍රය ඇතුළත් කරන්න (Please fill title and formula)', 'warning');
           return;
         }
 
@@ -4966,11 +5271,11 @@ class AppController {
 
         try {
           await dbService.saveCustomPhysicsInsight(data, this.currentUser?.name || 'Admin');
-          notificationService.showInAppToast('✅ Daily Physics Insight successfully pinned to all students!', 'success');
+          notificationService.showInAppToast('Daily Physics Insight successfully pinned to all students!', 'success');
           modal.remove();
         } catch (e) {
-          notificationService.showInAppToast('❌ Save error: ' + e.message, 'error');
-          btn.innerText = '💾 Save & Pin to Students';
+          notificationService.showInAppToast('Save error: ' + e.message, 'error');
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students';
           btn.disabled = false;
         }
       });
@@ -4979,10 +5284,10 @@ class AppController {
       document.getElementById('btn-revert-random')?.addEventListener('click', async () => {
         try {
           await dbService.setRandomPhysicsInsightMode(this.currentUser?.name || 'Admin');
-          notificationService.showInAppToast('✅ Successfully reverted to Automatic Daily Random Mode', 'success');
+          notificationService.showInAppToast('Successfully reverted to Automatic Daily Random Mode', 'success');
           modal.remove();
         } catch (e) {
-          notificationService.showInAppToast('❌ Revert error: ' + e.message, 'error');
+          notificationService.showInAppToast('Revert error: ' + e.message, 'error');
         }
       });
     };
@@ -5015,13 +5320,17 @@ class AppController {
         <div class="modal-sheet" style="max-height:88vh; overflow-y:auto; padding:18px;">
           <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
             <div style="display:flex; align-items:center; gap:10px;">
-              <div style="width:38px; height:38px; border-radius:12px; background:rgba(139, 92, 246, 0.12); display:flex; align-items:center; justify-content:center; font-size:20px; color:#8B5CF6;">⏱️</div>
+              <div style="width:38px; height:38px; border-radius:12px; background:rgba(139, 92, 246, 0.12); display:flex; align-items:center; justify-content:center; color:#8B5CF6;">
+                <span class="material-symbols-rounded" style="font-size:20px;">timer</span>
+              </div>
               <div>
                 <div style="font-size:16px; font-weight:800; color:#0F172A;">G.C.E. A/L Examination Countdowns</div>
                 <div style="font-size:11px; color:#64748B;">Target dates & dashboard countdown timer visibility</div>
               </div>
             </div>
-            <button class="modal-close-btn" id="btn-close-countdown">✕</button>
+            <button class="modal-close-btn" id="btn-close-countdown">
+              <span class="material-symbols-rounded">close</span>
+            </button>
           </div>
 
           <div style="display:flex; flex-direction:column; gap:12px;" id="countdowns-list-container">
@@ -5036,7 +5345,9 @@ class AppController {
                         <span style="font-size:13px; font-weight:800; color:#4338CA; background:#EEF2FF; padding:3px 10px; border-radius:8px; border:1px solid #C7D2FE;">${c.examYear}</span>
                         <span style="font-size:13px; font-weight:700; color:#1E293B;">${c.customTitle}</span>
                       </div>
-                      <div style="font-size:11px; color:#64748B; margin-top:4px;">🎯 Target: <strong>${dateFormatted}</strong></div>
+                      <div style="font-size:11px; color:#64748B; margin-top:4px; display:flex; align-items:center; gap:4px;">
+                        <span class="material-symbols-rounded" style="font-size:14px; color:#4338CA;">track_changes</span> Target: <strong>${dateFormatted}</strong>
+                      </div>
                     </div>
 
                     <!-- Visibility Toggle (lines 60-70 of Flutter screen) -->
@@ -5069,8 +5380,8 @@ class AppController {
                   <!-- Action Bar -->
                   <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F1F5F9; padding-top:8px;">
                     <div style="font-size:10.5px; color:#94A3B8;">${c.notes || 'Official countdown active for students'}</div>
-                    <button class="apk-paper-btn-secondary" data-edit-date="${c.id}" style="padding:4px 10px; font-size:11px; height:30px; border-color:#8B5CF6; color:#8B5CF6;">
-                      📅 Edit Date & Time
+                    <button class="apk-paper-btn-secondary" data-edit-date="${c.id}" style="padding:4px 10px; font-size:11px; height:30px; border-color:#8B5CF6; color:#8B5CF6; display:inline-flex; align-items:center; gap:4px;">
+                      <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span> Edit Date & Time
                     </button>
                   </div>
 
@@ -5089,8 +5400,8 @@ class AppController {
 
           <!-- Add New Countdown Button / Form -->
           <div style="margin-top:16px; border-top:1px solid #E2E8F0; padding-top:14px;">
-            <button class="apk-paper-btn-secondary" id="btn-toggle-add-cd" style="width:100%; border-color:#8B5CF6; color:#8B5CF6; height:40px; font-weight:700;">
-              ➕ Add New Batch Examination Countdown
+            <button class="apk-paper-btn-secondary" id="btn-toggle-add-cd" style="width:100%; border-color:#8B5CF6; color:#8B5CF6; height:40px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">add</span> Add New Batch Examination Countdown
             </button>
             <div id="add-cd-box" style="display:none; margin-top:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
               <div style="font-size:12px; font-weight:700; color:#1E293B; margin-bottom:8px;">Create New Batch Target:</div>
@@ -5129,11 +5440,11 @@ class AppController {
           try {
             btn.innerText = 'Saving...';
             await dbService.updateExamCountdown(id, { targetDate: new Date(val).toISOString() }, this.currentUser?.name || 'Admin');
-            notificationService.showInAppToast('✅ Examination target date successfully updated!', 'success');
+            notificationService.showInAppToast('Examination target date successfully updated!', 'success');
             countdowns = await dbService.getExamCountdowns();
             renderCountdownsList();
           } catch (e) {
-            notificationService.showInAppToast('❌ Update error: ' + e.message, 'error');
+            notificationService.showInAppToast('Update error: ' + e.message, 'error');
             btn.innerText = 'Save';
           }
         });
@@ -5145,11 +5456,11 @@ class AppController {
           const id = chk.dataset.toggleCd;
           try {
             await dbService.updateExamCountdown(id, { isEnabled: chk.checked }, this.currentUser?.name || 'Admin');
-            notificationService.showInAppToast(`✅ ${chk.checked ? 'Enabled' : 'Hidden'} countdown on student dashboard!`, 'info');
+            notificationService.showInAppToast(`${chk.checked ? 'Enabled' : 'Hidden'} countdown on student dashboard!`, 'info');
             const target = countdowns.find(x => x.id === id);
             if (target) target.isEnabled = chk.checked;
           } catch (e) {
-            notificationService.showInAppToast('❌ Visibility error: ' + e.message, 'error');
+            notificationService.showInAppToast('Visibility error: ' + e.message, 'error');
           }
         });
       });
@@ -5167,7 +5478,7 @@ class AppController {
         const title = document.getElementById('new-cd-title')?.value.trim();
 
         if (!year || !dateVal) {
-          notificationService.showInAppToast('⚠️ Please provide exam year and target date!', 'warning');
+          notificationService.showInAppToast('Please provide exam year and target date!', 'warning');
           return;
         }
 
@@ -5178,11 +5489,11 @@ class AppController {
             targetDate: new Date(dateVal).toISOString(),
             isEnabled: true
           }, this.currentUser?.name || 'Admin');
-          notificationService.showInAppToast('✅ New examination countdown created!', 'success');
+          notificationService.showInAppToast('New examination countdown created!', 'success');
           countdowns = await dbService.getExamCountdowns();
           renderCountdownsList();
         } catch (e) {
-          notificationService.showInAppToast('❌ Add error: ' + e.message, 'error');
+          notificationService.showInAppToast('Add error: ' + e.message, 'error');
         }
       });
     };
@@ -5216,19 +5527,25 @@ class AppController {
       <div class="modal-sheet" style="max-height:88vh; overflow-y:auto; padding:18px;">
         <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
           <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:38px; height:38px; border-radius:12px; background:rgba(37,99,235,0.1); display:flex; align-items:center; justify-content:center; font-size:20px; color:#2563EB;">📖</div>
+            <div style="width:38px; height:38px; border-radius:12px; background:rgba(37,99,235,0.1); display:flex; align-items:center; justify-content:center; color:#2563EB;">
+              <span class="material-symbols-rounded" style="font-size:20px;">menu_book</span>
+            </div>
             <div>
               <div style="font-size:16px; font-weight:800; color:#0F172A;">Dessert Submission Guidelines</div>
               <div style="font-size:11px; color:#64748B;">How to submit homework & answer sheets for grading</div>
             </div>
           </div>
-          <button class="modal-close-btn" id="btn-close-guide-modal">✕</button>
+          <button class="modal-close-btn" id="btn-close-guide-modal">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:14px;">
           <!-- Key Requirements Banner -->
           <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:14px;">
-            <div style="font-size:13px; font-weight:800; color:#1E40AF; margin-bottom:6px;">📋 අවශ්‍ය මූලික නීති (Essential Rules):</div>
+            <div style="font-size:13px; font-weight:800; color:#1E40AF; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded filled" style="font-size:16px;">assignment</span> අවශ්‍ය මූලික නීති (Essential Rules):
+            </div>
             <ul style="font-size:11.5px; color:#1E3A8A; line-height:1.6; padding-left:18px; margin:0;">
               <li><strong>පැහැදිලි ඡායාරූප (Good Lighting):</strong> ප්‍රමාණවත් ආලෝකය ඇති ස්ථානයක පත්‍රිකාව තබා සෘජුව (Portrait) ඡායාරූප ගන්න.</li>
               <li><strong>පිටු අංක (Page Numbers):</strong> සෑම පිටුවකම ඉහළින් පැහැදිලිව පිටු අංකය (Page 1, 2, 3...) සටහන් කරන්න.</li>
@@ -5239,7 +5556,9 @@ class AppController {
 
           <!-- Quick Topic Tags -->
           <div>
-            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px;">🏷️ Popular Physics Submission Units:</div>
+            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px; display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:15px;">label</span> Popular Physics Submission Units:
+            </div>
             <div style="display:flex; flex-wrap:wrap; gap:8px;">
               <span class="apk-filter-chip">Mechanics</span>
               <span class="apk-filter-chip">Waves & Optics</span>
@@ -5253,7 +5572,7 @@ class AppController {
           <!-- Telegram Bot Integration Card -->
           <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-              <span style="font-size:18px;">🤖</span>
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:#166534;">smart_toy</span>
               <span style="font-size:13px; font-weight:800; color:#166534;">Official Telegram Grading Bot</span>
             </div>
             <div style="font-size:11.5px; color:#15803D; line-height:1.45;">
@@ -5262,8 +5581,8 @@ class AppController {
           </div>
 
           <!-- Proceed Button -->
-          <button class="primary-btn" id="btn-proceed-to-scanner" style="height:44px; margin-top:4px;">
-            <span>📸 Open Document Camera Scanner</span>
+          <button class="primary-btn" id="btn-proceed-to-scanner" style="height:44px; margin-top:4px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">document_scanner</span> Open Document Camera Scanner
           </button>
         </div>
       </div>
@@ -5287,7 +5606,9 @@ class AppController {
       <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
         <div class="modal-header">
           <div style="font-size:16px; font-weight:800; color:#0F172A;">Create Paper Session</div>
-          <button class="modal-close-btn" id="btn-close-new-paper">✕</button>
+          <button class="modal-close-btn" id="btn-close-new-paper">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
@@ -5330,14 +5651,16 @@ class AppController {
 
           <!-- Physical Paper Delivery Note matching Flutter -->
           <div style="background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.2); border-radius:10px; padding:10px; display:flex; gap:8px;">
-            <span style="font-size:18px;">📦</span>
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB;">inventory_2</span>
             <div style="font-size:10.5px; color:#1E3A8A; line-height:1.45;">
               <strong>Physical Paper Delivery:</strong> සිසුන්ගේ නිවෙස් වලට කුරියර් කර ඇති මුද්‍රිත ප්‍රශ්න පත්‍රය කැමරාව ඉදිරියේ විවෘත කිරීමට ප්‍රථම විනාඩි 10 ක කාලයක් ස්වයංක්‍රීයව හිමිවේ.
             </div>
           </div>
 
           <div>
-            <div class="form-label">📅 Examination Date:</div>
+            <div class="form-label" style="display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:15px;">calendar_today</span> Examination Date:
+            </div>
             <input type="date" id="new-paper-date" class="form-textarea" style="height:40px;" value="${today}" />
           </div>
 
@@ -5357,7 +5680,9 @@ class AppController {
 
           <!-- Slot Times Container -->
           <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
-            <div style="font-size:11.5px; font-weight:700; color:#D97706; margin-bottom:6px;">☀️ Slot 1 (Morning Session):</div>
+            <div style="font-size:11.5px; font-weight:700; color:#D97706; margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded filled" style="font-size:15px; color:#D97706;">wb_sunny</span> Slot 1 (Morning Session):
+            </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
               <div>
                 <span style="font-size:10.5px; color:#64748B;">Start:</span>
@@ -5370,7 +5695,9 @@ class AppController {
             </div>
 
             <div id="new-slot2-box" style="margin-top:10px;">
-              <div style="font-size:11.5px; font-weight:700; color:#2563EB; margin-bottom:6px;">🌙 Slot 2 (Evening Session):</div>
+              <div style="font-size:11.5px; font-weight:700; color:#2563EB; margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded filled" style="font-size:15px; color:#2563EB;">bedtime</span> Slot 2 (Evening Session):
+              </div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <div>
                   <span style="font-size:10.5px; color:#64748B;">Start:</span>
@@ -5386,7 +5713,7 @@ class AppController {
 
           <!-- Manual Session End Note matching Flutter -->
           <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:10px; display:flex; gap:8px;">
-            <span style="font-size:16px; color:#D97706;">🛑</span>
+            <span class="material-symbols-rounded filled" style="font-size:18px; color:#D97706;">cancel</span>
             <div style="font-size:10.5px; color:#92400E; line-height:1.45;">
               <strong>Manual Session End:</strong> විභාග සැසිය ස්වයංක්‍රීයව අවසන් නොවේ. විභාගය අවසන් වූ පසු Admin විසින් "End Session" බොත්තම ඔබා එය අවසන් කළ යුතුය.
             </div>
@@ -5493,7 +5820,7 @@ class AppController {
         slot2
       });
 
-      notificationService.showInAppBanner('Paper Created! 📋', '✅ Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
+      notificationService.showInAppBanner('Paper Created!', 'Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
       modal.remove();
       const vp = document.getElementById('admin-main-viewport');
       if (vp) this.renderAdminPapersScreen(vp);
@@ -5513,7 +5840,7 @@ class AppController {
       questionsCount: 5
     });
 
-    notificationService.showInAppBanner('Sprint Created! ⚡', `${title} scheduled for ${this.adminSprintDate}.`, 'success');
+    notificationService.showInAppBanner('Sprint Created!', `${title} scheduled for ${this.adminSprintDate}.`, 'success');
     const vp = document.getElementById('admin-main-viewport');
     if (vp) this.renderAdminSprintsScreen(vp);
   }
@@ -5530,7 +5857,9 @@ class AppController {
             <div style="font-size:15px; font-weight:800; color:#0F172A;">Send Custom Message</div>
             <div style="font-size:11.5px; color:#64748B;">To: ${student.name} (${student.phone})</div>
           </div>
-          <button class="modal-close-btn" id="btn-close-msg-dialog">✕</button>
+          <button class="modal-close-btn" id="btn-close-msg-dialog">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
@@ -5544,8 +5873,8 @@ class AppController {
             <textarea id="cust-msg-body" class="form-textarea" rows="3" placeholder="Type instructions or feedback here..."></textarea>
           </div>
 
-          <button class="apk-btn-primary" id="btn-send-cust-msg" style="padding:12px;">
-            📨 Send to Student via Telegram
+          <button class="apk-btn-primary" id="btn-send-cust-msg" style="padding:12px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">send</span> Send to Student via Telegram
           </button>
         </div>
       </div>
@@ -5563,7 +5892,7 @@ class AppController {
         return;
       }
 
-      notificationService.showInAppBanner('Message Delivered! 📨', `Delivered to ${student.name} on Telegram.`, 'success');
+      notificationService.showInAppBanner('Message Delivered!', `Delivered to ${student.name} on Telegram.`, 'success');
       modal.remove();
     });
   }
@@ -5574,7 +5903,7 @@ class AppController {
     }
 
     dbService.deleteStudent(student.id);
-    notificationService.showInAppBanner('Account Purged 🗑️', `All data for ${student.name} removed.`, 'warning');
+    notificationService.showInAppBanner('Account Purged', `All data for ${student.name} removed.`, 'warning');
     const vp = document.getElementById('admin-main-viewport');
     if (vp) this.renderAdminStudentsScreen(vp);
   }
@@ -5632,28 +5961,28 @@ class AppController {
 
       const phase = session.currentPhase || 'waiting';
       let phaseColor = '#818CF8';
-      let phaseLabel = '⏳ Waiting Room (Students Waiting)';
+      let phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Waiting Room (Students Waiting)';
 
       switch (phase) {
         case 'package_opening':
           phaseColor = '#F59E0B';
-          phaseLabel = '📦 Package Opening (10 Mins Active)';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">inventory_2</span>Package Opening (10 Mins Active)';
           break;
         case 'writing':
           phaseColor = '#22C55E';
-          phaseLabel = '✍️ Exam Writing In Progress';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">edit_note</span>Exam Writing In Progress';
           break;
         case 'time_up':
           phaseColor = '#EA580C';
-          phaseLabel = '⏰ Time is Up (Collecting Answers)';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">alarm</span>Time is Up (Collecting Answers)';
           break;
         case 'ended':
           phaseColor = '#EF4444';
-          phaseLabel = '🛑 Session Ended';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">cancel</span>Session Ended';
           break;
         default:
           phaseColor = '#818CF8';
-          phaseLabel = '⏳ Waiting Room (Students Waiting)';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Waiting Room (Students Waiting)';
           break;
       }
 
@@ -5678,21 +6007,21 @@ class AppController {
               <div style="display:flex; align-items:center; gap:6px;">
                 ${!isEnded ? `
                   <button id="btn-proctor-time-up" style="background:${isTimeUp ? '#EA580C' : '#F59E0B'}; color:#000000; border:none; padding:5px 8px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
-                    <span>⏰</span> ${isTimeUp ? 'Time Up (Sent)' : 'Time Up'}
+                    <span class="material-symbols-rounded filled" style="font-size:14px;">alarm</span> ${isTimeUp ? 'Time Up (Sent)' : 'Time Up'}
                   </button>
                   <button id="btn-proctor-end-session" style="background:#EF4444; color:#FFFFFF; border:none; padding:5px 8px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
-                    <span>🛑</span> End Session
+                    <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                   </button>
                 ` : `
                   <div style="padding:4px 8px; border-radius:6px; background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px;">
-                    <span>✓</span> Ended
+                    <span class="material-symbols-rounded" style="font-size:14px;">check</span> Ended
                   </div>
                 `}
-                <button id="btn-proctor-broadcast" title="Broadcast Announcement to All Students" style="background:transparent; border:none; color:#F59E0B; font-size:18px; cursor:pointer; padding:4px;">
-                  📢
+                <button id="btn-proctor-broadcast" title="Broadcast Announcement to All Students" style="background:transparent; border:none; color:#F59E0B; cursor:pointer; padding:4px; display:flex; align-items:center;">
+                  <span class="material-symbols-rounded filled" style="font-size:20px; color:#F59E0B;">campaign</span>
                 </button>
-                <button id="btn-close-proctor-hall" title="Exit Hall" style="background:transparent; border:none; color:#94A3B8; font-size:16px; cursor:pointer; padding:4px 6px;">
-                  ✕
+                <button id="btn-close-proctor-hall" title="Exit Hall" style="background:transparent; border:none; color:#94A3B8; cursor:pointer; padding:4px 6px; display:inline-flex; align-items:center; justify-content:center;">
+                  <span class="material-symbols-rounded">close</span>
                 </button>
               </div>
             </div>
@@ -5700,13 +6029,13 @@ class AppController {
             <!-- TabBar: Slot 1, Slot 2, Answers (Count) -->
             <div style="display:flex; border-bottom:1px solid #334155;">
               <button class="proctor-tab-btn" data-tab="slot1" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'slot1' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'slot1' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <span>☀️</span> ${session.slot2 ? 'Slot 1' : 'Slot 1 (Live)'}
+                <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">wb_sunny</span> ${session.slot2 ? 'Slot 1' : 'Slot 1 (Live)'}
               </button>
               <button class="proctor-tab-btn" data-tab="slot2" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'slot2' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'slot2' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <span>🌙</span> ${session.slot2 ? 'Slot 2' : 'Slot 2 (None)'}
+                <span class="material-symbols-rounded filled" style="font-size:15px; color:#818CF8;">bedtime</span> ${session.slot2 ? 'Slot 2' : 'Slot 2 (None)'}
               </button>
               <button class="proctor-tab-btn" data-tab="answers" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'answers' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'answers' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <span style="color:#4ADE80;">✅</span> Answers (${submittedStudents.length})
+                <span class="material-symbols-rounded filled" style="font-size:15px; color:#4ADE80;">check_circle</span> Answers (${submittedStudents.length})
               </button>
             </div>
           </div>
@@ -5724,38 +6053,38 @@ class AppController {
             <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
               ${phase === 'waiting' ? `
                 <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>📦</span> Start Package Opening (10m)
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (10m)
                 </button>
                 <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #22C55E; color:#22C55E; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>▶</span> Start Writing Direct
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">play_arrow</span> Start Writing Direct
                 </button>
               ` : phase === 'package_opening' ? `
                 <button class="phase-action-btn" data-set-phase="writing" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>✍️</span> Start Exam Writing (ලිවීම අරඹන්න)
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">edit_note</span> Start Exam Writing (ලිවීම අරඹන්න)
                 </button>
                 <button class="phase-action-btn" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>🔄</span> Restart 10m Timer
+                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Restart 10m Timer
                 </button>
                 <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>🛑</span> End Session
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                 </button>
               ` : phase === 'writing' ? `
                 <button class="phase-action-btn" data-trigger-time-up="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>⏰</span> Trigger Time Up (වේලාව අවසන්)
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">alarm</span> Trigger Time Up (වේලාව අවසන්)
                 </button>
                 <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>🛑</span> End Session
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                 </button>
               ` : phase === 'time_up' ? `
                 <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>🛑</span> End Session (සැසිය අවසන් කරන්න)
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session (සැසිය අවසන් කරන්න)
                 </button>
                 <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #38BDF8; color:#38BDF8; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>🔄</span> Resume Writing
+                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Resume Writing
                 </button>
               ` : `
                 <button class="phase-action-btn" data-set-phase="writing" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span>🔄</span> Reopen Session (නැවත අරඹන්න)
+                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Reopen Session (නැවත අරඹන්න)
                 </button>
               `}
             </div>
@@ -5767,8 +6096,8 @@ class AppController {
               <!-- Answers Section (_buildSubmittedAnswersSection) -->
               <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:10px;">
-                  <div style="padding:8px; background:rgba(34,197,94,0.2); border-radius:10px; color:#4ADE80; font-size:18px;">
-                    📝
+                  <div style="padding:8px; background:rgba(34,197,94,0.2); border-radius:10px; color:#4ADE80; display:flex; align-items:center; justify-content:center;">
+                    <span class="material-symbols-rounded filled" style="font-size:20px;">description</span>
                   </div>
                   <div>
                     <div style="font-size:12.5px; font-weight:700; color:#FFFFFF;">Submitted Answer Sheets (ලැබුණු පිළිතුරු පත්‍ර)</div>
@@ -5784,8 +6113,8 @@ class AppController {
               <div style="flex:1; padding:16px;">
                 ${submittedStudents.length === 0 ? `
                   <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:260px; text-align:center; padding:32px;">
-                    <div style="width:70px; height:70px; border-radius:50%; background:#1E293B; border:1px solid #334155; display:flex; align-items:center; justify-content:center; font-size:32px; color:#64748B; margin-bottom:16px;">
-                      📂
+                    <div style="width:70px; height:70px; border-radius:50%; background:#1E293B; border:1px solid #334155; display:flex; align-items:center; justify-content:center; color:#64748B; margin-bottom:16px;">
+                      <span class="material-symbols-rounded" style="font-size:32px;">folder_open</span>
                     </div>
                     <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">තවමත් පිළිතුරු පත්‍ර ලැබී නොමැත</div>
                     <div style="font-size:12px; color:#94A3B8; line-height:1.5;">සිසුන් පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කළ පසු ඒවා ශිෂ්‍ය නාමය සමඟ මෙහි සජීවීව දිස්වනු ඇත.</div>
@@ -5821,15 +6150,21 @@ class AppController {
                 </div>
                 <div style="text-align:center;">
                   <div style="font-size:15px; font-weight:700; color:#22C55E;">${liveCount}</div>
-                  <div style="font-size:10px; color:#94A3B8;">🟢 Live Cameras</div>
+                  <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
+                    <span class="material-symbols-rounded filled" style="font-size:12px; color:#22C55E;">videocam</span> Live Cameras
+                  </div>
                 </div>
                 <div style="text-align:center;">
                   <div style="font-size:15px; font-weight:700; color:#EF4444;">${inactiveCount}</div>
-                  <div style="font-size:10px; color:#94A3B8;">🔴 Inactive</div>
+                  <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
+                    <span class="material-symbols-rounded" style="font-size:12px; color:#EF4444;">videocam_off</span> Inactive
+                  </div>
                 </div>
                 <div style="text-align:center;">
                   <div style="font-size:15px; font-weight:700; color:#38BDF8;">${submittedSlotCount}</div>
-                  <div style="font-size:10px; color:#94A3B8;">✅ Submitted</div>
+                  <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
+                    <span class="material-symbols-rounded filled" style="font-size:12px; color:#38BDF8;">check_circle</span> Submitted
+                  </div>
                 </div>
               </div>
 
@@ -5860,7 +6195,7 @@ class AppController {
                               <img src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
                             ` : `
                               <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
-                                <span style="font-size:26px; color:${borderColor};">📹</span>
+                                <span class="material-symbols-rounded" style="font-size:26px; color:${borderColor};">videocam</span>
                                 <span style="font-size:10px; font-weight:500; color:${isOnline ? '#4ADE80' : '#94A3B8'};">
                                   ${isSubmitted ? 'Paper Submitted' : isCameraActive ? 'Proctor Stream Active' : 'Camera Offline'}
                                 </span>
@@ -5871,8 +6206,8 @@ class AppController {
                               ${statusBadge}
                             </div>
                             <!-- Fullscreen Icon Top Right -->
-                            <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF;">
-                              🔍
+                            <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
+                              <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
                             </div>
                           </div>
 
@@ -5916,8 +6251,10 @@ class AppController {
             <div style="font-size:11px; color:#94A3B8;">
               Connected to Session Channel: edupeak_proctor_${session.id}
             </div>
-            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer;">
-              📝 Test Student View ➔
+            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded filled" style="font-size:15px;">description</span>
+              <span>Test Student View</span>
+              <span class="material-symbols-rounded" style="font-size:14px;">arrow_forward</span>
             </button>
           </div>
         </div>
@@ -5971,7 +6308,7 @@ class AppController {
           confirmColor: '#EF4444',
           onConfirm: async () => {
             await dbService.endPaperSession(session.id);
-            notificationService.showInAppBanner('🛑 Session Ended', 'Exam session has been officially ended.', 'warning');
+            notificationService.showInAppBanner('Session Ended', 'Exam session has been officially ended.', 'warning');
           }
         });
       });
@@ -5986,28 +6323,28 @@ class AppController {
         btn.addEventListener('click', async () => {
           const targetPhase = btn.dataset.setPhase;
           await dbService.setSessionPhase(session.id, targetPhase);
-          notificationService.showInAppBanner('✅ Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
+          notificationService.showInAppBanner('Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
         });
       });
 
       modal.querySelectorAll('[data-restart-10m]').forEach(btn => {
         btn.addEventListener('click', async () => {
           await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
-          notificationService.showInAppBanner('🔄 10m Timer Restarted', 'Package opening timer reset to 10:00', 'info');
+          notificationService.showInAppBanner('10m Timer Restarted', 'Package opening timer reset to 10:00', 'info');
         });
       });
 
       modal.querySelectorAll('[data-trigger-time-up]').forEach(btn => {
         btn.addEventListener('click', async () => {
           await dbService.triggerTimeUp(session.id);
-          notificationService.showInAppBanner('⏰ Time Up Triggered', 'Time is Up alert sent!', 'info');
+          notificationService.showInAppBanner('Time Up Triggered', 'Time is Up alert sent!', 'info');
         });
       });
 
       modal.querySelectorAll('[data-end-now]').forEach(btn => {
         btn.addEventListener('click', async () => {
           await dbService.endPaperSession(session.id);
-          notificationService.showInAppBanner('🛑 Session Ended', 'Session closed.', 'warning');
+          notificationService.showInAppBanner('Session Ended', 'Session closed.', 'warning');
         });
       });
 
@@ -6085,7 +6422,7 @@ class AppController {
     dialog.innerHTML = `
       <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:400px; color:#FFFFFF; font-family:'Poppins',sans-serif;">
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-          <span style="font-size:18px;">📢</span>
+          <span class="material-symbols-rounded filled" style="font-size:20px; color:#F59E0B;">campaign</span>
           <span style="font-size:14px; font-weight:700;">Broadcast Announcement</span>
         </div>
         <div style="font-size:11px; color:#94A3B8; margin-bottom:14px;">සියලුම සිසුන්ගේ තිරය මත ක්ෂණිකව දිස්වන නිවේදනයක් යවන්න.</div>
@@ -6107,7 +6444,7 @@ class AppController {
         message: msg,
         type: 'info'
       });
-      notificationService.showInAppBanner('📢 Broadcast Sent', 'Announcement sent to all students!', 'info');
+      notificationService.showInAppBanner('Broadcast Sent', 'Announcement sent to all students!', 'info');
     };
     document.body.appendChild(dialog);
   }
@@ -6130,7 +6467,9 @@ class AppController {
             <div style="font-size:14px; font-weight:700; color:#FFFFFF;">Direct Proctor Alert (ශිෂ්‍යයාට පණිවිඩයක්)</div>
             <div style="font-size:11px; color:#94A3B8;">To: ${student.studentName} (${student.studentPhone || ''})</div>
           </div>
-          <button id="sheet-close-btn" style="background:transparent; border:none; color:#94A3B8; font-size:18px; cursor:pointer;">✕</button>
+          <button id="sheet-close-btn" style="background:transparent; border:none; color:#94A3B8; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="font-size:11px; font-weight:600; color:#CBD5E1; margin-bottom:8px;">ක්ෂණික අනතුරු ඇඟවීම් (Quick Warnings):</div>
@@ -6168,7 +6507,7 @@ class AppController {
         message: msg,
         type: 'warning'
       });
-      notificationService.showInAppBanner('✅ Alert Sent', `Alert sent to ${student.studentName}!`, 'info');
+      notificationService.showInAppBanner('Alert Sent', `Alert sent to ${student.studentName}!`, 'info');
     };
     document.body.appendChild(sheet);
   }
@@ -6186,7 +6525,9 @@ class AppController {
             <div style="font-size:14px; font-weight:700;">${student.studentName}</div>
             <div style="font-size:11px; color:#94A3B8;">${student.studentPhone || ''} • Submitted ${photos.length} Pages</div>
           </div>
-          <button id="view-ans-close" style="background:transparent; border:none; color:#94A3B8; font-size:18px; cursor:pointer;">✕</button>
+          <button id="view-ans-close" style="background:transparent; border:none; color:#94A3B8; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded">close</span>
+          </button>
         </div>
 
         <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px;">
@@ -6216,8 +6557,9 @@ class AppController {
           <div style="font-size:14px; font-weight:700; color:#FFFFFF;">${student.studentName}</div>
           <div style="font-size:11px; color:#94A3B8;">Surveillance Monitor • Slot: ${student.selectedSlot || 'slot1'}</div>
         </div>
-        <button id="fs-close-btn" style="background:#334155; border:none; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer;">
-          ✕ Exit Full View
+        <button id="fs-close-btn" style="background:#334155; border:none; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">fullscreen_exit</span>
+          <span>Exit Full View</span>
         </button>
       </div>
 
@@ -6226,7 +6568,7 @@ class AppController {
           <img src="${student.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
         ` : `
           <div style="text-align:center; color:#94A3B8;">
-            <div style="font-size:48px; margin-bottom:12px;">📹</div>
+            <span class="material-symbols-rounded" style="font-size:48px; margin-bottom:12px; color:#64748B;">videocam</span>
             <div style="font-size:14px; font-weight:600;">Active Proctoring Feed</div>
             <div style="font-size:11px;">Audio & Video Active • Real-time Monitoring</div>
           </div>
@@ -6234,8 +6576,8 @@ class AppController {
       </div>
 
       <div style="background:#1E293B; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #334155;">
-        <button id="fs-warn-btn" style="background:#EF4444; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer;">
-          ⚠️ Issue Direct Warning
+        <button id="fs-warn-btn" style="background:#EF4444; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded filled" style="font-size:15px;">warning</span> Issue Direct Warning
         </button>
         ${(student.submissionPhotos?.length || student.status === 'submitted') ? `
           <button id="fs-answers-btn" style="background:#22C55E; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer;">
@@ -6269,7 +6611,7 @@ class AppController {
       alreadySubmittedModal.innerHTML = `
         <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:24px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-            <div style="color:#22C55E; font-size:26px;">✓</div>
+            <span class="material-symbols-rounded filled" style="color:#22C55E; font-size:28px;">check_circle</span>
             <h3 style="font-size:16px; font-weight:700; color:#FFFFFF; margin:0;">Paper Already Submitted</h3>
           </div>
           <p style="font-size:13px; color:#CBD5E1; line-height:1.5; margin:0 0 20px 0;">
@@ -6386,12 +6728,12 @@ class AppController {
           b.style.background = 'rgba(34, 197, 94, 0.2)';
           b.style.border = '1px solid #22C55E';
           b.style.color = '#4ADE80';
-          b.textContent = '🟢 Online';
+          b.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:11px; vertical-align:middle; margin-right:2px;">fiber_manual_record</span>Online';
         } else {
           b.style.background = 'rgba(239, 68, 68, 0.2)';
           b.style.border = '1px solid #EF4444';
           b.style.color = '#FCA5A5';
-          b.textContent = '🔴 Offline';
+          b.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:11px; vertical-align:middle; margin-right:2px;">fiber_manual_record</span>Offline';
         }
       });
     };
@@ -6447,42 +6789,42 @@ class AppController {
       const slot = getSlot();
 
       // Top live timer pill text and colors matching Flutter
-      let timerText = '⏳ Waiting';
+      let timerText = 'Waiting';
       let timerColor = '#818CF8';
-      let timerIcon = '⏳';
+      let timerIcon = 'hourglass_top';
 
       if (times.isEnded) {
         timerText = 'Ended';
         timerColor = '#EF4444';
-        timerIcon = '✕';
+        timerIcon = 'close';
       } else if (times.isTimeUp) {
-        timerText = '⏰ Time Up';
+        timerText = 'Time Up';
         timerColor = '#EF4444';
-        timerIcon = '⏰';
+        timerIcon = 'alarm';
       } else if (times.isWaiting) {
-        timerText = '⏳ Waiting';
+        timerText = 'Waiting';
         timerColor = '#818CF8';
-        timerIcon = '⏳';
+        timerIcon = 'hourglass_top';
       } else if (times.isPackageOpening) {
         const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');
         const s = String(times.pkgSecsLeft % 60).padStart(2, '0');
-        timerText = times.pkgSecsLeft <= 0 ? '📦 00:00' : `📦 Open: ${m}:${s}`;
+        timerText = times.pkgSecsLeft <= 0 ? '00:00' : `Open: ${m}:${s}`;
         timerColor = '#F59E0B';
-        timerIcon = '📦';
+        timerIcon = 'inventory_2';
       } else if (times.isWriting) {
         if (!times.isOvertime) {
           const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
           const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
           const s = String(times.writingSecsLeft % 60).padStart(2, '0');
-          timerText = Math.floor(times.writingSecsLeft / 3600) > 0 ? `📝 ${h}:${m}:${s}` : `📝 ${m}:${s}`;
+          timerText = Math.floor(times.writingSecsLeft / 3600) > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
           timerColor = times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E';
-          timerIcon = '📝';
+          timerIcon = 'edit_note';
         } else {
           const m = String(Math.floor(times.overtimeSecs / 60)).padStart(2, '0');
           const s = String(times.overtimeSecs % 60).padStart(2, '0');
-          timerText = `⏱️ Extra: +${m}:${s}`;
+          timerText = `Extra: +${m}:${s}`;
           timerColor = '#F59E0B';
-          timerIcon = '⏱️';
+          timerIcon = 'timer';
         }
       }
 
@@ -6497,7 +6839,7 @@ class AppController {
         <div style="background:#1E293B; height:56px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0;">
           <div style="display:flex; align-items:center; gap:12px;">
             <button id="btn-appbar-back" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; display:flex; align-items:center; padding:4px;">
-              ❮
+              <span class="material-symbols-rounded">arrow_back</span>
             </button>
             <div>
               <div style="font-size:14px; font-weight:600; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px;">
@@ -6511,29 +6853,29 @@ class AppController {
           <div style="display:flex; align-items:center; gap:8px;">
             <!-- Instant Phase Switcher Bar -->
             <div style="display:flex; background:#0F172A; border:1px solid #334155; border-radius:12px; padding:2px; gap:2px;">
-              <button class="btn-phase-tab" data-phase="waiting" style="background:${times.isWaiting ? '#6366F1' : 'transparent'}; color:${times.isWaiting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
-                ⏳ Waiting Room
+              <button class="btn-phase-tab" data-phase="waiting" style="background:${times.isWaiting ? '#6366F1' : 'transparent'}; color:${times.isWaiting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
+                <span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Waiting Room
               </button>
-              <button class="btn-phase-tab" data-phase="package_opening" style="background:${times.isPackageOpening ? '#F59E0B' : 'transparent'}; color:${times.isPackageOpening ? '#000000' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
-                📦 Parcel Open (10m)
+              <button class="btn-phase-tab" data-phase="package_opening" style="background:${times.isPackageOpening ? '#F59E0B' : 'transparent'}; color:${times.isPackageOpening ? '#000000' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
+                <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; margin-right:4px;">inventory_2</span>Parcel Open (10m)
               </button>
-              <button class="btn-phase-tab" data-phase="writing" style="background:${times.isWriting ? '#22C55E' : 'transparent'}; color:${times.isWriting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
-                📝 Writing Session
+              <button class="btn-phase-tab" data-phase="writing" style="background:${times.isWriting ? '#22C55E' : 'transparent'}; color:${times.isWriting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
+                <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; margin-right:4px;">edit_note</span>Writing Session
               </button>
-              <button class="btn-phase-tab" data-phase="scanner" style="background:transparent; color:#38BDF8; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
-                📄 Answer Submission
+              <button class="btn-phase-tab" data-phase="scanner" style="background:transparent; color:#38BDF8; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
+                <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; margin-right:4px;">description</span>Answer Submission
               </button>
             </div>
 
             ${!times.isWaiting ? `
               <button id="btn-appbar-flip" title="Flip Camera" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; padding:6px; display:flex; align-items:center;">
-                🔄
+                <span class="material-symbols-rounded">flip_camera_ios</span>
               </button>
             ` : ''}
             <!-- Upgraded Live Timer Pill -->
-            <div style="background:${timerColor}38; border:1.8px solid ${timerColor}; box-shadow:0 0 10px ${timerColor}4D; border-radius:20px; padding:5px 12px; display:flex; align-items:center; gap:6px;">
-              <span style="font-size:14px;">${timerIcon}</span>
-              <span style="font-size:13.5px; font-weight:800; color:${timerColor}; letter-spacing:0.5px;">${timerText}</span>
+            <div id="live-timer-pill" style="background:${timerColor}38; border:1.8px solid ${timerColor}; box-shadow:0 0 10px ${timerColor}4D; border-radius:20px; padding:5px 12px; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded filled timer-icon" style="font-size:16px; color:${timerColor};">${timerIcon}</span>
+              <span class="timer-text" style="font-size:13.5px; font-weight:800; color:${timerColor}; letter-spacing:0.5px;">${timerText}</span>
             </div>
           </div>
         </div>
@@ -6545,8 +6887,8 @@ class AppController {
             <div style="flex:1; overflow-y:auto; padding:16px; max-width:680px; width:100%; margin:0 auto;">
               <!-- 1. Top Waiting Notice Card -->
               <div style="padding:16px; border-radius:16px; background:linear-gradient(135deg, rgba(99,102,241,0.25), #0F172A); border:1px solid rgba(99,102,241,0.4); display:flex; gap:14px; align-items:flex-start;">
-                <div style="width:44px; height:44px; border-radius:50%; background:rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:22px; color:#A5B4FC; flex-shrink:0;">
-                  ⏳
+                <div style="width:44px; height:44px; border-radius:50%; background:rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; color:#A5B4FC; flex-shrink:0;">
+                  <span class="material-symbols-rounded filled" style="font-size:24px;">hourglass_top</span>
                 </div>
                 <div>
                   <div style="font-size:14px; font-weight:700; color:#FFFFFF; margin-bottom:4px;">
@@ -6565,18 +6907,18 @@ class AppController {
               <div style="margin-top:16px; background:#1E293B; border-radius:16px; border:1px solid #334155; overflow:hidden;">
                 <div style="padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155;">
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="color:#22C55E; font-size:16px;">📹</span>
+                    <span class="material-symbols-rounded" style="color:#22C55E; font-size:18px;">videocam</span>
                     <span style="font-size:12px; font-weight:600; color:#FFFFFF;">කැමරා පූර්ව පරීක්ෂාව (Self-Check)</span>
                   </div>
                   <div class="camera-status-pill" style="padding:3px 8px; border-radius:10px; font-size:10px; font-weight:700; ${cameraActive ? 'background:rgba(34,197,94,0.2); border:1px solid #22C55E; color:#4ADE80;' : 'background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5;'}">
-                    ${cameraActive ? '🟢 Online' : '🔴 Offline'}
+                    ${cameraActive ? '<span class="material-symbols-rounded filled" style="font-size:11px; vertical-align:middle; margin-right:2px;">fiber_manual_record</span>Online' : '<span class="material-symbols-rounded filled" style="font-size:11px; vertical-align:middle; margin-right:2px;">fiber_manual_record</span>Offline'}
                   </div>
                 </div>
                 <div style="height:220px; width:100%; background:#000000; position:relative; display:flex; align-items:center; justify-content:center;">
                   <video class="proctor-video-feed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
                   ${!cameraActive ? `
                     <div style="position:absolute; display:flex; flex-direction:column; align-items:center; gap:8px; color:#94A3B8; text-align:center; padding:16px;">
-                      <div style="font-size:24px;">📷</div>
+                      <span class="material-symbols-rounded" style="font-size:32px; color:#64748B;">videocam_off</span>
                       <div style="font-size:11px;">කැමරාව ආරම්භ වෙමින් පවතී...</div>
                       <button id="btn-retry-camera" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer;">නැවත උත්සාහ කරන්න (Retry)</button>
                     </div>
@@ -6584,11 +6926,11 @@ class AppController {
                 </div>
                 <div style="padding:12px; display:flex; align-items:center; justify-content:space-between;">
                   <div style="display:flex; align-items:center; gap:6px; font-size:10.5px; color:#94A3B8;">
-                    <span style="color:#22C55E;">✓</span>
+                    <span class="material-symbols-rounded filled" style="color:#22C55E; font-size:16px;">check_circle</span>
                     <span>ඔබගේ මුහුණ සහ විභාග මේසය පැහැදිලිව පෙනෙන සේ තබන්න.</span>
                   </div>
                   <button id="btn-flip-self-check" style="background:transparent; border:none; color:#818CF8; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">
-                    🔄 Flip
+                    <span class="material-symbols-rounded" style="font-size:14px;">flip_camera_ios</span> Flip
                   </button>
                 </div>
               </div>
@@ -6596,33 +6938,41 @@ class AppController {
               <!-- 3. Exam Preparations Checklist -->
               <div style="margin-top:16px; background:#1E293B; border-radius:16px; border:1px solid #334155; padding:16px;">
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-                  <span style="color:#F59E0B; font-size:18px;">📋</span>
+                  <span class="material-symbols-rounded filled" style="color:#F59E0B; font-size:20px;">assignment</span>
                   <span style="font-size:13px; font-weight:700; color:#FFFFFF;">විභාග උපදෙස් (Exam Checklist)</span>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:12px;">
                   <div style="display:flex; gap:10px; align-items:flex-start;">
-                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(245,158,11,0.15); display:flex; align-items:center; justify-content:center; color:#F59E0B; font-size:13px; flex-shrink:0;">📦</div>
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(245,158,11,0.15); display:flex; align-items:center; justify-content:center; color:#F59E0B; flex-shrink:0;">
+                      <span class="material-symbols-rounded filled" style="font-size:15px;">inventory_2</span>
+                    </div>
                     <div>
                       <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">මුද්‍රා තැබූ ප්‍රශ්න පත්‍ර පාර්සලය මේසය මත තබාගන්න</div>
                       <div style="font-size:10px; color:#94A3B8;">පරීක්ෂක විසින් විධානය දෙන තුරු කිසිසේත්ම විවෘත නොකරන්න.</div>
                     </div>
                   </div>
                   <div style="display:flex; gap:10px; align-items:flex-start;">
-                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(56,189,248,0.15); display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:13px; flex-shrink:0;">✂️</div>
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(56,189,248,0.15); display:flex; align-items:center; justify-content:center; color:#38BDF8; flex-shrink:0;">
+                      <span class="material-symbols-rounded filled" style="font-size:15px;">content_cut</span>
+                    </div>
                     <div>
                       <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">පාර්සලය විවෘත කිරීමට කතුරක්/බ්ලේඩයක් සූදානම් කරගන්න</div>
                       <div style="font-size:10px; color:#94A3B8;">කැමරාව ඉදිරියේ පළමු මිනිත්තු 10 තුළ විවෘත කළ යුතුය.</div>
                     </div>
                   </div>
                   <div style="display:flex; gap:10px; align-items:flex-start;">
-                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(34,197,94,0.15); display:flex; align-items:center; justify-content:center; color:#22C55E; font-size:13px; flex-shrink:0;">💡</div>
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(34,197,94,0.15); display:flex; align-items:center; justify-content:center; color:#22C55E; flex-shrink:0;">
+                      <span class="material-symbols-rounded filled" style="font-size:15px;">lightbulb</span>
+                    </div>
                     <div>
                       <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">ප්‍රමාණවත් ආලෝකය සහ ස්ථාවර ආධාරකයක් භාවිතා කරන්න</div>
                       <div style="font-size:10px; color:#94A3B8;">දුරකථනය නොසෙල්වෙන සේ මේසය මත රඳවා තබන්න.</div>
                     </div>
                   </div>
                   <div style="display:flex; gap:10px; align-items:flex-start;">
-                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(165,180,252,0.15); display:flex; align-items:center; justify-content:center; color:#A5B4FC; font-size:13px; flex-shrink:0;">🔒</div>
+                    <div style="width:26px; height:26px; border-radius:50%; background:rgba(165,180,252,0.15); display:flex; align-items:center; justify-content:center; color:#A5B4FC; flex-shrink:0;">
+                      <span class="material-symbols-rounded filled" style="font-size:15px;">lock</span>
+                    </div>
                     <div>
                       <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">මෙම තිරයෙන් ඉවත් නොවන්න</div>
                       <div style="font-size:10px; color:#94A3B8;">තිරය ස්වයංක්‍රීයව ක්‍රියා විරහිත නොවන පරිදි සකසා ඇත.</div>
@@ -6634,8 +6984,8 @@ class AppController {
               <!-- 4. Pulse Status -->
               <div style="margin:20px 0; text-align:center;">
                 <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:#0F172A; border:1px solid #334155; border-radius:20px; font-size:11px; color:#94A3B8;">
-                  <span style="width:8px; height:8px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
-                  <span>📡 Examiner Connection: Active • Waiting to Start...</span>
+                  <span class="material-symbols-rounded" style="font-size:16px; color:#22C55E;">sensors</span>
+                  <span>Examiner Connection: Active • Waiting to Start...</span>
                 </div>
               </div>
             </div>
@@ -6657,12 +7007,12 @@ class AppController {
                 <div style="background:rgba(15,23,42,0.95); border:2px solid ${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'}; border-radius:16px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
                   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:10px;">
-                      <div style="width:36px; height:36px; border-radius:50%; background:${times.pkgSecsLeft <= 0 ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}; display:flex; align-items:center; justify-content:center; font-size:18px;">
-                        📦
+                      <div style="width:36px; height:36px; border-radius:50%; background:${times.pkgSecsLeft <= 0 ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}; display:flex; align-items:center; justify-content:center;">
+                        <span class="material-symbols-rounded filled" style="font-size:20px; color:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'};">inventory_2</span>
                       </div>
                       <div>
                         <div style="font-size:12px; font-weight:700; color:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'};">
-                          ${times.pkgSecsLeft <= 0 ? '⏱️ විනාඩි 10 අවසන් (Time Stopped)' : '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)'}
+                          ${times.pkgSecsLeft <= 0 ? 'විනාඩි 10 අවසන් (Time Stopped)' : 'ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)'}
                         </div>
                         <div style="font-size:10px; color:#E2E8F0;">
                           ${times.pkgSecsLeft <= 0 ? 'පරීක්ෂකවරයා විභාගය ආරම්භ කරන තෙක් රැඳී සිටින්න' : 'කැමරාව ඉදිරියේ පමණක් පාර්සලය විවෘත කරන්න'}
@@ -6674,10 +7024,10 @@ class AppController {
                     </div>
                   </div>
                   <div style="background:#1E293B; border-radius:8px; border:1px solid #334155; padding:8px 10px; font-size:10px; color:#FFFFFF; line-height:1.6;">
-                    <div>1. 🏷️ මුද්‍රා තැබූ පාර්සලය කැමරාවට පෙන්වන්න (Show sealed parcel)</div>
-                    <div>2. ✂️ කැමරාව ඉදිරියේම කපා විවෘත කරන්න (Cut open on camera)</div>
+                    <div>1. <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle;">label</span> මුද්‍රා තැබූ පාර්සලය කැමරාවට පෙන්වන්න (Show sealed parcel)</div>
+                    <div>2. <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle;">content_cut</span> කැමරාව ඉදිරියේම කපා විවෘත කරන්න (Cut open on camera)</div>
                     <div style="color:${times.pkgSecsLeft <= 0 ? '#FBBF24' : '#4ADE80'}; font-weight:${times.pkgSecsLeft <= 0 ? '700' : '400'};">
-                      3. 📄 පත්‍රය මේසය මත තබා ලිවීමට සූදානම් වන්න (Place on desk)
+                      3. <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle;">description</span> පත්‍රය මේසය මත තබා ලිවීමට සූදානම් වන්න (Place on desk)
                     </div>
                   </div>
                 </div>
@@ -6687,14 +7037,14 @@ class AppController {
                   <div style="background:rgba(15,23,42,0.92); border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; border-radius:14px; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 6px 20px rgba(0,0,0,0.5);">
                     <div style="display:flex; align-items:center; gap:8px;">
                       <span style="width:10px; height:10px; border-radius:50%; background:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; display:inline-block;"></span>
-                      <span style="font-size:11.5px; font-weight:600; color:#FFFFFF;">✍️ ලිවීම සක්‍රීයයි • ඉතිරි කාලය:</span>
+                      <span style="font-size:11.5px; font-weight:600; color:#FFFFFF; display:inline-flex; align-items:center;"><span class="material-symbols-rounded filled" style="font-size:15px; vertical-align:middle; margin-right:4px;">edit_note</span>ලිවීම සක්‍රීයයි • ඉතිරි කාලය:</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
                       <span style="font-size:16px; font-weight:800; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
                         ${String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0')}:${String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0')}:${String(times.writingSecsLeft % 60).padStart(2, '0')}
                       </span>
-                      <button id="btn-toggle-hud" style="background:rgba(255,255,255,0.12); border:none; color:#FFFFFF; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer;">
-                        ⌵
+                      <button id="btn-toggle-hud" style="background:rgba(255,255,255,0.12); border:none; color:#FFFFFF; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; display:flex; align-items:center;">
+                        <span class="material-symbols-rounded" style="font-size:18px;">expand_more</span>
                       </button>
                     </div>
                   </div>
@@ -6703,10 +7053,10 @@ class AppController {
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                       <div style="display:flex; align-items:center; gap:8px;">
                         <span style="width:10px; height:10px; border-radius:50%; background:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; box-shadow:0 0 6px ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'};"></span>
-                        <span style="font-size:11px; font-weight:700; color:#E2E8F0; letter-spacing:0.5px;">📝 පිළිතුරු ලිවීම සක්‍රීයයි (WRITING ACTIVE)</span>
+                        <span style="font-size:11px; font-weight:700; color:#E2E8F0; letter-spacing:0.5px; display:inline-flex; align-items:center;"><span class="material-symbols-rounded filled" style="font-size:15px; vertical-align:middle; margin-right:4px;">edit_note</span>පිළිතුරු ලිවීම සක්‍රීයයි (WRITING ACTIVE)</span>
                       </div>
                       <button id="btn-toggle-hud" style="background:rgba(255,255,255,0.1); border:none; color:#94A3B8; border-radius:6px; padding:3px 8px; font-size:10px; cursor:pointer; display:flex; align-items:center; gap:4px;">
-                        <span>සුළු කරන්න</span> <span>⌃</span>
+                        <span>සුළු කරන්න</span> <span class="material-symbols-rounded" style="font-size:16px;">expand_less</span>
                       </button>
                     </div>
                     <!-- Digit Tiles -->
@@ -6741,9 +7091,9 @@ class AppController {
                 <!-- Urgent Time Up Banner -->
                 <div style="background:rgba(239,68,68,0.95); border:1.5px solid rgba(255,255,255,0.4); border-radius:14px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 0 16px rgba(239,68,68,0.5);">
                   <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:24px;">⏰</span>
+                    <span class="material-symbols-rounded filled" style="font-size:24px; color:#FFFFFF;">alarm</span>
                     <div>
-                      <div style="font-size:12px; font-weight:700; color:#FFFFFF;">⏰ වේලාව අවසන් විය! (TIME IS UP)</div>
+                      <div style="font-size:12px; font-weight:700; color:#FFFFFF;">වේලාව අවසන් විය! (TIME IS UP)</div>
                       <div style="font-size:10px; color:#FEE2E2;">ලිවීම නවතා පිළිතුරු පත්‍ර Scan කර දැන්ම Submit කරන්න.</div>
                     </div>
                   </div>
@@ -6763,7 +7113,7 @@ class AppController {
               <div style="background:rgba(30,41,59,0.92); border:1px solid ${times.isTimeUp ? '#EF4444' : '#334155'}; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
                 <div style="display:flex; align-items:center; gap:10px;">
                   <div style="width:36px; height:36px; border-radius:50%; background:${times.isTimeUp ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; display:flex; align-items:center; justify-content:center; color:${times.isTimeUp ? '#EF4444' : '#4ADE80'}; font-size:18px;">
-                    ${times.isTimeUp ? '⏰' : '🛡️'}
+                    <span class="material-symbols-rounded filled" style="font-size:20px;">${times.isTimeUp ? 'alarm' : 'shield'}</span>
                   </div>
                   <div>
                     <div style="font-size:11px; font-weight:600; color:${times.isTimeUp ? '#FCA5A5' : '#FFFFFF'};">
@@ -6775,7 +7125,7 @@ class AppController {
                   </div>
                 </div>
                 <button id="btn-bottom-submit" style="background:${times.isEnded ? '#334155' : (times.isTimeUp ? '#22C55E' : '#6366F1')}; color:#FFFFFF; border:none; padding:10px 16px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                  <span>${times.isTimeUp ? '📄' : '📤'}</span>
+                  <span class="material-symbols-rounded filled" style="font-size:16px;">${times.isTimeUp ? 'description' : 'upload'}</span>
                   <span>${times.isTimeUp ? 'Scan & Submit' : 'Submit Paper'}</span>
                 </button>
               </div>
@@ -6852,8 +7202,9 @@ class AppController {
       exitModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:999999;';
       exitModal.innerHTML = `
         <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:400px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
-          <h3 style="font-size:15px; font-weight:700; color:#FFFFFF; margin:0 0 10px 0;">
-            විභාග ශාලාවෙන් පිටවීම?
+          <h3 style="font-size:15px; font-weight:700; color:#FFFFFF; margin:0 0 10px 0; display:flex; align-items:center;">
+            <span class="material-symbols-rounded filled" style="color:#EF4444; font-size:20px; vertical-align:middle; margin-right:6px;">warning</span>
+            <span>විභාග ශාලාවෙන් පිටවීම?</span>
           </h3>
           <p style="font-size:12px; color:#CBD5E1; line-height:1.5; margin:0 0 20px 0;">
             විභාග සැසිය අතරතුර පිටවීම ගුරුභවතුන්ට සටහන් වේ. ඔබට පිටවීමට අවශ්‍යද?
@@ -6930,8 +7281,8 @@ class AppController {
           <!-- Top Control Bar (_buildTopControlBar) -->
           <div style="background:rgba(15,23,42,0.9); border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; z-index:20;">
             <div style="display:flex; align-items:center; gap:10px;">
-              <button id="btn-close-scanner" style="background:transparent; border:none; color:#FFFFFF; font-size:20px; cursor:pointer;">
-                ✕
+              <button id="btn-close-scanner" style="background:transparent; border:none; color:#FFFFFF; font-size:20px; cursor:pointer; display:flex; align-items:center;">
+                <span class="material-symbols-rounded">close</span>
               </button>
               <div>
                 <div style="font-size:13.5px; font-weight:700; color:#FFFFFF;">In-App Document Scanner</div>
@@ -6963,7 +7314,7 @@ class AppController {
 
               <!-- Center Guidance Badge -->
               <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.2); border-radius:20px; padding:6px 14px; display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                <span style="color:#4ADE80; font-size:14px;">📄</span>
+                <span class="material-symbols-rounded filled" style="color:#4ADE80; font-size:16px;">description</span>
                 <span style="font-size:10px; color:#FFFFFF; font-weight:500;">A4 කඩදාසිය රාමුවට ගැලපෙන සේ තබන්න</span>
               </div>
             </div>
@@ -6982,24 +7333,26 @@ class AppController {
                 <div style="position:relative; width:52px; height:68px; border-radius:8px; border:2px solid #22C55E; overflow:hidden; flex-shrink:0; cursor:pointer;" data-preview-idx="${idx}">
                   <img src="${p.dataUrl}" style="width:100%; height:100%; object-fit:cover;" />
                   <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,0.85); font-size:9px; font-weight:800; text-align:center; color:#FFFFFF;">P.${idx + 1}</div>
-                  <button class="btn-delete-page" data-del-idx="${idx}" style="position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:#EF4444; border:none; color:#FFFFFF; font-size:9px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                  <button class="btn-delete-page" data-del-idx="${idx}" style="position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:#EF4444; border:none; color:#FFFFFF; font-size:9px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <span class="material-symbols-rounded" style="font-size:12px;">close</span>
+                  </button>
                 </div>
               `).join('')}
             </div>
 
             <!-- Optional Google Drive Link Input -->
             <div style="display:flex; align-items:center; background:#1E293B; border:1px solid #334155; border-radius:10px; padding:0 12px;">
-              <span style="font-size:14px; margin-right:8px;">📁</span>
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:#94A3B8; margin-right:8px;">folder</span>
               <input id="scanner-drive-input" type="text" placeholder="Google Drive Link (විකල්ප - Optional)" value="${driveLink}" style="flex:1; background:transparent; border:none; color:#FFFFFF; font-size:11.5px; padding:10px 0; outline:none;" />
             </div>
 
             <!-- Action Buttons: Shutter & Submit -->
             <div style="display:flex; gap:10px; align-items:center;">
               <button id="btn-shutter-snap" style="flex:1; background:#0F766E; border:none; color:#FFFFFF; padding:12px; border-radius:12px; font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <span>📸</span> <span>Snap Page (${scannedPages.length + 1})</span>
+                <span class="material-symbols-rounded filled" style="font-size:18px;">photo_camera</span> <span>Snap Page (${scannedPages.length + 1})</span>
               </button>
               <button id="btn-scanner-submit-all" style="flex:1.4; background:#22C55E; border:none; color:#FFFFFF; padding:12px; border-radius:12px; font-size:12.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
-                <span>🚀</span> <span>Submit All Answers</span>
+                <span class="material-symbols-rounded filled" style="font-size:18px;">send</span> <span>Submit All Answers</span>
               </button>
             </div>
           </div>
@@ -7074,7 +7427,9 @@ class AppController {
               <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:16px; max-width:500px; width:90%; color:#FFFFFF; font-family:'Poppins',sans-serif;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                   <span style="background:#6366F1; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">Page ${idx + 1} of ${scannedPages.length}</span>
-                  <button id="btn-close-preview" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer;">✕</button>
+                  <button id="btn-close-preview" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; display:flex; align-items:center;">
+                    <span class="material-symbols-rounded">close</span>
+                  </button>
                 </div>
                 <div style="max-height:60vh; overflow:hidden; border-radius:8px; background:#000000;">
                   <img src="${scannedPages[idx].dataUrl}" style="width:100%; height:100%; object-fit:contain;" />
@@ -7108,14 +7463,14 @@ class AppController {
           confirmModal.innerHTML = `
             <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
               <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-                <span style="color:#22C55E; font-size:24px;">☁️</span>
+                <span class="material-symbols-rounded filled" style="color:#22C55E; font-size:28px;">cloud_upload</span>
                 <h3 style="font-size:16px; font-weight:700; color:#FFFFFF; margin:0;">Submit Answer Sheets?</h3>
               </div>
               <p style="font-size:13px; color:#E2E8F0; line-height:1.5; margin:0 0 14px 0;">
                 ඔබ විසින් Scan කරන ලද පිටු ${scannedPages.length} ක් ගුරුභවතුන් වෙත භාරදීමට සූදානම්ද?
               </p>
               <div style="background:#0F172A; border:1px solid #334155; border-radius:8px; padding:10px; display:flex; align-items:center; gap:8px; margin-bottom:18px;">
-                <span style="color:#22C55E;">✓</span>
+                <span class="material-symbols-rounded filled" style="color:#22C55E; font-size:16px;">check_circle</span>
                 <span style="font-size:11px; font-weight:600; color:#4ADE80;">${scannedPages.length} Pages Verified & Ready</span>
               </div>
               <div style="display:flex; justify-content:flex-end; gap:10px;">
@@ -7167,7 +7522,7 @@ class AppController {
               scannerModal.remove();
 
               // Show success message and exit
-              alert(`🎉 පිළිතුරු පත්‍ර (${photoUrls.length} Pages) සාර්ථකව භාරදෙන ලදී!`);
+              alert(`පිළිතුරු පත්‍ර (${photoUrls.length} Pages) සාර්ථකව භාරදෙන ලදී!`);
               cleanupAndExit();
             } catch (err) {
               console.error('Submission save error:', err);
@@ -7209,7 +7564,9 @@ class AppController {
       alertModal.innerHTML = `
         <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
           <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-            <div style="background:rgba(245,158,11,0.2); padding:8px; border-radius:8px; font-size:20px; color:#F59E0B;">⚠️</div>
+            <div style="background:rgba(245,158,11,0.2); padding:8px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#F59E0B;">
+              <span class="material-symbols-rounded filled" style="font-size:22px;">warning</span>
+            </div>
             <div>
               <div style="font-size:15px; font-weight:700; color:#FFFFFF;">විභාග පරීක්ෂක පණිවිඩය</div>
               <div style="font-size:11px; color:#94A3B8;">From: ${alert.senderName || 'Faculty Proctor'}</div>
@@ -7262,50 +7619,56 @@ class AppController {
       now = new Date();
       // Only re-render header & HUD countdowns to preserve smooth 60fps video
       const times = calculateTimes();
-      let timerText = '⏳ Waiting';
+      let timerText = 'Waiting';
       let timerColor = '#818CF8';
-      let timerIcon = '⏳';
+      let timerIcon = 'hourglass_top';
 
       if (times.isEnded) {
         timerText = 'Ended';
         timerColor = '#EF4444';
-        timerIcon = '✕';
+        timerIcon = 'close';
       } else if (times.isTimeUp) {
-        timerText = '⏰ Time Up';
+        timerText = 'Time Up';
         timerColor = '#EF4444';
-        timerIcon = '⏰';
+        timerIcon = 'alarm';
       } else if (times.isWaiting) {
-        timerText = '⏳ Waiting';
+        timerText = 'Waiting';
         timerColor = '#818CF8';
-        timerIcon = '⏳';
+        timerIcon = 'hourglass_top';
       } else if (times.isPackageOpening) {
         const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');
         const s = String(times.pkgSecsLeft % 60).padStart(2, '0');
-        timerText = times.pkgSecsLeft <= 0 ? '📦 00:00' : `📦 Open: ${m}:${s}`;
+        timerText = times.pkgSecsLeft <= 0 ? '00:00' : `Open: ${m}:${s}`;
         timerColor = '#F59E0B';
-        timerIcon = '📦';
+        timerIcon = 'inventory_2';
       } else if (times.isWriting) {
         if (!times.isOvertime) {
           const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
           const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
           const s = String(times.writingSecsLeft % 60).padStart(2, '0');
-          timerText = Math.floor(times.writingSecsLeft / 3600) > 0 ? `📝 ${h}:${m}:${s}` : `📝 ${m}:${s}`;
+          timerText = Math.floor(times.writingSecsLeft / 3600) > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
           timerColor = times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E';
-          timerIcon = '📝';
+          timerIcon = 'edit_note';
         } else {
           const m = String(Math.floor(times.overtimeSecs / 60)).padStart(2, '0');
           const s = String(times.overtimeSecs % 60).padStart(2, '0');
-          timerText = `⏱️ Extra: +${m}:${s}`;
+          timerText = `Extra: +${m}:${s}`;
           timerColor = '#F59E0B';
-          timerIcon = '⏱️';
+          timerIcon = 'timer';
         }
       }
 
       // Update timer pill in AppBar
-      const pill = roomContainer.querySelector('#btn-appbar-flip')?.nextElementSibling || roomContainer.querySelectorAll('#btn-appbar-back')[0]?.closest('div')?.parentElement?.children[1]?.lastElementChild;
+      const pill = roomContainer.querySelector('#live-timer-pill');
       if (pill) {
-        const span = pill.querySelector('span:last-child');
-        if (span) span.textContent = timerText;
+        const iconEl = pill.querySelector('.timer-icon');
+        const textEl = pill.querySelector('.timer-text');
+        if (iconEl && iconEl.textContent !== timerIcon) iconEl.textContent = timerIcon;
+        if (textEl && textEl.textContent !== timerText) textEl.textContent = timerText;
+        pill.style.background = `${timerColor}38`;
+        pill.style.borderColor = timerColor;
+        if (iconEl) iconEl.style.color = timerColor;
+        if (textEl) textEl.style.color = timerColor;
       }
     }, 1000);
   }
