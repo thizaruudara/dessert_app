@@ -899,12 +899,13 @@ class AppController {
             const slot2 = session.slot2 || null;
             const targetSlot = (selectedSlotId === 'slot2' && slot2) ? slot2 : slot1;
 
-            const isEnded = session.status === 'ended' || session.currentPhase === 'ended';
-            const isWaiting = session.currentPhase === 'waiting' && !isEnded;
-            const isPackageOpening = session.currentPhase === 'package_opening' && !isEnded;
-            const isWriting = session.currentPhase === 'writing' && !isEnded;
-            const isTimeUp = session.currentPhase === 'time_up' && !isEnded;
-            const isLive = !isEnded && !isWaiting && (session.status === 'active' || isPackageOpening || isWriting || isTimeUp);
+            const statusInfo = dbService.computeSessionStatus(session);
+            const isEnded = statusInfo.isEnded;
+            const isPackageOpening = statusInfo.isPackageOpening;
+            const isWriting = statusInfo.isWriting;
+            const isTimeUp = statusInfo.isTimeUp;
+            const isLive = statusInfo.isLive;
+            const isWaiting = statusInfo.isWaiting;
 
             // Calculate initial Package Opening Remaining Seconds
             let packageRemainingSecs = 600;
@@ -1001,7 +1002,7 @@ class AppController {
                       </div>
                     </div>
                   </div>
-                ` : isWriting ? `
+                ` : (isWriting || isLive) ? `
                   <div class="phase-status-banner-box writing">
                     <span style="font-size:24px;">✍️</span>
                     <div>
@@ -1054,7 +1055,7 @@ class AppController {
                   <button class="btn-primary" style="background:#D97706; padding:12px;" data-enter-exam="${session.id}">
                     📦 Open Package in Camera Room (පාර්සලය විවෘත කරන්න)
                   </button>
-                ` : isWriting ? `
+                ` : (isWriting || isLive) ? `
                   <button class="btn-primary" style="background:#16A34A; padding:12px;" data-enter-exam="${session.id}">
                     🎥 Enter Live Exam Room (කැමරාව ON කරන්න)
                   </button>
@@ -3799,21 +3800,7 @@ class AppController {
   }
 
   _computePaperStatus(session) {
-    if (session.isEnded || session.status === 'ended' || session.currentPhase === 'ended') {
-      return 'ended';
-    }
-    const isActive = session.status === 'active' && session.currentPhase !== 'ended' && session.currentPhase !== 'waiting';
-    let isAfterSlot1 = false;
-    if (session.slot1 && session.slot1.startTime) {
-      const s1 = new Date(session.slot1.startTime);
-      if (!isNaN(s1.getTime())) {
-        isAfterSlot1 = new Date() >= s1;
-      }
-    }
-    if (isActive || isAfterSlot1) {
-      return 'live';
-    }
-    return 'upcoming';
+    return dbService.computeSessionStatus(session).statusText;
   }
 
   _formatSessionDate(dateStr) {
