@@ -160,6 +160,27 @@ export class AuthService {
     return demoUser;
   }
 
+  async updateProfile(updates = {}) {
+    if (!this.currentUser) return null;
+    const updatedUser = { ...this.currentUser, ...updates };
+    this.saveSession(updatedUser);
+
+    try {
+      if (updatedUser.uid) {
+        await setDoc(doc(db, 'users', updatedUser.uid), updates, { merge: true });
+      }
+    } catch (e) {
+      console.warn('[Auth] Error updating profile in Firestore:', e);
+    }
+    return updatedUser;
+  }
+
+  async addCredits(amount) {
+    if (!this.currentUser || !amount) return;
+    const newCredits = (this.currentUser.credits || 0) + amount;
+    return this.updateProfile({ credits: newCredits });
+  }
+
   logout() {
     this.clearSession();
   }

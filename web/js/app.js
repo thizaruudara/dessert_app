@@ -1354,7 +1354,7 @@ class AppController {
   async renderRanksScreen(container) {
     this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Dessert, 1: Paper
     this.selectedLeague = this.selectedLeague ?? 'All Scholars';
-    this.selectedRanksBatch = this.selectedRanksBatch ?? 'All Batches';
+    this.selectedRanksBatch = this.selectedRanksBatch ?? (this.currentUser?.examYear || 'All Batches');
     this.expandedPaperBoards = this.expandedPaperBoards ?? new Set(['paper_001']);
 
     const leaders = await dbService.getLeaderboard();
@@ -1418,9 +1418,12 @@ class AppController {
           <span>Batch Selection:</span>
           <select class="batch-select" id="select-ranks-batch">
             <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
+            <option value="2024 A/L" ${this.selectedRanksBatch === '2024 A/L' ? 'selected' : ''}>2024 A/L</option>
+            <option value="2025 A/L" ${this.selectedRanksBatch === '2025 A/L' ? 'selected' : ''}>2025 A/L</option>
             <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
             <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
             <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
+            <option value="2029 A/L" ${this.selectedRanksBatch === '2029 A/L' ? 'selected' : ''}>2029 A/L</option>
           </select>
         </div>
 
@@ -1837,11 +1840,34 @@ class AppController {
     });
   }
 
-  // ── 5. Profile Tab (Trophy Room, Dark Mode, Admin Switcher - 1:1 Android) ──
-  renderProfileScreen(container) {
+  // ── 5. Profile Tab (Trophy Room, Dark Mode, Exam Batch & Avatar Picker - 1:1 Android) ──
+  async renderProfileScreen(container) {
     const user = this.currentUser || {};
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const examBatches = ['2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
+    const currentBatch = user.examYear || '2027 A/L';
+
+    // Fetch student's real homework submissions from Firestore
+    let desserts = [];
+    try {
+      desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone) || [];
+    } catch (_) {
+      desserts = [];
+    }
+    const approvedCount = desserts.filter(d => d.status === 'approved').length;
+    const pendingCount = desserts.filter(d => !d.status || d.status === 'pending').length;
+    const totalCount = desserts.length;
+    const creditsXP = user.credits ?? 155;
+
+    // Format member since date
+    let memberSinceStr = 'September 2026';
+    if (user.createdAt) {
+      try {
+        const d = new Date(user.createdAt);
+        memberSinceStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      } catch (_) {}
+    }
 
     container.innerHTML = `
       <!-- Screen Top Bar -->
@@ -1850,7 +1876,7 @@ class AppController {
           <div class="appbar-icon-box" style="background:#EFF6FF; color:#2563EB;">👤</div>
           <div>
             <div class="appbar-title">Student Profile</div>
-            <div class="appbar-subtitle">Account Details, Trophy Room & Preferences</div>
+            <div class="appbar-subtitle">Account Details, Batch & Preferences</div>
           </div>
         </div>
       </div>
@@ -1863,16 +1889,22 @@ class AppController {
           ` : `
             <div class="profile-avatar-img">${user.name ? user.name.charAt(0).toUpperCase() : 'K'}</div>
           `}
-          <button class="profile-cam-btn" id="btn-change-avatar" title="Change Photo">📷</button>
+          <button class="profile-cam-btn" id="btn-change-avatar" title="Change Profile Photo">📷</button>
         </div>
 
-        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
-          <span style="font-size:19px; font-weight:800; color:#0F172A;">${user.name || 'Kasun Perera'}</span>
-          <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:14px;">✏️</button>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+          <span style="font-size:20px; font-weight:800; color:#0F172A;" id="profile-display-name">${user.name || 'Kasun Perera'}</span>
+          <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:15px;" title="Edit Name">✏️</button>
         </div>
 
-        <div style="font-size:12px; color:#64748B; margin-top:2px;">
+        <div style="font-size:12.5px; color:#64748B; margin-top:2px;">
           ${user.phone || '+94 77 123 4567'} • <span style="color:#059669; font-weight:700;">Verified Student ✓</span>
+        </div>
+
+        <!-- Student ID Badge -->
+        <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; padding:3px 10px; background:#F1F5F9; border-radius:12px; font-size:11px; font-weight:700; color:#475569;">
+          <span>🆔</span>
+          <span>${user.studentId || ('EP-' + (user.phone ? user.phone.slice(-4) : '2026'))}</span>
         </div>
 
         <div style="margin-top:10px; padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800; background: ${isStandalone ? '#ECFDF5' : '#FEF3C7'}; color: ${isStandalone ? '#047857' : '#B45309'}; border: 1px solid ${isStandalone ? '#A7F3D0' : '#FDE68A'};">
@@ -1883,18 +1915,45 @@ class AppController {
       <!-- 3-Item Stats Card (Credits, Approved, Pending) -->
       <div class="stats-trio-card">
         <div>
-          <div class="stat-number" style="color:#F59E0B;">⭐ 155</div>
+          <div class="stat-number" style="color:#F59E0B;">⭐ ${creditsXP}</div>
           <div class="stat-label">Credits (XP)</div>
         </div>
         <div class="stat-divider"></div>
         <div>
-          <div class="stat-number" style="color:#10B981;">✅ 4</div>
+          <div class="stat-number" style="color:#10B981;">✅ ${approvedCount}</div>
           <div class="stat-label">Approved</div>
         </div>
         <div class="stat-divider"></div>
         <div>
-          <div class="stat-number" style="color:#EA580C;">⏳ 1</div>
+          <div class="stat-number" style="color:#EA580C;">⏳ ${pendingCount}</div>
           <div class="stat-label">Pending</div>
+        </div>
+      </div>
+
+      <!-- Target A/L Exam Batch Card (1:1 examYear parity) -->
+      <div class="hero-card" style="padding:16px 18px; margin-top:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">🎯</span>
+            <div>
+              <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Target Examination Batch</div>
+              <div style="font-size:11px; color:#64748B;">Select your A/L year for countdown & papers</div>
+            </div>
+          </div>
+          <span style="font-size:12px; font-weight:800; color:#2563EB; background:#EFF6FF; padding:4px 10px; border-radius:12px; border:1px solid #BFDBFE;" id="current-batch-badge">
+            ${currentBatch}
+          </span>
+        </div>
+
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${examBatches.map(b => {
+            const isSel = b === currentBatch;
+            return `
+              <button class="batch-select-chip ${isSel ? 'active' : ''}" data-target-batch="${b}" style="flex:1; min-width:64px; padding:8px 6px; border-radius:10px; border:1px solid ${isSel ? '#2563EB' : '#CBD5E1'}; background:${isSel ? '#2563EB' : '#F8FAFC'}; color:${isSel ? '#FFFFFF' : '#334155'}; font-size:11.5px; font-weight:700; cursor:pointer; transition:all 0.2s ease;">
+                ${b}
+              </button>
+            `;
+          }).join('')}
         </div>
       </div>
 
@@ -1904,19 +1963,19 @@ class AppController {
           <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
             <span>🎓 Role:</span>
           </div>
-          <span style="font-size:12px; font-weight:800; color:#2563EB;">Student (A/L Physics)</span>
+          <span style="font-size:12px; font-weight:800; color:#2563EB;">Student (A/L Physics & Dessert)</span>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #E2E8F0;">
           <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
             <span>📅 Member Since:</span>
           </div>
-          <span style="font-size:12px; font-weight:600; color:#64748B;">September 2026</span>
+          <span style="font-size:12px; font-weight:600; color:#64748B;">${memberSinceStr}</span>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0;">
           <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#334155;">
             <span>📁 Total Submissions:</span>
           </div>
-          <span style="font-size:12px; font-weight:800; color:#0F172A;">5 Problem Sets</span>
+          <span style="font-size:12px; font-weight:800; color:#0F172A;">${totalCount} Problem Sets</span>
         </div>
       </div>
 
@@ -1983,16 +2042,23 @@ class AppController {
     });
 
     document.getElementById('btn-edit-student-name')?.addEventListener('click', () => {
-      this.openEditNameDialog();
+      this.openEditNameDialog(container);
     });
 
     document.getElementById('btn-change-avatar')?.addEventListener('click', () => {
-      const url = prompt('Enter image URL or photo link for your profile picture:', user.avatarUrl || '');
-      if (url) {
-        user.avatarUrl = url;
-        authService.currentUser.avatarUrl = url;
+      this.openAvatarPickerSheet(container);
+    });
+
+    // Target Batch Switchers
+    container.querySelectorAll('[data-target-batch]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const newBatch = btn.dataset.targetBatch;
+        if (newBatch === user.examYear) return;
+        await authService.updateProfile({ examYear: newBatch });
+        if (this.currentUser) this.currentUser.examYear = newBatch;
+        notificationService.showInAppBanner('Exam Batch Updated 🎯', `Switched to ${newBatch} curriculum & countdown!`, 'success');
         this.renderProfileScreen(container);
-      }
+      });
     });
 
     document.getElementById('chk-dark-mode')?.addEventListener('change', (e) => {
@@ -2015,68 +2081,233 @@ class AppController {
     });
   }
 
-  // ── Trophy Room Modal (Matching badge_model.dart & trophy_room_sheet.dart) ─
-  openTrophyRoomModal() {
-    const badges = [
-      { id: 'streak_3', emoji: '🔥', title: '3-Day Fire Streak', desc: 'Stay active and learn for 3 consecutive days.', unlocked: true, progress: 100, label: '3 / 3 Days' },
-      { id: 'first_masterpiece', emoji: '🍰', title: 'First Masterpiece', desc: 'Get your very first homework approved by teacher.', unlocked: true, progress: 100, label: '1 / 1 Approved' },
-      { id: 'century_club', emoji: '⚡', title: 'Century Scholar', desc: 'Earn 100 or more XP credits across all homework.', unlocked: true, progress: 100, label: '155 / 100 XP' },
-      { id: 'speed_demon', emoji: '🚀', title: 'Speed Demon', desc: 'Submit 5 homework solutions with high precision.', unlocked: false, progress: 80, label: '4 / 5 Done' },
-      { id: 'night_owl', emoji: '🦉', title: 'Night Owl Scholar', desc: 'Dedication at night! Submit homework after 9:00 PM.', unlocked: true, progress: 100, label: '2 / 2 Night Subs' },
-      { id: 'podium_king', emoji: '👑', title: 'Podium King', desc: 'Reach the Top 3 on the Institute Leaderboard.', unlocked: false, progress: 77, label: '155 / 200 XP' },
-      { id: 'grandmaster', emoji: '🏆', title: 'Dessert Grandmaster', desc: 'Accumulate 500 XP and achieve ultimate mastery.', unlocked: false, progress: 31, label: '155 / 500 XP' },
-      { id: 'physics_guru', emoji: '⚛️', title: 'Physics Prodigy', desc: 'Solve 3 Daily MCQ Sprints with 100% correct score.', unlocked: true, progress: 100, label: '3 / 3 Completed' }
+  // ── Avatar Picker Bottom Sheet (1:1 student_profile_screen.dart parity) ────
+  openAvatarPickerSheet(profileContainer) {
+    const user = this.currentUser || {};
+    const presets = [
+      { name: 'Albert Einstein', role: 'Relativity', emoji: '⚛️', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240' },
+      { name: 'Isaac Newton', role: 'Mechanics', emoji: '🍎', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240' },
+      { name: 'Nikola Tesla', role: 'Electricity', emoji: '⚡', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240' },
+      { name: 'Marie Curie', role: 'Nuclear', emoji: '🔬', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240' },
+      { name: 'Richard Feynman', role: 'Quantum', emoji: '🚀', url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240' },
+      { name: 'Pastry Prodigy', role: 'Dessert Master', emoji: '🍰', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240' }
     ];
 
     const modal = document.createElement('div');
     modal.className = 'app-modal';
+    modal.style.display = 'flex';
     modal.innerHTML = `
-      <div class="modal-sheet">
+      <div class="modal-sheet" style="max-height:92vh; overflow-y:auto;">
+        <!-- Drag pill -->
+        <div style="width:36px; height:4px; background:#CBD5E1; border-radius:2px; margin:0 auto 12px auto;"></div>
+
         <div class="modal-header">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:22px;">🏆</span>
-            <div>
-              <h3 class="modal-title">Trophy Room & Flex Zone</h3>
-              <div style="font-size:11px; color:#64748B;">Unlock badges by submitting homework & earning XP</div>
-            </div>
+          <div>
+            <h3 class="modal-title">Change Profile Photo 📸</h3>
+            <div style="font-size:11.5px; color:#64748B;">Upload your portrait or choose a Physics genius</div>
           </div>
-          <button class="modal-close-btn" id="btn-close-trophy">✕</button>
+          <button class="modal-close-btn" id="btn-close-avatar-sheet">✕</button>
         </div>
 
-        <div class="badges-grid">
-          ${badges.map(b => `
-            <div class="badge-card ${b.unlocked ? 'unlocked' : ''}">
-              <div class="badge-top">
-                <span class="badge-emoji">${b.emoji}</span>
-                <span class="badge-status-tag ${b.unlocked ? 'badge-unlocked-tag' : 'badge-locked-tag'}">
-                  ${b.unlocked ? 'UNLOCKED' : 'LOCKED'}
-                </span>
+        <!-- Action Row (Camera vs Gallery) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;">
+          <!-- Camera Capture Button -->
+          <button id="btn-snap-camera-avatar" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px 12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:14px; cursor:pointer;">
+            <span style="font-size:26px;">📷</span>
+            <span style="font-size:12.5px; font-weight:800; color:#1D4ED8;">Take Photo (Camera)</span>
+          </button>
+
+          <!-- Gallery Upload Button -->
+          <label for="input-gallery-avatar" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px 12px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:14px; cursor:pointer;">
+            <span style="font-size:26px;">🖼️</span>
+            <span style="font-size:12.5px; font-weight:800; color:#15803D;">Choose from Gallery</span>
+            <input type="file" id="input-gallery-avatar" accept="image/*" style="display:none;" />
+          </label>
+        </div>
+
+        <!-- Hidden Camera Stream Preview -->
+        <div id="avatar-camera-container" style="display:none; flex-direction:column; align-items:center; margin-top:14px; background:#0F172A; border-radius:16px; padding:12px;">
+          <video id="avatar-webcam-preview" autoplay playsinline style="width:200px; height:200px; border-radius:50%; object-fit:cover; border:3px solid #2563EB;"></video>
+          <div style="display:flex; gap:10px; margin-top:12px;">
+            <button id="btn-capture-snapshot" class="apk-btn-primary" style="padding:8px 18px; font-size:12px;">
+              📸 Capture Snapshot
+            </button>
+            <button id="btn-cancel-webcam" style="background:transparent; border:1px solid #475569; color:#CBD5E1; border-radius:8px; padding:8px 14px; font-size:12px; cursor:pointer;">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <!-- Presets Row -->
+        <div style="margin-top:18px;">
+          <div style="font-size:12px; font-weight:800; color:#334155; margin-bottom:8px;">
+            ⚛️ Or Choose a Physics Scholar Avatar:
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
+            ${presets.map((p, idx) => `
+              <div class="preset-avatar-card" data-preset-idx="${idx}" style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; cursor:pointer; transition:all 0.2s ease;">
+                <img src="${p.url}" style="width:52px; height:52px; border-radius:50%; object-fit:cover; border:2px solid #CBD5E1;" />
+                <div style="font-size:11px; font-weight:800; color:#0F172A; margin-top:6px;">${p.name}</div>
+                <div style="font-size:9.5px; color:#64748B;">${p.role}</div>
               </div>
-              <div class="badge-title">${b.title}</div>
-              <div class="badge-desc">${b.desc}</div>
-              <div class="badge-progress-bg">
-                <div class="badge-progress-fill" style="width:${b.progress}%; background:${b.unlocked ? '#10B981' : '#2563EB'};"></div>
-              </div>
-              <div style="font-size:9.5px; font-weight:800; color:#64748B; margin-top:2px;">${b.label}</div>
-            </div>
-          `).join('')}
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Direct URL Option -->
+        <div style="margin-top:16px; padding-top:14px; border-top:1px solid #E2E8F0;">
+          <div style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:6px;">Custom Image Web Link:</div>
+          <div style="display:flex; gap:8px;">
+            <input type="url" id="input-avatar-url" placeholder="https://..." value="${user.avatarUrl || ''}" class="form-textarea" style="height:38px; margin:0;" />
+            <button id="btn-save-avatar-url" class="apk-btn-primary" style="width:auto; padding:0 16px; font-size:12px;">Save</button>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(modal);
-    document.getElementById('btn-close-trophy')?.addEventListener('click', () => modal.remove());
+
+    let activeStream = null;
+
+    const stopWebcam = () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
+      }
+      const camCont = modal.querySelector('#avatar-camera-container');
+      if (camCont) camCont.style.display = 'none';
+    };
+
+    const saveAndClose = async (newUrl) => {
+      stopWebcam();
+      await authService.updateProfile({ avatarUrl: newUrl });
+      if (this.currentUser) this.currentUser.avatarUrl = newUrl;
+      notificationService.showInAppBanner('Profile Photo Updated! 📸', 'Your portrait is now updated across all portals.', 'success');
+      modal.remove();
+      if (profileContainer) this.renderProfileScreen(profileContainer);
+    };
+
+    modal.querySelector('#btn-close-avatar-sheet')?.addEventListener('click', () => {
+      stopWebcam();
+      modal.remove();
+    });
+
+    // Preset Selection
+    modal.querySelectorAll('[data-preset-idx]').forEach(card => {
+      card.addEventListener('click', () => {
+        const p = presets[Number(card.dataset.presetIdx)];
+        if (p) saveAndClose(p.url);
+      });
+    });
+
+    // Gallery File Upload (Reads as Base64 Data URL)
+    modal.querySelector('#input-gallery-avatar')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          saveAndClose(re.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Camera Capture
+    modal.querySelector('#btn-snap-camera-avatar')?.addEventListener('click', async () => {
+      try {
+        const camCont = modal.querySelector('#avatar-camera-container');
+        const videoEl = modal.querySelector('#avatar-webcam-preview');
+        activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        if (videoEl && activeStream) {
+          videoEl.srcObject = activeStream;
+          videoEl.play().catch(() => {});
+          camCont.style.display = 'flex';
+        }
+      } catch (err) {
+        alert('Could not access camera: ' + err.message);
+      }
+    });
+
+    modal.querySelector('#btn-cancel-webcam')?.addEventListener('click', () => {
+      stopWebcam();
+    });
+
+    modal.querySelector('#btn-capture-snapshot')?.addEventListener('click', () => {
+      const videoEl = modal.querySelector('#avatar-webcam-preview');
+      if (!videoEl) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      // Draw centered square crop
+      const minDim = Math.min(videoEl.videoWidth || 400, videoEl.videoHeight || 400);
+      const startX = ((videoEl.videoWidth || 400) - minDim) / 2;
+      const startY = ((videoEl.videoHeight || 400) - minDim) / 2;
+      ctx.drawImage(videoEl, startX, startY, minDim, minDim, 0, 0, 400, 400);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      saveAndClose(dataUrl);
+    });
+
+    // Custom URL
+    modal.querySelector('#btn-save-avatar-url')?.addEventListener('click', () => {
+      const url = modal.querySelector('#input-avatar-url')?.value.trim();
+      if (url) saveAndClose(url);
+    });
   }
 
-  // ── Edit Name Dialog ──────────────────────────────────────────────────────
-  openEditNameDialog() {
+  // ── Edit Name Dialog (Matching _showEditNameDialog in Flutter) ────────────
+  openEditNameDialog(profileContainer) {
     const currentName = this.currentUser?.name || 'Kasun Perera';
-    const newName = prompt('Enter your full name:', currentName);
-    if (newName && newName.trim().length > 0) {
-      this.currentUser.name = newName.trim();
-      authService.currentUser.name = newName.trim();
-      this.renderScreen(this.activeTab);
-    }
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:380px;">
+        <div class="modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:20px;">✏️</span>
+            <div>
+              <h3 class="modal-title">Edit Name</h3>
+              <div style="font-size:11px; color:#64748B;">සම්පූර්ණ නම සංස්කරණය කරන්න</div>
+            </div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-name-modal">✕</button>
+        </div>
+
+        <div style="margin-top:14px;">
+          <label style="font-size:11.5px; font-weight:700; color:#334155; display:block; margin-bottom:6px;">Full Name (ශිෂ්‍යයාගේ නම)</label>
+          <input type="text" id="input-new-student-name" class="form-textarea" style="height:42px; font-size:14px; font-weight:600;" value="${currentName}" placeholder="Enter full name" />
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+          <button id="btn-cancel-edit-name" style="background:transparent; border:none; color:#64748B; font-size:13px; font-weight:700; padding:8px 14px; cursor:pointer;">
+            Cancel
+          </button>
+          <button id="btn-save-student-name" class="apk-btn-primary" style="width:auto; padding:8px 20px; font-size:13px;">
+            Save Name
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.querySelector('#btn-close-name-modal')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('#btn-cancel-edit-name')?.addEventListener('click', () => modal.remove());
+
+    modal.querySelector('#btn-save-student-name')?.addEventListener('click', async () => {
+      const newName = modal.querySelector('#input-new-student-name')?.value.trim();
+      if (!newName) {
+        alert('Please enter a valid name.');
+        return;
+      }
+
+      await authService.updateProfile({ name: newName });
+      if (this.currentUser) this.currentUser.name = newName;
+      notificationService.showInAppBanner('Name Updated ✏️', `Profile name updated to ${newName}!`, 'success');
+      modal.remove();
+      if (profileContainer) this.renderProfileScreen(profileContainer);
+    });
   }
 
   // ── Dessert Detail Modal ──────────────────────────────────────────────────
@@ -2306,26 +2537,144 @@ class AppController {
             if (selectedAnswers[idx] === qu.correctIndex) correct++;
           });
 
-          notificationService.showInAppBanner('Sprint Complete! 🔥', `You scored ${correct}/5. +50 XP awarded!`, 'success');
+          const xpEarned = correct * 10;
+          const timeFormatted = `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`;
+          const isPerfect = correct === questions.length;
+          const user = this.currentUser || {};
 
+          // 1. Record Attempt in Firestore
+          dbService.recordSprintAttempt({
+            studentId: user.uid || user.id || 'demo_student_01',
+            studentName: user.name || 'Student',
+            phone: user.phone || '',
+            examYear: user.examYear || '2027 A/L',
+            date: sprint.targetDate || new Date().toISOString().split('T')[0],
+            score: correct,
+            totalQuestions: questions.length,
+            timeTakenSeconds: elapsedSeconds,
+            timeTakenFormatted: timeFormatted,
+            answers: selectedAnswers,
+            xpEarned
+          });
+
+          // 2. Increment credits
+          if (xpEarned > 0) {
+            authService.addCredits(xpEarned);
+          }
+
+          notificationService.showInAppBanner(
+            isPerfect ? '🏆 PERFECT SCORE!' : 'Sprint Complete! 🔥',
+            `You scored ${correct}/${questions.length}. +${xpEarned} XP awarded!`,
+            'success'
+          );
+
+          // 3. Render 1:1 Completed Review View matching _buildCompletedReviewView in Flutter
           modal.innerHTML = `
-            <div class="modal-sheet" style="text-align:center; padding:30px 20px;">
-              <div style="font-size:54px;">🏆</div>
-              <h2 style="font-size:20px; font-weight:900; color:#0F172A; margin-top:8px;">Sprint Completed!</h2>
-              <div style="font-size:13.5px; color:#64748B; margin-top:4px;">
-                You scored <strong style="color:#059669;">${correct} / 5</strong> in ${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s.
+            <div class="modal-sheet" style="max-height:92vh; overflow-y:auto; padding:20px 16px;">
+              <!-- Celebration Card -->
+              <div style="background:${isPerfect ? 'linear-gradient(135deg, #065F46, #047857)' : 'linear-gradient(135deg, #1E3A8A, #2563EB)'}; border-radius:20px; padding:20px; text-align:center; color:#FFFFFF; box-shadow:0 10px 24px rgba(0,0,0,0.25);">
+                <div style="font-size:14px; font-weight:800; letter-spacing:0.5px; opacity:0.9;">
+                  ${isPerfect ? '🏆 PERFECT SCORE!' : '🎉 SPRINT COMPLETED!'}
+                </div>
+                <div style="display:flex; align-items:baseline; justify-content:center; gap:4px; margin:8px 0 10px 0;">
+                  <span style="font-size:48px; font-weight:900; line-height:1;">${correct}</span>
+                  <span style="font-size:20px; font-weight:700; opacity:0.75;">/ ${questions.length}</span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:6px;">
+                  <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700;">
+                    ⏱️ Time: ${timeFormatted}
+                  </span>
+                  <span style="background:rgba(251,191,36,0.3); color:#FEF3C7; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:800;">
+                    ⚡ +${xpEarned} XP Added
+                  </span>
+                  <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700;">
+                    📚 Mechanics & Newton Laws
+                  </span>
+                </div>
               </div>
-              <div style="margin:16px auto; padding:10px 20px; background:#FEF3C7; color:#B45309; border-radius:20px; font-size:14px; font-weight:900; width:fit-content;">
-                ⭐ +50 XP Added to Your Rank!
+
+              <!-- Review Header -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin:18px 0 10px 0;">
+                <div style="font-size:14px; font-weight:800; color:#0F172A;">
+                  Question Review & Explanations (විවරණ)
+                </div>
+                <button id="btn-sprint-view-ranks" style="background:none; border:none; color:#2563EB; font-size:12px; font-weight:700; cursor:pointer;">
+                  View Ranks 🏆
+                </button>
               </div>
-              <button class="btn-primary" id="btn-finish-sprint-sheet" style="margin-top:10px;">
-                Back to Dashboard
-              </button>
+
+              <!-- Question by Question Review List -->
+              <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+                ${questions.map((qu, qIdx) => {
+                  const studentChoice = selectedAnswers[qIdx];
+                  const isCorrect = studentChoice === qu.correctIndex;
+                  return `
+                    <div style="background:#FFFFFF; border:1.5px solid ${isCorrect ? '#22C55E' : '#EF4444'}; border-radius:14px; padding:14px;">
+                      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <span style="background:${isCorrect ? '#DCFCE7' : '#FEE2E2'}; color:${isCorrect ? '#15803D' : '#B91C1C'}; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:800;">
+                          Q${qIdx + 1}
+                        </span>
+                        <span style="font-size:11.5px; font-weight:800; color:${isCorrect ? '#15803D' : '#B91C1C'};">
+                          ${isCorrect ? 'Correct (+10 XP) ✓' : 'Incorrect (0 XP) ✕'}
+                        </span>
+                      </div>
+
+                      <div style="font-size:13px; font-weight:700; color:#0F172A; line-height:1.45; margin-bottom:10px;">
+                        ${qu.text}
+                      </div>
+
+                      <!-- Options List -->
+                      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+                        ${qu.options.map((opt, optIdx) => {
+                          const isAnswer = optIdx === qu.correctIndex;
+                          const isPicked = optIdx === studentChoice;
+                          let bg = '#F8FAFC';
+                          let border = '#E2E8F0';
+                          let color = '#475569';
+                          if (isAnswer) {
+                            bg = '#F0FDF4';
+                            border = '#22C55E';
+                            color = '#15803D';
+                          } else if (isPicked && !isAnswer) {
+                            bg = '#FEF2F2';
+                            border = '#EF4444';
+                            color = '#B91C1C';
+                          }
+                          return `
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:${bg}; border:1px solid ${border}; border-radius:8px; padding:7px 10px; font-size:12px; color:${color}; font-weight:${isAnswer ? '700' : '500'};">
+                              <span>(${String.fromCharCode(65 + optIdx)}) ${opt}</span>
+                              ${isAnswer ? '<span style="color:#22C55E; font-weight:800;">✓ Correct</span>' : (isPicked ? '<span style="color:#EF4444; font-weight:800;">✕ Your Choice</span>' : '')}
+                            </div>
+                          `;
+                        }).join('')}
+                      </div>
+
+                      <!-- Amber Explanation Box (විවරණය) -->
+                      <div style="background:#FFFBEB; border-left:3px solid #F59E0B; border-radius:8px; padding:10px; font-size:11.5px; color:#92400E; line-height:1.45;">
+                        <strong>💡 විවරණය (Explanation):</strong><br>
+                        ${qu.explanation}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <!-- Bottom Actions -->
+              <div style="display:flex; gap:8px;">
+                <button class="btn-primary" id="btn-finish-sprint-sheet" style="flex:1;">
+                  Back to Dashboard
+                </button>
+              </div>
             </div>
           `;
 
           document.getElementById('btn-finish-sprint-sheet')?.addEventListener('click', () => {
             modal.remove();
+          });
+
+          document.getElementById('btn-sprint-view-ranks')?.addEventListener('click', () => {
+            modal.remove();
+            this.switchTab('leaderboard');
           });
         }
       });
@@ -2611,16 +2960,45 @@ class AppController {
     });
   }
 
-  // Live 4-box Countdown
-  startCountdownTimer() {
+  // Live 4-box Countdown dynamically wired to student's batch and Firestore countdowns
+  async startCountdownTimer() {
     if (this.countdownTimer) clearInterval(this.countdownTimer);
 
-    // 318 days, 12 hours, 17 mins, 57 secs
-    const target = new Date(Date.now() + (318 * 86400000) + (12 * 3600000) + (17 * 60000) + (57 * 1000));
+    const user = this.currentUser || {};
+    const userBatch = user.examYear || '2027 A/L';
+    let target = null;
+    let title = `${userBatch} Physics Final Exam`;
+
+    try {
+      const countdowns = await dbService.getExamCountdowns();
+      const match = countdowns.find(c => dbService.matchesYear(c.examYear, userBatch) && c.isEnabled !== false);
+      if (match && match.targetDate) {
+        target = new Date(match.targetDate);
+        if (match.customTitle) title = match.customTitle;
+      }
+    } catch (_) {}
+
+    if (!target || isNaN(target.getTime())) {
+      const yearNum = parseInt((userBatch.match(/\d{4}/) || [2027])[0]);
+      target = new Date(`${yearNum}-08-15T08:30:00+05:30`);
+    }
+
+    const titleEl = document.querySelector('.cd-exam-name');
+    if (titleEl) titleEl.textContent = title;
 
     const update = () => {
       const diff = target - new Date();
-      if (diff <= 0) return;
+      if (diff <= 0) {
+        const d = document.getElementById('cd-days');
+        const h = document.getElementById('cd-hours');
+        const m = document.getElementById('cd-mins');
+        const s = document.getElementById('cd-secs');
+        if (d) d.textContent = '0';
+        if (h) h.textContent = '00';
+        if (m) m.textContent = '00';
+        if (s) s.textContent = '00';
+        return;
+      }
 
       const days = Math.floor(diff / 86400000);
       const hours = Math.floor((diff % 86400000) / 3600000);
@@ -2633,9 +3011,9 @@ class AppController {
       const s = document.getElementById('cd-secs');
 
       if (d) d.textContent = days;
-      if (h) h.textContent = hours;
-      if (m) m.textContent = mins;
-      if (s) s.textContent = secs;
+      if (h) h.textContent = hours.toString().padStart(2, '0');
+      if (m) m.textContent = mins.toString().padStart(2, '0');
+      if (s) s.textContent = secs.toString().padStart(2, '0');
     };
 
     this.countdownTimer = setInterval(update, 1000);

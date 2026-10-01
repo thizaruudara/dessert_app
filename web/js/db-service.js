@@ -491,6 +491,84 @@ export class DbService {
     }
   }
 
+  streamProctorAlerts(paperId, studentId, callback) {
+    if (!paperId) return () => {};
+    try {
+      const alertsRef = collection(db, 'proctor_alerts');
+      const q = query(alertsRef, where('paperId', '==', paperId));
+      return onSnapshot(q, (snapshot) => {
+        const list = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (!data.isRead && (data.studentId === studentId || data.studentId === 'ALL')) {
+            list.push({ id: docSnap.id, ...data });
+          }
+        });
+        callback(list);
+      }, (err) => {
+        console.warn('[DB] streamProctorAlerts error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] streamProctorAlerts catch:', e);
+      return () => {};
+    }
+  }
+
+  async markProctorAlertRead(alertId) {
+    if (!alertId) return;
+    try {
+      const alertRef = doc(db, 'proctor_alerts', alertId);
+      await updateDoc(alertRef, { isRead: true });
+    } catch (e) {
+      console.warn('[DB] markProctorAlertRead error:', e);
+    }
+  }
+
+  streamStudentAlerts(paperId, studentId, callback) {
+    return this.streamProctorAlerts(paperId, studentId, callback);
+  }
+
+  async markAlertRead(alertId) {
+    return this.markProctorAlertRead(alertId);
+  }
+
+  async recordSprintAttempt(attemptData) {
+    try {
+      const attemptsRef = collection(db, 'sprint_attempts');
+      await addDoc(attemptsRef, {
+        ...attemptData,
+        createdAt: new Date().toISOString()
+      });
+
+      if (attemptData.studentId && attemptData.xpEarned > 0) {
+        try {
+          const userDocRef = doc(db, 'users', attemptData.studentId);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const currentCredits = userDoc.data().credits || 0;
+            await updateDoc(userDocRef, {
+              credits: currentCredits + attemptData.xpEarned
+            });
+          }
+        } catch (ue) {
+          console.warn('[DB] User credit increment warning:', ue);
+        }
+      }
+    } catch (e) {
+      console.warn('[DB] recordSprintAttempt error:', e);
+    }
+  }
+
+  async updateUserProfile(uid, updates) {
+    if (!uid) return;
+    try {
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, updates, { merge: true });
+    } catch (e) {
+      console.warn('[DB] updateUserProfile error:', e);
+    }
+  }
+
   // ── 3. Daily MCQ Sprint ──────────────────────────────────────────────────
   getDailySprint(dateStr) {
     return {
