@@ -1010,15 +1010,26 @@
 }
 
 [data-theme="dark"] .bottom-nav-bar {
-  background: rgba(17, 24, 39, 0.96) !important;
-  border-top-color: #1F2937 !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 [data-theme="dark"] .nav-tab-btn {
   color: #64748B !important;
+  outline: none !important;
 }
 
 [data-theme="dark"] .nav-tab-btn.active {
+  color: #60A5FA !important;
+}
+
+[data-theme="dark"] .nav-tab-btn.active .nav-pill-icon {
+  background: rgba(37, 99, 235, 0.22) !important;
+  color: #60A5FA !important;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.3) !important;
+}
+
+[data-theme="dark"] .nav-tab-btn.active span {
   color: #60A5FA !important;
 }
 

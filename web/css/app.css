@@ -1039,7 +1039,7 @@ body {
   font-size: 13px;
 }
 
-/* ── Bottom Navigation Bar (Matching student_shell.dart) ── */
+/* ── Bottom Navigation Bar (1:1 Material 3 NavigationBar & student_shell.dart) ── */
 .bottom-nav-bar {
   position: absolute;
   bottom: 0;
@@ -1047,50 +1047,109 @@ body {
   right: 0;
   height: calc(72px + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-top: 1px solid #E2E8F0;
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 50;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .nav-tab-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
-  background: none;
+  background: transparent;
   border: none;
+  outline: none !important;
+  box-shadow: none !important;
   color: #64748B;
-  font-size: 10.5px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
   position: relative;
-  padding: 4px 10px;
+  padding: 4px 6px;
+  border-radius: 16px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+  flex: 1;
+  max-width: 82px;
 }
 
-.nav-tab-btn.active {
-  color: #2563EB;
+.nav-tab-btn:focus,
+.nav-tab-btn:focus-visible,
+.nav-tab-btn:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.nav-tab-btn:active {
+  transform: scale(0.90);
 }
 
 .nav-pill-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 48px;
+  height: 28px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  transition: all 0.2s ease;
+  color: #64748B;
+  background: transparent;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.nav-tab-btn span {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748B;
+  letter-spacing: -0.1px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 1.2;
+}
+
+/* Material 3 Active Pill Indicator */
+.nav-tab-btn.active {
+  color: #2563EB;
 }
 
 .nav-tab-btn.active .nav-pill-icon {
   background: #EFF6FF;
   color: #2563EB;
+  transform: scale(1.08);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.14);
+}
+
+.nav-tab-btn.active span {
+  color: #2563EB;
+  font-weight: 800;
+}
+
+/* Page Transition: 1:1 with Flutter _buildSmoothPage (Fade + Slide) */
+@keyframes tabSmoothEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-page-transition {
+  animation: tabSmoothEntrance 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 /* Form & Modals */

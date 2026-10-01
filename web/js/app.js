@@ -416,6 +416,11 @@ class AppController {
       btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
 
+    // Smooth page entrance transition matching Flutter 1:1
+    container.classList.remove('tab-page-transition');
+    void container.offsetWidth; // Force DOM reflow to re-trigger CSS keyframes
+    container.classList.add('tab-page-transition');
+
     switch (tabName) {
       case 'home':
         this.renderHomeScreen(container);
@@ -3171,6 +3176,11 @@ class AppController {
       b.classList.toggle('active', b.dataset.adminTab === tabName);
     });
 
+    // Smooth page entrance transition matching Flutter 1:1
+    viewport.classList.remove('tab-page-transition');
+    void viewport.offsetWidth; // Force DOM reflow to re-trigger CSS keyframes
+    viewport.classList.add('tab-page-transition');
+
     switch (tabName) {
       case 'dashboard':
         this.renderAdminDashboardScreen(viewport);
@@ -3190,6 +3200,8 @@ class AppController {
       default:
         this.renderAdminDashboardScreen(viewport);
     }
+
+    viewport.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // ═════════════════════════════════════════════════════════════════════════
