@@ -28,7 +28,10 @@ class AppController {
       this.currentMode = 'admin';
     }
 
-    // 1. Initialize PWA Gatekeeper for iOS Add to Home Screen enforcement
+    // 1. Mount 1:1 Opening Loading Screen (splash_screen.dart replica)
+    this.renderSplashScreen();
+
+    // 2. Initialize PWA Gatekeeper for iOS Add to Home Screen enforcement
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: () => {
         console.log('[App] PWA Standalone Mode active.');
@@ -44,12 +47,55 @@ class AppController {
 
     gatekeeper.init();
 
-    // 2. Global Anti-Cheat Listener
+    // 3. Global Anti-Cheat Listener
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && this.isInsideLiveExam) {
         this.handleExamTabSwitch();
       }
     });
+  }
+
+  // ── 00. 1:1 Opening Loading Screen (Exact splash_screen.dart Replica) ──
+  renderSplashScreen() {
+    if (document.getElementById('app-splash-screen')) return;
+
+    const splash = document.createElement('div');
+    splash.className = 'splash-screen-overlay';
+    splash.id = 'app-splash-screen';
+    splash.innerHTML = `
+      <div style="height: 20px;"></div>
+
+      <!-- Center Content: Logo + Badge (100% Dead Centered) -->
+      <div class="splash-center-content">
+        <div class="splash-logo-wrap">
+          <img src="./icons/edupeak_logo.png" alt="EduPeak" class="splash-logo-img" onerror="this.src='./icons/icon-192.png'" />
+        </div>
+        <div class="splash-badge-wrap">
+          <div class="splash-badge">
+            <div class="splash-badge-dot"></div>
+            <span class="splash-badge-text">AI & Advanced Level Institute</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Loader (100% Dead Centered) -->
+      <div class="splash-bottom-loader">
+        <div class="splash-progress-track">
+          <div class="splash-progress-bar"></div>
+        </div>
+        <div class="splash-loading-text">Connecting to Campus...</div>
+      </div>
+    `;
+
+    document.body.appendChild(splash);
+
+    // Keep splash visible for 1900ms viewing time, then execute Swap-Up exit
+    setTimeout(() => {
+      splash.classList.add('swap-up-exit');
+      setTimeout(() => {
+        splash.remove();
+      }, 550);
+    }, 1900);
   }
 
   // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
@@ -72,8 +118,11 @@ class AppController {
         </div>
 
         <div class="auth-header">
-          <div class="auth-brand-logo">🍰</div>
+          <div class="auth-brand-logo-wrap">
+            <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" onerror="this.src='./icons/icon-192.png'" />
+          </div>
           <div class="auth-title">EduPeak Learning Platform</div>
+          <div class="auth-brand-tag">AI & Advanced Level Institute ⚛️</div>
           <div class="auth-subtitle">A/L Physics Examination & Proctoring Suite</div>
         </div>
 

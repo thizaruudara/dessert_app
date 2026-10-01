@@ -1292,17 +1292,229 @@
   margin-bottom: 24px;
 }
 
-.auth-brand-logo {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
-  border-radius: 18px;
+.auth-brand-logo-wrap {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 3px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
-  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+  padding: 6px;
   margin-bottom: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-brand-logo-wrap:hover {
+  transform: scale(1.04);
+  box-shadow: 0 14px 32px rgba(37, 99, 235, 0.35);
+}
+
+.auth-brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.auth-brand-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(37, 99, 235, 0.15);
+  color: #38BDF8;
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-top: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+/* ── 1:1 Opening Loading Screen (splash_screen.dart) ─────────────────────── */
+.splash-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999999;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #FFFFFF;
+  transition: transform 0.55s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.55s ease-in;
+  will-change: transform, opacity;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+[data-theme="dark"] .splash-screen-overlay,
+html[data-theme="dark"] .splash-screen-overlay {
+  background-color: #0F172A;
+}
+
+.splash-screen-overlay.swap-up-exit {
+  transform: translateY(-100%);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.splash-center-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.splash-logo-wrap {
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: splashLogoEntrance 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.splash-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 28px rgba(37, 99, 235, 0.22));
+}
+
+@keyframes splashLogoEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.78) translateY(22px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.splash-badge-wrap {
+  margin-top: 24px;
+  animation: splashBadgeEntrance 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s both;
+}
+
+@keyframes splashBadgeEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.splash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .splash-badge,
+html[data-theme="dark"] .splash-badge {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.splash-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563EB;
+  box-shadow: 0 0 8px #2563EB;
+}
+
+.splash-badge-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .splash-badge-text,
+html[data-theme="dark"] .splash-badge-text {
+  color: #CBD5E1;
+}
+
+.splash-bottom-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 38px;
+  animation: splashLoaderEntrance 0.6s ease-in 0.55s both;
+}
+
+@keyframes splashLoaderEntrance {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.splash-progress-track {
+  width: 124px;
+  height: 3.5px;
+  border-radius: 999px;
+  background: #F1F5F9;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .splash-progress-track,
+html[data-theme="dark"] .splash-progress-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.splash-progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45px;
+  background: linear-gradient(90deg, transparent, #2563EB 50%, #60A5FA 75%, transparent);
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+  border-radius: 999px;
+  animation: splashSweep 1.4s infinite ease-in-out;
+}
+
+@keyframes splashSweep {
+  0% {
+    left: -45px;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.splash-loading-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  letter-spacing: 0.5px;
+  margin-top: 12px;
+}
+
+[data-theme="dark"] .splash-loading-text,
+html[data-theme="dark"] .splash-loading-text {
+  color: #64748B;
 }
 
 .auth-title {

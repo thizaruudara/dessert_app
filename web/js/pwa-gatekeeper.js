@@ -78,7 +78,7 @@ export class PwaGatekeeper {
         <!-- Top App Emblem -->
         <div class="gatekeeper-header">
           <div class="gatekeeper-icon-wrap">
-            <img src="./icons/icon-192.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/icon.svg'" />
+            <img src="./icons/edupeak_logo.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/icon-192.png'" />
             <div class="icon-ring-pulse"></div>
           </div>
           <span class="gatekeeper-badge">iOS Home Screen Required</span>
