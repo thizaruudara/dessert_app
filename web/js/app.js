@@ -3119,6 +3119,9 @@ class AppController {
       <!-- Main Scrollable Viewport -->
       <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;"></div>
 
+      <!-- Contained Floating Action Button Slot (Strictly inside #app-root) -->
+      <div id="admin-fab-slot"></div>
+
       <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart NavigationBar) -->
       <nav class="bottom-nav-bar" id="admin-bottom-nav" style="background:#FFFFFF; border-top:1px solid #E2E8F0;">
         <button class="nav-tab-btn ${this.adminTab === 'dashboard' ? 'active' : ''}" data-admin-tab="dashboard">
@@ -3159,6 +3162,10 @@ class AppController {
     this.adminTab = tabName;
     const viewport = document.getElementById('admin-main-viewport');
     if (!viewport) return;
+
+    // Reset FAB slot on every tab switch so buttons never bleed across tabs
+    const fabSlot = document.getElementById('admin-fab-slot');
+    if (fabSlot) fabSlot.innerHTML = '';
 
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.adminTab === tabName);
@@ -3624,12 +3631,17 @@ class AppController {
         ${this.adminPaperTab === 1 ? this._buildAdminUpcomingPapersHTML() : ''}
         ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML() : ''}
       </div>
-
-      <!-- FAB (Floating Action Button) -->
-      <button class="apk-fab-button" id="btn-fab-admin-paper">
-        <span style="font-size:18px;">+</span> ${this.adminPaperTab === 0 ? 'Add Live Session' : (this.adminPaperTab === 1 ? 'Add Upcoming Paper' : 'Create Leaderboard')}
-      </button>
     `;
+
+    // Render FAB strictly inside the contained admin-fab-slot
+    const fabSlot = document.getElementById('admin-fab-slot');
+    if (fabSlot) {
+      fabSlot.innerHTML = `
+        <button class="apk-fab-button" id="btn-fab-admin-paper">
+          <span style="font-size:18px;">+</span> ${this.adminPaperTab === 0 ? 'Add Live Session' : (this.adminPaperTab === 1 ? 'Add Upcoming Paper' : 'Create Leaderboard')}
+        </button>
+      `;
+    }
 
     // Tab switcher events
     container.querySelectorAll('[data-paper-tab]').forEach(btn => {
@@ -4299,12 +4311,17 @@ class AppController {
       <div id="admin-sprint-content" style="padding-bottom:90px;">
         ${this.adminSprintTab === 0 ? this._buildAdminSprintsTabHTML(dateStr) : this._buildAdminSprintLeaderboardHTML(dateStr)}
       </div>
-
-      <!-- FAB -->
-      <button class="apk-fab-button" id="btn-fab-create-sprint">
-        <span style="font-size:18px;">+</span> Create 5-MCQ Sprint
-      </button>
     `;
+
+    // Render FAB strictly inside the contained admin-fab-slot
+    const fabSlot = document.getElementById('admin-fab-slot');
+    if (fabSlot) {
+      fabSlot.innerHTML = `
+        <button class="apk-fab-button" id="btn-fab-create-sprint">
+          <span style="font-size:18px;">+</span> Create 5-MCQ Sprint
+        </button>
+      `;
+    }
 
     // Tab Switcher
     container.querySelectorAll('[data-sprint-tab]').forEach(btn => {
