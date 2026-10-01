@@ -391,10 +391,12 @@ class AppController {
   }
 
   // ── 1. The Exact Student Cockpit (Home) ──────────────────────────────────
-  renderHomeScreen(container) {
+  async renderHomeScreen(container) {
     const user = this.currentUser || {};
     const studentName = user.name || 'ThiZaru';
     const initial = studentName.charAt(0).toUpperCase();
+
+    const insight = await dbService.getDailyInsight();
 
     container.innerHTML = `
       <!-- 1. Header (Avatar, Name, Verified Badge, 2027 Tag, 3 Days Streak) -->
@@ -621,23 +623,23 @@ class AppController {
             <button class="btn-vault-refresh" id="btn-shuffle-insight" title="Shuffle">🔄</button>
           </div>
         </div>
-        <div class="vault-topic-meta">යාන්ත්‍ර විද්‍යාව • Mechanics</div>
-        <div class="vault-concept-name">
-          කාර්යය-ශක්ති ප්‍රමේයය <span style="font-size: 12.5px; font-weight:600; color:#64748B;">(Work-Energy Theorem & Friction Losses)</span>
+        <div class="vault-topic-meta" id="home-vault-meta">${insight.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'} • ${insight.unitEnglish || 'Mechanics'}</div>
+        <div class="vault-concept-name" id="home-vault-name">
+          ${insight.titleSinhala || 'කාර්යය-ශක්ති ප්‍රමේයය'} <span style="font-size: 12.5px; font-weight:600; color:#64748B;" id="home-vault-en">(${insight.titleEnglish || 'Work-Energy Theorem & Friction Losses'})</span>
         </div>
-        <div class="vault-formula-box">
-          W_net  =  ΔK  =  ½ m v²  -  ½ m u²
+        <div class="vault-formula-box" id="home-vault-formula">
+          ${insight.formula || 'W_net  =  ΔK  =  ½ m v²  -  ½ m u²'}
         </div>
         <div class="vault-exam-tip-box">
           <div class="tip-header">
             <span>💡</span>
             <span>විභාග උපදෙස (Exam Tip):</span>
           </div>
-          <div class="tip-sinhala">
-            ආනත තලයක චලිතයේදී ඝර්ෂණයට එරෙහි කාර්යය (W_f = -f · s) යාන්ත්‍රික ශක්ති සමීකරණයට පෙර වෙන්ව සලකා බලන්න.
+          <div class="tip-sinhala" id="home-vault-tip-si">
+            ${insight.tipSinhala || 'ආනත තලයක චලිතයේදී ඝර්ෂණයට එරෙහි කාර්යය (W_f = -f · s) යාන්ත්‍රික ශක්ති සමීකරණයට පෙර වෙන්ව සලකා බලන්න.'}
           </div>
-          <div class="tip-english">
-            En: Always compute work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.
+          <div class="tip-english" id="home-vault-tip-en">
+            En: ${insight.tipEnglish || 'Always compute work done against friction W_f = -f · s separately before equating mechanical energy at the base of an incline.'}
           </div>
         </div>
         <div class="btn-ask-ai-tutor" id="btn-ask-tutor-insight">
@@ -678,12 +680,31 @@ class AppController {
     this.startCountdownTimer();
     this.startInspirationRotator();
 
+    // Shuffle Insight Handler across 10 official presets
+    let shuffleIdx = 0;
+    const presets = dbService.getPresetPhysicsInsights();
+    document.getElementById('btn-shuffle-insight')?.addEventListener('click', () => {
+      shuffleIdx = (shuffleIdx + 1) % presets.length;
+      const p = presets[shuffleIdx];
+      const meta = document.getElementById('home-vault-meta');
+      if (meta) meta.innerText = `${p.unitSinhala} • ${p.unitEnglish}`;
+      const name = document.getElementById('home-vault-name');
+      if (name) name.innerHTML = `${p.titleSinhala} <span style="font-size:12.5px; font-weight:600; color:#64748B;">(${p.titleEnglish})</span>`;
+      const form = document.getElementById('home-vault-formula');
+      if (form) form.innerText = p.formula;
+      const tipSi = document.getElementById('home-vault-tip-si');
+      if (tipSi) tipSi.innerText = p.tipSinhala;
+      const tipEn = document.getElementById('home-vault-tip-en');
+      if (tipEn) tipEn.innerText = `En: ${p.tipEnglish}`;
+      notificationService.showInAppToast('⚛️ Shuffled Concept: ' + p.titleEnglish, 'info');
+    });
+
     // Event Listeners
     document.getElementById('act-daily-mcq')?.addEventListener('click', () => this.switchTab('home'));
     document.getElementById('btn-start-sprint-action')?.addEventListener('click', () => this.openSprintDialog());
     document.getElementById('act-ai-tutor')?.addEventListener('click', () => this.openAiTutorDialog());
-    document.getElementById('btn-ask-tutor-insight')?.addEventListener('click', () => this.openAiTutorDialog('Work-Energy Theorem'));
-    document.getElementById('act-submit-hw')?.addEventListener('click', () => this.openDocumentScanner());
+    document.getElementById('btn-ask-tutor-insight')?.addEventListener('click', () => this.openAiTutorDialog(insight.titleEnglish || 'Work-Energy Theorem'));
+    document.getElementById('act-submit-hw')?.addEventListener('click', () => this.openSubmitGuideModal());
     document.getElementById('act-ranks')?.addEventListener('click', () => this.switchTab('ranks'));
     document.getElementById('btn-enter-eval-room')?.addEventListener('click', () => this.switchTab('papers'));
     document.getElementById('btn-header-avatar')?.addEventListener('click', () => this.switchTab('profile'));
@@ -2854,6 +2875,14 @@ class AppController {
                 <div class="subtitle">Send telegram</div>
               </div>
             </button>
+
+            <button class="apk-command-btn emerald" id="btn-cmd-daily-insight" style="grid-column: span 2;">
+              <div class="apk-command-icon-box" style="background:rgba(16, 185, 129, 0.12); color:#10B981;">⚛️</div>
+              <div class="apk-command-info">
+                <div class="title">Physics Micro-Insight ⚛️</div>
+                <div class="subtitle">Auto-rotate random or pin custom formula</div>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -2977,6 +3006,9 @@ class AppController {
     });
     document.getElementById('btn-cmd-broadcasts')?.addEventListener('click', () => {
       this.switchAdminTab('broadcasts');
+    });
+    document.getElementById('btn-cmd-daily-insight')?.addEventListener('click', () => {
+      this.openAdminDailyInsightModal();
     });
 
     container.querySelectorAll('[data-review-id]').forEach(btn => {
@@ -4165,42 +4197,571 @@ class AppController {
   }
 
   // ── Helper Modal Dialogs ───────────────────────────────────────────────
-  openExamCountdownsModal() {
+  async openAdminDailyInsightModal() {
+    const current = await dbService.getDailyInsight();
+    const presets = dbService.getPresetPhysicsInsights();
+
+    let isCustom = current.isCustom || false;
+    let selectedPresetIdx = isCustom ? -1 : 0;
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    const renderModalContent = () => {
+      modal.innerHTML = `
+        <div class="modal-sheet" style="max-height:90vh; overflow-y:auto; padding:18px;">
+          <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:38px; height:38px; border-radius:12px; background:rgba(16, 185, 129, 0.12); display:flex; align-items:center; justify-content:center; font-size:20px; color:#10B981;">⚛️</div>
+              <div>
+                <div style="font-size:16px; font-weight:800; color:#0F172A;">Daily Physics Insight Manager</div>
+                <div style="font-size:11px; color:#64748B;">Control formula rotation & custom pinned concepts for students</div>
+              </div>
+            </div>
+            <button class="modal-close-btn" id="btn-close-insight-modal">✕</button>
+          </div>
+
+          <!-- Mode Toggle Cards (1:1 with Flutter _isCustomMode) -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+            <div id="btn-mode-random" style="border:2px solid ${!isCustom ? '#10B981' : '#E2E8F0'}; background:${!isCustom ? '#ECFDF5' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:16px;">🔄</span>
+                <span style="font-size:12.5px; font-weight:700; color:${!isCustom ? '#065F46' : '#475569'};">Random Mode</span>
+              </div>
+              <div style="font-size:10.5px; color:${!isCustom ? '#047857' : '#94A3B8'}; margin-top:4px; line-height:1.35;">Auto-rotates daily across 10 official A/L formula presets.</div>
+            </div>
+
+            <div id="btn-mode-custom" style="border:2px solid ${isCustom ? '#2563EB' : '#E2E8F0'}; background:${isCustom ? '#EFF6FF' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:16px;">📌</span>
+                <span style="font-size:12.5px; font-weight:700; color:${isCustom ? '#1E40AF' : '#475569'};">Custom Pinned</span>
+              </div>
+              <div style="font-size:10.5px; color:${isCustom ? '#1D4ED8' : '#94A3B8'}; margin-top:4px; line-height:1.35;">Pin a specific formula, concept, or exam tip for all students.</div>
+            </div>
+          </div>
+
+          ${isCustom ? `
+            <!-- Preset Selector (lines 89-102 of Flutter) -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px; margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:11.5px; font-weight:700; color:#334155;">⚡ Preload From Curated Presets:</span>
+                <span style="font-size:10px; color:#64748B;">10 Official Presets</span>
+              </div>
+              <select id="preset-select" class="form-textarea" style="height:38px; padding:6px 10px; font-size:12px;">
+                <option value="-1">-- Choose a concept preset to populate --</option>
+                ${presets.map((p, idx) => `
+                  <option value="${idx}" ${selectedPresetIdx === idx ? 'selected' : ''}>${p.unitSinhala} • ${p.titleSinhala} (${p.titleEnglish})</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <!-- Form Fields -->
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
+                  <div class="form-label">මාතෘකාව (Sinhala Title):</div>
+                  <input type="text" id="ins-title-si" class="form-textarea" style="height:38px;" value="${current.titleSinhala || ''}" placeholder="උදා: කාර්යය-ශක්ති ප්‍රමේයය" />
+                </div>
+                <div>
+                  <div class="form-label">Concept (English Title):</div>
+                  <input type="text" id="ins-title-en" class="form-textarea" style="height:38px;" value="${current.titleEnglish || ''}" placeholder="e.g. Work-Energy Theorem" />
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
+                  <div class="form-label">පාඩම (Sinhala Unit):</div>
+                  <input type="text" id="ins-unit-si" class="form-textarea" style="height:38px;" value="${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'}" />
+                </div>
+                <div>
+                  <div class="form-label">Physics Unit (English):</div>
+                  <input type="text" id="ins-unit-en" class="form-textarea" style="height:38px;" value="${current.unitEnglish || 'Mechanics'}" />
+                </div>
+              </div>
+
+              <div>
+                <div class="form-label">භෞතික විද්‍යා සූත්‍රය (Physics Formula):</div>
+                <input type="text" id="ins-formula" class="form-textarea" style="height:42px; font-family:monospace; font-weight:700; color:#1E3A8A; background:#EFF6FF; border-color:#BFDBFE;" value="${current.formula || ''}" placeholder="e.g. W_net = ΔK = ½ m v² - ½ m u²" />
+              </div>
+
+              <div>
+                <div class="form-label">විභාග උපදෙස (Sinhala Exam Tip):</div>
+                <textarea id="ins-tip-si" class="form-textarea" style="height:55px; resize:none;" placeholder="සිසුන්ට මතක තබාගත යුතු ප්‍රධාන උපක්‍රමය හෝ ফাঁද...">${current.tipSinhala || ''}</textarea>
+              </div>
+
+              <div>
+                <div class="form-label">Exam Tip (English Explanation):</div>
+                <textarea id="ins-tip-en" class="form-textarea" style="height:55px; resize:none;" placeholder="Important exam nuance or common pitfall in English...">${current.tipEnglish || ''}</textarea>
+              </div>
+            </div>
+          ` : `
+            <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px; margin-bottom:14px; display:flex; align-items:flex-start; gap:10px;">
+              <span style="font-size:22px;">🔄</span>
+              <div>
+                <div style="font-size:13px; font-weight:700; color:#166534;">Daily Random Mode is Currently Active</div>
+                <div style="font-size:11px; color:#15803D; margin-top:3px; line-height:1.4;">
+                  The system automatically cycles through all 10 core A/L physics formula presets every day at midnight (Sri Lanka Time). Students see a fresh formula and exam tip every single day.
+                </div>
+              </div>
+            </div>
+          `}
+
+          <!-- Live Preview Card (Matching Student Cockpit 1:1) -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span style="font-size:11.5px; font-weight:700; color:#475569;">👁️ Live Student Cockpit Preview:</span>
+              <span style="font-size:10px; color:#10B981; font-weight:700;">● Pixel-Perfect 1:1</span>
+            </div>
+
+            <div class="insight-vault-card" id="ins-preview-card" style="margin:0; box-shadow:0 4px 16px rgba(15,23,42,0.06);">
+              <div class="vault-top">
+                <div class="vault-pill">
+                  <span>⚛️</span>
+                  <span>PHYSICS MICRO-INSIGHT</span>
+                </div>
+                <span class="vault-tag-pill">${isCustom ? '📌 Custom Pinned' : 'අද දවසේ සූත්‍රය • Daily'}</span>
+              </div>
+              <div class="vault-topic-meta" id="prev-unit">${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'} • ${current.unitEnglish || 'Mechanics'}</div>
+              <div class="vault-concept-name" id="prev-title">
+                ${current.titleSinhala || 'කාර්යය-ශක්ති ප්‍රමේයය'} <span style="font-size: 12.5px; font-weight:600; color:#64748B;" id="prev-title-en">(${current.titleEnglish || 'Work-Energy Theorem'})</span>
+              </div>
+              <div class="vault-formula-box" id="prev-formula">
+                ${current.formula || 'W_net  =  ΔK  =  ½ m v²  -  ½ m u²'}
+              </div>
+              <div class="vault-exam-tip-box">
+                <div class="tip-header">
+                  <span>💡</span>
+                  <span>විභාග උපදෙස (Exam Tip):</span>
+                </div>
+                <div class="tip-sinhala" id="prev-tip-si">
+                  ${current.tipSinhala || 'ආනත තලයක චලිතයේදී ඝර්ෂණයට එරෙහි කාර්යය යාන්ත්‍රික ශක්ති සමීකරණයට පෙර වෙන්ව සලකා බලන්න.'}
+                </div>
+                <div class="tip-english" id="prev-tip-en">
+                  En: ${current.tipEnglish || 'Always compute work done against friction separately.'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons Row -->
+          <div style="display:flex; gap:10px;">
+            ${isCustom ? `
+              <button class="apk-paper-btn-secondary" id="btn-revert-random" style="flex:1; border-color:#EF4444; color:#EF4444; height:44px;">
+                <span>🔄 Revert to Random</span>
+              </button>
+              <button class="primary-btn" id="btn-save-custom-insight" style="flex:2; height:44px; margin-top:0;">
+                <span>💾 Save & Pin to Students</span>
+              </button>
+            ` : `
+              <button class="apk-paper-btn-secondary" id="btn-switch-custom-mode" style="flex:1; border-color:#2563EB; color:#2563EB; height:44px;">
+                <span>✏️ Switch to Custom Pinned Mode</span>
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+
+      // Attach Event Listeners
+      document.getElementById('btn-close-insight-modal')?.addEventListener('click', () => modal.remove());
+
+      document.getElementById('btn-mode-random')?.addEventListener('click', () => {
+        if (isCustom) {
+          isCustom = false;
+          renderModalContent();
+        }
+      });
+
+      document.getElementById('btn-mode-custom')?.addEventListener('click', () => {
+        if (!isCustom) {
+          isCustom = true;
+          renderModalContent();
+        }
+      });
+
+      document.getElementById('btn-switch-custom-mode')?.addEventListener('click', () => {
+        isCustom = true;
+        renderModalContent();
+      });
+
+      document.getElementById('preset-select')?.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.value);
+        if (idx >= 0 && idx < presets.length) {
+          selectedPresetIdx = idx;
+          const p = presets[idx];
+          current.titleSinhala = p.titleSinhala;
+          current.titleEnglish = p.titleEnglish;
+          current.unitSinhala = p.unitSinhala;
+          current.unitEnglish = p.unitEnglish;
+          current.formula = p.formula;
+          current.tipSinhala = p.tipSinhala;
+          current.tipEnglish = p.tipEnglish;
+          current.topicCode = p.topicCode;
+          renderModalContent();
+        }
+      });
+
+      // Live typing updates for preview
+      const updatePreview = () => {
+        const titleSi = document.getElementById('ins-title-si')?.value || '';
+        const titleEn = document.getElementById('ins-title-en')?.value || '';
+        const unitSi = document.getElementById('ins-unit-si')?.value || '';
+        const unitEn = document.getElementById('ins-unit-en')?.value || '';
+        const formula = document.getElementById('ins-formula')?.value || '';
+        const tipSi = document.getElementById('ins-tip-si')?.value || '';
+        const tipEn = document.getElementById('ins-tip-en')?.value || '';
+
+        const prevTitle = document.getElementById('prev-title');
+        if (prevTitle) prevTitle.innerHTML = `${titleSi || 'Formula Title'} <span style="font-size:12.5px; font-weight:600; color:#64748B;">(${titleEn || 'English Concept'})</span>`;
+        const prevUnit = document.getElementById('prev-unit');
+        if (prevUnit) prevUnit.innerText = `${unitSi} • ${unitEn}`;
+        const prevFormula = document.getElementById('prev-formula');
+        if (prevFormula) prevFormula.innerText = formula;
+        const prevTipSi = document.getElementById('prev-tip-si');
+        if (prevTipSi) prevTipSi.innerText = tipSi;
+        const prevTipEn = document.getElementById('prev-tip-en');
+        if (prevTipEn) prevTipEn.innerText = `En: ${tipEn}`;
+      };
+
+      ['ins-title-si', 'ins-title-en', 'ins-unit-si', 'ins-unit-en', 'ins-formula', 'ins-tip-si', 'ins-tip-en'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', updatePreview);
+      });
+
+      // Save custom
+      document.getElementById('btn-save-custom-insight')?.addEventListener('click', async () => {
+        const titleSi = document.getElementById('ins-title-si')?.value.trim();
+        const formula = document.getElementById('ins-formula')?.value.trim();
+        if (!titleSi || !formula) {
+          notificationService.showInAppToast('⚠️ කරුණාකර මාතෘකාව සහ සූත්‍රය ඇතුළත් කරන්න (Please fill title and formula)', 'warning');
+          return;
+        }
+
+        const data = {
+          titleSinhala: titleSi,
+          titleEnglish: document.getElementById('ins-title-en')?.value.trim() || '',
+          unitSinhala: document.getElementById('ins-unit-si')?.value.trim() || '',
+          unitEnglish: document.getElementById('ins-unit-en')?.value.trim() || '',
+          formula: formula,
+          tipSinhala: document.getElementById('ins-tip-si')?.value.trim() || '',
+          tipEnglish: document.getElementById('ins-tip-en')?.value.trim() || '',
+          topicCode: current.topicCode || 'topic_custom'
+        };
+
+        const btn = document.getElementById('btn-save-custom-insight');
+        btn.innerText = 'Saving to Cloud...';
+        btn.disabled = true;
+
+        try {
+          await dbService.saveCustomPhysicsInsight(data, this.currentUser?.name || 'Admin');
+          notificationService.showInAppToast('✅ Daily Physics Insight successfully pinned to all students!', 'success');
+          modal.remove();
+        } catch (e) {
+          notificationService.showInAppToast('❌ Save error: ' + e.message, 'error');
+          btn.innerText = '💾 Save & Pin to Students';
+          btn.disabled = false;
+        }
+      });
+
+      // Revert to Random
+      document.getElementById('btn-revert-random')?.addEventListener('click', async () => {
+        try {
+          await dbService.setRandomPhysicsInsightMode(this.currentUser?.name || 'Admin');
+          notificationService.showInAppToast('✅ Successfully reverted to Automatic Daily Random Mode', 'success');
+          modal.remove();
+        } catch (e) {
+          notificationService.showInAppToast('❌ Revert error: ' + e.message, 'error');
+        }
+      });
+    };
+
+    renderModalContent();
+    document.body.appendChild(modal);
+  }
+
+  // ── Examination Countdowns Manager (1:1 with admin_exam_countdowns_screen.dart) ──
+  async openExamCountdownsModal() {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    let countdowns = await dbService.getExamCountdowns();
+    let timerInterval = null;
+
+    const computeTimeLeft = (targetStr) => {
+      const diff = new Date(targetStr).getTime() - Date.now();
+      if (diff <= 0) return { days: 0, hours: 0, mins: 0, secs: 0, expired: true };
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((diff / 1000 / 60) % 60);
+      const secs = Math.floor((diff / 1000) % 60);
+      return { days, hours, mins, secs, expired: false };
+    };
+
+    const renderCountdownsList = () => {
+      modal.innerHTML = `
+        <div class="modal-sheet" style="max-height:88vh; overflow-y:auto; padding:18px;">
+          <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:38px; height:38px; border-radius:12px; background:rgba(139, 92, 246, 0.12); display:flex; align-items:center; justify-content:center; font-size:20px; color:#8B5CF6;">⏱️</div>
+              <div>
+                <div style="font-size:16px; font-weight:800; color:#0F172A;">G.C.E. A/L Examination Countdowns</div>
+                <div style="font-size:11px; color:#64748B;">Target dates & dashboard countdown timer visibility</div>
+              </div>
+            </div>
+            <button class="modal-close-btn" id="btn-close-countdown">✕</button>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:12px;" id="countdowns-list-container">
+            ${countdowns.map((c) => {
+              const t = computeTimeLeft(c.targetDate);
+              const dateFormatted = new Date(c.targetDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+              return `
+                <div class="hero-card" style="padding:14px; border:1px solid ${c.isEnabled ? '#C7D2FE' : '#E2E8F0'}; background:${c.isEnabled ? '#FFFFFF' : '#F8FAFC'}; box-shadow:0 2px 8px rgba(15,23,42,0.04);" id="card-cd-${c.id}">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:13px; font-weight:800; color:#4338CA; background:#EEF2FF; padding:3px 10px; border-radius:8px; border:1px solid #C7D2FE;">${c.examYear}</span>
+                        <span style="font-size:13px; font-weight:700; color:#1E293B;">${c.customTitle}</span>
+                      </div>
+                      <div style="font-size:11px; color:#64748B; margin-top:4px;">🎯 Target: <strong>${dateFormatted}</strong></div>
+                    </div>
+
+                    <!-- Visibility Toggle (lines 60-70 of Flutter screen) -->
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="Toggle visibility for students">
+                      <span style="font-size:10.5px; font-weight:600; color:${c.isEnabled ? '#10B981' : '#94A3B8'};">${c.isEnabled ? 'Visible' : 'Hidden'}</span>
+                      <input type="checkbox" data-toggle-cd="${c.id}" ${c.isEnabled ? 'checked' : ''} style="width:18px; height:18px; accent-color:#10B981; cursor:pointer;" />
+                    </label>
+                  </div>
+
+                  <!-- Live Counter Box (Days, Hours, Mins, Secs) -->
+                  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:12px 0; background:${c.isEnabled ? '#F5F3FF' : '#F1F5F9'}; padding:10px; border-radius:10px; text-align:center;">
+                    <div>
+                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-days-${c.id}">${t.days}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Days</div>
+                    </div>
+                    <div>
+                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-hours-${c.id}">${t.hours}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Hours</div>
+                    </div>
+                    <div>
+                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-mins-${c.id}">${t.mins}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Mins</div>
+                    </div>
+                    <div>
+                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-secs-${c.id}">${t.secs}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Secs</div>
+                    </div>
+                  </div>
+
+                  <!-- Action Bar -->
+                  <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F1F5F9; padding-top:8px;">
+                    <div style="font-size:10.5px; color:#94A3B8;">${c.notes || 'Official countdown active for students'}</div>
+                    <button class="apk-paper-btn-secondary" data-edit-date="${c.id}" style="padding:4px 10px; font-size:11px; height:30px; border-color:#8B5CF6; color:#8B5CF6;">
+                      📅 Edit Date & Time
+                    </button>
+                  </div>
+
+                  <!-- Inline Date Picker Box -->
+                  <div id="date-picker-box-${c.id}" style="display:none; margin-top:10px; padding:10px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px;">
+                    <div style="font-size:11px; font-weight:700; color:#334155; margin-bottom:6px;">Select New Examination Date & Time:</div>
+                    <div style="display:flex; gap:8px;">
+                      <input type="datetime-local" id="input-dt-${c.id}" class="form-textarea" style="height:36px; font-size:11.5px; flex:1;" value="${new Date(c.targetDate).toISOString().slice(0, 16)}" />
+                      <button class="primary-btn" data-save-dt="${c.id}" style="height:36px; padding:0 14px; margin-top:0; font-size:11.5px;">Save</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Add New Countdown Button / Form -->
+          <div style="margin-top:16px; border-top:1px solid #E2E8F0; padding-top:14px;">
+            <button class="apk-paper-btn-secondary" id="btn-toggle-add-cd" style="width:100%; border-color:#8B5CF6; color:#8B5CF6; height:40px; font-weight:700;">
+              ➕ Add New Batch Examination Countdown
+            </button>
+            <div id="add-cd-box" style="display:none; margin-top:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+              <div style="font-size:12px; font-weight:700; color:#1E293B; margin-bottom:8px;">Create New Batch Target:</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                <input type="text" id="new-cd-year" class="form-textarea" style="height:38px;" placeholder="e.g. 2030 A/L" />
+                <input type="datetime-local" id="new-cd-date" class="form-textarea" style="height:38px;" />
+              </div>
+              <input type="text" id="new-cd-title" class="form-textarea" style="height:38px; margin-bottom:8px;" placeholder="e.g. 2030 G.C.E. Advanced Level Examination" />
+              <button class="primary-btn" id="btn-submit-new-cd" style="height:38px; margin-top:0; width:100%;">Create & Sync Countdown</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Handlers
+      document.getElementById('btn-close-countdown')?.addEventListener('click', () => {
+        if (timerInterval) clearInterval(timerInterval);
+        modal.remove();
+      });
+
+      // Toggle edit box
+      modal.querySelectorAll('[data-edit-date]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.editDate;
+          const box = document.getElementById(`date-picker-box-${id}`);
+          if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        });
+      });
+
+      // Save date
+      modal.querySelectorAll('[data-save-dt]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.saveDt;
+          const val = document.getElementById(`input-dt-${id}`)?.value;
+          if (!val) return;
+          try {
+            btn.innerText = 'Saving...';
+            await dbService.updateExamCountdown(id, { targetDate: new Date(val).toISOString() }, this.currentUser?.name || 'Admin');
+            notificationService.showInAppToast('✅ Examination target date successfully updated!', 'success');
+            countdowns = await dbService.getExamCountdowns();
+            renderCountdownsList();
+          } catch (e) {
+            notificationService.showInAppToast('❌ Update error: ' + e.message, 'error');
+            btn.innerText = 'Save';
+          }
+        });
+      });
+
+      // Toggle visibility
+      modal.querySelectorAll('[data-toggle-cd]').forEach(chk => {
+        chk.addEventListener('change', async () => {
+          const id = chk.dataset.toggleCd;
+          try {
+            await dbService.updateExamCountdown(id, { isEnabled: chk.checked }, this.currentUser?.name || 'Admin');
+            notificationService.showInAppToast(`✅ ${chk.checked ? 'Enabled' : 'Hidden'} countdown on student dashboard!`, 'info');
+            const target = countdowns.find(x => x.id === id);
+            if (target) target.isEnabled = chk.checked;
+          } catch (e) {
+            notificationService.showInAppToast('❌ Visibility error: ' + e.message, 'error');
+          }
+        });
+      });
+
+      // Toggle Add Form
+      document.getElementById('btn-toggle-add-cd')?.addEventListener('click', () => {
+        const box = document.getElementById('add-cd-box');
+        if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      });
+
+      // Submit new
+      document.getElementById('btn-submit-new-cd')?.addEventListener('click', async () => {
+        const year = document.getElementById('new-cd-year')?.value.trim();
+        const dateVal = document.getElementById('new-cd-date')?.value;
+        const title = document.getElementById('new-cd-title')?.value.trim();
+
+        if (!year || !dateVal) {
+          notificationService.showInAppToast('⚠️ Please provide exam year and target date!', 'warning');
+          return;
+        }
+
+        try {
+          await dbService.addExamCountdown({
+            examYear: year,
+            customTitle: title || `${year} Examination`,
+            targetDate: new Date(dateVal).toISOString(),
+            isEnabled: true
+          }, this.currentUser?.name || 'Admin');
+          notificationService.showInAppToast('✅ New examination countdown created!', 'success');
+          countdowns = await dbService.getExamCountdowns();
+          renderCountdownsList();
+        } catch (e) {
+          notificationService.showInAppToast('❌ Add error: ' + e.message, 'error');
+        }
+      });
+    };
+
+    renderCountdownsList();
+    document.body.appendChild(modal);
+
+    // Live 1-second interval to tick countdown numbers
+    timerInterval = setInterval(() => {
+      countdowns.forEach(c => {
+        const t = computeTimeLeft(c.targetDate);
+        const daysEl = document.getElementById(`cd-days-${c.id}`);
+        const hoursEl = document.getElementById(`cd-hours-${c.id}`);
+        const minsEl = document.getElementById(`cd-mins-${c.id}`);
+        const secsEl = document.getElementById(`cd-secs-${c.id}`);
+        if (daysEl) daysEl.innerText = t.days;
+        if (hoursEl) hoursEl.innerText = t.hours;
+        if (minsEl) minsEl.innerText = t.mins;
+        if (secsEl) secsEl.innerText = t.secs;
+      });
+    }, 1000);
+  }
+
+  // ── Student Homework Submission Guidelines Modal (1:1 with student_submit_guide_screen.dart) ──
+  openSubmitGuideModal() {
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.style.display = 'flex';
 
     modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:85vh; overflow-y:auto;">
-        <div class="modal-header">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:20px;">⏱️</span>
+      <div class="modal-sheet" style="max-height:88vh; overflow-y:auto; padding:18px;">
+        <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:38px; height:38px; border-radius:12px; background:rgba(37,99,235,0.1); display:flex; align-items:center; justify-content:center; font-size:20px; color:#2563EB;">📖</div>
             <div>
-              <div style="font-size:15px; font-weight:800; color:#0F172A;">A/L Exam Target Dates</div>
-              <div style="font-size:11px; color:#64748B;">Official countdowns to national examination</div>
+              <div style="font-size:16px; font-weight:800; color:#0F172A;">Dessert Submission Guidelines</div>
+              <div style="font-size:11px; color:#64748B;">How to submit homework & answer sheets for grading</div>
             </div>
           </div>
-          <button class="modal-close-btn" id="btn-close-countdown">✕</button>
+          <button class="modal-close-btn" id="btn-close-guide-modal">✕</button>
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
-          <div class="hero-card" style="padding:16px; border:1px solid #DBEAFE; background:#EFF6FF;">
-            <div style="font-size:12px; font-weight:800; color:#2563EB;">2026 G.C.E. A/L EXAMINATION</div>
-            <div style="font-size:18px; font-weight:900; color:#1E3A8A; margin-top:4px;">November 2026</div>
-            <div style="font-size:12px; color:#3B82F6; margin-top:2px;">Target date countdown active for all registered 2026 students.</div>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <!-- Key Requirements Banner -->
+          <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:14px;">
+            <div style="font-size:13px; font-weight:800; color:#1E40AF; margin-bottom:6px;">📋 අවශ්‍ය මූලික නීති (Essential Rules):</div>
+            <ul style="font-size:11.5px; color:#1E3A8A; line-height:1.6; padding-left:18px; margin:0;">
+              <li><strong>පැහැදිලි ඡායාරූප (Good Lighting):</strong> ප්‍රමාණවත් ආලෝකය ඇති ස්ථානයක පත්‍රිකාව තබා සෘජුව (Portrait) ඡායාරූප ගන්න.</li>
+              <li><strong>පිටු අංක (Page Numbers):</strong> සෑම පිටුවකම ඉහළින් පැහැදිලිව පිටු අංකය (Page 1, 2, 3...) සටහන් කරන්න.</li>
+              <li><strong>නම සහ ශිෂ්‍ය අංකය (Student ID):</strong> පළමු පිටුවේ ඔබගේ නම සහ ලියාපදිංචි ශිෂ්‍ය අංකය සටහන් කරන්න.</li>
+              <li><strong>සෙවණැලි වළක්වන්න (Avoid Shadows):</strong> කැමරාවෙන් පත්‍රිකාව මත සෙවණැලි වැටීමෙන් වළකින්න.</li>
+            </ul>
           </div>
 
-          <div class="hero-card" style="padding:16px; border:1px solid #E0E7FF; background:#EEF2FF;">
-            <div style="font-size:12px; font-weight:800; color:#4F46E5;">2027 G.C.E. A/L EXAMINATION</div>
-            <div style="font-size:18px; font-weight:900; color:#312E81; margin-top:4px;">November 2027</div>
-            <div style="font-size:12px; color:#6366F1; margin-top:2px;">Target date countdown active for 2027 batch.</div>
+          <!-- Quick Topic Tags -->
+          <div>
+            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px;">🏷️ Popular Physics Submission Units:</div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <span class="apk-filter-chip">Mechanics</span>
+              <span class="apk-filter-chip">Waves & Optics</span>
+              <span class="apk-filter-chip">Thermal Physics</span>
+              <span class="apk-filter-chip">Electricity & Mag</span>
+              <span class="apk-filter-chip">Modern Physics</span>
+              <span class="apk-filter-chip">Unit Test</span>
+            </div>
           </div>
+
+          <!-- Telegram Bot Integration Card -->
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+              <span style="font-size:18px;">🤖</span>
+              <span style="font-size:13px; font-weight:800; color:#166534;">Official Telegram Grading Bot</span>
+            </div>
+            <div style="font-size:11.5px; color:#15803D; line-height:1.45;">
+              You can also directly link with <strong>@edupeakbot</strong> on Telegram to receive instant teacher marks, corrections, and audio feedback notifications!
+            </div>
+          </div>
+
+          <!-- Proceed Button -->
+          <button class="primary-btn" id="btn-proceed-to-scanner" style="height:44px; margin-top:4px;">
+            <span>📸 Open Document Camera Scanner</span>
+          </button>
         </div>
       </div>
     `;
 
     document.body.appendChild(modal);
-    document.getElementById('btn-close-countdown')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-close-guide-modal')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-proceed-to-scanner')?.addEventListener('click', () => {
+      modal.remove();
+      this.openDocumentScanner();
+    });
   }
 
   openAdminCreatePaperModal() {
