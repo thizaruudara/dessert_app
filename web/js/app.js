@@ -3237,9 +3237,9 @@ class AppController {
         <!-- ── 1. Executive Top Header (lines 185-344) ── -->
         <div class="apk-admin-exec-card">
           <div class="apk-admin-exec-top-row">
-            <div class="apk-admin-portal-badge">
+            <div class="apk-admin-portal-badge" title="Admin Portal • ${adminName}">
               <span class="apk-pulsing-dot"></span>
-              <span>Admin Portal • ${adminName}</span>
+              <span>Admin Portal</span>
             </div>
             <div class="apk-admin-exec-actions">
               <button class="apk-btn-student-view" id="btn-admin-student-view">

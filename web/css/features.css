@@ -1937,20 +1937,35 @@ html[data-theme="dark"] .splash-loading-text {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .apk-admin-portal-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 5px 10px;
   border-radius: 20px;
   background: rgba(37, 99, 235, 0.08);
   border: 1px solid rgba(37, 99, 235, 0.2);
   color: #2563EB;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.apk-admin-portal-badge span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .apk-pulsing-dot {
@@ -1960,6 +1975,7 @@ html[data-theme="dark"] .splash-loading-text {
   background: #10B981;
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
   animation: apkPulse 2s infinite;
+  flex-shrink: 0;
 }
 
 @keyframes apkPulse {
@@ -1971,26 +1987,36 @@ html[data-theme="dark"] .splash-loading-text {
 .apk-admin-exec-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .apk-btn-student-view {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 6px 12px;
+  padding: 6px 11px;
   background: #F8FAFC;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #475569;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s ease;
+  line-height: 1.2;
+  outline: none !important;
+  box-sizing: border-box;
 }
 .apk-btn-student-view:hover {
   background: #F1F5F9;
   color: #0F172A;
+}
+.apk-btn-student-view:active {
+  transform: scale(0.95);
 }
 
 .apk-btn-logout-icon {
@@ -2005,12 +2031,18 @@ html[data-theme="dark"] .splash-loading-text {
   color: #64748B;
   cursor: pointer;
   font-size: 14px;
+  flex-shrink: 0;
   transition: all 0.2s ease;
+  outline: none !important;
+  box-sizing: border-box;
 }
 .apk-btn-logout-icon:hover {
   background: #FEE2E2;
   color: #EF4444;
   border-color: #FECACA;
+}
+.apk-btn-logout-icon:active {
+  transform: scale(0.92);
 }
 
 .apk-admin-greeting-row {
@@ -2527,5 +2559,52 @@ html[data-theme="dark"] .splash-loading-text {
   border-color: #2563EB;
   color: #2563EB;
   font-weight: 700;
+}
+
+/* ── Universal Responsive Button Fit Engine ── */
+button,
+.apk-btn-primary,
+.btn-primary,
+.apk-btn-student-view,
+.apk-btn-logout-icon,
+.apk-command-btn,
+.apk-icon-action-btn,
+.apk-segmented-tab-btn,
+.apk-tabbar-tab,
+.apk-filter-chip,
+.sub-tab-btn,
+.nav-tab-btn,
+.auth-tab-btn,
+.auth-quick-btn {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  outline: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button:focus,
+button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Flexible action rows that never blow out their containers */
+.paper-actions-row,
+.apk-appbar-actions,
+.apk-actions-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Prevent flex child blowouts */
+.apk-command-btn,
+.apk-filter-chip,
+.apk-segmented-tab-btn,
+.sub-tab-btn {
+  min-width: 0;
 }
 
