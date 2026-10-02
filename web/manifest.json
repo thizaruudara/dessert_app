@@ -1,13 +1,13 @@
 {
-  "name": "EduPeak Physics Institute",
+  "name": "EduPeak Student App",
   "short_name": "EduPeak",
-  "description": "Institute Dessert Homework Submission, Live Exam Proctoring & Daily Physics Insights",
+  "description": "EduPeak student app for study, homework submissions, papers, exams, and rankings.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0B0F19",
-  "theme_color": "#2563EB",
+  "background_color": "#F6FAFF",
+  "theme_color": "#227AFF",
   "categories": ["education", "productivity"],
   "icons": [
     {

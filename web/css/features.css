@@ -1656,6 +1656,92 @@ html[data-theme="dark"] .splash-loading-text {
   background: #4F46E5;
 }
 
+/* Keep the web auth flow aligned with Flutter LoginScreen and AppColors. */
+.auth-screen-container {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 24px calc(32px + env(safe-area-inset-bottom, 0px));
+  background: #F6FAFF;
+  color: #0F172A;
+  font-family: 'Outfit', sans-serif;
+}
+.auth-header { margin: 16px 0 28px; }
+.auth-brand-logo-wrap {
+  width: 90px; height: 90px; margin-bottom: 14px;
+  border: 3px solid rgba(34, 122, 255, .3);
+  box-shadow: 0 8px 20px rgba(34, 122, 255, .18);
+}
+.auth-title {
+  margin-bottom: 4px; color: #0F172A; font-size: 26px;
+  font-weight: 900; letter-spacing: -.5px;
+}
+.auth-brand-tag {
+  margin-top: 4px; padding: 4px 12px; border: 0;
+  background: rgba(34, 122, 255, .1); color: #227AFF;
+  font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700;
+}
+.auth-tabs-bar {
+  margin-bottom: 24px; padding: 4px; border: 1px solid #E2E8F0;
+  border-radius: 16px; background: #EFF5FF;
+}
+.auth-tab-btn {
+  padding: 12px; border-radius: 12px; color: #64748B;
+  font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 500;
+}
+.auth-tab-btn.active {
+  background: #FFFFFF; color: #227AFF; box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+}
+.auth-form-card {
+  padding: 20px; border: 1px solid #E2E8F0; border-radius: 20px;
+  background: #FFFFFF; box-shadow: 0 4px 16px rgba(15, 23, 42, .04);
+}
+.auth-form-card form { gap: 0 !important; }
+.auth-form-heading h2 { color: #0F172A; font: 700 18px 'Outfit', sans-serif; }
+.auth-form-heading p { margin-top: 4px; color: #64748B; font: 400 13px/1.45 'Outfit', sans-serif; }
+.auth-form-heading { margin-bottom: 20px; }
+.auth-field-group { gap: 6px; }
+.auth-field-group + .auth-field-group { margin-top: 16px; }
+.auth-field-label { color: #64748B; font: 400 14px 'Outfit', sans-serif; }
+.auth-phone-row { display: flex; align-items: center; gap: 10px; }
+.auth-phone-country {
+  min-height: 56px; display: flex; align-items: center; gap: 4px;
+  padding: 0 14px; border: 1px solid #E2E8F0; border-radius: 12px;
+  background: #EFF5FF; color: #0F172A; font: 700 15px 'Outfit', sans-serif;
+}
+.auth-phone-input-wrap { flex: 1; min-width: 0; }
+.auth-input-wrapper { position: relative; }
+.auth-input-prefix {
+  position: absolute; z-index: 1; left: 12px; color: #64748B; font-size: 20px;
+  pointer-events: none;
+}
+.auth-input {
+  min-height: 56px; padding: 14px 16px; border: 1px solid #E2E8F0;
+  border-radius: 12px; background: #FFFFFF; color: #0F172A;
+  font: 500 14px 'Outfit', sans-serif;
+}
+.auth-input::placeholder { color: #64748B; opacity: 1; }
+.auth-input.has-prefix { padding-left: 44px; }
+.auth-input.has-suffix { padding-right: 48px; }
+.auth-input:focus { border-color: #227AFF; box-shadow: 0 0 0 1px #227AFF; }
+.auth-pw-toggle { right: 8px; color: #64748B; }
+.auth-btn-submit {
+  min-height: 52px; margin-top: 20px; padding: 15px 24px;
+  border-radius: 14px; background: #227AFF; box-shadow: none;
+  font: 700 15px 'Outfit', sans-serif;
+}
+.auth-btn-submit:hover { background: #1565D8; }
+.auth-helper-text { color: #64748B; font: 400 12px 'Outfit', sans-serif; }
+.auth-error-msg, #auth-error-msg { font-family: 'Outfit', sans-serif; }
+.auth-secure-note {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 32px; color: #64748B; font: 400 12px 'Outfit', sans-serif;
+}
+.auth-secure-note .material-symbols-rounded { font-size: 14px; }
+@media (min-width: 480px) {
+  .auth-screen-container { padding-top: 20px; padding-bottom: 32px; }
+}
+
 .auth-quick-demo-section {
   margin-top: 24px;
   display: flex;

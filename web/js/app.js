@@ -111,36 +111,22 @@ class AppController {
 
     root.innerHTML = `
       <div class="auth-screen-container">
-        <!-- Status Bar -->
-        <div class="ios-status-bar" style="background:transparent; color:#FFFFFF;">
-          <span class="status-time" id="status-clock">8:15</span>
-          <div class="status-icons" style="display:flex; align-items:center; gap:6px;">
-            <span class="material-symbols-rounded" style="font-size:16px;">signal_cellular_alt</span>
-            <span class="material-symbols-rounded" style="font-size:16px;">wifi</span>
-            <span class="material-symbols-rounded" style="font-size:18px;">battery_full</span>
-          </div>
-        </div>
-
         <div class="auth-header">
           <div class="auth-brand-logo-wrap">
             <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" onerror="this.src='./icons/icon-192.png'" />
           </div>
-          <div class="auth-title">EduPeak Learning Platform</div>
+          <div class="auth-title">EduPeak</div>
           <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
-            <span>AI & Advanced Level Institute</span>
-            <span class="material-symbols-rounded" style="font-size:15px; color:#818CF8;">science</span>
+            <span>A/L Pastry &amp; Dessert Institute 🍰</span>
           </div>
-          <div class="auth-subtitle">A/L Physics Examination & Proctoring Suite</div>
         </div>
 
         <!-- Auth Tabs (Login vs Register) -->
         <div class="auth-tabs-bar">
           <button class="auth-tab-btn ${this.authTab === 0 ? 'active' : ''}" id="tab-auth-login" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            <span class="material-symbols-rounded" style="font-size:16px;">lock</span>
-            <span>Login with Password</span>
+            <span>Sign In</span>
           </button>
           <button class="auth-tab-btn ${this.authTab === 1 ? 'active' : ''}" id="tab-auth-register" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            <span class="material-symbols-rounded" style="font-size:16px;">person_add</span>
             <span>Register</span>
           </button>
         </div>
@@ -150,20 +136,28 @@ class AppController {
           ${this.authTab === 0 ? `
             <!-- Login Form -->
             <form id="form-login" style="display:flex; flex-direction:column; gap:14px;">
+              <div class="auth-form-heading">
+                <h2>Sign In</h2>
+                <p>Enter your phone number and password to access your portal</p>
+              </div>
               <div class="auth-field-group">
-                <label class="auth-field-label">Phone Number (දුරකථන අංකය)</label>
-                <div class="auth-input-wrapper">
-                  <span class="auth-phone-prefix">+94</span>
-                  <input type="tel" class="auth-input has-prefix" id="input-login-phone" placeholder="77 055 7769" autocomplete="tel-national" required />
+                <label class="auth-field-label" for="input-login-phone">Phone Number</label>
+                <div class="auth-phone-row">
+                  <span class="auth-phone-country"><span>🇱🇰</span><strong>+94</strong></span>
+                  <div class="auth-input-wrapper auth-phone-input-wrap">
+                    <span class="material-symbols-rounded auth-input-prefix">call</span>
+                    <input type="tel" class="auth-input" id="input-login-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
+                  </div>
                 </div>
               </div>
 
               <div class="auth-field-group">
-                <label class="auth-field-label">Password (මුරපදය)</label>
+                <label class="auth-field-label" for="input-login-password">Password</label>
                 <div class="auth-input-wrapper">
-                  <input type="password" class="auth-input" id="input-login-password" placeholder="Password" autocomplete="current-password" required />
+                  <span class="material-symbols-rounded auth-input-prefix">lock_outline</span>
+                  <input type="password" class="auth-input has-prefix has-suffix" id="input-login-password" placeholder="Enter your password" autocomplete="current-password" required />
                   <button type="button" class="auth-pw-toggle" id="btn-toggle-login-pw">
-                    <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
+                    <span class="material-symbols-rounded" style="font-size:18px;">visibility_off</span>
                   </button>
                 </div>
               </div>
@@ -171,42 +165,66 @@ class AppController {
               <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
 
               <button type="submit" class="auth-btn-submit" id="btn-submit-login" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span>Sign In (ඇතුල් වන්න)</span>
-                <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
+                <span>Sign In 🚀</span>
               </button>
             </form>
           ` : `
             <!-- Register Form -->
             <form id="form-register" style="display:flex; flex-direction:column; gap:14px;">
-              <div class="auth-field-group">
-                <label class="auth-field-label">Full Name (සම්පූර්ණ නම)</label>
-                <input type="text" class="auth-input" id="input-reg-name" placeholder="Ex: ThiZaru Perera" required />
+              <div class="auth-form-heading">
+                <h2>New Student Registration</h2>
+                <p>Create your password to instantly access your portal</p>
               </div>
-
               <div class="auth-field-group">
-                <label class="auth-field-label">Phone Number (දුරකථන අංකය)</label>
+                <label class="auth-field-label" for="input-reg-name">Full Name</label>
                 <div class="auth-input-wrapper">
-                  <span class="auth-phone-prefix">+94</span>
-                  <input type="tel" class="auth-input has-prefix" id="input-reg-phone" placeholder="77 123 4567" required />
+                  <span class="material-symbols-rounded auth-input-prefix">person_outline</span>
+                  <input type="text" class="auth-input has-prefix" id="input-reg-name" placeholder="e.g. Thisaru Udara" autocomplete="name" required />
                 </div>
               </div>
 
               <div class="auth-field-group">
-                <label class="auth-field-label">Target A/L Examination Batch</label>
-                <select class="auth-input" id="input-reg-batch" style="background:#0F172A; color:#FFFFFF;">
-                  <option value="2027 A/L" selected>2027 A/L</option>
-                  <option value="2028 A/L">2028 A/L</option>
-                  <option value="2029 A/L">2029 A/L</option>
-                  <option value="2026 A/L">2026 A/L</option>
-                </select>
+                <label class="auth-field-label" for="input-reg-phone">Phone Number</label>
+                <div class="auth-phone-row">
+                  <span class="auth-phone-country"><span>🇱🇰</span><strong>+94</strong></span>
+                  <div class="auth-input-wrapper auth-phone-input-wrap">
+                    <span class="material-symbols-rounded auth-input-prefix">call</span>
+                    <input type="tel" class="auth-input" id="input-reg-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
+                  </div>
+                </div>
               </div>
 
               <div class="auth-field-group">
-                <label class="auth-field-label">Password (මුරපදය)</label>
+                <label class="auth-field-label" for="input-reg-batch">A/L Examination Year</label>
                 <div class="auth-input-wrapper">
-                  <input type="password" class="auth-input" id="input-reg-password" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required />
+                  <span class="material-symbols-rounded auth-input-prefix">school</span>
+                  <select class="auth-input has-prefix" id="input-reg-batch">
+                  <option value="2027 A/L" selected>2027 A/L</option>
+                  <option value="2028 A/L">2028 A/L</option>
+                  <option value="2029 A/L">2029 A/L</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="auth-field-group">
+                <label class="auth-field-label" for="input-reg-password">Create Password (8+ Digits)</label>
+                <div class="auth-input-wrapper">
+                  <span class="material-symbols-rounded auth-input-prefix">lock_outline</span>
+                  <input type="password" class="auth-input has-prefix has-suffix" id="input-reg-password" placeholder="Minimum 8 characters" minlength="8" autocomplete="new-password" required />
                   <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-pw">
-                    <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
+                    <span class="material-symbols-rounded" style="font-size:18px;">visibility_off</span>
+                  </button>
+                </div>
+                <small class="auth-helper-text">Must be at least 8 characters long</small>
+              </div>
+
+              <div class="auth-field-group">
+                <label class="auth-field-label" for="input-reg-confirm-password">Confirm 8-Digit Password</label>
+                <div class="auth-input-wrapper">
+                  <span class="material-symbols-rounded auth-input-prefix">lock_outline</span>
+                  <input type="password" class="auth-input has-prefix has-suffix" id="input-reg-confirm-password" placeholder="Re-enter your 8-digit password" autocomplete="new-password" required />
+                  <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-confirm-pw">
+                    <span class="material-symbols-rounded" style="font-size:18px;">visibility_off</span>
                   </button>
                 </div>
               </div>
@@ -214,11 +232,14 @@ class AppController {
               <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
 
               <button type="submit" class="auth-btn-submit" id="btn-submit-reg" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span>Create Account</span>
-                <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
+                <span>Create Account (Instant Sign-in) 🚀</span>
               </button>
             </form>
           `}
+        </div>
+        <div class="auth-secure-note">
+          <span class="material-symbols-rounded">lock_outline</span>
+          <span>Secure authentication for EduPeak Students</span>
         </div>
 
       </div>
@@ -233,11 +254,27 @@ class AppController {
     // Show/Hide Password toggles
     document.getElementById('btn-toggle-login-pw')?.addEventListener('click', () => {
       const inp = document.getElementById('input-login-password');
-      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        const icon = document.querySelector('#btn-toggle-login-pw .material-symbols-rounded');
+        if (icon) icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
+      }
     });
     document.getElementById('btn-toggle-reg-pw')?.addEventListener('click', () => {
       const inp = document.getElementById('input-reg-password');
-      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        const icon = document.querySelector('#btn-toggle-reg-pw .material-symbols-rounded');
+        if (icon) icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
+      }
+    });
+    document.getElementById('btn-toggle-reg-confirm-pw')?.addEventListener('click', () => {
+      const inp = document.getElementById('input-reg-confirm-password');
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        const icon = document.querySelector('#btn-toggle-reg-confirm-pw .material-symbols-rounded');
+        if (icon) icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
+      }
     });
 
     // Form Submissions
@@ -268,8 +305,10 @@ class AppController {
       const phone = document.getElementById('input-reg-phone')?.value || '';
       const examYear = document.getElementById('input-reg-batch')?.value || '2027 A/L';
       const password = document.getElementById('input-reg-password')?.value || '';
+      const confirmPassword = document.getElementById('input-reg-confirm-password')?.value || '';
       const errEl = document.getElementById('auth-error-msg');
       try {
+        if (password !== confirmPassword) throw new Error('Passwords do not match.');
         const user = await authService.register({ name, phone, password, examYear });
         this.currentUser = user;
         this.renderApp();
