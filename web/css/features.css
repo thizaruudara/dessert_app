@@ -1740,7 +1740,16 @@ html[data-theme="dark"] .splash-loading-text {
 }
 .auth-secure-note .material-symbols-rounded { font-size: 14px; }
 @media (min-width: 480px) {
-  .auth-screen-container { padding-top: 20px; padding-bottom: 32px; }
+  .auth-screen-container {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-top: 20px;
+    padding-bottom: 32px;
+  }
 }
 
 .auth-quick-demo-section {
