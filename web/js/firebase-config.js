@@ -1,6 +1,6 @@
 // Firebase Configuration & Service Initializer
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
+import { initializeApp } from 'firebase/app';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithCustomToken, signOut, updateProfile, getIdTokenResult } from 'firebase/auth';
 import { 
   getFirestore, 
   collection, 
@@ -18,8 +18,8 @@ import {
   onSnapshot, 
   serverTimestamp, 
   arrayUnion 
-} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
-import { getStorage, ref, uploadString, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js';
+} from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDVaNNyALnsrqrqTj371nGn8gbeBWL7fGc",
@@ -56,6 +56,11 @@ export {
   ref,
   uploadString,
   getDownloadURL,
-  signInAnonymously,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithCustomToken,
+  signOut,
+  updateProfile,
+  getIdTokenResult
 };

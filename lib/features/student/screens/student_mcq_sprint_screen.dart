@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/haptic_feedback_service.dart';
+import '../../../core/services/backend_api_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../credits/providers/credits_provider.dart';
 
@@ -664,51 +665,12 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
     setState(() => _isSubmitting = true);
     _stopwatchTimer?.cancel();
 
-    // 1. Calculate Score
-    int score = 0;
-    for (int i = 0; i < questions.length; i++) {
-      final q = questions[i] as Map<String, dynamic>;
-      final correctIdx = q['correctIndex'] ?? 0;
-      final studentChoice = _selectedAnswers[i];
-      if (studentChoice == correctIdx) {
-        score++;
-      }
-    }
-
-    final xpEarned = score * 10;
-    final formattedTime = _formatDuration(_elapsedSeconds);
-
-    // 2. Prepare Payload for Firestore collection 'sprint_attempts'
-    // Matches exact leaderboard query requirements in admin_mcq_sprint_screen.dart
-    final attemptData = {
-      'studentId': user.uid,
-      'studentName': user.name.isNotEmpty ? user.name : 'Student',
-      'phone': user.phone,
-      'examYear': user.examYear ?? '2027 A/L',
-      'date': sprintDate,
-      'score': score,
-      'totalQuestions': questions.length,
-      'timeTakenSeconds': _elapsedSeconds,
-      'timeTakenFormatted': '${_elapsedSeconds ~/ 60}m ${_elapsedSeconds % 60}s',
-      'answers': _selectedAnswers.map((k, v) => MapEntry(k.toString(), v)),
-      'xpEarned': xpEarned,
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
     try {
-      // Save attempt
-      await FirebaseFirestore.instance.collection('sprint_attempts').add(attemptData);
-
-      // Increment student credits in Firestore
-      if (xpEarned > 0) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'credits': FieldValue.increment(xpEarned),
-        });
-
-        if (mounted) {
-          context.read<CreditsProvider>().updateCredits(user.credits + xpEarned);
-        }
-      }
+      await BackendApiService.post('sprints/submit-attempt', {
+        'date': sprintDate,
+        'answers': _selectedAnswers.map((k, v) => MapEntry(k.toString(), v)),
+        'timeTakenSeconds': _elapsedSeconds,
+      });
 
       HapticFeedbackService.success();
     } catch (e) {
@@ -730,7 +692,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
     final score = (attempt['score'] ?? 0) as int;
     final total = (attempt['totalQuestions'] ?? questions.length) as int;
     final timeFormatted = attempt['timeTakenFormatted'] ?? '${attempt['timeTakenSeconds'] ?? 0}s';
-    final xpEarned = attempt['xpEarned'] ?? (score * 10);
+    final xpEarned = (attempt['xpEarned'] ?? 0) as int;
     final answers = (attempt['answers'] as Map<dynamic, dynamic>?) ?? {};
 
     final isPerfect = score == total;
@@ -782,7 +744,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
                 alignment: WrapAlignment.center,
                 children: [
                   _buildResultPill('⏱️ Time: $timeFormatted', Colors.white.withOpacity(0.18)),
-                  _buildResultPill('⚡ +$xpEarned XP Added', const Color(0xFFFBBF24).withOpacity(0.25)),
+                  _buildResultPill('⚡ +$xpEarned XP earned', const Color(0xFFFBBF24).withOpacity(0.25)),
                   _buildResultPill('📚 $unit', Colors.white.withOpacity(0.18)),
                 ],
               ),
@@ -853,7 +815,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      isStudentCorrect ? 'Correct (+10 XP)' : 'Incorrect (0 XP)',
+                      isStudentCorrect ? 'Correct' : 'Incorrect',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -1041,7 +1003,6 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
             final score = att['score'] ?? 0;
             final total = att['totalQuestions'] ?? 5;
             final time = att['timeTakenFormatted'] ?? '${att['timeTakenSeconds'] ?? 0}s';
-            final xp = att['xpEarned'] ?? 0;
 
             final medal = rank == 1
                 ? '🥇'
@@ -1086,7 +1047,7 @@ class _StudentMcqSprintScreenState extends State<StudentMcqSprintScreen>
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '⏱️ $time • +$xp XP',
+                          '⏱️ $time • Score: $score / $total',
                           style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                         ),
                       ],

@@ -15,8 +15,9 @@ import {
   orderBy, 
   limit, 
   onSnapshot, 
-  serverTimestamp 
+  serverTimestamp
 } from './firebase-config.js';
+import { callBackend } from './backend-api.js';
 
 export class DbService {
   constructor() {
@@ -27,7 +28,7 @@ export class DbService {
   async getStudentDesserts(studentId, studentPhone) {
     try {
       const dessertsRef = collection(db, 'desserts');
-      let q = query(dessertsRef, orderBy('submittedAt', 'desc'), limit(50));
+      let q = query(dessertsRef, where('studentId', '==', studentId), limit(50));
       
       const snap = await getDocs(q);
       const list = [];
@@ -37,13 +38,11 @@ export class DbService {
           list.push({ id: docSnap.id, ...data });
         }
       });
-      if (list.length === 0) {
-        return this.getMockDesserts(studentId);
-      }
+      list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
       return list;
     } catch (e) {
-      console.warn('[DB] Fallback to local sample desserts if offline/empty:', e);
-      return this.getMockDesserts(studentId);
+      console.warn('[DB] Student dessert query failed:', e);
+      throw e;
     }
   }
 
@@ -51,7 +50,7 @@ export class DbService {
   listenToStudentDesserts(studentId, studentPhone, callback) {
     try {
       const dessertsRef = collection(db, 'desserts');
-      const q = query(dessertsRef, orderBy('submittedAt', 'desc'), limit(40));
+      const q = query(dessertsRef, where('studentId', '==', studentId), limit(40));
 
       return onSnapshot(q, (snapshot) => {
         const list = [];
@@ -61,17 +60,14 @@ export class DbService {
             list.push({ id: docSnap.id, ...data });
           }
         });
-        if (list.length === 0) {
-          callback(this.getMockDesserts(studentId));
-        } else {
-          callback(list);
-        }
+        list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+        callback(list);
       }, (err) => {
-        console.warn('[DB] Desserts snapshot listener error, using fallback:', err);
-        callback(this.getMockDesserts(studentId));
+        console.warn('[DB] Desserts snapshot listener error:', err);
+        callback([]);
       });
     } catch (_) {
-      callback(this.getMockDesserts(studentId));
+      callback([]);
       return () => {};
     }
   }
@@ -100,20 +96,7 @@ export class DbService {
       return { id: docRef.id, ...newDoc };
     } catch (e) {
       console.error('[DB] Error saving dessert submission to Firestore:', e);
-      // Return optimistic submission object
-      return {
-        id: 'local_' + Date.now(),
-        studentId,
-        studentName,
-        studentPhone,
-        subject,
-        caption,
-        mediaUrls,
-        type: 'image',
-        status: 'pending',
-        creditsAwarded: 0,
-        submittedAt: new Date().toISOString()
-      };
+      throw e;
     }
   }
 
@@ -163,7 +146,7 @@ export class DbService {
       return { id: docRef.id, ...session };
     } catch (e) {
       console.warn('[DB] Saved paper locally:', e);
-      return { id: 'paper_' + Date.now(), ...session };
+      throw e;
     }
   }
 
@@ -498,9 +481,9 @@ export class DbService {
         if (list.length > 0) return list;
       }
     } catch (e) {
-      console.warn('[DB] getPaperSessions error, using fallback:', e);
+      console.warn('[DB] getPaperSessions error:', e);
     }
-    return this.getMockPaperSessions(examYear);
+    return [];
   }
 
   async getPaperSession(paperId) {
@@ -514,8 +497,7 @@ export class DbService {
     } catch (e) {
       console.warn('[DB] getPaperSession error:', e);
     }
-    const mocks = this.getMockPaperSessions();
-    return mocks.find(m => m.id === paperId) || mocks[0] || null;
+    return null;
   }
 
   streamPaperSession(paperId, callback) {
@@ -548,38 +530,28 @@ export class DbService {
         if (list.length > 0 && (!examYear || examYear === 'All' || examYear === 'All Batches')) return list;
       }
     } catch (e) {
-      console.warn('[DB] getUpcomingPapers error, using fallback:', e);
+      console.warn('[DB] getUpcomingPapers error:', e);
     }
-    return this.getMockUpcomingPapers(examYear);
+    return [];
   }
 
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
-    const regKey = `edupeak_reg_${paperId}_${studentId}`;
-    const regData = {
-      paperId,
-      studentId,
-      studentName,
-      studentPhone,
-      selectedSlot: slotId,
-      status: 'registered',
-      isCameraActive: false,
-      registeredAt: new Date().toISOString()
-    };
+    const regData = { paperId, studentId, studentName, studentPhone, selectedSlot: slotId, status: 'registered', isCameraActive: false, registeredAt: new Date().toISOString() };
     try {
-      localStorage.setItem(regKey, JSON.stringify(regData));
-      const ref = doc(db, 'paper_registrations', `${paperId}_${studentId}`);
-      await setDoc(ref, regData, { merge: true });
-    } catch (_) {}
+      await callBackend('papers/register-slot', { paperId, slotId });
+    } catch (error) { console.warn('[DB] Secure paper registration failed:', error); throw error; }
     return regData;
   }
 
-  getStudentRegistration(paperId, studentId) {
+  async getStudentRegistration(paperId, studentId) {
+    if (!paperId || !studentId) return null;
     try {
-      const regKey = `edupeak_reg_${paperId}_${studentId}`;
-      const saved = localStorage.getItem(regKey);
-      if (saved) return JSON.parse(saved);
-    } catch (_) {}
-    return null;
+      const snap = await getDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`));
+      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    } catch (error) {
+      console.warn('[DB] getStudentRegistration error:', error);
+      return null;
+    }
   }
 
   async getSlotRegistrations(paperId, slotId) {
@@ -824,19 +796,16 @@ export class DbService {
     if (!paperId) return () => {};
     try {
       const alertsRef = collection(db, 'proctor_alerts');
-      const q = query(alertsRef, where('paperId', '==', paperId));
-      return onSnapshot(q, (snapshot) => {
-        const list = [];
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          if (!data.isRead && (data.studentId === studentId || data.studentId === 'ALL')) {
-            list.push({ id: docSnap.id, ...data });
-          }
-        });
-        callback(list);
-      }, (err) => {
-        console.warn('[DB] streamProctorAlerts error:', err);
-      });
+      let targeted = [];
+      let broadcast = [];
+      const emit = () => callback([...targeted, ...broadcast].filter(item => !item.isRead));
+      const stopTargeted = onSnapshot(query(alertsRef, where('paperId', '==', paperId), where('studentId', '==', studentId)), snapshot => {
+        targeted = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); emit();
+      }, err => console.warn('[DB] targeted proctor alerts failed:', err));
+      const stopBroadcast = onSnapshot(query(alertsRef, where('paperId', '==', paperId), where('studentId', '==', 'ALL')), snapshot => {
+        broadcast = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); emit();
+      }, err => console.warn('[DB] broadcast proctor alerts failed:', err));
+      return () => { stopTargeted(); stopBroadcast(); };
     } catch (e) {
       console.warn('[DB] streamProctorAlerts catch:', e);
       return () => {};
@@ -863,28 +832,15 @@ export class DbService {
 
   async recordSprintAttempt(attemptData) {
     try {
-      const attemptsRef = collection(db, 'sprint_attempts');
-      await addDoc(attemptsRef, {
-        ...attemptData,
-        createdAt: new Date().toISOString()
+      const result = await callBackend('sprints/submit-attempt', {
+        date: attemptData.date,
+        answers: attemptData.answers,
+        timeTakenSeconds: attemptData.timeTakenSeconds
       });
-
-      if (attemptData.studentId && attemptData.xpEarned > 0) {
-        try {
-          const userDocRef = doc(db, 'users', attemptData.studentId);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const currentCredits = userDoc.data().credits || 0;
-            await updateDoc(userDocRef, {
-              credits: currentCredits + attemptData.xpEarned
-            });
-          }
-        } catch (ue) {
-          console.warn('[DB] User credit increment warning:', ue);
-        }
-      }
+      return result;
     } catch (e) {
       console.warn('[DB] recordSprintAttempt error:', e);
+      throw e;
     }
   }
 
@@ -899,57 +855,20 @@ export class DbService {
   }
 
   // ── 3. Daily MCQ Sprint ──────────────────────────────────────────────────
-  getDailySprint(dateStr) {
-    return {
-      id: 'sprint_' + (dateStr || 'today'),
-      title: 'Daily High-Yield Physics Sprint',
-      targetDate: dateStr || new Date().toISOString().split('T')[0],
-      durationSeconds: 180,
-      xpBonus: 75,
-      questions: [
-        {
-          id: 'q1',
-          text: 'A block of mass m slides down an inclined plane of angle θ with constant velocity. What is the coefficient of kinetic friction μk?',
-          options: ['sin θ', 'cos θ', 'tan θ', 'cot θ', '1 / tan θ'],
-          correctIndex: 2,
-          explanation: 'When velocity is constant, the net force along the incline is zero: mg sin θ = fk = μk mg cos θ. Therefore, μk = tan θ.'
-        },
-        {
-          id: 'q2',
-          text: 'What happens to the capacitance of a parallel plate capacitor when a dielectric slab of dielectric constant k is fully inserted between the plates?',
-          options: ['Decreases by k', 'Increases by k', 'Remains unchanged', 'Decreases by k²', 'Increases to infinity'],
-          correctIndex: 1,
-          explanation: 'Inserting a dielectric slab increases capacitance according to C = k * C0, where k > 1 is the dielectric constant.'
-        },
-        {
-          id: 'q3',
-          text: 'In simple harmonic motion, at which position does the particle have maximum kinetic energy?',
-          options: ['At maximum displacement +A', 'At maximum displacement -A', 'At the equilibrium position (x = 0)', 'At x = A / 2', 'At x = A / √2'],
-          correctIndex: 2,
-          explanation: 'At the equilibrium position (x = 0), potential energy is minimum (zero) and velocity is maximum (v = ωA), giving maximum kinetic energy.'
-        },
-        {
-          id: 'q4',
-          text: 'Two identical sinusoidal waves of frequency f and amplitude A travel in opposite directions along a stretched string. The resulting standing wave has amplitude at an antinode equal to:',
-          options: ['0', 'A / 2', 'A', '2A', '4A'],
-          correctIndex: 3,
-          explanation: 'At an antinode, constructive interference of the two opposing waves with amplitude A produces an antinode amplitude of 2A.'
-        },
-        {
-          id: 'q5',
-          text: 'A light ray passes from a denser medium with refractive index n1 into a rarer medium with refractive index n2. The critical angle θc is given by:',
-          options: ['sin⁻¹(n1 / n2)', 'sin⁻¹(n2 / n1)', 'tan⁻¹(n2 / n1)', 'cos⁻¹(n2 / n1)', 'n1 * n2'],
-          correctIndex: 1,
-          explanation: 'By Snell\'s Law for critical angle (refracted angle = 90°): n1 sin(θc) = n2 sin(90°), hence sin(θc) = n2 / n1, where n1 > n2.'
-        }
-      ]
-    };
+  async getDailySprint(dateStr, examYear) {
+    const targetDate = dateStr || new Date().toISOString().slice(0, 10);
+    const snap = await getDocs(collection(db, 'daily_sprints'));
+    const matching = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.targetDate === targetDate && (!s.examYear || s.examYear === 'All Batches' || !examYear || s.examYear === examYear))
+      .sort((a, b) => Number(a.examYear === 'All Batches') - Number(b.examYear === 'All Batches'));
+    return matching[0] || null;
   }
 
   // ── 4. Leaderboard ───────────────────────────────────────────────────────
   async getLeaderboard() {
     try {
-      const usersRef = collection(db, 'users');
+      const usersRef = collection(db, 'leaderboard_public');
       const q = query(usersRef, orderBy('credits', 'desc'), limit(25));
       const snap = await getDocs(q);
       if (!snap.empty) {

@@ -2,7 +2,6 @@ const express = require('express');
 const admin = require('firebase-admin');
 const axios = require('axios');
 const path = require('path');
-const fs = require('fs');
 
 // ── Initialize Firebase Admin ────────────────────────────────────────────────
 let credential;
@@ -30,11 +29,6 @@ if (!credential && process.env.FIREBASE_SERVICE_ACCOUNT) {
   }
 }
 
-if (!credential && fs.existsSync(path.join(__dirname, 'serviceAccountKey.json'))) {
-  const serviceAccount = require('./serviceAccountKey.json');
-  credential = admin.credential.cert(serviceAccount);
-}
-
 if (!credential) {
   credential = admin.credential.applicationDefault();
 }
@@ -46,45 +40,22 @@ admin.initializeApp({
 
 const db = admin.firestore();
 const app = express();
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '2mb', verify: (req, res, buffer) => { req.rawBody = Buffer.from(buffer); } }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 // Serve static frontend demo
 app.use(express.static(path.join(__dirname, '../demo')));
 
 // ── Meta WhatsApp & Gemini Config ───────────────────────────────────────────
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'edupeak_secret_token_2025';
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAeBBzDxMAsBSfVwaHiaaya4X19aTEhby81bKygKwR6kNFGwCBzxxkZBGiRsmEX6WsZB0xAXZCIS7WHFTwbw19fGfRfgLDQpJQlm4w6tGZB88ystZCgiddiCsFGZBiZCcUZBQWgK6v29o81aBQl5bfbXahKP1oMIYeveV7OAMz2M4Q0LrlTkWERFA4BGOBZBF1wZDZD';
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1282807424918189';
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET;
+const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // ── Direct HTTP OTP Dispatch Endpoint ─────────────────────────────────────────
 app.post('/api/send-otp', async (req, res) => {
-  try {
-    const { phone, name } = req.body;
-    if (!phone) return res.status(400).json({ error: 'Phone required' });
-
-    const studentName = name || 'Student';
-    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-    await db.collection('otp_verifications').doc(phone).set({
-      otp: randomOtp,
-      phone: phone,
-      name: studentName,
-      expiresAt: expiresAt,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    const targetWaNumber = phone.replace(/\D/g, '');
-    await sendWhatsAppOtp(targetWaNumber, randomOtp, studentName);
-    console.log(`📲 Direct API: WhatsApp OTP [${randomOtp}] dispatched to ${phone} (${studentName})`);
-
-    return res.status(200).json({ success: true, message: 'OTP sent successfully' });
-  } catch (err) {
-    console.error('Error in /api/send-otp:', err);
-    return res.status(500).json({ error: err.message });
-  }
+  return res.status(410).json({ error: 'Legacy OTP is disabled. Use Firebase Authentication.' });
 });
 
 // ── Health Check ─────────────────────────────────────────────────────────────
@@ -96,7 +67,6 @@ app.get('/', (req, res) => {
       <div style="margin-top:30px;background:#1E2138;display:inline-block;padding:20px 30px;border-radius:12px;border:1px solid #2E3154;text-align:left;">
         <p><b>Webhook Endpoint:</b> <code>/whatsappWebhook</code></p>
         <p><b>Direct OTP Endpoint:</b> <code>/api/send-otp</code></p>
-        <p><b>Verify Token:</b> <code>dessert_secret_2026</code></p>
         <p><b>AI Model:</b> <code>Gemini 3.6 Flash with Firestore Multi-Turn Memory</code></p>
         <p><b>Multi-Photo Batching:</b> 🟢 Active</p>
       </div>
@@ -112,7 +82,7 @@ const handleVerification = (req, res) => {
 
   console.log(`[Webhook Verification] mode=${mode}, token=${token}`);
 
-  if (mode === 'subscribe' && (token === VERIFY_TOKEN || token === 'edupeak_secret_token_2025' || token === 'dessert_secret_2026')) {
+  if (VERIFY_TOKEN && mode === 'subscribe' && token === VERIFY_TOKEN) {
     console.log('✅ Webhook verified successfully with Meta!');
     return res.status(200).send(challenge);
   }
@@ -126,6 +96,15 @@ app.get('/whatsappWebhook', handleVerification);
 // ── Incoming WhatsApp Messages (POST) ────────────────────────────────────────
 const handleIncoming = async (req, res) => {
   try {
+    if (!WHATSAPP_APP_SECRET || !req.rawBody) return res.status(503).send('Webhook signature validation is not configured');
+    const crypto = require('crypto');
+    const signature = req.get('x-hub-signature-256') || '';
+    const expected = `sha256=${crypto.createHmac('sha256', WHATSAPP_APP_SECRET).update(req.rawBody).digest('hex')}`;
+    const suppliedBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (suppliedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(suppliedBuffer, expectedBuffer)) {
+      return res.status(401).send('Invalid webhook signature');
+    }
     const body = req.body;
     console.log('[Incoming Webhook Event]:', JSON.stringify(body, null, 2));
 

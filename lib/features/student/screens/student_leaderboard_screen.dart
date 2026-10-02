@@ -475,7 +475,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
-                .collection('users')
+                .collection('leaderboard_public')
                 .where('role', isEqualTo: 'student')
                 .snapshots(),
             builder: (context, snap) {

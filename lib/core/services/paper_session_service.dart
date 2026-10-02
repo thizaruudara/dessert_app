@@ -5,17 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/paper_session_model.dart';
+import 'backend_api_service.dart';
 
 class PaperSessionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> _ensureAuth() async {
-    if (_auth.currentUser == null) {
-      try {
-        await _auth.signInAnonymously();
-      } catch (_) {}
-    }
+    if (_auth.currentUser == null) throw StateError('Sign in is required for this action.');
   }
 
   // ── 1. Create or Update Paper Session ──────────────────────────────────────
@@ -41,7 +38,6 @@ class PaperSessionService {
           if (idToken != null) {
             request.headers.set('Authorization', 'Bearer $idToken');
           }
-          request.headers.set('X-Admin-Secret', 'edupeak_admin_sec_2026');
           request.add(utf8.encode(jsonEncode({
             'title': session.title,
             'subject': session.subject,
@@ -200,58 +196,9 @@ class PaperSessionService {
     required String slotId, // 'slot1' or 'slot2'
   }) async {
     await _ensureAuth();
-    final regDocId = '${paperId}_$studentId';
-    final regRef = _firestore.collection('paper_registrations').doc(regDocId);
-
-    await _firestore.runTransaction((transaction) async {
-      final regSnap = await transaction.get(regRef);
-      final paperRef = _firestore.collection('paper_sessions').doc(paperId);
-      final paperSnap = await transaction.get(paperRef);
-
-      if (!paperSnap.exists) throw Exception('Paper session does not exist');
-      final Map<String, dynamic> paperData = paperSnap.data() ?? <String, dynamic>{};
-      final Map<String, dynamic>? regData = regSnap.data();
-      final previousSlot = regSnap.exists && regData != null ? regData['selectedSlot'] as String? : null;
-
-      Map<String, dynamic> safeSlotMap(dynamic val) {
-        if (val is Map) return Map<String, dynamic>.from(val);
-        return <String, dynamic>{};
-      }
-
-      // Update slot counts on paper_sessions
-      if (previousSlot != null && previousSlot != slotId) {
-        // Switching slot
-        final prevSlotMap = safeSlotMap(paperData[previousSlot]);
-        final nextSlotMap = safeSlotMap(paperData[slotId]);
-        final prevCount = ((prevSlotMap['registeredCount'] is num) ? (prevSlotMap['registeredCount'] as num).toInt() : 1) - 1;
-        final newCount = ((nextSlotMap['registeredCount'] is num) ? (nextSlotMap['registeredCount'] as num).toInt() : 0) + 1;
-        transaction.update(paperRef, {
-          '$previousSlot.registeredCount': prevCount < 0 ? 0 : prevCount,
-          '$slotId.registeredCount': newCount,
-        });
-      } else if (!regSnap.exists) {
-        // New registration
-        final nextSlotMap = safeSlotMap(paperData[slotId]);
-        final currentCount = ((nextSlotMap['registeredCount'] is num) ? (nextSlotMap['registeredCount'] as num).toInt() : 0) + 1;
-        transaction.update(paperRef, {
-          '$slotId.registeredCount': currentCount,
-        });
-      }
-
-      transaction.set(
-        regRef,
-        {
-          'paperId': paperId,
-          'studentId': studentId,
-          'studentName': studentName,
-          'studentPhone': studentPhone,
-          'selectedSlot': slotId,
-          'status': 'registered',
-          'registeredAt': FieldValue.serverTimestamp(),
-          'isCameraActive': false,
-        },
-        SetOptions(merge: true),
-      );
+    await BackendApiService.post('papers/register-slot', {
+      'paperId': paperId,
+      'slotId': slotId,
     });
   }
 
@@ -425,48 +372,44 @@ class PaperSessionService {
     if (paperId.isEmpty || (studentId.isEmpty && (studentPhone == null || studentPhone.isEmpty))) {
       return Stream.value([]);
     }
-    return _firestore
+    final targeted = _firestore
         .collection('proctor_alerts')
         .where('paperId', isEqualTo: paperId)
-        .snapshots()
-        .map((snapshot) {
-      final list = <ProctorAlert>[];
-      final normPhone = (studentPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-      final normStudentId = studentId.replaceAll(RegExp(r'[^0-9]'), '');
-
-      for (final doc in snapshot.docs) {
-        try {
-          final alert = ProctorAlert.fromFirestore(doc);
-          final alertSid = alert.studentId;
-          final rawData = doc.data();
-          final alertPhone = (rawData is Map && rawData['studentPhone'] != null)
-              ? rawData['studentPhone'].toString()
-              : '';
-          final normAlertPhone = alertPhone.replaceAll(RegExp(r'[^0-9]'), '');
-          final normAlertSid = alertSid.replaceAll(RegExp(r'[^0-9]'), '');
-
-          bool matches = alertSid == 'ALL' ||
-              alertSid == studentId ||
-              (studentPhone != null && studentPhone.isNotEmpty && alertSid == studentPhone) ||
-              (alertPhone.isNotEmpty && alertPhone == studentPhone) ||
-              (alertPhone.isNotEmpty && alertPhone == studentId) ||
-              (normPhone.isNotEmpty && normAlertPhone.isNotEmpty && (normPhone.endsWith(normAlertPhone) || normAlertPhone.endsWith(normPhone))) ||
-              (normPhone.isNotEmpty && normAlertSid.isNotEmpty && (normPhone.endsWith(normAlertSid) || normAlertSid.endsWith(normPhone))) ||
-              (normStudentId.isNotEmpty && normAlertSid.isNotEmpty && (normStudentId.endsWith(normAlertSid) || normAlertSid.endsWith(normStudentId)));
-
-          if (matches) {
-            list.add(alert);
-          }
-        } catch (e) {
-          debugPrint('Error parsing proctor alert ${doc.id}: $e');
-        }
-      }
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return list;
-    }).handleError((e) {
-      debugPrint('Error in streamStudentAlerts: $e');
-      return <ProctorAlert>[];
-    });
+        .where('studentId', isEqualTo: studentId)
+        .snapshots();
+    final broadcast = _firestore
+        .collection('proctor_alerts')
+        .where('paperId', isEqualTo: paperId)
+        .where('studentId', isEqualTo: 'ALL')
+        .snapshots();
+    late StreamSubscription<QuerySnapshot<Map<String, dynamic>>> targetSub;
+    late StreamSubscription<QuerySnapshot<Map<String, dynamic>>> broadcastSub;
+    final controller = StreamController<List<ProctorAlert>>();
+    final targetDocs = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    final broadcastDocs = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    void emit() {
+      final docs = [...targetDocs.values, ...broadcastDocs.values];
+      final list = docs.map((doc) => ProctorAlert.fromFirestore(doc)).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      controller.add(list);
+    }
+    targetSub = targeted.listen((snapshot) {
+      targetDocs
+        ..clear()
+        ..addEntries(snapshot.docs.map((doc) => MapEntry(doc.id, doc)));
+      emit();
+    }, onError: controller.addError);
+    broadcastSub = broadcast.listen((snapshot) {
+      broadcastDocs
+        ..clear()
+        ..addEntries(snapshot.docs.map((doc) => MapEntry(doc.id, doc)));
+      emit();
+    }, onError: controller.addError);
+    controller.onCancel = () {
+      targetSub.cancel();
+      broadcastSub.cancel();
+    };
+    return controller.stream;
   }
 
   // ── 12. Mark Alert as Read ────────────────────────────────────────────────

@@ -1,22 +1,19 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/user_model.dart';
+import '../../../core/services/backend_api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   UserModel? _user;
+  bool _isAdmin = false;
   bool _loading = false;
   String? _error;
-  String? _verificationId;
   String? _currentPhone;
   String? _currentName;
   String? _currentExamYear;
@@ -26,7 +23,7 @@ class AuthProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
   bool get isLoggedIn => _user != null;
-  bool get isAdmin => _user?.isAdmin ?? false;
+  bool get isAdmin => _isAdmin;
   String? get currentPhone => _currentPhone;
   String? get currentName => _currentName;
   String? get currentExamYear => _currentExamYear;
@@ -36,87 +33,38 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _initAuth() async {
-    if (_auth.currentUser == null) {
-      try {
-        await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
-      } catch (e) {
-        debugPrint('Anonymous auth on init: $e');
-      }
-    }
-
-    // 1. Try loading saved session from SharedPreferences
-    await _loadPersistedSession();
-
-    // 2. Also listen to Firebase Auth state
+    // Identity is restored exclusively by Firebase Auth. A local UID or phone
+    // value is never treated as proof of identity.
     _auth.authStateChanges().listen(_onAuthStateChanged);
   }
 
-  Future<void> _loadPersistedSession() async {
-    try {
-      if (_auth.currentUser == null) {
-        try {
-          await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
-        } catch (_) {}
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final savedUid = prefs.getString('saved_uid');
-      final savedPhone = prefs.getString('saved_phone');
-
-      if (savedUid != null && savedUid.isNotEmpty) {
-        await _fetchUser(savedUid);
-      }
-
-      if (_user == null && savedPhone != null && savedPhone.isNotEmpty) {
-        QuerySnapshot<Map<String, dynamic>>? q;
-        try {
-          q = await _db
-              .collection('users')
-              .where('phone', isEqualTo: savedPhone)
-              .limit(1)
-              .get(const GetOptions(source: Source.serverAndCache))
-              .timeout(const Duration(seconds: 4));
-        } catch (_) {
-          try {
-            q = await _db
-                .collection('users')
-                .where('phone', isEqualTo: savedPhone)
-                .limit(1)
-                .get(const GetOptions(source: Source.cache));
-          } catch (_) {}
-        }
-        if (q != null && q.docs.isNotEmpty) {
-          var u = UserModel.fromFirestore(q.docs.first);
-          if (isPhoneAdmin(u.phone) && !u.isAdmin) {
-            u = u.copyWith(role: UserRole.admin);
-            q.docs.first.reference.update({'role': 'admin'}).catchError((_) {});
-          }
-          _user = u;
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('Error restoring saved session: $e');
-    }
+  String _normalizedPhone(String phone) {
+    var digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('0')) digits = '94${digits.substring(1)}';
+    if (digits.length == 9) digits = '94$digits';
+    return digits;
   }
 
-  static bool isPhoneAdmin(String? phone) {
-    if (phone == null) return false;
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    return digits.contains('770557769') ||
-        digits.contains('707938883') ||
-        digits.contains('701068489') ||
-        digits.endsWith('770557769') ||
-        digits.endsWith('707938883') ||
-        digits.endsWith('701068489');
+  String _authEmail(String phone) => 'p${_normalizedPhone(phone)}@users.edupeak.app';
+
+  Future<void> _ensureProfile({required String name, required String phone, required String examYear}) async {
+    await BackendApiService.post('auth/ensure-profile', {
+      'name': name,
+      'phone': '+${_normalizedPhone(phone)}',
+      'examYear': examYear,
+    });
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw StateError('Authentication expired. Sign in again.');
+    await _fetchUser(uid);
+    if (_user == null) throw StateError('Account profile could not be loaded.');
   }
 
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
-    if (firebaseUser == null) {
-      // If we already loaded a session from SharedPreferences, keep it
-      if (_user == null) {
-        notifyListeners();
-      }
+    if (firebaseUser == null || firebaseUser.isAnonymous) {
+      if (firebaseUser?.isAnonymous == true) await _auth.signOut();
+      _user = null;
+      _isAdmin = false;
+      notifyListeners();
       return;
     }
     await _fetchUser(firebaseUser.uid);
@@ -142,15 +90,17 @@ class AuthProvider extends ChangeNotifier {
       }
 
       if (doc != null && doc.exists) {
-        var u = UserModel.fromFirestore(doc);
-        if (isPhoneAdmin(u.phone) && !u.isAdmin) {
-          u = u.copyWith(role: UserRole.admin);
-          doc.reference.update({'role': 'admin'}).catchError((_) {});
-        }
-        _user = u;
+        final claims = await _auth.currentUser?.getIdTokenResult(true);
+        _isAdmin = claims?.claims?['admin'] == true;
+        final profile = UserModel.fromFirestore(doc);
+        _user = profile.copyWith(role: _isAdmin ? UserRole.admin : UserRole.student);
+      } else {
+        _user = null;
+        _isAdmin = false;
       }
     } catch (e) {
       _error = e.toString();
+      _isAdmin = false;
     }
     notifyListeners();
   }
@@ -168,96 +118,20 @@ class AuthProvider extends ChangeNotifier {
     _currentName = name;
     _currentExamYear = examYear;
 
+    UserCredential? createdCredential;
     try {
-      // 1. Check if user already exists (with timeout and cache fallback to prevent hanging on slow VPNs)
-      QuerySnapshot<Map<String, dynamic>>? existing;
-      try {
-        existing = await _db
-            .collection('users')
-            .where('phone', isEqualTo: phone)
-            .limit(1)
-            .get(const GetOptions(source: Source.serverAndCache))
-            .timeout(const Duration(seconds: 4));
-      } catch (_) {
-        try {
-          existing = await _db
-              .collection('users')
-              .where('phone', isEqualTo: phone)
-              .limit(1)
-              .get(const GetOptions(source: Source.cache));
-        } catch (_) {}
-      }
-      final existingDocs = existing?.docs;
-      if (existingDocs != null && existingDocs.isNotEmpty) {
-        // User already exists, check if has password
-        final existingData = existingDocs.first.data();
-        if (existingData['password'] != null && existingData['password'].toString().isNotEmpty) {
-          _error = 'An account already exists with this phone number. Please sign in.';
-          _setLoading(false);
-          notifyListeners();
-          return false;
-        }
-      }
-
-      // 2. Sign in anonymously to Firebase Auth for security rules if not signed in
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        try {
-          final anonResult = await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
-          currentUser = anonResult.user;
-        } catch (_) {}
-      }
-
-      final uid = currentUser?.uid ?? phone.replaceAll(RegExp(r'\D'), '');
-      final isTargetAdmin = isPhoneAdmin(phone);
-
-      if (existingDocs != null && existingDocs.isNotEmpty) {
-        // Update existing record with password & details
-        final docRef = existingDocs.first.reference;
-        await docRef.update({
-          'name': name,
-          'password': password,
-          'examYear': examYear,
-          'role': isTargetAdmin ? 'admin' : (existingDocs.first.data()['role'] ?? 'student'),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        DocumentSnapshot<Map<String, dynamic>> updatedDoc;
-        try {
-          updatedDoc = await docRef
-              .get(const GetOptions(source: Source.serverAndCache))
-              .timeout(const Duration(seconds: 4));
-        } catch (_) {
-          updatedDoc = await docRef.get(const GetOptions(source: Source.cache));
-        }
-        _user = UserModel.fromFirestore(updatedDoc);
-      } else {
-        // Create new user profile document
-        final newDocRef = _db.collection('users').doc(uid);
-        final newUser = UserModel(
-          uid: uid,
-          name: name,
-          phone: phone,
-          role: isTargetAdmin ? UserRole.admin : UserRole.student,
-          credits: 0,
-          examYear: examYear,
-          password: password,
-          createdAt: DateTime.now(),
-        );
-
-        await newDocRef.set(newUser.toFirestore());
-        _user = newUser;
-      }
-
-      // 3. Persist session
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_uid', _user!.uid);
-      await prefs.setString('saved_phone', phone);
-
+      final credential = await _auth.createUserWithEmailAndPassword(email: _authEmail(phone), password: password);
+      createdCredential = credential;
+      await credential.user?.updateDisplayName(name.trim());
+      await _ensureProfile(name: name.trim(), phone: phone, examYear: examYear);
       _setLoading(false);
       notifyListeners();
       return true;
     } catch (e) {
+      try {
+        await createdCredential?.user?.delete();
+        await _auth.signOut();
+      } catch (_) {}
       _error = 'Registration failed: ${e.toString()}';
       _setLoading(false);
       notifyListeners();
@@ -275,77 +149,25 @@ class AuthProvider extends ChangeNotifier {
     _currentPhone = phone;
 
     try {
-      // 1. Query user by phone with timeout fallback to avoid Wi-Fi freeze
-      QuerySnapshot<Map<String, dynamic>>? userQuery;
+      UserCredential credential;
       try {
-        userQuery = await _db
-            .collection('users')
-            .where('phone', isEqualTo: phone)
-            .limit(1)
-            .get(const GetOptions(source: Source.serverAndCache))
-            .timeout(const Duration(seconds: 6));
-      } catch (e) {
-        debugPrint('Query by phone timed out on server, trying cache: $e');
-        try {
-          userQuery = await _db
-              .collection('users')
-              .where('phone', isEqualTo: phone)
-              .limit(1)
-              .get(const GetOptions(source: Source.cache));
-        } catch (_) {}
+        credential = await _auth.signInWithEmailAndPassword(email: _authEmail(phone), password: password);
+      } on FirebaseAuthException catch (error) {
+        if (!['user-not-found', 'invalid-credential', 'invalid-login-credentials', 'wrong-password'].contains(error.code)) rethrow;
+        final result = await BackendApiService.post('auth/upgrade-legacy', {
+          'phone': '+${_normalizedPhone(phone)}',
+          'password': password,
+        }, authenticated: false);
+        credential = await _auth.signInWithCustomToken(result['token'] as String);
       }
-
-      final userDocs = userQuery?.docs;
-      if (userDocs == null || userDocs.isEmpty) {
-        // If it's the designated admin phone, auto-create
-        if (isPhoneAdmin(phone)) {
-          return await registerWithPassword(
-            name: 'Teacher / Admin',
-            phone: phone,
-            password: password,
-            examYear: '2025 A/L',
-          );
-        }
-
-        _error = 'No account found with this phone number. Please register first.';
-        _setLoading(false);
-        notifyListeners();
-        return false;
-      }
-
-      final doc = userDocs.first;
-      final data = doc.data();
-      final storedPassword = data['password']?.toString();
-
-      // Check matching password
-      final isMatch = storedPassword != null && storedPassword == password;
-
-      if (!isMatch) {
-        _error = 'Incorrect password. You can also log in via WhatsApp OTP below.';
-        _setLoading(false);
-        notifyListeners();
-        return false;
-      }
-
-      // Sign in anonymously if needed
-      if (_auth.currentUser == null) {
-        try {
-          await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
-        } catch (_) {}
-      }
-
-      var u = UserModel.fromFirestore(doc);
-      if (isPhoneAdmin(phone) && !u.isAdmin) {
-        u = u.copyWith(role: UserRole.admin);
-        doc.reference.update({'role': 'admin'}).catchError((_) {});
-      }
-      _user = u;
-
-      // Persist session
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_uid', _user!.uid);
-      await prefs.setString('saved_phone', phone);
-
+      final uid = credential.user?.uid;
+      if (uid == null) throw StateError('Sign in did not return an authenticated user.');
+      await BackendApiService.post('auth/ensure-admin', {
+        'phone': '+${_normalizedPhone(phone)}',
+      });
+      await credential.user?.getIdToken(true);
+      await _fetchUser(uid);
+      if (_user == null) throw StateError('Account profile is unavailable. Contact the institute administrator.');
       _setLoading(false);
       notifyListeners();
       return true;
@@ -358,307 +180,27 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// ── 3. Generate & Save WhatsApp OTP for Chat-Based Login ─────────────────
-  Future<String> prepareWhatsAppLoginOtp(String phoneNumber) async {
-    _currentPhone = phoneNumber;
-    final rng = Random.secure();
-    final randomOtp = (100000 + rng.nextInt(900000)).toString();
-    final expiresAt = DateTime.now().millisecondsSinceEpoch + 10 * 60 * 1000;
+  // Legacy chat-issued codes used a publicly writable Firestore collection.
+  // They are disabled; sign-in uses Firebase Authentication only.
+  Future<String> prepareWhatsAppLoginOtp(String phoneNumber) async => '';
 
-    try {
-      await _db.collection('otp_verifications').doc(phoneNumber).set({
-        'otp': randomOtp,
-        'phone': phoneNumber,
-        'name': _currentName ?? 'Student',
-        'expiresAt': expiresAt,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('Error writing WhatsApp OTP doc: $e');
-    }
-
-    return randomOtp;
-  }
-
-  /// Step 1 — Send OTP (via WhatsApp + Direct Webhook)
   Future<bool> sendOtp(String phoneNumber, {String? name, String? examYear}) async {
-    _setLoading(true);
-    _error = null;
-    _currentPhone = phoneNumber;
-    _currentName = name;
-    _currentExamYear = examYear;
-
-    try {
-      // 1. Submit WhatsApp OTP request to Firestore (with 3s timeout)
-      try {
-        await _db.collection('otp_requests').add({
-          'phone': phoneNumber,
-          'name': name ?? 'Student',
-          'examYear': examYear,
-          'requestedAt': FieldValue.serverTimestamp(),
-        }).timeout(const Duration(seconds: 3));
-      } catch (e) {
-        debugPrint('Firestore OTP write notice: $e');
-      }
-
-      // 2. Trigger direct API call in background (fire-and-forget, non-blocking)
-      _triggerDirectOtpAsync(phoneNumber, name ?? 'Student');
-
-      // 3. Also trigger Firebase Phone Auth fallback in background
-      try {
-        _auth.verifyPhoneNumber(
-          phoneNumber: phoneNumber,
-          verificationCompleted: (PhoneAuthCredential credential) async {
-            await _auth.signInWithCredential(credential);
-          },
-          verificationFailed: (FirebaseAuthException e) {
-            debugPrint('Firebase phone auth fallback notice: ${e.message}');
-          },
-          codeSent: (String verificationId, int? resendToken) {
-            _verificationId = verificationId;
-          },
-          codeAutoRetrievalTimeout: (String verificationId) {
-            _verificationId = verificationId;
-          },
-          timeout: const Duration(seconds: 30),
-        );
-      } catch (_) {}
-
-      _setLoading(false);
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      _setLoading(false);
-      return true; // Still return true so user can navigate to OTP screen
-    }
+    _error = 'One-time-code login is temporarily disabled during the account security upgrade. Sign in with your password.';
+    notifyListeners();
+    return false;
   }
 
-  /// ── 4. Request Telegram OTP (Direct vs 1st-time Deep Link) ────────────────
-  Future<Map<String, dynamic>> requestTelegramOtp(String phone, {String? name}) async {
-    _currentPhone = phone;
-    _currentName = name;
-    final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
+  Future<Map<String, dynamic>> requestTelegramOtp(String phone, {String? name}) async => {
+    'success': false,
+    'mode': 'disabled',
+    'message': 'Use Firebase Authentication sign-in instead.',
+  };
 
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 8);
-      final req = await client.postUrl(Uri.parse('https://edupeak-telegram-bot.vercel.app/api/send-otp'));
-      req.headers.set('Content-Type', 'application/json');
-      req.headers.set('X-Client-App', 'edupeak-flutter-app');
-      req.add(utf8.encode(jsonEncode({
-        'phone': cleanDigits,
-        'name': name ?? 'Student',
-      })));
-      final res = await req.close().timeout(const Duration(seconds: 8));
-      final body = await res.transform(utf8.decoder).join();
-      client.close();
-
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      return data;
-    } catch (e) {
-      debugPrint('Error calling send-otp API: $e');
-      return {
-        'success': true,
-        'mode': 'deep_link',
-        'deepLink': 'https://t.me/edupeakbot?start=otp_$cleanDigits',
-      };
-    }
-  }
-
-  void _triggerDirectOtpAsync(String phone, String name) {
-    Future.microtask(() async {
-      try {
-        final client = HttpClient();
-        client.connectionTimeout = const Duration(seconds: 5);
-        final req = await client.postUrl(Uri.parse('https://edupeak-telegram-bot.vercel.app/api/send-otp'));
-        req.headers.set('Content-Type', 'application/json');
-        req.headers.set('X-Client-App', 'edupeak-flutter-app');
-        req.add(utf8.encode(jsonEncode({
-          'phone': phone.replaceAll(RegExp(r'\D'), ''),
-          'name': name,
-        })));
-        final res = await req.close().timeout(const Duration(seconds: 6));
-        debugPrint('📲 Direct OTP API Response: ${res.statusCode}');
-        client.close();
-      } catch (httpErr) {
-        debugPrint('Direct OTP HTTP notice: $httpErr');
-      }
-    });
-  }
-
-  /// Step 2 — Verify OTP and persist session
   Future<bool> verifyOtp(String otp, {String? name, String? phone, String? examYear}) async {
-    _setLoading(true);
-    _error = null;
-    final targetPhone = phone ?? _currentPhone ?? '';
-    final targetName = name ?? _currentName ?? '';
-    final targetExamYear = examYear ?? _currentExamYear;
-
-    try {
-      bool isVerified = false;
-
-      // 1. Check WhatsApp OTP verification document in Firestore (with timeout)
-      if (targetPhone.isNotEmpty) {
-        DocumentSnapshot<Map<String, dynamic>>? doc;
-        try {
-          doc = await _db
-              .collection('otp_verifications')
-              .doc(targetPhone)
-              .get(const GetOptions(source: Source.serverAndCache))
-              .timeout(const Duration(seconds: 4));
-        } catch (_) {
-          try {
-            doc = await _db
-                .collection('otp_verifications')
-                .doc(targetPhone)
-                .get(const GetOptions(source: Source.cache));
-          } catch (_) {}
-        }
-        if (doc != null && doc.exists) {
-          final data = doc.data()!;
-          final storedOtp = data['otp']?.toString();
-          final expiresAt = data['expiresAt'] as int? ?? 0;
-
-          if (storedOtp == otp && DateTime.now().millisecondsSinceEpoch < expiresAt) {
-            isVerified = true;
-            // Clean up used OTP
-            await _db.collection('otp_verifications').doc(targetPhone).delete().catchError((_) {});
-          }
-        }
-      }
-
-      // 2. Fallback to Firebase Phone Auth verificationId
-      if (!isVerified && _verificationId != null) {
-        try {
-          final credential = PhoneAuthProvider.credential(
-            verificationId: _verificationId!,
-            smsCode: otp,
-          );
-          final result = await _auth.signInWithCredential(credential);
-          if (result.user != null) isVerified = true;
-        } catch (_) {}
-      }
-
-      if (!isVerified) {
-        _error = 'Invalid or expired OTP code. Please check your WhatsApp.';
-        _setLoading(false);
-        notifyListeners();
-        return false;
-      }
-
-      // Ensure user is signed in to Firebase Auth for Firestore rules
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        try {
-          final anonResult = await _auth.signInAnonymously().timeout(const Duration(seconds: 4));
-          currentUser = anonResult.user;
-        } catch (e) {
-          debugPrint('Anonymous auth fallback notice: $e');
-        }
-      }
-
-      final uid = currentUser?.uid ?? targetPhone.replaceAll(RegExp(r'\D'), '');
-
-      final bool isTargetAdmin = isPhoneAdmin(targetPhone);
-
-      // Check or create user profile in Firestore
-      QuerySnapshot<Map<String, dynamic>>? userQuery;
-      try {
-        userQuery = await _db
-            .collection('users')
-            .where('phone', isEqualTo: targetPhone)
-            .limit(1)
-            .get(const GetOptions(source: Source.serverAndCache))
-            .timeout(const Duration(seconds: 4));
-      } catch (_) {
-        try {
-          userQuery = await _db
-              .collection('users')
-              .where('phone', isEqualTo: targetPhone)
-              .limit(1)
-              .get(const GetOptions(source: Source.cache));
-        } catch (_) {}
-      }
-
-      final queryDocs = userQuery?.docs;
-      if (queryDocs != null && queryDocs.isNotEmpty) {
-        final existingDoc = queryDocs.first;
-        final updates = <String, dynamic>{};
-        if (targetName.isNotEmpty && (existingDoc.data()['name'] == null || existingDoc.data()['name'].toString().isEmpty || existingDoc.data()['name'].toString().startsWith('Student ('))) {
-          updates['name'] = targetName;
-        }
-        if (targetExamYear != null && targetExamYear.isNotEmpty) {
-          updates['examYear'] = targetExamYear;
-        }
-        if (isTargetAdmin && existingDoc.data()['role'] != 'admin') {
-          updates['role'] = 'admin';
-        }
-        if (updates.isNotEmpty) {
-          await existingDoc.reference.update(updates).catchError((_) {});
-        }
-        DocumentSnapshot<Map<String, dynamic>> updatedDoc;
-        try {
-          updatedDoc = await existingDoc.reference
-              .get(const GetOptions(source: Source.serverAndCache))
-              .timeout(const Duration(seconds: 4));
-        } catch (_) {
-          updatedDoc = await existingDoc.reference.get(const GetOptions(source: Source.cache));
-        }
-        var u = UserModel.fromFirestore(updatedDoc);
-        if (isTargetAdmin && !u.isAdmin) {
-          u = u.copyWith(role: UserRole.admin);
-        }
-        _user = u;
-      } else {
-        final docRef = _db.collection('users').doc(uid);
-        DocumentSnapshot<Map<String, dynamic>>? doc;
-        try {
-          doc = await docRef
-              .get(const GetOptions(source: Source.serverAndCache))
-              .timeout(const Duration(seconds: 4));
-        } catch (_) {
-          try {
-            doc = await docRef.get(const GetOptions(source: Source.cache));
-          } catch (_) {}
-        }
-        if (doc != null && doc.exists) {
-          var u = UserModel.fromFirestore(doc);
-          if (isTargetAdmin && !u.isAdmin) {
-            u = u.copyWith(role: UserRole.admin);
-            doc.reference.update({'role': 'admin'}).catchError((_) {});
-          }
-          _user = u;
-        } else {
-          // Create new user profile
-          final newUser = UserModel(
-            uid: uid,
-            name: targetName.isNotEmpty ? targetName : (isTargetAdmin ? 'Teacher Admin' : 'Student'),
-            phone: targetPhone,
-            role: isTargetAdmin ? UserRole.admin : UserRole.student,
-            credits: 0,
-            examYear: targetExamYear,
-            createdAt: DateTime.now(),
-          );
-          await docRef.set(newUser.toFirestore());
-          _user = newUser;
-        }
-      }
-
-      // Persist session to SharedPreferences so reopening the app stays logged in
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('saved_uid', _user!.uid);
-      await prefs.setString('saved_phone', targetPhone);
-
-      _setLoading(false);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      _setLoading(false);
-      notifyListeners();
-      return false;
-    }
+    _error = 'One-time-code login is disabled. Use your password to sign in.';
+    notifyListeners();
+    return false;
   }
-
   /// Update Profile Picture (DP)
   Future<bool> updateProfilePhoto(String base64OrUrl) async {
     if (_user == null) return false;

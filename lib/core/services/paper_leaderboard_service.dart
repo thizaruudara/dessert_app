@@ -11,11 +11,7 @@ class PaperLeaderboardService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> _ensureAuth() async {
-    if (_auth.currentUser == null) {
-      try {
-        await _auth.signInAnonymously();
-      } catch (_) {}
-    }
+    if (_auth.currentUser == null) throw StateError('Sign in is required for this action.');
   }
 
   // ══════════════════════════════════════════════════════════════════════════

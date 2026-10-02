@@ -19,14 +19,18 @@ class AppController {
   }
 
   init() {
+    authService.onAuthStateChanged((user) => {
+      this.currentUser = user;
+      if (user && document.getElementById('app-root') && !document.getElementById('pwa-gatekeeper-overlay')) {
+        if (user.role === 'admin') this.renderAdminApp();
+        else this.renderApp();
+      }
+    });
     // 0. Theme Initialization
     const savedTheme = localStorage.getItem('edupeak_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('admin') === 'true') {
-      this.currentMode = 'admin';
-    }
+    // Privileged mode is determined only by the protected server profile.
 
     // 1. Mount 1:1 Opening Loading Screen (splash_screen.dart replica)
     this.renderSplashScreen();
@@ -37,7 +41,7 @@ class AppController {
         console.log('[App] PWA Standalone Mode active.');
         if (!this.currentUser) {
           this.renderAuthScreen();
-        } else if (this.currentMode === 'admin' || this.currentUser?.role === 'admin') {
+        } else if (this.currentUser?.role === 'admin') {
           this.renderAdminApp();
         } else {
           this.renderApp();
@@ -150,14 +154,14 @@ class AppController {
                 <label class="auth-field-label">Phone Number (දුරකථන අංකය)</label>
                 <div class="auth-input-wrapper">
                   <span class="auth-phone-prefix">+94</span>
-                  <input type="tel" class="auth-input has-prefix" id="input-login-phone" placeholder="77 055 7769" value="0770557769" required />
+                  <input type="tel" class="auth-input has-prefix" id="input-login-phone" placeholder="77 055 7769" autocomplete="tel-national" required />
                 </div>
               </div>
 
               <div class="auth-field-group">
                 <label class="auth-field-label">Password (මුරපදය)</label>
                 <div class="auth-input-wrapper">
-                  <input type="password" class="auth-input" id="input-login-password" placeholder="••••••••" value="demo1234" required />
+                  <input type="password" class="auth-input" id="input-login-password" placeholder="Password" autocomplete="current-password" required />
                   <button type="button" class="auth-pw-toggle" id="btn-toggle-login-pw">
                     <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
                   </button>
@@ -200,7 +204,7 @@ class AppController {
               <div class="auth-field-group">
                 <label class="auth-field-label">Password (මුරපදය)</label>
                 <div class="auth-input-wrapper">
-                  <input type="password" class="auth-input" id="input-reg-password" placeholder="Create password" required />
+                  <input type="password" class="auth-input" id="input-reg-password" placeholder="At least 8 characters" minlength="8" autocomplete="new-password" required />
                   <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-pw">
                     <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
                   </button>
@@ -210,40 +214,13 @@ class AppController {
               <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
 
               <button type="submit" class="auth-btn-submit" id="btn-submit-reg" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span>Create Account & Claim +50 Bonus XP</span>
+                <span>Create Account</span>
                 <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
               </button>
             </form>
           `}
         </div>
 
-        <!-- Quick 1-Tap Demo Switcher -->
-        <div class="auth-quick-demo-section">
-          <div style="font-size:11.5px; font-weight:700; color:#64748B; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
-            <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">bolt</span>
-            <span>Quick 1-Tap Login for Testing & Evaluation:</span>
-          </div>
-          <button class="auth-quick-btn" id="btn-quick-student">
-            <span style="display:inline-flex; align-items:center; gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:18px; color:#818CF8;">school</span>
-              <span>Student Demo (ThiZaru • 2027 A/L)</span>
-            </span>
-            <span style="color:#818CF8; font-weight:800; display:inline-flex; align-items:center; gap:2px;">
-              <span>Log In</span>
-              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-            </span>
-          </button>
-          <button class="auth-quick-btn" id="btn-quick-admin">
-            <span style="display:inline-flex; align-items:center; gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:18px; color:#F59E0B;">admin_panel_settings</span>
-              <span>Teacher / Admin Demo (Prof. Senanayake)</span>
-            </span>
-            <span style="color:#F59E0B; font-weight:800; display:inline-flex; align-items:center; gap:2px;">
-              <span>Log In</span>
-              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-            </span>
-          </button>
-        </div>
       </div>
     `;
 
@@ -272,7 +249,7 @@ class AppController {
       try {
         const user = await authService.login({ phone, password });
         this.currentUser = user;
-        if (user.role === 'admin' || authService.isPhoneAdmin(user.phone)) {
+        if (user.role === 'admin') {
           this.renderAdminApp();
         } else {
           this.renderApp();
@@ -304,24 +281,6 @@ class AppController {
       }
     });
 
-    // Quick Demo Logins
-    document.getElementById('btn-quick-student')?.addEventListener('click', () => {
-      const user = authService.loginDemo('student');
-      user.name = 'ThiZaru';
-      user.examYear = '2027 A/L Candidate';
-      user.phone = '0770557769';
-      user.credits = 155;
-      authService.saveSession(user);
-      this.currentUser = user;
-      this.renderApp();
-    });
-
-    document.getElementById('btn-quick-admin')?.addEventListener('click', () => {
-      const user = authService.loginDemo('admin');
-      authService.saveSession(user);
-      this.currentUser = user;
-      this.renderAdminApp();
-    });
   }
 
   // ── Logout In-App Confirmation Dialog (1:1 student_profile_screen.dart replica) ─
@@ -883,15 +842,13 @@ class AppController {
       const activeTargetYear = this.showAllBatches ? null : currentYear;
 
       const [sessions, upcomingList] = await Promise.all([
-        dbService.getPaperSessions(activeTargetYear).catch(e => {
-          console.warn('[Papers] Sessions fetch error, falling back:', e);
-          return dbService.getMockPaperSessions(activeTargetYear);
-        }),
-        dbService.getUpcomingPapers(activeTargetYear).catch(e => {
-          console.warn('[Papers] Upcoming fetch error, falling back:', e);
-          return dbService.getMockUpcomingPapers(activeTargetYear);
-        })
+        dbService.getPaperSessions(activeTargetYear),
+        dbService.getUpcomingPapers(activeTargetYear)
       ]);
+      const registrations = new Map(await Promise.all(sessions.map(async session => [
+        session.id,
+        await dbService.getStudentRegistration(session.id, user.uid)
+      ])));
 
       const formatHeaderSubtitle = () => {
         if (this.showAllBatches) {
@@ -979,7 +936,7 @@ class AppController {
               </button>
             </div>
           ` : sessions.map(session => {
-            const reg = dbService.getStudentRegistration(session.id, user.phone || 'demo_user');
+            const reg = registrations.get(session.id);
             const isSubmitted = reg?.status === 'submitted' || reg?.isSubmitted === true;
             const selectedSlotId = reg?.selectedSlot || 'slot1';
 
@@ -1345,7 +1302,7 @@ class AppController {
           const sId = box.dataset.slotId;
           await dbService.registerStudentSlot({
             paperId: pId,
-            studentId: user.phone || 'demo_user',
+            studentId: user.uid,
             studentName: user.name || 'Scholar',
             studentPhone: user.phone || '0770557769',
             slotId: sId
@@ -1357,10 +1314,10 @@ class AppController {
 
       // View Submission Details
       container.querySelectorAll('[data-view-sub]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const pId = btn.dataset.viewSub;
           const sess = sessions.find(s => s.id === pId);
-          const reg = dbService.getStudentRegistration(pId, user.phone || 'demo_user');
+          const reg = registrations.get(pId);
           if (sess) this.showSubmissionDetailsDialog(sess, reg);
         });
       });
@@ -2097,7 +2054,7 @@ class AppController {
       });
 
       this.capturedHomeworkPhotos = [];
-      notificationService.showInAppBanner('Homework Submitted!', '+100 XP awarded to your profile.', 'success');
+      notificationService.showInAppBanner('Homework Submitted!', 'Your submission was saved for review.', 'success');
       this.dessertsTab = 1;
       this.renderDessertsScreen(container);
     });
@@ -2304,17 +2261,6 @@ class AppController {
           <span class="material-symbols-rounded" style="color:#64748B; font-size:20px;">chevron_right</span>
         </button>
 
-        <!-- Teacher / Admin Console (Always accessible in Demo Mode) -->
-        <button class="hero-card" style="padding:14px; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); border-color:#93C5FD;" id="btn-profile-admin">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span class="material-symbols-rounded filled" style="font-size:22px; color:#2563EB;">admin_panel_settings</span>
-            <div style="text-align:left;">
-              <div style="font-size:13.5px; font-weight:800; color:#1E3A8A;">Teacher / Admin Console</div>
-              <div style="font-size:11px; color:#2563EB;">Grade Submissions & Manage Exam Papers</div>
-            </div>
-          </div>
-          <span class="material-symbols-rounded" style="color:#2563EB; font-size:20px;">chevron_right</span>
-        </button>
 
         <!-- Sign Out Button -->
         <button class="btn-primary" style="background:#EF4444; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" id="btn-profile-logout">
@@ -2359,10 +2305,6 @@ class AppController {
       this.openNotificationCenter();
     });
 
-    document.getElementById('btn-profile-admin')?.addEventListener('click', () => {
-      this.currentMode = 'admin';
-      this.renderAdminApp();
-    });
 
     document.getElementById('btn-profile-logout')?.addEventListener('click', () => {
       this.confirmLogout();
@@ -2733,9 +2675,20 @@ class AppController {
   }
 
   // ── Daily MCQ Sprint Runner (Full 1:1 Android Parity) ─────────────────────
-  openSprintDialog() {
-    const sprint = dbService.getDailySprint();
-    const questions = sprint.questions;
+  async openSprintDialog() {
+    let sprint;
+    try {
+      sprint = await dbService.getDailySprint(undefined, this.currentUser?.examYear);
+    } catch (error) {
+      console.error('[Sprint] Could not load the shared sprint:', error);
+      alert('Could not load today’s sprint from the institute database. Please try again later.');
+      return;
+    }
+    const questions = sprint?.questions || [];
+    if (questions.length === 0) {
+      alert('There is no sprint published for your batch today.');
+      return;
+    }
     let currentIdx = 0;
     let selectedAnswers = {};
     let elapsedSeconds = 0;
@@ -2780,7 +2733,7 @@ class AppController {
 
           <!-- Question Text -->
           <div style="font-size:14px; font-weight:800; color:#0F172A; line-height:1.5; margin-bottom:14px; background:#F8FAFC; padding:14px; border-radius:14px; border:1px solid #E2E8F0;">
-            ${q.text}
+            ${q.question || q.text || ''}
           </div>
 
           <!-- Options -->
@@ -2811,7 +2764,7 @@ class AppController {
             ` : ''}
 
             <button class="btn-primary" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px;" id="btn-sprint-next">
-              <span>${currentIdx === questions.length - 1 ? 'Finish Sprint & Claim +50 XP' : 'Next Question'}</span>
+              <span>${currentIdx === questions.length - 1 ? 'Finish Sprint' : 'Next Question'}</span>
               <span class="material-symbols-rounded" style="font-size:16px;">${currentIdx === questions.length - 1 ? 'check' : 'arrow_forward'}</span>
             </button>
           </div>
@@ -2836,7 +2789,7 @@ class AppController {
         renderQuestion();
       });
 
-      document.getElementById('btn-sprint-next')?.addEventListener('click', () => {
+      document.getElementById('btn-sprint-next')?.addEventListener('click', async () => {
         if (selectedAnswers[currentIdx] === undefined) {
           alert('Please select an option before continuing.');
           return;
@@ -2853,34 +2806,29 @@ class AppController {
             if (selectedAnswers[idx] === qu.correctIndex) correct++;
           });
 
-          const xpEarned = correct * 10;
+          let xpEarned = 0;
           const timeFormatted = `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`;
-          const isPerfect = correct === questions.length;
-          const user = this.currentUser || {};
+          let isPerfect = correct === questions.length;
 
           // 1. Record Attempt in Firestore
-          dbService.recordSprintAttempt({
-            studentId: user.uid || user.id || 'demo_student_01',
-            studentName: user.name || 'Student',
-            phone: user.phone || '',
-            examYear: user.examYear || '2027 A/L',
-            date: sprint.targetDate || new Date().toISOString().split('T')[0],
-            score: correct,
-            totalQuestions: questions.length,
-            timeTakenSeconds: elapsedSeconds,
-            timeTakenFormatted: timeFormatted,
-            answers: selectedAnswers,
-            xpEarned
-          });
-
-          // 2. Increment credits
-          if (xpEarned > 0) {
-            authService.addCredits(xpEarned);
+          try {
+            const result = await dbService.recordSprintAttempt({
+              date: sprint.targetDate || new Date().toISOString().split('T')[0],
+              timeTakenSeconds: elapsedSeconds,
+              answers: selectedAnswers
+            });
+            correct = result.score;
+            xpEarned = result.xpEarned;
+            isPerfect = correct === questions.length;
+          } catch (error) {
+            console.error('[Sprint] Attempt could not be saved:', error);
+            alert('Your sprint result could not be saved to the institute database. Please try again.');
+            return;
           }
 
           notificationService.showInAppBanner(
             isPerfect ? 'PERFECT SCORE!' : 'Sprint Complete!',
-            `You scored ${correct}/${questions.length}. +${xpEarned} XP awarded!`,
+            `You scored ${correct}/${questions.length}. +${xpEarned} XP earned.`,
             'success'
           );
 
@@ -2901,7 +2849,7 @@ class AppController {
                     <span class="material-symbols-rounded" style="font-size:13px;">timer</span> Time: ${timeFormatted}
                   </span>
                   <span style="background:rgba(251,191,36,0.3); color:#FEF3C7; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                    <span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">bolt</span> +${xpEarned} XP Added
+                    <span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">bolt</span> +${xpEarned} XP earned
                   </span>
                   <span style="background:rgba(255,255,255,0.18); padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
                     <span class="material-symbols-rounded" style="font-size:13px;">menu_book</span> Mechanics & Newton Laws
@@ -6603,7 +6551,7 @@ class AppController {
     const student = this.currentUser || { id: 's_default', name: 'Student', phone: '' };
 
     // 1. Check if student already submitted this paper (matching _checkIfAlreadySubmitted)
-    const existingReg = await dbService.getStudentRegistration(paperId, student.id);
+    const existingReg = await dbService.getStudentRegistration(paperId, student.uid || student.id);
     if (existingReg && (existingReg.isSubmitted || existingReg.status === 'submitted')) {
       const alreadySubmittedModal = document.createElement('div');
       alreadySubmittedModal.className = 'app-modal';

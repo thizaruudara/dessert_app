@@ -70,7 +70,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         headers: {
           'Content-Type': 'application/json',
           if (idToken != null) 'Authorization': 'Bearer $idToken',
-          'X-Admin-Secret': 'edupeak_admin_sec_2026',
         },
         body: jsonEncode({
           'title': title,

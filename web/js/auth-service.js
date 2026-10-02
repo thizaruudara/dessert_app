@@ -1,188 +1,125 @@
-// EduPeak Auth Service
-// Supports Student Registration, Phone Login, Admin Detection & Demo Quick-Login
-import { db, collection, doc, getDoc, getDocs, setDoc, query, where, serverTimestamp } from './firebase-config.js';
+// EduPeak Authentication. Firebase Auth is the sole credential store.
+import {
+  auth, db, doc, getDoc, setDoc, onAuthStateChanged,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signInWithCustomToken, signOut, updateProfile, getIdTokenResult
+} from './firebase-config.js';
+import { callBackend } from './backend-api.js';
+
+
+function normalizedPhone(phone) {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.startsWith('0')) digits = `94${digits.slice(1)}`;
+  else if (digits.length === 9) digits = `94${digits}`;
+  if (!digits) throw new Error('Enter a valid phone number.');
+  return digits;
+}
+
+function authEmail(phone) {
+  return `p${normalizedPhone(phone)}@users.edupeak.app`;
+}
 
 export class AuthService {
   constructor() {
     this.currentUser = null;
     this.listeners = [];
-    this.loadPersistedUser();
+    this.loading = true;
+    this.unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
+      this.currentUser = firebaseUser ? await this.readProfile(firebaseUser.uid) : null;
+      this.loading = false;
+      this.notify();
+    });
   }
 
-  isPhoneAdmin(phone) {
-    if (!phone) return false;
-    const digits = phone.replace(/\D/g, '');
-    return (
-      digits.includes('770557769') ||
-      digits.includes('707938883') ||
-      digits.includes('701068489') ||
-      digits.endsWith('770557769') ||
-      digits.endsWith('707938883') ||
-      digits.endsWith('701068489')
-    );
-  }
-
-  loadPersistedUser() {
+  async readProfile(uid) {
     try {
-      const saved = localStorage.getItem('edupeak_user');
-      if (saved) {
-        this.currentUser = JSON.parse(saved);
-      }
-    } catch (_) {}
-  }
-
-  saveSession(user) {
-    this.currentUser = user;
-    try {
-      localStorage.setItem('edupeak_user', JSON.stringify(user));
-    } catch (_) {}
-    this.notify();
-  }
-
-  clearSession() {
-    this.currentUser = null;
-    try {
-      localStorage.removeItem('edupeak_user');
-    } catch (_) {}
-    this.notify();
+      const profileSnap = await getDoc(doc(db, 'users', uid));
+      if (!profileSnap.exists()) return null;
+      const claims = await getIdTokenResult(auth.currentUser, true);
+      return { uid, id: uid, ...profileSnap.data(), role: claims.claims.admin === true ? 'admin' : 'student' };
+    } catch (error) {
+      console.error('[Auth] Profile load failed:', error);
+      return null;
+    }
   }
 
   onAuthStateChanged(callback) {
     this.listeners.push(callback);
     callback(this.currentUser);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== callback);
-    };
+    return () => { this.listeners = this.listeners.filter((listener) => listener !== callback); };
   }
 
-  notify() {
-    this.listeners.forEach(l => l(this.currentUser));
+  notify() { this.listeners.forEach((listener) => listener(this.currentUser)); }
+
+  async ensureProfile(firebaseUser, { name, phone, examYear }) {
+    await callBackend('auth/ensure-profile', { name, phone: `+${normalizedPhone(phone)}`, examYear });
+    const profile = await this.readProfile(firebaseUser.uid);
+    if (!profile) throw new Error('Your account was created, but its profile could not be loaded. Please sign in again.');
+    this.currentUser = profile;
+    this.notify();
+    return profile;
   }
 
   async register({ name, phone, password, examYear }) {
-    const cleanPhone = phone.trim();
-    if (!cleanPhone || !name || !password) {
-      throw new Error('Please fill in all required fields.');
-    }
-
-    // Check if phone already registered in Firestore
+    const cleanName = String(name || '').trim();
+    if (!cleanName || !phone || !password) throw new Error('Please fill in all required fields.');
+    if (password.length < 8) throw new Error('Use a password with at least 8 characters.');
+    const credential = await createUserWithEmailAndPassword(auth, authEmail(phone), password);
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('phone', '==', cleanPhone));
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-        const existingData = snap.docs[0].data();
-        if (existingData.password) {
-          throw new Error('An account already exists with this phone number. Please sign in.');
-        }
-      }
-
-      const uid = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-      const isAdmin = this.isPhoneAdmin(cleanPhone);
-
-      const userData = {
-        uid: uid,
-        name: name.trim(),
-        phone: cleanPhone,
-        password: password,
-        role: isAdmin ? 'admin' : 'student',
-        credits: 50, // Welcome bonus
-        examYear: examYear || '2026 A/L',
-        studentId: 'EP-' + cleanPhone.slice(-4),
-        avatarUrl: '',
-        createdAt: new Date().toISOString()
-      };
-
-      // Write to Firestore
-      await setDoc(doc(db, 'users', uid), userData);
-
-      this.saveSession(userData);
-      return userData;
-    } catch (err) {
-      console.error('[Auth] Register error:', err);
-      throw err;
+      await updateProfile(credential.user, { displayName: cleanName });
+      return await this.ensureProfile(credential.user, { name: cleanName, phone, examYear });
+    } catch (error) {
+      try { await credential.user.delete(); } catch (_) {}
+      await signOut(auth);
+      throw error;
     }
   }
 
   async login({ phone, password }) {
-    const cleanPhone = phone.trim();
-    if (!cleanPhone || !password) {
-      throw new Error('Please enter your phone number and password.');
-    }
-
+    if (!phone || !password) throw new Error('Please enter your phone number and password.');
+    let credential;
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('phone', '==', cleanPhone));
-      const snap = await getDocs(q);
-
-      if (snap.empty) {
-        throw new Error('No account found with this phone number. Please register first.');
+      credential = await signInWithEmailAndPassword(auth, authEmail(phone), password);
+    } catch (error) {
+      if (['auth/user-not-found', 'auth/invalid-credential', 'auth/wrong-password', 'auth/invalid-login-credentials'].includes(error.code)) {
+        try {
+          const result = await callBackend('auth/upgrade-legacy', { phone: `+${normalizedPhone(phone)}`, password }, { authenticated: false });
+          credential = await signInWithCustomToken(auth, result.token);
+        } catch (migrationError) {
+          if (migrationError.code === 'unauthenticated') {
+            throw new Error('Phone or password is incorrect. If you no longer know your old password, contact the institute to reset your account.');
+          }
+          throw migrationError;
+        }
+      } else {
+        throw error;
       }
-
-      const userDoc = snap.docs[0];
-      const userData = userDoc.data();
-
-      if (userData.password && userData.password !== password) {
-        throw new Error('Incorrect password. Please try again.');
-      }
-
-      // Check if admin phone
-      if (this.isPhoneAdmin(cleanPhone) && userData.role !== 'admin') {
-        userData.role = 'admin';
-        setDoc(doc(db, 'users', userDoc.id), { role: 'admin' }, { merge: true }).catch(() => {});
-      }
-
-      this.saveSession(userData);
-      return userData;
-    } catch (err) {
-      console.error('[Auth] Login error:', err);
-      throw err;
     }
-  }
-
-  // Quick Demo Login for instant testing & evaluation
-  loginDemo(role = 'student') {
-    const isTeacher = role === 'admin';
-    const demoUser = {
-      uid: isTeacher ? 'demo_teacher_01' : 'demo_student_01',
-      name: isTeacher ? 'Prof. Senanayake (Admin)' : 'Kasun Perera',
-      phone: isTeacher ? '0770557769' : '0712345678',
-      role: isTeacher ? 'admin' : 'student',
-      credits: isTeacher ? 9999 : 340,
-      examYear: '2026 A/L',
-      studentId: isTeacher ? 'EP-ADMIN' : 'EP-5678',
-      avatarUrl: '',
-      createdAt: new Date().toISOString()
-    };
-
-    this.saveSession(demoUser);
-    return demoUser;
+    await callBackend('auth/ensure-admin', { phone: `+${normalizedPhone(phone)}` });
+    await credential.user.getIdToken(true);
+    const profile = await this.readProfile(credential.user.uid);
+    if (!profile) throw new Error('Account profile is unavailable. Contact the institute administrator.');
+    this.currentUser = profile;
+    this.notify();
+    return profile;
   }
 
   async updateProfile(updates = {}) {
     if (!this.currentUser) return null;
-    const updatedUser = { ...this.currentUser, ...updates };
-    this.saveSession(updatedUser);
-
-    try {
-      if (updatedUser.uid) {
-        await setDoc(doc(db, 'users', updatedUser.uid), updates, { merge: true });
-      }
-    } catch (e) {
-      console.warn('[Auth] Error updating profile in Firestore:', e);
+    const allowed = {};
+    for (const key of ['name', 'avatarUrl', 'photoUrl', 'examYear']) {
+      if (Object.hasOwn(updates, key)) allowed[key] = updates[key];
     }
-    return updatedUser;
+    await setDoc(doc(db, 'users', this.currentUser.uid), allowed, { merge: true });
+    this.currentUser = { ...this.currentUser, ...allowed };
+    this.notify();
+    return this.currentUser;
   }
 
-  async addCredits(amount) {
-    if (!this.currentUser || !amount) return;
-    const newCredits = (this.currentUser.credits || 0) + amount;
-    return this.updateProfile({ credits: newCredits });
-  }
-
-  logout() {
-    this.clearSession();
+  async logout() {
+    await signOut(auth);
+    this.currentUser = null;
+    this.notify();
   }
 }
 

@@ -468,7 +468,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
             const SizedBox(height: 32),
 
             // ── Admin Dashboard Switch Button (If Admin) ────────────
-            if (auth.isAdmin || AuthProvider.isPhoneAdmin(user.phone)) ...[
+            if (auth.isAdmin) ...[
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

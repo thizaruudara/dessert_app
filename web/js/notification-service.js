@@ -11,13 +11,15 @@ export class NotificationService {
   }
 
   async init(user = null) {
-    if (!this.isSupported) {
-      console.warn('[Notification] Push notifications not supported on this browser/platform');
-      return;
-    }
-
     try {
-      this.swRegistration = await navigator.serviceWorker.ready;
+      if ('serviceWorker' in navigator && window.isSecureContext) {
+        this.swRegistration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+        await navigator.serviceWorker.ready;
+      }
+      if (!this.isSupported || !this.swRegistration) {
+        console.warn('[Notification] Push notifications not supported on this browser/platform');
+        return;
+      }
       console.log('[Notification] Service Worker Ready for Push Notifications');
 
       if (this.permission === 'granted' && user) {

@@ -1,5 +1,5 @@
 // EduPeak Service Worker - PWA & Web Push Notification Handler
-const CACHE_NAME = 'edupeak-pwa-v1.0.5';
+const CACHE_NAME = 'edupeak-pwa-v1.2.0';
 const OFFLINE_URLS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const OFFLINE_URLS = [
   './css/gatekeeper.css',
   './css/camera-scanner.css',
   './css/exam-room.css',
+  './css/features.css',
   './js/firebase-config.js',
   './js/pwa-gatekeeper.js',
   './js/notification-service.js',
@@ -15,6 +16,7 @@ const OFFLINE_URLS = [
   './js/auth-service.js',
   './js/db-service.js',
   './js/app.js',
+  './js/app.bundle.js',
   './icons/icon.svg',
   './icons/apple-touch-icon.png'
 ];

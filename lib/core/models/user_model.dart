@@ -12,7 +12,6 @@ class UserModel {
   final String? studentId;
   final String? avatarUrl;
   final String? examYear;
-  final String? password;
   final DateTime createdAt;
 
   const UserModel({
@@ -25,7 +24,6 @@ class UserModel {
     this.studentId,
     this.avatarUrl,
     this.examYear,
-    this.password,
     required this.createdAt,
   });
 
@@ -45,7 +43,6 @@ class UserModel {
       studentId: data['studentId'],
       avatarUrl: data['avatarUrl'] ?? data['photoUrl'],
       examYear: data['examYear']?.toString(),
-      password: data['password']?.toString(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -61,7 +58,6 @@ class UserModel {
       'avatarUrl': avatarUrl,
       'photoUrl': avatarUrl,
       'examYear': examYear,
-      if (password != null) 'password': password,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }

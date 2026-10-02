@@ -67,26 +67,14 @@ class DessertsProvider extends ChangeNotifier {
       notifyListeners();
     }
 
-    final rawPhone = (studentPhone ?? '').replaceAll(RegExp(r'\D'), '');
-    final last7 = rawPhone.length >= 7 ? rawPhone.substring(rawPhone.length - 7) : rawPhone;
+    final studentQuery = _db.collection('desserts').where('studentId', isEqualTo: studentId);
 
-    bool matchesStudent(DessertModel d) {
-      if (d.studentId == studentId) return true;
-      if (last7.isNotEmpty) {
-        final dPhone = d.studentPhone.replaceAll(RegExp(r'\D'), '');
-        if (dPhone.isNotEmpty && (dPhone.contains(last7) || dPhone.endsWith(rawPhone) || rawPhone.endsWith(dPhone))) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    // 1. Instant Cache-First Read (< 10ms): Read local SQLite cache immediately
-    _db.collection('desserts').get(const GetOptions(source: Source.cache)).then((cachedSnap) {
+    // Only query documents this student is allowed to read. Firestore rules
+    // cannot safely authorize a collection-wide read followed by client filtering.
+    studentQuery.get(const GetOptions(source: Source.cache)).then((cachedSnap) {
       if (cachedSnap.docs.isNotEmpty) {
         final cached = cachedSnap.docs
             .map(DessertModel.fromFirestore)
-            .where(matchesStudent)
             .toList()
           ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
         if (cached.isNotEmpty) {
@@ -100,10 +88,9 @@ class DessertsProvider extends ChangeNotifier {
     }).catchError((_) {});
 
     // 2. Real-time stream for live updates (automatically syncs server delta)
-    _dessertSub = _db.collection('desserts').snapshots().listen((snap) {
+    _dessertSub = studentQuery.snapshots().listen((snap) {
       _desserts = snap.docs
           .map(DessertModel.fromFirestore)
-          .where(matchesStudent)
           .toList()
         ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _loading = false;
@@ -130,24 +117,14 @@ class DessertsProvider extends ChangeNotifier {
 
   /// Manual refresh
   Future<void> refreshStudentDesserts(String studentId, {String? studentPhone}) async {
-    final rawPhone = (studentPhone ?? '').replaceAll(RegExp(r'\D'), '');
-    final last7 = rawPhone.length >= 7 ? rawPhone.substring(rawPhone.length - 7) : rawPhone;
-
     try {
       final snap = await _db
           .collection('desserts')
+          .where('studentId', isEqualTo: studentId)
           .get()
           .timeout(const Duration(seconds: 4));
       _desserts = snap.docs
           .map(DessertModel.fromFirestore)
-          .where((d) {
-            if (d.studentId == studentId) return true;
-            if (last7.isNotEmpty) {
-              final dPhone = d.studentPhone.replaceAll(RegExp(r'\D'), '');
-              return dPhone.contains(last7) || dPhone.endsWith(rawPhone) || rawPhone.endsWith(dPhone);
-            }
-            return false;
-          })
           .toList()
         ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       _loading = false;

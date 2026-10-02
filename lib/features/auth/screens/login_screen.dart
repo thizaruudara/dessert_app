@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -79,68 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context.go(auth.isAdmin ? '/admin' : '/student');
     } else if (!success && mounted) {
       _showError(auth.error ?? 'Invalid phone number or password.');
-    }
-  }
-
-  // ── 2. TELEGRAM 1-TAP OTP LOGIN ──────────────────────────────────────────
-  Future<void> _handleTelegramOtpLogin() async {
-    final rawNumber = _loginPhoneCtrl.text.trim();
-    if (rawNumber.isEmpty) {
-      _showError('Please enter your phone number first');
-      return;
-    }
-
-    HapticFeedbackService.medium();
-    final phone = _cleanPhone(rawNumber);
-    final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
-
-    final auth = context.read<AuthProvider>();
-    await auth.prepareWhatsAppLoginOtp(phone);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('⏳ Checking Telegram connection...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-
-    final res = await auth.requestTelegramOtp(phone);
-    final mode = res['mode'];
-
-    if (mode == 'deep_link') {
-      // First-time user only -> Open Telegram so they can tap Start once
-      final deepLink = res['deepLink'] ?? 'https://t.me/edupeakbot?start=otp_$cleanDigits';
-      final webUri = Uri.parse(deepLink);
-      final appUri = Uri.parse(deepLink.replaceFirst('https://t.me/', 'tg://resolve?domain='));
-
-      try {
-        if (await canLaunchUrl(appUri)) {
-          await launchUrl(appUri, mode: LaunchMode.externalApplication);
-        } else if (await canLaunchUrl(webUri)) {
-          await launchUrl(webUri, mode: LaunchMode.externalApplication);
-        }
-      } catch (_) {
-        if (await canLaunchUrl(webUri)) {
-          await launchUrl(webUri, mode: LaunchMode.externalApplication);
-        }
-      }
-    } else {
-      // Returning user -> Code is already sent directly to Telegram chat in background!
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📩 Verification code sent directly to your Telegram!'),
-            backgroundColor: Color(0xFF22C55E),
-          ),
-        );
-      }
-    }
-
-    if (mounted) {
-      context.push('/auth/otp', extra: {
-        'phone': phone,
-        'isRegister': false,
-      });
     }
   }
 
@@ -339,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── 1. LOGIN FORM (Phone + Password OR WhatsApp 1-Tap OTP) ────────────────
+  // ── 1. LOGIN FORM (Phone + Firebase Authentication password) ─────────────
   Widget _buildLoginForm(AuthProvider auth) {
     return Form(
       key: _loginFormKey,
@@ -424,38 +361,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
 
             const SizedBox(height: 20),
-
-            // OR Divider
-            Row(
-              children: const [
-                Expanded(child: Divider(color: AppColors.border)),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('OR', style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-                Expanded(child: Divider(color: AppColors.border)),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Secondary: Telegram 1-Tap OTP Login Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: auth.loading ? null : _handleTelegramOtpLogin,
-                icon: const Icon(Icons.send_rounded, color: Color(0xFF229ED9), size: 19),
-                label: const Text(
-                  'Login via Telegram OTP ✈️',
-                  style: TextStyle(color: Color(0xFF229ED9), fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF229ED9), width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
-            ),
           ],
         ),
       ),

@@ -31,6 +31,8 @@ ios/Flutter/Flutter.podspec
 
 # Functions node_modules
 functions/node_modules/
+web/node_modules/
+web/.vercel/
 
 # OS
 .DS_Store

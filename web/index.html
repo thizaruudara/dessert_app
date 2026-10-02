@@ -38,7 +38,33 @@
   <!-- App Mounting Root -->
   <div id="app-root"></div>
 
-  <!-- Main ES Module Application Script -->
-  <script type="module" src="./js/app.js?v=1.1.0"></script>
+  <!-- Show an actionable message if the module graph (including Firebase SDK imports) fails to load. -->
+  <script>
+    (() => {
+      const showStartupError = () => {
+        if (window.app) return;
+        document.getElementById('app-splash-screen')?.remove();
+        const root = document.getElementById('app-root');
+        if (!root) return;
+        root.innerHTML = `
+          <main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;background:#0B1220;color:#F8FAFC;font-family:system-ui,sans-serif;">
+            <section style="max-width:360px;text-align:center;">
+              <h1 style="font-size:22px;margin:0 0 12px;">EduPeak couldn’t start</h1>
+              <p style="color:#CBD5E1;line-height:1.6;margin:0 0 18px;">The app’s JavaScript or Firebase SDK did not load. Check your internet connection and access to <strong>www.gstatic.com</strong>, then retry.</p>
+              <button onclick="location.reload()" style="border:0;border-radius:10px;background:#2563EB;color:white;padding:11px 20px;font-weight:700;cursor:pointer;">Retry</button>
+            </section>
+          </main>`;
+      };
+      window.addEventListener('error', (event) => {
+        if (event.target?.tagName === 'SCRIPT' && event.target.type === 'module') showStartupError();
+      }, true);
+      setTimeout(() => {
+        if (!window.app && !document.querySelector('.gatekeeper-overlay,.auth-screen-container')) showStartupError();
+      }, 10000);
+    })();
+  </script>
+
+  <!-- Firebase SDK is bundled locally so the app does not depend on a browser reaching gstatic. -->
+  <script type="module" src="./js/app.bundle.js?v=1.2.0"></script>
 </body>
 </html>
