@@ -1709,6 +1709,7 @@ html[data-theme="dark"] .splash-loading-text {
   padding: 0 14px; border: 1px solid #E2E8F0; border-radius: 12px;
   background: #EFF5FF; color: #0F172A; font: 700 15px 'Outfit', sans-serif;
 }
+.auth-country-flag { display: block; width: 24px; height: 16px; flex: 0 0 auto; border-radius: 2px; }
 .auth-phone-input-wrap { flex: 1; min-width: 0; }
 .auth-input-wrapper { position: relative; }
 .auth-input-prefix {

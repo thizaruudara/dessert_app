@@ -143,10 +143,19 @@ class AppController {
               <div class="auth-field-group">
                 <label class="auth-field-label" for="input-login-phone">Phone Number</label>
                 <div class="auth-phone-row">
-                  <span class="auth-phone-country"><span>🇱🇰</span><strong>+94</strong></span>
+                  <span class="auth-phone-country">
+                    <svg class="auth-country-flag" viewBox="0 0 28 18" role="img" aria-label="Sri Lanka">
+                      <rect x=".5" y=".5" width="27" height="17" rx="2.5" fill="#FFBE29" />
+                      <rect x="2" y="3" width="4" height="12" fill="#00534E" />
+                      <rect x="6.5" y="3" width="4" height="12" fill="#EB7400" />
+                      <rect x="11" y="3" width="15" height="12" rx="1" fill="#8D153A" />
+                      <path d="M17 6.2c1.4-.9 3.3-.4 3.5 1.1.1 1.2-1 1.4-1.7 2.1-.4.4-.3 1.1.1 1.5m-2.7-4.7-.7-.8m4.9.4.7-.7M18.7 11v1.1m-2.3-.2-.8.8m4.7-.8.8.8" fill="none" stroke="#FFBE29" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <strong>+94</strong>
+                  </span>
                   <div class="auth-input-wrapper auth-phone-input-wrap">
                     <span class="material-symbols-rounded auth-input-prefix">call</span>
-                    <input type="tel" class="auth-input" id="input-login-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
+                    <input type="tel" class="auth-input has-prefix" id="input-login-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
                   </div>
                 </div>
               </div>
@@ -186,10 +195,19 @@ class AppController {
               <div class="auth-field-group">
                 <label class="auth-field-label" for="input-reg-phone">Phone Number</label>
                 <div class="auth-phone-row">
-                  <span class="auth-phone-country"><span>🇱🇰</span><strong>+94</strong></span>
+                  <span class="auth-phone-country">
+                    <svg class="auth-country-flag" viewBox="0 0 28 18" role="img" aria-label="Sri Lanka">
+                      <rect x=".5" y=".5" width="27" height="17" rx="2.5" fill="#FFBE29" />
+                      <rect x="2" y="3" width="4" height="12" fill="#00534E" />
+                      <rect x="6.5" y="3" width="4" height="12" fill="#EB7400" />
+                      <rect x="11" y="3" width="15" height="12" rx="1" fill="#8D153A" />
+                      <path d="M17 6.2c1.4-.9 3.3-.4 3.5 1.1.1 1.2-1 1.4-1.7 2.1-.4.4-.3 1.1.1 1.5m-2.7-4.7-.7-.8m4.9.4.7-.7M18.7 11v1.1m-2.3-.2-.8.8m4.7-.8.8.8" fill="none" stroke="#FFBE29" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <strong>+94</strong>
+                  </span>
                   <div class="auth-input-wrapper auth-phone-input-wrap">
                     <span class="material-symbols-rounded auth-input-prefix">call</span>
-                    <input type="tel" class="auth-input" id="input-reg-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
+                    <input type="tel" class="auth-input has-prefix" id="input-reg-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
                   </div>
                 </div>
               </div>
