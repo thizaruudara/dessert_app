@@ -2656,7 +2656,7 @@ class AppController {
   }
 
   // ── Admin Review Modal (Mock Teacher Console) ─────────────────────────────
-  openAdminReviewModal() {
+  openMockTeacherConsoleModal() {
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.innerHTML = `
