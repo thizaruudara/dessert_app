@@ -78,61 +78,40 @@ body {
 #app-root {
   width: 100%;
   max-width: 430px;
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #F8FAFC;
   position: relative;
-  overflow-x: hidden;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 @media (min-width: 480px) {
   body {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
     padding: 20px 0;
+    align-items: center;
+    overflow: hidden;
   }
   #app-root {
     border-radius: 40px;
     box-shadow: 0 25px 70px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(226, 232, 240, 0.8);
-    height: 920px;
-    min-height: 920px;
-    overflow-y: hidden;
+    height: min(920px, calc(100dvh - 40px));
+    min-height: 0;
   }
-}
-
-/* Top Status Bar (8:15 battery / wifi / signal) */
-.ios-status-bar {
-  height: calc(44px + var(--safe-top));
-  padding: var(--safe-top) 24px 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #1E293B;
-  background: rgba(248, 250, 252, 0.95);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 40;
-}
-
-.status-time {
-  font-weight: 800;
-  letter-spacing: -0.2px;
-}
-
-.status-icons {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  font-size: 13px;
 }
 
 /* Scrollable Content Container */
 .main-viewport {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 14px 20px calc(80px + var(--safe-bottom));
+  padding: calc(14px + var(--safe-top)) 20px calc(80px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
   gap: 16px;

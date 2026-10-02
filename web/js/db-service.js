@@ -865,24 +865,108 @@ export class DbService {
     return matching[0] || null;
   }
 
+  async getDailySprints() {
+    const snapshot = await getDocs(collection(db, 'daily_sprints'));
+    return snapshot.docs
+      .map((sprintDoc) => ({ id: sprintDoc.id, ...sprintDoc.data() }))
+      .sort((a, b) => String(b.targetDate || '').localeCompare(String(a.targetDate || '')));
+  }
+
+  async publishDailySprint({ title, subject, unit, targetDate, examYear, questions }) {
+    const safeDate = String(targetDate || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate) || !Array.isArray(questions) || questions.length !== 5) {
+      throw new Error('Enter a valid date and all five questions.');
+    }
+    const batch = String(examYear || 'All Batches');
+    const docId = batch === 'All Batches'
+      ? safeDate
+      : `${safeDate}_${batch.replaceAll(' ', '_').replaceAll('/', '_')}`;
+    await setDoc(doc(db, 'daily_sprints', docId), {
+      title: `🔥 ${String(title || 'Daily 5-MCQ Sprint').trim()} - ${String(unit || '').trim()}`,
+      subject: String(subject || 'Physics'),
+      unit: String(unit || '').trim(),
+      targetDate: safeDate,
+      examYear: batch,
+      xpPerQuestion: 10,
+      questions: questions.map((question, index) => ({
+        qNum: index + 1,
+        question: String(question.question || '').trim(),
+        options: (question.options || []).map((option) => String(option || '').trim()),
+        correctIndex: Number(question.correctIndex) || 0,
+        explanation: String(question.explanation || '').trim(),
+      })),
+      createdAt: new Date(),
+    });
+    return docId;
+  }
+
+  async deleteDailySprint(id) {
+    if (!id) return;
+    await deleteDoc(doc(db, 'daily_sprints', id));
+  }
+
   // ── 4. Leaderboard ───────────────────────────────────────────────────────
-  async getLeaderboard() {
-    try {
-      const usersRef = collection(db, 'leaderboard_public');
-      const q = query(usersRef, orderBy('credits', 'desc'), limit(25));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        return snap.docs.map((d, index) => ({
-          rank: index + 1,
-          id: d.id,
-          name: d.data().name || 'Student',
-          examYear: d.data().examYear || '2026 A/L',
-          credits: d.data().credits || 0,
-          avatarUrl: d.data().avatarUrl || ''
-        }));
-      }
-    } catch (_) {}
-    return [];
+  async getLeaderboard(batch) {
+    const snapshot = await getDocs(collection(db, 'leaderboard_public'));
+    return snapshot.docs.map((studentDoc) => {
+      const student = studentDoc.data();
+      return {
+      rank: 0,
+      id: studentDoc.id,
+      role: 'student',
+      name: student.name || 'Student',
+      examYear: student.examYear || '',
+      credits: Number(student.credits) || 0,
+      avatarUrl: student.avatarUrl || student.photoUrl || '',
+      };
+    }).filter((student) => !batch || batch === 'All Batches'
+      || String(student.examYear).replace(/\s+/g, '').toUpperCase() === String(batch).replace(/\s+/g, '').toUpperCase()
+      || ['ALL', 'ALLBATCHES'].includes(String(student.examYear).replace(/\s+/g, '').toUpperCase()))
+      .sort((a, b) => b.credits - a.credits || a.name.localeCompare(b.name));
+  }
+
+  async getPaperLeaderboards() {
+    const snapshot = await getDocs(collection(db, 'paper_leaderboards'));
+    return snapshot.docs.map((paperDoc) => {
+      const data = paperDoc.data();
+      const rawPublishedAt = data.publishedAt;
+      const publishedAt = rawPublishedAt?.toDate
+        ? rawPublishedAt.toDate()
+        : new Date(rawPublishedAt || Date.now());
+      const entries = Array.isArray(data.entries) ? data.entries.map((entry, index) => ({
+        rank: Number(entry?.rank) || index + 1,
+        studentId: String(entry?.studentId || ''),
+        studentName: String(entry?.studentName || 'Student'),
+        studentPhone: String(entry?.studentPhone || ''),
+        indexNumber: String(entry?.indexNumber || ''),
+        marks: Number(entry?.marks) || 0,
+        grade: String(entry?.grade || 'F').toUpperCase(),
+        remarks: String(entry?.remarks || ''),
+      })).sort((a, b) => a.rank - b.rank) : [];
+
+      return {
+        id: paperDoc.id,
+        paperTitle: String(data.paperTitle || 'Paper Evaluation Leaderboard'),
+        subject: String(data.subject || 'Physics'),
+        examYear: String(data.examYear || ''),
+        paperDate: String(data.paperDate || ''),
+        totalMarks: Number(data.totalMarks) || 100,
+        publishedAt: Number.isNaN(publishedAt.getTime()) ? new Date(0) : publishedAt,
+        entries,
+      };
+    }).sort((a, b) => b.publishedAt - a.publishedAt);
+  }
+
+  async getSprintAttempts(date) {
+    const snapshot = await getDocs(query(
+      collection(db, 'sprint_attempts'),
+      where('date', '==', date),
+      limit(200),
+    ));
+    return snapshot.docs
+      .map((attempt) => ({ id: attempt.id, ...attempt.data() }))
+      .sort((a, b) => Number(b.score || 0) - Number(a.score || 0)
+        || Number(a.timeTakenSeconds || 0) - Number(b.timeTakenSeconds || 0));
   }
 
   // ── 5. Daily Physics Insight (1:1 with DailyPhysicsInsightService & Model) ──
@@ -1270,18 +1354,6 @@ export class DbService {
     ];
   }
 
-  getMockLeaderboard() {
-    return [
-      { rank: 1, id: 'u1', name: 'Danushka Wickramasinghe', examYear: '2026 A/L', credits: 1420, avatarUrl: '' },
-      { rank: 2, id: 'u2', name: 'Minoli Senarath', examYear: '2026 A/L', credits: 1280, avatarUrl: '' },
-      { rank: 3, id: 'u3', name: 'Sachintha Fernando', examYear: '2027 A/L', credits: 1190, avatarUrl: '' },
-      { rank: 4, id: 'u4', name: 'Dinuka Rajapaksha', examYear: '2026 A/L', credits: 940, avatarUrl: '' },
-      { rank: 5, id: 'u5', name: 'Kavindu Jayawardena', examYear: '2026 A/L', credits: 890, avatarUrl: '' },
-      { rank: 6, id: 'u6', name: 'Anuki Dissanayake', examYear: '2027 A/L', credits: 810, avatarUrl: '' },
-      { rank: 7, id: 'u7', name: 'Thejana Gunawardana', examYear: '2026 A/L', credits: 760, avatarUrl: '' },
-      { rank: 8, id: 'u8', name: 'Praveen Silva', examYear: '2028 A/L', credits: 710, avatarUrl: '' }
-    ];
-  }
 }
 
 export const dbService = new DbService();

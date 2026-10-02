@@ -110,7 +110,8 @@ class AppController {
     this.authTab = initialTab; // 0 = Login, 1 = Register
 
     root.innerHTML = `
-      <div class="auth-screen-container">
+      <div class="auth-screen-container ${this.authTab === 1 ? 'is-registering' : ''}">
+        <div class="auth-scroll-content">
         <div class="auth-header">
           <div class="auth-brand-logo-wrap">
             <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" onerror="this.src='./icons/icon-192.png'" />
@@ -249,9 +250,6 @@ class AppController {
 
               <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
 
-              <button type="submit" class="auth-btn-submit" id="btn-submit-reg" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span>Create Account (Instant Sign-in) 🚀</span>
-              </button>
             </form>
           `}
         </div>
@@ -259,11 +257,17 @@ class AppController {
           <span class="material-symbols-rounded">lock_outline</span>
           <span>Secure authentication for EduPeak Students</span>
         </div>
+        </div>
+        ${this.authTab === 1 ? `
+          <div class="auth-sticky-action">
+            <button type="submit" form="form-register" class="auth-btn-submit" id="btn-submit-reg">
+              <span>Create Account (Instant Sign-in) 🚀</span>
+            </button>
+          </div>
+        ` : ''}
 
       </div>
     `;
-
-    this.updateClock();
 
     // Tab Listeners
     document.getElementById('tab-auth-login')?.addEventListener('click', () => this.renderAuthScreen(0));
@@ -382,16 +386,6 @@ class AppController {
     if (!root) return;
 
     root.innerHTML = `
-      <!-- iOS Status Bar (8:15 battery/wifi) -->
-      <div class="ios-status-bar">
-        <span class="status-time" id="status-clock">8:15</span>
-        <div class="status-icons" style="display:flex; align-items:center; gap:5px;">
-          <span class="material-symbols-rounded filled" style="font-size:14px;">signal_cellular_alt</span>
-          <span class="material-symbols-rounded" style="font-size:14px;">wifi</span>
-          <span class="material-symbols-rounded filled" style="font-size:16px;">battery_full</span>
-        </div>
-      </div>
-
       <!-- Main Scrollable Viewport -->
       <div class="main-viewport" id="main-viewport"></div>
 
@@ -420,10 +414,6 @@ class AppController {
       </nav>
     `;
 
-    // Clock
-    this.updateClock();
-    setInterval(() => this.updateClock(), 30000);
-
     // Nav Listeners
     document.querySelectorAll('.nav-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -435,16 +425,6 @@ class AppController {
 
     // Init notification service
     notificationService.init(this.currentUser);
-  }
-
-  updateClock() {
-    const el = document.getElementById('status-clock');
-    if (el) {
-      const now = new Date();
-      let hrs = now.getHours();
-      let mins = now.getMinutes();
-      el.textContent = `${hrs}:${mins < 10 ? '0' : ''}${mins}`;
-    }
   }
 
   switchTab(tabName) {
@@ -1623,10 +1603,30 @@ class AppController {
   async renderRanksScreen(container) {
     this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Dessert, 1: Paper
     this.selectedLeague = this.selectedLeague ?? 'All Scholars';
-    this.selectedRanksBatch = this.selectedRanksBatch ?? (this.currentUser?.examYear || 'All Batches');
-    this.expandedPaperBoards = this.expandedPaperBoards ?? new Set(['paper_001']);
+    const currentUser = this.currentUser || {};
+    const isAdmin = currentUser.role === 'admin';
+    const studentBatch = String(currentUser.examYear || '').trim();
+    this.selectedRanksBatch = isAdmin
+      ? (this.selectedRanksBatch || 'All Batches')
+      : studentBatch;
+    this.expandedPaperBoards = this.expandedPaperBoards ?? new Set();
+    this.paperBoardsInitialized = this.paperBoardsInitialized ?? false;
 
-    const leaders = await dbService.getLeaderboard();
+    let leaders = [];
+    let paperBoards = [];
+    let leaderboardLoadError = false;
+    let paperLeaderboardLoadError = false;
+    try {
+      if (this.ranksBoardType === 0) {
+        leaders = await dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : undefined);
+      } else {
+        paperBoards = await dbService.getPaperLeaderboards();
+      }
+    } catch (error) {
+      console.warn('[Ranks] Board could not be loaded:', error?.code || 'unknown');
+      if (this.ranksBoardType === 0) leaderboardLoadError = true;
+      else paperLeaderboardLoadError = true;
+    }
     const leagues = [
       { name: 'All Scholars', icon: 'public' },
       { name: 'Diamond', icon: 'diamond' },
@@ -1635,17 +1635,186 @@ class AppController {
       { name: 'Bronze', icon: 'military_tech' }
     ];
 
+    const normalizeBatch = (value) => String(value || '').replace(/\s+/g, '').toUpperCase();
+    const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]);
+    const paperBatchFilter = isAdmin ? this.selectedRanksBatch : studentBatch;
+    const normalizedPaperBatch = normalizeBatch(paperBatchFilter);
+    const visiblePaperBoards = paperBoards.filter((board) => {
+      const boardBatch = normalizeBatch(board.examYear);
+      return !normalizedPaperBatch || normalizedPaperBatch === 'ALLBATCHES'
+        || boardBatch === normalizedPaperBatch || boardBatch === 'ALLBATCHES' || boardBatch === 'ALL';
+    });
+    if (this.ranksBoardType === 1 && !this.paperBoardsInitialized && visiblePaperBoards[0]) {
+      this.expandedPaperBoards.add(visiblePaperBoards[0].id);
+      this.paperBoardsInitialized = true;
+    }
     const filtered = leaders.filter(s => {
-      if (this.selectedRanksBatch !== 'All Batches' && s.examYear !== this.selectedRanksBatch) return false;
+      if (s.role !== 'student') return false;
+      if (isAdmin) {
+        if (this.selectedRanksBatch !== 'All Batches' && normalizeBatch(s.examYear) !== normalizeBatch(this.selectedRanksBatch)) return false;
+      } else if (!studentBatch || normalizeBatch(s.examYear) !== normalizeBatch(studentBatch)) {
+        return false;
+      }
       if (this.selectedLeague === 'Diamond') return s.credits >= 500;
       if (this.selectedLeague === 'Gold') return s.credits >= 250 && s.credits < 500;
       if (this.selectedLeague === 'Silver') return s.credits >= 100 && s.credits < 250;
       if (this.selectedLeague === 'Bronze') return s.credits < 100;
       return true;
-    });
+    }).sort((a, b) => b.credits - a.credits);
 
+    filtered.forEach((student, index) => { student.rank = index + 1; });
     const top3 = filtered.slice(0, 3);
-    const rest = filtered.slice(3);
+    const showPodium = this.selectedLeague === 'All Scholars' && top3.length >= 2;
+    const visibleRankRows = showPodium ? filtered.slice(3) : filtered;
+    const currentUserRank = filtered.findIndex((student) => student.id === currentUser.uid) + 1;
+    const currentUserEntry = currentUserRank > 0 ? filtered[currentUserRank - 1] : null;
+    const nextRankEntry = currentUserRank > 1 ? filtered[currentUserRank - 2] : null;
+    const emptyBatchLabel = isAdmin
+      ? (this.selectedRanksBatch === 'All Batches' ? '' : this.selectedRanksBatch)
+      : studentBatch;
+    const xpToNextRank = nextRankEntry
+      ? Math.max(1, nextRankEntry.credits - currentUserEntry.credits + 1)
+      : 0;
+
+    const rankingContent = leaderboardLoadError
+      ? `<div class="leaderboard-state" role="status">
+          <span class="material-symbols-rounded">cloud_off</span>
+          <strong>Leaderboard unavailable</strong>
+          <span>Check your connection and try again.</span>
+          <button class="leaderboard-retry-btn" id="btn-ranks-retry" type="button">Retry</button>
+        </div>`
+      : filtered.length === 0
+        ? `<div class="leaderboard-state" role="status">
+            <span class="material-symbols-rounded">emoji_events</span>
+            <strong>${!emptyBatchLabel ? 'No students ranked yet' : `No students ranked in ${escapeHTML(emptyBatchLabel)} yet`}</strong>
+            <span>Rankings appear here when student XP records are available.</span>
+          </div>`
+        : `${showPodium ? `
+            <div class="podium-container">
+              <div class="podium-card">
+                <div class="podium-medal"><span class="material-symbols-rounded filled" style="color:#94A3B8; font-size:24px;">military_tech</span></div>
+                <div class="podium-name">${escapeHTML(top3[1].name.split(' ')[0])}</div>
+                <div class="podium-xp">${top3[1].credits} XP</div>
+                <span style="font-size:10px; color:#64748B;">#2 Rank</span>
+              </div>
+              <div class="podium-card podium-card-gold">
+                <div class="podium-medal-gold"><span class="material-symbols-rounded filled" style="color:#B45309; font-size:28px;">emoji_events</span></div>
+                <div class="podium-name">${escapeHTML(top3[0].name.split(' ')[0])}</div>
+                <div class="podium-xp">${top3[0].credits} XP</div>
+                <span style="font-size:11px; font-weight:800; color:#B45309;">#1 Rank</span>
+              </div>
+              <div class="podium-card">
+                <div class="podium-medal"><span class="material-symbols-rounded filled" style="color:#B45309; font-size:24px;">military_tech</span></div>
+                <div class="podium-name">${top3[2] ? escapeHTML(top3[2].name.split(' ')[0]) : '—'}</div>
+                <div class="podium-xp">${top3[2] ? `${top3[2].credits} XP` : ''}</div>
+                <span style="font-size:10px; color:#64748B;">#3 Rank</span>
+              </div>
+            </div>
+          ` : ''}
+          <div class="ranks-list">
+            ${visibleRankRows.map((student) => `
+              <div class="rank-list-item ${student.id === currentUser.uid ? 'is-current-user' : ''}">
+                <div class="rank-item-left">
+                  <span class="rank-index">#${student.rank}</span>
+                  <div class="rank-avatar">${escapeHTML(String(student.name || 'S').charAt(0).toUpperCase())}</div>
+                  <div class="rank-name-box">
+                    <div class="rank-student-name">
+                      <span>${escapeHTML(student.name)}</span>
+                      ${student.id === currentUser.uid ? '<span class="rank-you-tag">You</span>' : ''}
+                    </div>
+                    <div class="rank-batch-tag">${escapeHTML(student.examYear || 'General Batch')}</div>
+                  </div>
+                </div>
+                <span class="rank-xp-pill">${student.credits} XP</span>
+              </div>
+            `).join('')}
+          </div>
+          ${currentUserEntry ? `
+            <div class="my-rank-sticky-bar">
+              <div class="my-rank-info">
+                <span class="my-rank-num">#${currentUserRank}</span>
+                <div>
+                  <div class="my-rank-name">${escapeHTML(currentUserEntry.name)} (You)</div>
+                  <div class="my-rank-next">${nextRankEntry ? `Next rank: +${xpToNextRank} XP needed` : 'You are ranked #1!'}</div>
+                </div>
+              </div>
+              <span class="my-rank-xp">${currentUserEntry.credits} XP</span>
+            </div>
+          ` : ''}`;
+
+    const ownPhone = String(currentUser.phone || '').replace(/\D/g, '');
+    const paperViewContent = paperLeaderboardLoadError
+      ? `<div class="leaderboard-state" role="status">
+          <span class="material-symbols-rounded">cloud_off</span>
+          <strong>Paper results unavailable</strong>
+          <span>Check your connection and try again.</span>
+          <button class="leaderboard-retry-btn" id="btn-ranks-retry" type="button">Retry</button>
+        </div>`
+      : visiblePaperBoards.length === 0
+        ? `<div class="leaderboard-state" role="status">
+            <span class="material-symbols-rounded">military_tech</span>
+            <strong>No Paper Leaderboards for ${escapeHTML(paperBatchFilter || 'your batch')}</strong>
+            <span>Official rankings and marks will appear here after an evaluation is published.</span>
+          </div>`
+        : `<div class="paper-results-list">
+            ${visiblePaperBoards.map((board, boardIndex) => {
+              const entries = board.entries || [];
+              const expanded = this.expandedPaperBoards.has(board.id);
+              const myEntry = entries.find((entry) => {
+                const entryPhone = String(entry.studentPhone || '').replace(/\D/g, '');
+                return (entry.studentId && entry.studentId === currentUser.uid)
+                  || (ownPhone && entryPhone && ownPhone === entryPhone)
+                  || (currentUser.name && entry.studentName.trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
+              });
+              const publishedDate = board.publishedAt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+              const topThree = entries.slice(0, 3);
+              return `
+                <article class="paper-board-card ${boardIndex === 0 ? 'is-latest' : ''}">
+                  <button class="paper-board-header" type="button" data-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}">
+                    <span class="paper-board-heading-content">
+                      <span class="paper-board-tag">${escapeHTML(board.subject)} · ${escapeHTML(board.examYear)}</span>
+                      ${boardIndex === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ''}
+                      <span class="paper-board-date">${escapeHTML(publishedDate)}</span>
+                      <strong class="paper-board-title">${escapeHTML(board.paperTitle)}</strong>
+                      <span class="paper-board-stats">
+                        <span>Max: ${board.totalMarks} marks</span>
+                        <span>${entries.length} candidates</span>
+                        ${myEntry ? `<span class="paper-my-result">You: #${myEntry.rank} · ${myEntry.marks}/${board.totalMarks}</span>` : ''}
+                      </span>
+                      ${!expanded && entries[0] ? `<span class="paper-winner-snippet">Rank 1: ${escapeHTML(entries[0].studentName)} (${entries[0].marks} marks · ${escapeHTML(entries[0].grade)})</span>` : ''}
+                    </span>
+                    <span class="material-symbols-rounded paper-expand-icon">${expanded ? 'expand_less' : 'expand_more'}</span>
+                  </button>
+                  ${expanded ? `
+                    <div class="paper-results-content">
+                      ${topThree.length >= 2 ? `
+                        <div class="paper-results-podium">
+                          ${topThree.slice(0, 3).map((entry, index) => `
+                            <div class="paper-results-podium-item ${index === 0 ? 'first' : ''}">
+                              <span class="material-symbols-rounded">${index === 0 ? 'emoji_events' : 'military_tech'}</span>
+                              <strong>${escapeHTML(entry.studentName)}</strong>
+                              <span>#${entry.rank} · ${entry.marks} marks</span>
+                            </div>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+                      <div class="paper-results-list-heading">Full Candidate Rankings <span>${entries.length} ranked</span></div>
+                      ${entries.length ? entries.map((entry) => `
+                        <div class="paper-result-row ${myEntry && entry.rank === myEntry.rank ? 'is-current-user' : ''}">
+                          <span class="paper-result-rank">#${entry.rank}</span>
+                          <span class="paper-result-name">${escapeHTML(entry.studentName)}${myEntry && entry.rank === myEntry.rank ? ' <b>You</b>' : ''}</span>
+                          <span class="grade-badge grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
+                          <strong class="paper-result-marks">${entry.marks} / ${board.totalMarks}</strong>
+                        </div>
+                      `).join('') : '<div class="paper-results-empty">No candidate records published yet.</div>'}
+                    </div>
+                  ` : ''}
+                </article>
+              `;
+            }).join('')}
+          </div>`;
 
     container.innerHTML = `
       <!-- Screen Top Bar -->
@@ -1674,6 +1843,26 @@ class AppController {
       </div>
 
       ${this.ranksBoardType === 0 ? `
+        ${isAdmin ? `
+          <div class="batch-filter-row">
+            <span>Batch Selection:</span>
+            <select class="batch-select" id="select-ranks-batch">
+              <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
+              <option value="2024 A/L" ${this.selectedRanksBatch === '2024 A/L' ? 'selected' : ''}>2024 A/L</option>
+              <option value="2025 A/L" ${this.selectedRanksBatch === '2025 A/L' ? 'selected' : ''}>2025 A/L</option>
+              <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
+              <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
+              <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
+              <option value="2029 A/L" ${this.selectedRanksBatch === '2029 A/L' ? 'selected' : ''}>2029 A/L</option>
+            </select>
+          </div>
+        ` : `
+          <div class="leaderboard-batch-banner">
+            <strong>${escapeHTML(studentBatch || 'General Batch')} Standings</strong>
+            <span>Showing rankings for your exam year</span>
+          </div>
+        `}
+
         <!-- League Horizontal Filter Scroll -->
         <div class="leagues-scroll-row">
           ${leagues.map(l => `
@@ -1684,138 +1873,28 @@ class AppController {
           `).join('')}
         </div>
 
-        <!-- Batch Filter Row -->
-        <div class="batch-filter-row">
-          <span>Batch Selection:</span>
-          <select class="batch-select" id="select-ranks-batch">
-            <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
-            <option value="2024 A/L" ${this.selectedRanksBatch === '2024 A/L' ? 'selected' : ''}>2024 A/L</option>
-            <option value="2025 A/L" ${this.selectedRanksBatch === '2025 A/L' ? 'selected' : ''}>2025 A/L</option>
-            <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
-            <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
-            <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
-            <option value="2029 A/L" ${this.selectedRanksBatch === '2029 A/L' ? 'selected' : ''}>2029 A/L</option>
-          </select>
-        </div>
-
-        <!-- Top 3 Podium (Rank 2 Silver on left, Rank 1 Gold in center, Rank 3 Bronze on right) -->
-        <div class="podium-container">
-          <!-- Rank 2 -->
-          ${top3[1] ? `
-            <div class="podium-card">
-              <div class="podium-medal"><span class="material-symbols-rounded filled" style="color:#94A3B8; font-size:24px;">military_tech</span></div>
-              <div class="podium-name">${top3[1].name.split(' ')[0]}</div>
-              <div class="podium-xp">${top3[1].credits} XP</div>
-              <span style="font-size:10px; color:#64748B;">#2 Rank</span>
-            </div>
-          ` : '<div></div>'}
-
-          <!-- Rank 1 Gold (Elevated) -->
-          ${top3[0] ? `
-            <div class="podium-card podium-card-gold">
-              <div class="podium-medal-gold"><span class="material-symbols-rounded filled" style="color:#B45309; font-size:28px;">emoji_events</span></div>
-              <div class="podium-name">${top3[0].name.split(' ')[0]}</div>
-              <div class="podium-xp">${top3[0].credits} XP</div>
-              <span style="font-size:11px; font-weight:800; color:#B45309;">#1 Island Rank</span>
-            </div>
-          ` : '<div></div>'}
-
-          <!-- Rank 3 -->
-          ${top3[2] ? `
-            <div class="podium-card">
-              <div class="podium-medal"><span class="material-symbols-rounded filled" style="color:#B45309; font-size:24px;">military_tech</span></div>
-              <div class="podium-name">${top3[2].name.split(' ')[0]}</div>
-              <div class="podium-xp">${top3[2].credits} XP</div>
-              <span style="font-size:10px; color:#64748B;">#3 Rank</span>
-            </div>
-          ` : '<div></div>'}
-        </div>
-
-        <!-- Full List from Rank #4 onwards -->
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          ${rest.map(r => `
-            <div class="rank-list-item">
-              <div class="rank-item-left">
-                <span class="rank-index">#${r.rank}</span>
-                <div class="rank-avatar">${r.name.charAt(0)}</div>
-                <div class="rank-name-box">
-                  <div class="rank-student-name">
-                    <span>${r.name}</span>
-                    <span class="material-symbols-rounded filled" style="color:#2563EB; font-size:14px; vertical-align:middle;">verified</span>
-                  </div>
-                  <div class="rank-batch-tag">${r.examYear} Candidate</div>
-                </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-flex; align-items:center; gap:3px; font-size:11.5px; font-weight:700;"><span class="material-symbols-rounded filled" style="color:#EA580C; font-size:14px;">local_fire_department</span> 3d</span>
-                <span class="rank-xp-pill">${r.credits} XP</span>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-
-        <!-- Sticky Bottom Bar for Current Student's Rank -->
-        <div class="my-rank-sticky-bar">
-          <div class="my-rank-info">
-            <span class="my-rank-num">#3</span>
-            <div>
-              <div style="font-size:12.5px; font-weight:800;">Kasun Perera (You)</div>
-              <div style="font-size:10.5px; color:#94A3B8;">Next Rank: +45 XP needed</div>
-            </div>
-          </div>
-          <span style="font-size:13px; font-weight:900; color:#38BDF8;">155 XP</span>
-        </div>
+      ${rankingContent}
       ` : `
-        <!-- Paper Leaderboard View -->
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <div class="paper-board-card">
-            <div class="paper-board-header" id="btn-toggle-pb1">
-              <div>
-                <div style="font-size:14.5px; font-weight:800; color:#0F172A;">2027 A/L Physics Term Paper 01</div>
-                <div class="paper-board-stats">
-                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded" style="font-size:13px;">calendar_today</span> Sept 2026</span>
-                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded" style="font-size:13px;">analytics</span> Avg: 68.4</span>
-                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">emoji_events</span> Highest: 98</span>
-                  <span style="display:inline-flex; align-items:center; gap:3px;"><span class="material-symbols-rounded" style="font-size:13px;">group</span> 142 Students</span>
-                </div>
-              </div>
-              <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">expand_more</span>
-            </div>
-
-            <div class="paper-scores-table" id="pb1-table">
-              <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 6px; border-bottom:1px solid #E2E8F0; font-size:12px; font-weight:800; background:#ECFDF5; border-radius:8px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="color:#047857;">#14 (You)</span>
-                  <span>Kasun Perera</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <span class="grade-badge grade-A">A Grade</span>
-                  <span style="font-size:13px; font-weight:900; color:#047857;">78 / 100</span>
-                </div>
-              </div>
-
-              ${[
-                { rank: 1, name: 'Danushka Wickramasinghe', marks: 98, grade: 'A', time: '2h 10m' },
-                { rank: 2, name: 'Minoli Senarath', marks: 94, grade: 'A', time: '2h 18m' },
-                { rank: 3, name: 'Sachintha Fernando', marks: 91, grade: 'A', time: '2h 25m' },
-                { rank: 4, name: 'Dinuka Rajapaksha', marks: 88, grade: 'A', time: '2h 28m' },
-                { rank: 5, name: 'Kavindu Jayawardena', marks: 84, grade: 'A', time: '2h 30m' }
-              ].map(s => `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 6px; font-size:12px; border-bottom:1px solid #F1F5F9;">
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-weight:800; color:#64748B; width:22px;">#${s.rank}</span>
-                    <span style="font-weight:700; color:#1E293B;">${s.name}</span>
-                  </div>
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="display:inline-flex; align-items:center; gap:3px; font-size:10.5px; color:#64748B;"><span class="material-symbols-rounded" style="font-size:12px;">timer</span> ${s.time}</span>
-                    <span class="grade-badge grade-${s.grade}">${s.grade}</span>
-                    <span style="font-weight:800; color:#2563EB;">${s.marks}</span>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
+        ${isAdmin ? `
+          <div class="batch-filter-row paper-batch-filter">
+            <span>Batch Selection:</span>
+            <select class="batch-select" id="select-ranks-batch">
+              <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
+              <option value="2024 A/L" ${this.selectedRanksBatch === '2024 A/L' ? 'selected' : ''}>2024 A/L</option>
+              <option value="2025 A/L" ${this.selectedRanksBatch === '2025 A/L' ? 'selected' : ''}>2025 A/L</option>
+              <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
+              <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
+              <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
+              <option value="2029 A/L" ${this.selectedRanksBatch === '2029 A/L' ? 'selected' : ''}>2029 A/L</option>
+            </select>
           </div>
-        </div>
+        ` : `
+          <div class="leaderboard-batch-banner paper-batch-banner">
+            <strong>${escapeHTML(studentBatch || 'General Batch')} Paper Results</strong>
+            <span>Official exam evaluations for your batch</span>
+          </div>
+        `}
+        ${paperViewContent}
       `}
     `;
 
@@ -1839,12 +1918,22 @@ class AppController {
 
     document.getElementById('select-ranks-batch')?.addEventListener('change', (e) => {
       this.selectedRanksBatch = e.target.value;
+      this.expandedPaperBoards = new Set();
+      this.paperBoardsInitialized = false;
       this.renderRanksScreen(container);
     });
 
-    document.getElementById('btn-toggle-pb1')?.addEventListener('click', () => {
-      const tbl = document.getElementById('pb1-table');
-      if (tbl) tbl.style.display = tbl.style.display === 'none' ? 'flex' : 'none';
+    document.getElementById('btn-ranks-retry')?.addEventListener('click', () => {
+      this.renderRanksScreen(container);
+    });
+
+    container.querySelectorAll('[data-paper-board]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const boardId = button.dataset.paperBoard;
+        if (this.expandedPaperBoards.has(boardId)) this.expandedPaperBoards.delete(boardId);
+        else this.expandedPaperBoards.add(boardId);
+        this.renderRanksScreen(container);
+      });
     });
   }
 
@@ -3397,16 +3486,6 @@ class AppController {
     this.adminTab = this.adminTab || 'dashboard';
 
     root.innerHTML = `
-      <!-- iOS Status Bar -->
-      <div class="ios-status-bar">
-        <span class="status-time" id="status-clock">10:26</span>
-        <div class="status-icons" style="display:flex; align-items:center; gap:5px;">
-          <span class="material-symbols-rounded filled" style="font-size:14px;">signal_cellular_alt</span>
-          <span class="material-symbols-rounded" style="font-size:14px;">wifi</span>
-          <span class="material-symbols-rounded filled" style="font-size:16px;">battery_full</span>
-        </div>
-      </div>
-
       <!-- Main Scrollable Viewport -->
       <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;"></div>
 
@@ -3437,8 +3516,6 @@ class AppController {
         </button>
       </nav>
     `;
-
-    this.updateClock();
 
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -3909,7 +3986,32 @@ class AppController {
   // 2. Admin Papers Screen (admin_paper_sessions_screen.dart)
   async renderAdminPapersScreen(container) {
     this.adminPaperTab = this.adminPaperTab ?? 0; // 0: Live Sessions, 1: Upcoming Papers, 2: Leaderboard
+    this.adminSelectedPaperBatch = this.adminSelectedPaperBatch || 'All Batches';
     const papers = await dbService.getPaperSessions();
+    let adminUpcomingPapers = [];
+    let adminUpcomingPapersError = false;
+    if (this.adminPaperTab === 1) {
+      try {
+        adminUpcomingPapers = await dbService.getUpcomingPapers('All Batches');
+      } catch (error) {
+        console.warn('[Admin papers] Upcoming papers could not be loaded:', error?.code || 'unknown');
+        adminUpcomingPapersError = true;
+      }
+    }
+    let adminPaperBoards = [];
+    let adminPaperBoardsError = false;
+    if (this.adminPaperTab === 2) {
+      try {
+        const allBoards = await dbService.getPaperLeaderboards();
+        const selectedBatch = this.adminSelectedPaperBatch.replace(/\s+/g, '').toUpperCase();
+        adminPaperBoards = allBoards.filter((board) => this.adminSelectedPaperBatch === 'All Batches'
+          || board.examYear.replace(/\s+/g, '').toUpperCase() === selectedBatch
+          || ['ALL', 'ALLBATCHES'].includes(board.examYear.replace(/\s+/g, '').toUpperCase()));
+      } catch (error) {
+        console.warn('[Admin papers] Paper results could not be loaded:', error?.code || 'unknown');
+        adminPaperBoardsError = true;
+      }
+    }
 
     const subtitle = this.adminPaperTab === 0
       ? 'සජීවී විභාග සැසි සහ කැමරා අධීක්ෂණය'
@@ -3955,8 +4057,8 @@ class AppController {
       <!-- Tab Viewport -->
       <div id="admin-papers-content" style="padding:0 16px 90px;">
         ${this.adminPaperTab === 0 ? this._buildAdminLiveSessionsHTML(papers) : ''}
-        ${this.adminPaperTab === 1 ? this._buildAdminUpcomingPapersHTML() : ''}
-        ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML() : ''}
+        ${this.adminPaperTab === 1 ? this._buildAdminUpcomingPapersHTML(adminUpcomingPapers, adminUpcomingPapersError) : ''}
+        ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML(adminPaperBoards, adminPaperBoardsError, this.adminSelectedPaperBatch) : ''}
       </div>
     `;
 
@@ -3975,6 +4077,27 @@ class AppController {
     container.querySelectorAll('[data-paper-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.adminPaperTab = Number(btn.dataset.paperTab);
+        this.renderAdminPapersScreen(container);
+      });
+    });
+
+    document.getElementById('select-admin-paper-results-batch')?.addEventListener('change', (event) => {
+      this.adminSelectedPaperBatch = event.target.value;
+      this.adminExpandedPaperBoards = new Set();
+      this.adminPaperBoardsInitialized = false;
+      this.renderAdminPapersScreen(container);
+    });
+    document.getElementById('btn-admin-paper-results-retry')?.addEventListener('click', () => {
+      this.renderAdminPapersScreen(container);
+    });
+    document.getElementById('btn-admin-upcoming-retry')?.addEventListener('click', () => {
+      this.renderAdminPapersScreen(container);
+    });
+    container.querySelectorAll('[data-admin-paper-board]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const boardId = button.dataset.adminPaperBoard;
+        if (this.adminExpandedPaperBoards.has(boardId)) this.adminExpandedPaperBoards.delete(boardId);
+        else this.adminExpandedPaperBoards.add(boardId);
         this.renderAdminPapersScreen(container);
       });
     });
@@ -4449,207 +4572,108 @@ class AppController {
     this.renderAdminPapersScreen(container);
   }
 
-  _buildAdminUpcomingPapersHTML() {
-    return `
-      <div style="display:flex; flex-direction:column; gap:14px; margin-top:12px;">
-        <div class="hero-card" style="padding:16px; border:1px solid #E2E8F0;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:11px; background:#EEF2FF; color:#4F46E5; font-weight:800; padding:3px 8px; border-radius:8px;">
-              Physics • 2027 A/L
-            </span>
-            <span style="font-size:11.5px; font-weight:700; color:#D97706; display:inline-flex; align-items:center; gap:3px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
-              <span>In 3 Days</span>
-            </span>
-          </div>
-
-          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">
-            2027 A/L Speed Paper 02 (Mechanics & Equilibrium)
-          </div>
-          <div style="font-size:12px; color:#64748B; margin-top:2px; display:inline-flex; align-items:center; gap:8px;">
-            <span style="display:inline-flex; align-items:center; gap:3px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
-              <span>2026 October 02 (Friday) at 08:30 AM</span>
-            </span>
-            <span>•</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-              <span>150 Mins</span>
-            </span>
-          </div>
-
-          <div style="margin-top:10px;">
-            <div style="font-size:11px; font-weight:700; color:#334155; margin-bottom:4px;">Syllabus & Tested Topics:</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">
-                <span class="material-symbols-rounded filled" style="font-size:12px; color:#10B981;">check_circle</span>
-                <span>Circular Motion</span>
-              </span>
-              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">
-                <span class="material-symbols-rounded filled" style="font-size:12px; color:#10B981;">check_circle</span>
-                <span>Newton's Laws</span>
-              </span>
-              <span style="background:#0F172A; color:#FFFFFF; font-size:10.5px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">
-                <span class="material-symbols-rounded filled" style="font-size:12px; color:#10B981;">check_circle</span>
-                <span>Friction & Slopes</span>
-              </span>
-            </div>
-          </div>
-
-          <!-- Highlight Box (Special Paper Hints & Guidance) -->
-          <div style="margin-top:12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309;">
-              <span class="material-symbols-rounded" style="font-size:16px;">lightbulb</span>
-              <span>Special Paper Hints & Guidance:</span>
-            </div>
-            <div style="font-size:11.5px; color:#78350F; line-height:1.45; margin-top:4px;">
-              කෝණික ප්‍රවේගය (ω) සහ ස්පර්ශීය ප්‍රවේගය (v = rω) අතර සම්බන්ධය මතක තබාගන්න. තන්තුවක ආතතිය කේන්ද්‍රාභිසාරී බලය ලෙස ක්‍රියා කරන ආකාරය විශේෂයෙන් සලකන්න.
-            </div>
-          </div>
-
-          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="alert('Scope and comprehensive study notes for this paper have been dispatched to student study packs.')">
-            <span class="material-symbols-rounded" style="font-size:16px;">visibility</span>
-            <span>View Full Scope & Hints</span>
-          </button>
-        </div>
-
-        <div class="hero-card" style="padding:16px; border:1px solid #E2E8F0;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:11px; background:#EEF2FF; color:#4F46E5; font-weight:800; padding:3px 8px; border-radius:8px;">
-              Physics • 2026 A/L
-            </span>
-            <span style="font-size:11.5px; font-weight:700; color:#D97706; display:inline-flex; align-items:center; gap:3px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
-              <span>In 10 Days</span>
-            </span>
-          </div>
-
-          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:8px;">
-            2026 A/L Island-Wide Comprehensive Paper 05
-          </div>
-          <div style="font-size:12px; color:#64748B; margin-top:2px; display:inline-flex; align-items:center; gap:8px;">
-            <span style="display:inline-flex; align-items:center; gap:3px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
-              <span>2026 October 09 (Friday) at 08:30 AM</span>
-            </span>
-            <span>•</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-              <span>180 Mins</span>
-            </span>
-          </div>
-
-          <div style="margin-top:12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309;">
-              <span class="material-symbols-rounded" style="font-size:16px;">lightbulb</span>
-              <span>Special Paper Hints & Guidance:</span>
-            </div>
-            <div style="font-size:11.5px; color:#78350F; line-height:1.45; margin-top:4px;">
-              දෝලන හා තරංග සහ ධ්වනිය පිළිබඳ ගැටළු වලදී ඩොප්ලර් ආචරණයේ ලකුණු සම්මුතිය (Sign Convention) නිවැරදිව භාවිතා කරන්න.
-            </div>
-          </div>
-
-          <button class="apk-btn-primary" style="margin-top:12px; padding:10px; font-size:12px; background:#4F46E5; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="alert('Full preparation pack unlocked.')">
-            <span class="material-symbols-rounded" style="font-size:16px;">visibility</span>
-            <span>View Full Scope & Hints</span>
-          </button>
-        </div>
-      </div>
-    `;
+  _buildAdminUpcomingPapersHTML(papers, loadError = false) {
+    if (loadError) return `<div class="leaderboard-state" role="status"><span class="material-symbols-rounded">cloud_off</span><strong>Upcoming papers unavailable</strong><span>Check the connection and try again.</span><button class="leaderboard-retry-btn" id="btn-admin-upcoming-retry" type="button">Retry</button></div>`;
+    if (!papers.length) return `<div class="leaderboard-state" role="status"><span class="material-symbols-rounded">event_busy</span><strong>No upcoming papers published</strong><span>When an administrator publishes a paper, it will appear here.</span></div>`;
+    const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    const formatDate = (value) => new Date(value).toLocaleString(undefined, { year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return `<div class="admin-upcoming-papers-list">
+      ${papers.map((paper) => `
+        <article class="hero-card admin-upcoming-paper-card">
+          <div class="admin-upcoming-paper-tags"><span>${escapeHTML(paper.subject)} · ${escapeHTML(paper.examYear)}</span><span>${escapeHTML(paper.status)}</span></div>
+          <h3>${escapeHTML(paper.title)}</h3>
+          <div class="admin-upcoming-paper-meta"><span class="material-symbols-rounded">calendar_today</span>${escapeHTML(formatDate(paper.scheduledDate))}<span>·</span><span>${Number(paper.durationMinutes) || 180} mins</span></div>
+          ${paper.paperStructure ? `<p>${escapeHTML(paper.paperStructure)}</p>` : ''}
+          ${paper.syllabusTopics?.length ? `<div class="admin-upcoming-topics">${paper.syllabusTopics.map((topic) => `<span>${escapeHTML(topic)}</span>`).join('')}</div>` : ''}
+          ${paper.hints ? `<div class="admin-paper-hints"><strong><span class="material-symbols-rounded">lightbulb</span> Special Paper Hints &amp; Guidance</strong><p>${escapeHTML(paper.hints)}</p></div>` : ''}
+          ${paper.instructions ? `<p class="admin-upcoming-instructions">${escapeHTML(paper.instructions)}</p>` : ''}
+        </article>
+      `).join('')}
+    </div>`;
   }
 
-  _buildAdminPaperLeaderboardHTML() {
-    return `
-      <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px;">
-        <!-- Top 3 Podium matching Mobile App -->
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center; padding:16px 10px; background:linear-gradient(180deg, #1E293B, #0F172A); border-radius:16px; color:#FFFFFF;">
-          <!-- 2nd -->
-          <div style="display:flex; flex-direction:column; align-items:center; margin-top:16px;">
-            <span class="material-symbols-rounded filled" style="font-size:22px; color:#94A3B8;">military_tech</span>
-            <div style="width:40px; height:40px; border-radius:50%; background:#94A3B8; color:#0F172A; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; margin:4px 0;">M</div>
-            <div style="font-size:11.5px; font-weight:700;">Minoli S.</div>
-            <div style="font-size:10px; color:#94A3B8;">94 Marks</div>
-          </div>
-          <!-- 1st -->
-          <div style="display:flex; flex-direction:column; align-items:center;">
-            <span class="material-symbols-rounded filled" style="font-size:26px; color:#F59E0B;">emoji_events</span>
-            <div style="width:48px; height:48px; border-radius:50%; background:#F59E0B; color:#0F172A; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px; margin:4px 0; border:2px solid #FCD34D;">D</div>
-            <div style="font-size:12px; font-weight:800; color:#FCD34D;">Danushka W.</div>
-            <div style="font-size:10.5px; color:#E2E8F0; font-weight:700;">98 Marks</div>
-          </div>
-          <!-- 3rd -->
-          <div style="display:flex; flex-direction:column; align-items:center; margin-top:20px;">
-            <span class="material-symbols-rounded filled" style="font-size:20px; color:#CD7F32;">military_tech</span>
-            <div style="width:38px; height:38px; border-radius:50%; background:#B45309; color:#FFFFFF; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:13px; margin:4px 0;">K</div>
-            <div style="font-size:11.5px; font-weight:700;">Kavindu J.</div>
-            <div style="font-size:10px; color:#94A3B8;">89 Marks</div>
-          </div>
-        </div>
+  _buildAdminPaperLeaderboardHTML(boards, loadError, selectedBatch) {
+    const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]);
+    if (loadError) return `
+      <div class="leaderboard-state" role="status">
+        <span class="material-symbols-rounded">cloud_off</span>
+        <strong>Paper results unavailable</strong>
+        <span>Check the connection and retry.</span>
+        <button class="leaderboard-retry-btn" id="btn-admin-paper-results-retry" type="button">Retry</button>
+      </div>`;
+    if (!boards.length) return `
+      <div class="leaderboard-state" role="status">
+        <span class="material-symbols-rounded">military_tech</span>
+        <strong>No published paper results for ${escapeHTML(selectedBatch)}</strong>
+        <span>Published evaluations will appear here.</span>
+      </div>`;
+    this.adminExpandedPaperBoards ??= new Set();
+    if (!this.adminPaperBoardsInitialized) {
+      this.adminExpandedPaperBoards.add(boards[0].id);
+      this.adminPaperBoardsInitialized = true;
+    }
 
-        <!-- Leaderboard Table -->
-        <div style="background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; overflow:hidden;">
-          <div style="padding:10px 14px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:12px; font-weight:800; color:#475569; display:flex; justify-content:space-between;">
-            <span>Student & Batch</span>
-            <span>Marks / Rank</span>
-          </div>
-
-          <div style="display:flex; flex-direction:column;">
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #F1F5F9;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#F59E0B; font-size:13px;">#1</span>
-                <div>
-                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Danushka Wickramasinghe</div>
-                  <div style="font-size:10.5px; color:#64748B;">2026 A/L • Colombo District</div>
-                </div>
+    return `<div class="paper-results-list admin-paper-results-list">
+      ${boards.map((board, index) => {
+        const entries = board.entries || [];
+        const expanded = this.adminExpandedPaperBoards.has(board.id);
+        const published = board.publishedAt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return `<article class="paper-board-card ${index === 0 ? 'is-latest' : ''}">
+          <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}">
+            <span class="paper-board-heading-content">
+              <span class="paper-board-tag">${escapeHTML(board.subject)} · ${escapeHTML(board.examYear)}</span>
+              ${index === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ''}
+              <span class="paper-board-date">${escapeHTML(published)}</span>
+              <strong class="paper-board-title">${escapeHTML(board.paperTitle)}</strong>
+              <span class="paper-board-stats"><span>Max: ${board.totalMarks} marks</span><span>${entries.length} candidates</span></span>
+              ${!expanded && entries[0] ? `<span class="paper-winner-snippet">Rank 1: ${escapeHTML(entries[0].studentName)} (${entries[0].marks} marks · ${escapeHTML(entries[0].grade)})</span>` : ''}
+            </span>
+            <span class="material-symbols-rounded paper-expand-icon">${expanded ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          ${expanded ? `<div class="paper-results-content">
+            <div class="paper-results-list-heading">Full Candidate Rankings <span>${entries.length} ranked</span></div>
+            ${entries.length ? entries.map((entry) => `
+              <div class="paper-result-row">
+                <span class="paper-result-rank">#${entry.rank}</span>
+                <span class="paper-result-name">${escapeHTML(entry.studentName)}</span>
+                <span class="grade-badge grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
+                <strong class="paper-result-marks">${entry.marks} / ${board.totalMarks}</strong>
               </div>
-              <span style="font-size:13px; font-weight:800; color:#10B981;">98% (49/50)</span>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #F1F5F9;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#64748B; font-size:13px;">#2</span>
-                <div>
-                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Minoli Senarath</div>
-                  <div style="font-size:10.5px; color:#64748B;">2026 A/L • Gampaha District</div>
-                </div>
-              </div>
-              <span style="font-size:13px; font-weight:800; color:#10B981;">94% (47/50)</span>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #F1F5F9;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#B45309; font-size:13px;">#3</span>
-                <div>
-                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Kavindu Jayawardena</div>
-                  <div style="font-size:10.5px; color:#64748B;">2026 A/L • Kandy District</div>
-                </div>
-              </div>
-              <span style="font-size:13px; font-weight:800; color:#10B981;">89% (44/50)</span>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-weight:800; color:#475569; font-size:13px;">#4</span>
-                <div>
-                  <div style="font-size:12.5px; font-weight:800; color:#0F172A;">Kasun Perera (You)</div>
-                  <div style="font-size:10.5px; color:#64748B;">2027 A/L • Kurunegala District</div>
-                </div>
-              </div>
-              <span style="font-size:13px; font-weight:800; color:#2563EB;">86% (43/50)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+            `).join('') : '<div class="paper-results-empty">No candidate records published yet.</div>'}
+          </div>` : ''}
+        </article>`;
+      }).join('')}
+    </div>`;
   }
 
   // 3. Admin Sprints Screen (admin_mcq_sprint_screen.dart)
-  renderAdminSprintsScreen(container) {
+  async renderAdminSprintsScreen(container) {
     this.adminSprintTab = this.adminSprintTab ?? 0; // 0: Sprint Sets, 1: Live Leaderboard
     this.adminSprintDate = this.adminSprintDate || new Date().toISOString().split('T')[0];
-    this.customSprints = this.customSprints || [];
 
     const dateStr = this.adminSprintDate;
+    let dailySprints = [];
+    let dailySprintsError = false;
+    if (this.adminSprintTab === 0) {
+      try {
+        dailySprints = await dbService.getDailySprints();
+      } catch (error) {
+        console.warn('[Admin sprints] Sprint sets could not be loaded:', error?.code || 'unknown');
+        dailySprintsError = true;
+      }
+    }
+    let sprintAttempts = [];
+    let sprintAttemptsError = false;
+    if (this.adminSprintTab === 1) {
+      try {
+        sprintAttempts = await dbService.getSprintAttempts(dateStr);
+      } catch (error) {
+        console.warn('[Admin sprints] Attempts could not be loaded:', error?.code || 'unknown');
+        sprintAttemptsError = true;
+      }
+    }
 
     container.innerHTML = `
       <!-- Screen AppBar -->
@@ -4678,7 +4702,7 @@ class AppController {
 
       <!-- Tab Content Area -->
       <div id="admin-sprint-content" style="padding-bottom:90px;">
-        ${this.adminSprintTab === 0 ? this._buildAdminSprintsTabHTML(dateStr) : this._buildAdminSprintLeaderboardHTML(dateStr)}
+        ${this.adminSprintTab === 0 ? this._buildAdminSprintsTabHTML(dateStr, dailySprints, dailySprintsError) : this._buildAdminSprintLeaderboardHTML(dateStr, sprintAttempts, sprintAttemptsError)}
       </div>
     `;
 
@@ -4699,6 +4723,12 @@ class AppController {
         this.renderAdminSprintsScreen(container);
       });
     });
+    document.getElementById('btn-admin-sprint-retry')?.addEventListener('click', () => {
+      this.renderAdminSprintsScreen(container);
+    });
+    document.getElementById('btn-admin-sprints-retry')?.addEventListener('click', () => {
+      this.renderAdminSprintsScreen(container);
+    });
 
     // Date Picker action
     const pickDateAction = () => {
@@ -4711,18 +4741,12 @@ class AppController {
     document.getElementById('btn-pick-sprint-date')?.addEventListener('click', pickDateAction);
     document.getElementById('btn-change-sprint-date')?.addEventListener('click', pickDateAction);
 
-    // Load Demo Sprint
-    document.getElementById('btn-load-demo-sprint')?.addEventListener('click', () => {
-      this.customSprints.push({
-        id: 'sprint_demo_' + Date.now(),
-        title: 'A/L Mechanics High-Yield Sprint',
-        subject: 'Physics',
-        targetDate: this.adminSprintDate,
-        examYear: '2026 A/L',
-        questionsCount: 5
+    container.querySelectorAll('[data-delete-daily-sprint]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (!confirm('Delete this published sprint? Students will no longer be able to open it.')) return;
+        await dbService.deleteDailySprint(button.dataset.deleteDailySprint);
+        this.renderAdminSprintsScreen(container);
       });
-      notificationService.showInAppBanner('Demo Sprint Loaded!', 'Physics Mechanics 5-MCQ Set is ready.', 'success');
-      this.renderAdminSprintsScreen(container);
     });
 
     // Create Sprint FAB
@@ -4731,8 +4755,14 @@ class AppController {
     });
   }
 
-  _buildAdminSprintsTabHTML(dateStr) {
-    const sprintsForDate = this.customSprints.filter(s => s.targetDate === dateStr);
+  _buildAdminSprintsTabHTML(dateStr, sprints, loadError = false) {
+    if (loadError) return `
+      <div class="leaderboard-state" role="status">
+        <span class="material-symbols-rounded">cloud_off</span>
+        <strong>Sprint sets unavailable</strong>
+        <span>Check the connection and try again.</span>
+        <button class="leaderboard-retry-btn" id="btn-admin-sprints-retry" type="button">Retry</button>
+      </div>`;
 
     return `
       <!-- Date Filter Bar -->
@@ -4747,30 +4777,39 @@ class AppController {
       </div>
 
       <!-- Sprints Content -->
-      ${sprintsForDate.length === 0 ? `
-        <!-- Empty State matching Screenshot 3 -->
+      ${sprints.length === 0 ? `
         <div style="margin:0 16px; padding:28px 20px; background:#FFFFFF; border-radius:16px; border:1px solid #E2E8F0; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <span class="material-symbols-rounded" style="font-size:44px; color:#94A3B8;">note_alt</span>
-          <div style="font-size:15.5px; font-weight:800; color:#0F172A;">No Custom MCQ Sprints Created Yet</div>
+          <div style="font-size:15.5px; font-weight:800; color:#0F172A;">No MCQ Sprints Published Yet</div>
           <div style="font-size:12.5px; color:#64748B; max-width:320px; line-height:1.45;">
-            Telegram bot is currently using the high-yield A/L Mechanics fallback set. Create custom daily 5-MCQ sets below!
+            Published five-question sprint sets for all batches will appear here.
           </div>
-          <button class="apk-btn-primary" id="btn-load-demo-sprint" style="margin-top:8px; display:inline-flex; align-items:center; gap:6px;">
-            <span class="material-symbols-rounded filled" style="font-size:16px;">flash_on</span> Load Demo A/L Physics Sprint Set
-          </button>
         </div>
       ` : `
         <div style="display:flex; flex-direction:column; gap:12px; padding:0 16px;">
-          ${sprintsForDate.map(s => `
+          ${sprints.map(s => `
             <div class="hero-card" style="padding:16px; border: 1.5px solid #2563EB; background: rgba(37,99,235,0.04);">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:12px; font-weight:800; color:#2563EB; display:inline-flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px; color:#EA580C;">local_fire_department</span> ${s.examYear}
                 </span>
-                <span style="font-size:11px; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:800;">5 Questions Ready</span>
+                <span style="font-size:11px; background:${s.targetDate === dateStr ? '#DCFCE7' : '#F1F5F9'}; color:${s.targetDate === dateStr ? '#166534' : '#475569'}; padding:2px 8px; border-radius:10px; font-weight:800;">${s.targetDate === dateStr ? 'TODAY' : s.targetDate}</span>
               </div>
               <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:6px;">${s.title}</div>
-              <div style="font-size:12px; color:#64748B; margin-top:2px;">Target: ${s.targetDate} • ${s.subject}</div>
+              <div style="font-size:12px; color:#64748B; margin-top:2px;">${s.targetDate} • ${s.subject || 'Physics'} (${s.unit || 'General'}) • ${(s.questions || []).length} Questions</div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer; color:#2563EB; font-size:12px; font-weight:700;">Review questions</summary>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                  ${(s.questions || []).map((question, index) => `
+                    <div style="padding:10px; border-radius:10px; background:#F8FAFC; font-size:11px;">
+                      <strong>Q${index + 1}: ${String(question.question || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])}</strong>
+                      ${(question.options || []).map((option, optionIndex) => `<div style="margin-top:4px; color:${optionIndex === Number(question.correctIndex) ? '#047857' : '#475569'};">${optionIndex === Number(question.correctIndex) ? '✓ ' : ''}${String(option).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])}</div>`).join('')}
+                      ${question.explanation ? `<small style="display:block; margin-top:6px; color:#64748B;">${String(question.explanation).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])}</small>` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </details>
+              <button class="apk-icon-action-btn" type="button" data-delete-daily-sprint="${s.id}" title="Delete sprint" style="margin-top:10px; color:#EF4444;"><span class="material-symbols-rounded">delete</span> Delete</button>
             </div>
           `).join('')}
         </div>
@@ -4778,17 +4817,36 @@ class AppController {
     `;
   }
 
-  _buildAdminSprintLeaderboardHTML(dateStr) {
-    return `
-      <!-- Empty Leaderboard matching Screenshot 4 -->
-      <div style="padding:80px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
-        <span class="material-symbols-rounded filled" style="font-size:44px; color:#94A3B8;">emoji_events</span>
-        <div style="font-size:16px; font-weight:800; color:#0F172A;">No completions for ${dateStr} yet</div>
-        <div style="font-size:13px; color:#64748B; max-width:320px; line-height:1.45;">
-          Students who complete the Sprint on Telegram will appear here live!
-        </div>
-      </div>
-    `;
+  _buildAdminSprintLeaderboardHTML(dateStr, attempts, loadError = false) {
+    if (loadError) return `
+      <div class="leaderboard-state" role="status">
+        <span class="material-symbols-rounded">cloud_off</span>
+        <strong>Sprint results unavailable</strong>
+        <span>Check your connection and try again.</span>
+        <button class="leaderboard-retry-btn" id="btn-admin-sprint-retry" type="button">Retry</button>
+      </div>`;
+    if (!attempts.length) return `
+      <div class="leaderboard-state" role="status">
+        <span class="material-symbols-rounded">emoji_events</span>
+        <strong>No completions for ${dateStr} yet</strong>
+        <span>Students who complete this sprint will appear here.</span>
+      </div>`;
+
+    return `<div class="admin-sprint-rank-list">
+      ${attempts.map((attempt, index) => {
+        const rank = index + 1;
+        const medal = rank === 1 ? 'emoji_events' : (rank <= 3 ? 'military_tech' : 'tag');
+        return `<article class="admin-sprint-rank-row ${rank <= 3 ? 'is-top-rank' : ''}">
+          <span class="admin-sprint-medal material-symbols-rounded ${rank <= 3 ? 'filled' : ''}">${medal}</span>
+          <span class="admin-sprint-avatar">${String(attempt.studentName || 'S').charAt(0).toUpperCase()}</span>
+          <span class="admin-sprint-student">
+            <strong>${String(attempt.studentName || 'Student').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char])}</strong>
+            <small>${String(attempt.phone || '').replace(/[&<>"']/g, '')} · ${String(attempt.timeTakenFormatted || `${Number(attempt.timeTakenSeconds) || 0}s`).replace(/[&<>"']/g, '')}</small>
+          </span>
+          <span class="admin-sprint-score"><strong>${Number(attempt.score) || 0} / ${Number(attempt.totalQuestions) || 0}</strong><small>+${Number(attempt.xpEarned) || 0} XP</small></span>
+        </article>`;
+      }).join('')}
+    </div>`;
   }
 
   // 4. Admin Students Screen (admin_students_screen.dart)
@@ -5833,21 +5891,76 @@ class AppController {
   }
 
   openCreateSprintSheet() {
-    const title = prompt('Enter Sprint Title:', 'Daily 5-MCQ Sprint (A/L Physics)');
-    if (!title) return;
-
-    this.customSprints.push({
-      id: 'sprint_' + Date.now(),
-      title,
-      subject: 'Physics',
-      targetDate: this.adminSprintDate,
-      examYear: '2026 A/L',
-      questionsCount: 5
+    document.getElementById('create-sprint-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.id = 'create-sprint-modal';
+    modal.innerHTML = `
+      <form id="form-create-sprint" class="sprint-create-sheet">
+        <header class="sprint-create-header">
+          <div><h2>Create Daily 5-MCQ Sprint</h2><p>Publish questions to the shared student database.</p></div>
+          <button type="button" class="modal-close-btn" id="btn-close-create-sprint" aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        </header>
+        <div class="sprint-create-scroll">
+          <div class="sprint-create-meta">
+            <label>Title<input name="title" required value="Daily MCQ 5"></label>
+            <label>Unit / Lesson<input name="unit" required value="Mechanics"></label>
+            <label>Batch<select name="examYear"><option>All Batches</option><option>2026 A/L</option><option>2027 A/L</option><option>2028 A/L</option></select></label>
+            <label>Sprint Date<input name="targetDate" type="date" required value="${this.adminSprintDate}"></label>
+          </div>
+          ${Array.from({ length: 5 }, (_, index) => `
+            <section class="sprint-question-card">
+              <h3>Question ${index + 1}</h3>
+              <label>Question<input name="question-${index}" required placeholder="Enter question text"></label>
+              <div class="sprint-question-options">
+                ${Array.from({ length: 5 }, (_, option) => `<label>Option ${option + 1}<input name="option-${index}-${option}" required placeholder="Option ${option + 1}"></label>`).join('')}
+              </div>
+              <label>Correct option<select name="correct-${index}">${Array.from({ length: 5 }, (_, option) => `<option value="${option}">Option ${option + 1}</option>`).join('')}</select></label>
+              <label>Explanation<textarea name="explanation-${index}" rows="2" placeholder="Optional explanation"></textarea></label>
+            </section>
+          `).join('')}
+          <div id="create-sprint-error" class="sprint-create-error" role="alert" hidden></div>
+        </div>
+        <footer class="sprint-create-footer"><button class="apk-btn-primary" id="btn-publish-sprint" type="submit">Publish 5-MCQ Sprint 🚀</button></footer>
+      </form>`;
+    document.body.appendChild(modal);
+    document.getElementById('btn-close-create-sprint')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (event) => { if (event.target === modal) modal.remove(); });
+    document.getElementById('form-create-sprint')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!form.reportValidity()) return;
+      const fields = new FormData(form);
+      const questions = Array.from({ length: 5 }, (_, index) => ({
+        question: fields.get(`question-${index}`),
+        options: Array.from({ length: 5 }, (_, option) => fields.get(`option-${index}-${option}`)),
+        correctIndex: Number(fields.get(`correct-${index}`)),
+        explanation: fields.get(`explanation-${index}`),
+      }));
+      const publishButton = document.getElementById('btn-publish-sprint');
+      const errorBox = document.getElementById('create-sprint-error');
+      publishButton.disabled = true;
+      publishButton.textContent = 'Publishing…';
+      try {
+        await dbService.publishDailySprint({
+          title: fields.get('title'),
+          unit: fields.get('unit'),
+          examYear: fields.get('examYear'),
+          targetDate: fields.get('targetDate'),
+          subject: 'Physics',
+          questions,
+        });
+        modal.remove();
+        notificationService.showInAppBanner('Sprint Published', 'The five-question sprint is available to the selected batch.', 'success');
+        const viewport = document.getElementById('admin-main-viewport');
+        if (viewport) this.renderAdminSprintsScreen(viewport);
+      } catch (error) {
+        errorBox.hidden = false;
+        errorBox.textContent = error?.message || 'The sprint could not be published. Try again.';
+        publishButton.disabled = false;
+        publishButton.textContent = 'Publish 5-MCQ Sprint 🚀';
+      }
     });
-
-    notificationService.showInAppBanner('Sprint Created!', `${title} scheduled for ${this.adminSprintDate}.`, 'success');
-    const vp = document.getElementById('admin-main-viewport');
-    if (vp) this.renderAdminSprintsScreen(vp);
   }
 
   openSendCustomMessageModal(student) {
