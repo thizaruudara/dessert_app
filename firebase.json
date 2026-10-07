@@ -14,6 +14,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "dessert-institute",
     "public": "web",
     "ignore": [
       "firebase.json",

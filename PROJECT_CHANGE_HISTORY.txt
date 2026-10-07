@@ -1,0 +1,79 @@
+EDUPEAK PROJECT — CHANGE HISTORY AND WORK COMPLETED
+Prepared: 2026-10-04 (Asia/Colombo)
+Repository: dessert_app
+Purpose: A readable record of the Android app, web app, Firebase, deployment, and the work discussed in this Codex conversation.
+
+IMPORTANT SECURITY NOTE
+This file intentionally does not contain passwords, access tokens, the Firebase service-account JSON/private key, or the full admin phone number. Those are credentials/private account details and must remain in protected secret storage.
+
+1. PROJECT START AND ANDROID RELEASE PIPELINE (2026-08-29 onward)
+
+The repository began as an Android Flutter application with a GitHub Actions workflow to build a release APK. Early work stabilized Android Gradle/AndroidX configuration, version metadata, app resources and manifest, Firebase options, Kotlin/Gradle/Android Gradle Plugin versions, NDK/SDK settings, and the GitHub workflow's APK output path. Portrait orientation and deterministic Firebase setup were also configured. The project subsequently maintained automated APK builds/releases through GitHub Actions.
+
+Representative early commits include 5bb52f4 (initial APK workflow), 8ec25bf (Android build toolchain repair), 023165c (CI APK discovery), and 1427659 (portrait orientation).
+
+2. ORIGINAL STUDENT APP FEATURES AND BRANDING (2026-08-29 through 2026-09-19)
+
+The Android app grew into EduPeak, a student learning and exam app. The app uses Firebase Authentication, Cloud Firestore, Firebase Storage, and Firebase messaging. Early features included phone-based Sri Lankan (+94) account flows, OTP delivery/verification, student registration/profile, persistent login, image viewing and submissions, a student dashboard, activity/XP and credits, rankings, countdowns, and a teacher/admin portal.
+
+The app added WhatsApp and later Telegram integrations for OTP/tutor/support flows; a Node webhook service and Gemini-powered A/L tutor were also added. Admin tools grew to include student management, announcements, physics insight management, countdowns, homework review/XP awards, and batch targeting.
+
+Exam features expanded to scheduled paper sessions, slot registration, live exam rooms, camera proctoring, answer-photo submission/review, invigilator views, student presence, alerts, and push notifications. Later changes improved the exam lifecycle (waiting room, package opening, writing, time-up/submission), network reliability, cache behavior, upload handling, and navigation. The UI went through light/dark theme work, dashboard/gamification revisions, liquid navigation, animations, progress views, and leaderboards.
+
+Representative milestones: 80b2451 (Firestore rules hardening), 1823be2 (student profile and persistent session), ad1ee6a (WhatsApp tutor/webhook service), 8b5a868 (MCQ sprint creator), 9eb2d62 (proctored paper sessions), 9fcb4e8 (native push notifications), 03d7af5 (leaderboards, upcoming papers and admin controls), 402b0ea (student MCQ sprint), 01cc541 (batch-isolated leaderboards), and 996419f (remove fake dashboard cards and connect real Firestore data).
+
+3. WEB/PWA VERSION (2026-09-28 onward)
+
+A browser/PWA version was added under the repository's web/ folder. It includes student navigation/screens for Home, Papers, Ranks, Desserts/homework, Profile, and exam/sprint flows; camera/document capture; PWA/iOS installation handling; and an admin console. The intended direction was for Android and web/iOS students to use the same Firebase project/database and shared account, with admins able to manage the institute from either client.
+
+The web app has been iteratively matched against Flutter Android screens. Earlier work claimed broad screen parity, but later inspection found significant mismatches and demo content still present, so the latest changes focus on removing sample UI/data and aligning actual behavior rather than assuming parity. The Android login code is the source reference: light theme, EduPeak / A/L Pastry & Dessert Institute identity, Sri Lankan phone input, password login, registration with exam year and confirmation, and student navigation. Flutter defaults to light mode.
+
+4. FIREBASE AUTHENTICATION, ROLES, AND SECURITY MIGRATION
+
+The user asked to secure the app and migrate both Android and web accounts to Firebase Authentication. The old data model included legacy profile records with phone/password values. The migration work added server-side Vercel API routes using the Firebase Admin SDK to upgrade a verified legacy account, create/ensure its profile and phone index, and provision the admin custom claim only for the protected server-side allowlist. Both clients then refresh Firebase ID tokens and read the admin claim. Firestore rules were changed to trust the signed Firebase token's admin claim rather than a client-editable profile field.
+
+The web and Android Firebase configuration files both point to Firebase project dessert-institute. The user confirmed that both apps should use the same Firebase Authentication and shared database. For the admin account, the user confirmed adding the admin phone to Vercel Production and Development. A server-only Vercel secret was configured for those scopes; the value is not repeated here.
+
+The legacy migration requires working backend credentials because Firebase Admin performs privileged profile/role changes. Deploying Firebase Functions failed because the project's Google Cloud billing account was not open and required Google APIs could not be enabled. The user explained they could not change billing and preferred Vercel hosting with Firebase used as the database. Work moved the web API handlers to Vercel serverless functions instead of requiring Firebase Functions deployment.
+
+5. VERCEL HOSTING AND LOCAL DEVELOPMENT
+
+The web site is hosted on Vercel at https://edupeak-web.vercel.app/. The Vercel project root directory was corrected to web/ after an initial build tried to use the repository root and could not find the web package. The project has Firebase server configuration environment variables in Vercel. The production Vercel root/build was previously verified ready for the older UI commit.
+
+The local preview uses the web files on port 3002/3004 in this session. Earlier, a 404 sign-in error was traced to the local helper being static-only while the app calls /api/auth/upgrade-legacy, /api/auth/ensure-profile, and /api/auth/ensure-admin. Local .env.local contains an invalid Firebase service-account value (only a few characters; invalid JSON), so local Firebase Admin routes cannot initialize. The user declined permission to proxy local sign-in data to Vercel. No proxy was left in the local server. The local UI previews still work; authenticated local API flows require valid locally configured Firebase service-account credentials or another explicitly approved setup.
+
+6. LOGIN UI CORRECTIONS MADE AFTER USER REJECTED PHYSICS-BRANDED UI (2026-10-02)
+
+The user reported that the displayed web UI was not their app. Inspection compared the Flutter LoginScreen source, the web login markup, the app's default theme, and the launch route. The actual Android login implementation uses the EduPeak pastry institute label and light AppColors theme, while the web screen had Physics branding and a dark theme. The web login and registration were updated to match Flutter content/layout more closely: light background, EduPeak branding, sign-in/register switch, phone/password fields, year selection, password confirmation, and a secure-authentication note. The phone entry layout was later corrected because the icon overlapped its placeholder; a drawn Sri Lankan flag replaced inconsistent operating-system emoji rendering.
+
+The registration form was made scrollable and the Create Account action placed in a separate footer so it remains visible without covering form fields. The app-wide mobile shell was changed to size to the viewport instead of a fixed 920px height. The web-generated fake time/battery/status icons were removed; the Android OS already supplies those indicators natively.
+
+These changes were built locally with `npm run build` and visually checked in the localhost browser preview. Commits de30b3f (login UI), b1c889a (phone alignment/flag), and 2e5056e (registration button reachability) were pushed. The production site was visually confirmed on Vercel using the 2e5056e UI: Android-style EduPeak login with light colors and the corrected phone field.
+
+7. LEADERBOARD AND ADMIN UI FIXES
+
+The user showed a leaderboard with a fake personal rank card despite no actual ranking rows. Inspection found the web app hardcoded a named student/rank/XP footer and swallowed Firestore query errors as if no data existed. The actual Android dessert leaderboard reads the sanitized `leaderboard_public` collection, filters ordinary students to their own exam year, and only shows a user's sticky rank when that real user is present.
+
+The current UI work removes the invented student rank, shows a meaningful empty/error state, derives rank and XP progress from real records, filters student results to their batch, and gives admins a batch selector. The filter chips were changed so the complete set is visible rather than silently clipping “Silver” and later options.
+
+Paper leaderboards and the admin sprint leaderboard had also contained sample marks/students or a misleading Telegram empty-state message. The web code was changed to read the same Firestore collections as Android (`paper_leaderboards` and `sprint_attempts`), render expandable actual paper results, and distinguish an empty state from a loading error.
+
+The admin Paper Examination Hub's Upcoming Papers tab contained example cards instead of Firestore data. Current local work replaces those examples with documents from `upcoming_papers`. The Sprint Sets tab similarly used an in-memory demo list; current local work reads/writes/deletes the real `daily_sprints` collection. The Create Sprint dialog now collects a title, unit, batch, date, and five questions/options/correct answers/explanations, then publishes to Firestore in the format Android consumes.
+
+8. CURRENT REPOSITORY/DEPLOYMENT STATE AT THIS FILE'S CREATION
+
+Latest commit pushed to GitHub main: 3b7b76c — “Align web UI with Android app shell and data.” It contains the app shell sizing/status-bar corrections, registration scroll/footer work, web leaderboard rendering/data changes, and several admin screen parity changes. `npm run build` succeeds locally.
+
+The Vercel production deployment for commit 3b7b76c has not yet been verified in this conversation after that push. Earlier production UI verification was on commit 2e5056e, and Vercel has historically auto-deployed pushes to main. The user should check Vercel Deployments or reload the production site after its newest build completes.
+
+The working directory still contains two local-only items that were deliberately not included in those commits: a `.gitignore` edit and `web/dev-server.cjs` (local preview helper). The generated bundle is ignored. The helper does not proxy authentication requests to Vercel.
+
+9. IMPORTANT CAVEATS
+
+- This change history records work performed in the repository and conversation; it is not a guarantee that every Android feature is pixel-perfect or behavior-identical on web.
+- Students on both clients are intended to use the same Firebase project, but server-side legacy migration/admin role assignment needs correctly configured Firebase Admin service credentials.
+- Local sign-in API routes are not operational until a valid local Firebase Admin credential is configured. Vercel production API credentials are separate from localhost.
+- No real student password was entered as part of the work documented here.
+- Never put service-account JSON/private keys, access tokens, or passwords in this history file, source control, screenshots, or public client code.
+
+END OF HISTORY

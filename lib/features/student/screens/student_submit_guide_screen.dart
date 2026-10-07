@@ -39,7 +39,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
   final ImagePicker _picker = ImagePicker();
 
   // Form State
-  final String _selectedSubject = 'Physics';
+  String _selectedTopic = 'Mechanics';
   final TextEditingController _captionController = TextEditingController();
   final List<File> _selectedPhotos = [];
 
@@ -176,19 +176,9 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
     });
   }
 
-  void _insertQuickTag(String tag) {
+  void _selectTopic(String tag) {
     HapticFeedbackService.selection();
-    final current = _captionController.text.trim();
-    if (current.contains(tag)) return;
-    if (current.isEmpty) {
-      _captionController.text = '[$tag] ';
-    } else {
-      _captionController.text = '[$tag] $current';
-    }
-    _captionController.selection = TextSelection.fromPosition(
-      TextPosition(offset: _captionController.text.length),
-    );
-    setState(() {});
+    setState(() => _selectedTopic = tag);
   }
 
   void _previewPhotoDialog(File file, int index) {
@@ -265,7 +255,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
 
       final fileBytes = await file.readAsBytes();
       final fileName = 'dessert_${userId}_${DateTime.now().millisecondsSinceEpoch}_$index.jpg';
-      final caption = '🍰 Homework: $_selectedSubject | Student: $userId | Page: ${index + 1}';
+      final caption = '🍰 Homework: Physics: $_selectedTopic | Student: $userId | Page: ${index + 1}';
 
       final header = '--$boundary\r\n'
           'Content-Disposition: form-data; name="chat_id"\r\n\r\n'
@@ -391,7 +381,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
             studentId: user.id,
             studentName: user.name,
             studentPhone: user.phone,
-            subject: _selectedSubject,
+            subject: 'Physics: $_selectedTopic',
             caption: caption,
             mediaUrls: uploadedUrls,
             type: uploadedUrls.isNotEmpty ? DessertType.image : DessertType.text,
@@ -469,19 +459,36 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          'Homework & Desserts 🍰',
-          style: GoogleFonts.outfit(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Dessert Homework System',
+                style: GoogleFonts.outfit(
+                  fontSize: 17,
+                  height: 1.15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'A/L Physics Daily Problem Sets & Submissions',
+                style: GoogleFonts.outfit(
+                  fontSize: 10.5,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ],
           ),
         ),
         automaticallyImplyLeading: false,
         elevation: 0,
+        toolbarHeight: 62,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: const Size.fromHeight(64),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(4),
@@ -506,26 +513,40 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
               dividerColor: Colors.transparent,
               labelColor: const Color(0xFF2563EB),
               unselectedLabelColor: const Color(0xFF64748B),
-              labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5),
-              unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 13.5),
+              labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+              unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 12),
               tabs: [
-                const Tab(
-                  child: Row(
+                Tab(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.cloud_upload_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('Submit Work'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.cloud_upload_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          const Flexible(child: Text('Submit Homework', overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text('Scan & Upload Pages', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),
                 Tab(
-                  child: Row(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.history_rounded, size: 18),
-                      const SizedBox(width: 8),
-                      Text('My Submissions (${myDesserts.length})'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.history_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          Flexible(child: Text('Submission History (${myDesserts.length})', overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text('Marks & Teacher Feedback', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),
@@ -553,23 +574,21 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 1. Unified Clean Hero Card with Live Pulse XP Tag ────────────────
+          const SizedBox(height: 8),
+
+          // ── 1. Topic Selector (matches the web submission form) ───────────
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xFF334155)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withOpacity(0.2),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+                  color: const Color(0xFF0F172A).withOpacity(0.025),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -577,172 +596,81 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Subject Pill
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('⚡', style: TextStyle(fontSize: 13)),
-                          const SizedBox(width: 5),
-                          Text(
-                            'A/L Physics Only',
-                            style: GoogleFonts.outfit(
-                              color: const Color(0xFF60A5FA),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      child: const Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 17),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '1. Choose Topic Tag',
+                        style: GoogleFonts.outfit(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-
-                    // Live Animated XP Badge
-                    ScaleTransition(
-                      scale: _pulseAnimation,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFF59E0B).withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('⭐', style: TextStyle(fontSize: 11)),
-                            const SizedBox(width: 4),
-                            Text(
-                              '+25 to +50 XP',
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    Text(
+                      '(Optional)',
+                      style: GoogleFonts.outfit(color: const Color(0xFF94A3B8), fontSize: 11),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  'Direct Homework Submission',
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Upload clear photos of your solved questions & homework. Teachers evaluate your work to boost your leaderboard ranking!',
-                  style: GoogleFonts.outfit(
-                    color: const Color(0xFF94A3B8),
-                    fontSize: 12.5,
-                    height: 1.4,
-                  ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: _quickTopicTags.map((tag) {
+                    final selected = _selectedTopic == tag;
+                    return _BouncingTap(
+                      onTap: () => _selectTopic(tag),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selected ? const Color(0xFF2563EB) : Colors.white,
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(
+                            color: selected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        child: Text(
+                          tag,
+                          style: GoogleFonts.outfit(
+                            color: selected ? Colors.white : const Color(0xFF475569),
+                            fontSize: 11.5,
+                            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 22),
-
-          // ── 2. Question Details & Quick Topic Selection ─────────────────────
+          const SizedBox(height: 14),
+          // ── 2. Student Notes ──────────────────────────────────────────────
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 18),
-              ),
-              const SizedBox(width: 8),
+              const Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 18),
+              const SizedBox(width: 6),
               Text(
-                'Question Details & Topics',
+                '3. Student Remarks / Questions',
                 style: GoogleFonts.outfit(
                   color: AppColors.textPrimary,
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '(Optional)',
-                style: GoogleFonts.outfit(
-                  color: const Color(0xFF94A3B8),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-
-          // Quick Topic Chips (Live interactive tap to auto-fill)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: _quickTopicTags.map((tag) {
-                final isContained = _captionController.text.contains(tag);
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _BouncingTap(
-                    onTap: () => _insertQuickTag(tag),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isContained ? const Color(0xFFEFF6FF) : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isContained ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isContained) ...[
-                            const Icon(Icons.check_rounded, size: 12, color: Color(0xFF2563EB)),
-                            const SizedBox(width: 4),
-                          ],
-                          Text(
-                            tag,
-                            style: GoogleFonts.outfit(
-                              color: isContained ? const Color(0xFF2563EB) : const Color(0xFF475569),
-                              fontSize: 11.5,
-                              fontWeight: isContained ? FontWeight.bold : FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
           // Notes Input Box
           Container(
@@ -774,175 +702,141 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
 
           const SizedBox(height: 24),
 
-          // ── 3. High-Contrast, Tactile Photo Upload Zone ─────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(8),
+          // ── 3. Capture Homework Pages ────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withOpacity(0.025),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.add_a_photo_rounded, color: Color(0xFF16A34A), size: 17),
                     ),
-                    child: const Icon(Icons.add_a_photo_rounded, color: Color(0xFF16A34A), size: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Attach Written Work',
-                    style: GoogleFonts.outfit(
-                      color: AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '2. Capture Homework Pages',
+                        style: GoogleFonts.outfit(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (_selectedPhotos.isNotEmpty)
+                      Text(
+                        '${_selectedPhotos.length} page${_selectedPhotos.length == 1 ? '' : 's'}',
+                        style: GoogleFonts.outfit(
+                          color: const Color(0xFF2563EB),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BouncingTap(
+                        onTap: _isUploading ? null : _pickFromCamera,
+                        child: Container(
+                          height: 82,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFBFDBFE), width: 1.3),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.camera_alt_rounded, color: Color(0xFF2563EB), size: 25),
+                              const SizedBox(height: 6),
+                              Text(
+                                'In-App Camera',
+                                style: GoogleFonts.outfit(
+                                  color: const Color(0xFF2563EB),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _BouncingTap(
+                        onTap: _isUploading ? null : _pickFromGallery,
+                        child: Container(
+                          height: 82,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFBFDBFE), width: 1.3),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.photo_library_rounded, color: Color(0xFF2563EB), size: 25),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Gallery / Files',
+                                style: GoogleFonts.outfit(
+                                  color: const Color(0xFF2563EB),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_selectedPhotos.isEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: Text(
+                      'No pages attached yet. Tap Camera or Gallery to add pages.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(color: const Color(0xFF64748B), fontSize: 11.5),
                     ),
                   ),
                 ],
-              ),
-              if (_selectedPhotos.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${_selectedPhotos.length} Page${_selectedPhotos.length > 1 ? 's' : ''} Selected',
-                    style: GoogleFonts.outfit(
-                      color: const Color(0xFF2563EB),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // High-Contrast Dual Action Tiles
-          Row(
-            children: [
-              // 1. Camera Tile
-              Expanded(
-                child: _BouncingTap(
-                  onTap: _isUploading ? null : _pickFromCamera,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFBFDBFE), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2563EB).withOpacity(0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF2563EB).withOpacity(0.15),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF2563EB), size: 22),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Take Photo',
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF1E3A8A),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Snap via camera',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              // 2. Gallery Tile
-              Expanded(
-                child: _BouncingTap(
-                  onTap: _isUploading ? null : _pickFromGallery,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFAF5FF),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFDDD6FE), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF7C3AED).withOpacity(0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF7C3AED).withOpacity(0.15),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.photo_library_rounded, color: Color(0xFF7C3AED), size: 22),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'From Gallery',
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF581C87),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Select multiple',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
 
+          const SizedBox(height: 4),
           // Selected Photos Preview Strip
           if (_selectedPhotos.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -1163,7 +1057,7 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
                       Text(
                         _selectedPhotos.isNotEmpty
                             ? 'Submit ${_selectedPhotos.length} Page${_selectedPhotos.length > 1 ? 's' : ''} for Review'
-                            : 'Submit Homework Now 🚀',
+                            : 'Submit Homework (+100 XP)',
                         style: GoogleFonts.outfit(
                           fontSize: 15.5,
                           fontWeight: FontWeight.bold,
@@ -1183,9 +1077,9 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
           // ── 5. Minimalist Telegram Bot Alternative ──────────────────────────
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFF0284C7),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFF0369A1)),
             ),
             child: Theme(
               data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -1196,22 +1090,32 @@ class _StudentSubmitGuideScreenState extends State<StudentSubmitGuideScreen>
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0088CC).withOpacity(0.12),
+                    color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Center(child: Text('✈️', style: TextStyle(fontSize: 18))),
+                  child: const Center(child: Icon(Icons.smart_toy_rounded, color: Colors.white, size: 20)),
                 ),
                 title: Text(
-                  'Prefer Telegram? Submit via Bot',
+                  'Submit via Telegram AI Bot',
                   style: GoogleFonts.outfit(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 subtitle: Text(
-                  'Chat with @edupeakbot to drop files anytime',
-                  style: GoogleFonts.outfit(color: const Color(0xFF64748B), fontSize: 12),
+                  'Prefer Telegram? Forward images to @edupeakbot',
+                  style: GoogleFonts.outfit(color: Colors.white.withOpacity(0.88), fontSize: 10.5),
+                ),
+                trailing: TextButton(
+                  onPressed: () => _openTelegram(context),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF0369A1),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text('Open Bot', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
                 children: [
                   Padding(

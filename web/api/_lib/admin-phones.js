@@ -1,7 +1,10 @@
 const { normalizePhone } = require('./http');
 
 function isConfiguredAdminPhone(phoneDigits) {
-  const configured = String(process.env.FIREBASE_ADMIN_PHONES || '')
+  const configured = [
+    process.env.FIREBASE_ADMIN_PHONES,
+    process.env.FIREBASE_ADMIN_PHONE_ADDITIONS,
+  ].filter(Boolean).join(',')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);

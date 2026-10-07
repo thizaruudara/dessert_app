@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -12,7 +14,10 @@ class AuthProvider extends ChangeNotifier {
 
   UserModel? _user;
   bool _isAdmin = false;
-  bool _loading = false;
+  bool _loading = true;
+  bool _authInitialized = false;
+  final Completer<void> _initialAuthReady = Completer<void>();
+  StreamSubscription<User?>? _authSubscription;
   String? _error;
   String? _currentPhone;
   String? _currentName;
@@ -21,6 +26,7 @@ class AuthProvider extends ChangeNotifier {
   UserModel? get user => _user;
   UserModel? get userModel => _user;
   bool get loading => _loading;
+  bool get authInitialized => _authInitialized;
   String? get error => _error;
   bool get isLoggedIn => _user != null;
   bool get isAdmin => _isAdmin;
@@ -32,10 +38,19 @@ class AuthProvider extends ChangeNotifier {
     _initAuth();
   }
 
+  Future<void> get initialAuthReady => _initialAuthReady.future;
+
   Future<void> _initAuth() async {
     // Identity is restored exclusively by Firebase Auth. A local UID or phone
     // value is never treated as proof of identity.
-    _auth.authStateChanges().listen(_onAuthStateChanged);
+    _authSubscription = _auth.authStateChanges().listen(
+      _onAuthStateChanged,
+      onError: (Object error) {
+        _error = error.toString();
+        _loading = false;
+        _finishInitialAuth();
+      },
+    );
   }
 
   String _normalizedPhone(String phone) {
@@ -64,10 +79,24 @@ class AuthProvider extends ChangeNotifier {
       if (firebaseUser?.isAnonymous == true) await _auth.signOut();
       _user = null;
       _isAdmin = false;
+      _loading = false;
+      _finishInitialAuth();
       notifyListeners();
       return;
     }
     await _fetchUser(firebaseUser.uid);
+    if (!_authInitialized) {
+      _loading = false;
+      _finishInitialAuth();
+    }
+    notifyListeners();
+  }
+
+  void _finishInitialAuth() {
+    if (_authInitialized) return;
+    _authInitialized = true;
+    if (!_initialAuthReady.isCompleted) _initialAuthReady.complete();
+    notifyListeners();
   }
 
   Future<void> _fetchUser(String uid) async {
@@ -90,7 +119,10 @@ class AuthProvider extends ChangeNotifier {
       }
 
       if (doc != null && doc.exists) {
-        final claims = await _auth.currentUser?.getIdTokenResult(true);
+        // Use the restored token on startup. Login explicitly refreshes claims
+        // after ensure-admin, so forcing a network refresh here only delays
+        // session restoration on every cold launch.
+        final claims = await _auth.currentUser?.getIdTokenResult();
         _isAdmin = claims?.claims?['admin'] == true;
         final profile = UserModel.fromFirestore(doc);
         _user = profile.copyWith(role: _isAdmin ? UserRole.admin : UserRole.student);
@@ -253,6 +285,12 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
     _user = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> refreshUser() async {

@@ -1,5 +1,18 @@
 import { auth } from './firebase-config.js';
 
+function getApiBase() {
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return '/api';
+  }
+  if (host.includes('vercel.app')) {
+    return '/api';
+  }
+  return 'https://edupeak-web.vercel.app/api';
+}
+
+const API_BASE = getApiBase();
+
 export async function callBackend(endpoint, payload, { authenticated = true } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (authenticated) {
@@ -7,7 +20,7 @@ export async function callBackend(endpoint, payload, { authenticated = true } = 
     if (!user) throw new Error('Sign in first.');
     headers.Authorization = `Bearer ${await user.getIdToken()}`;
   }
-  const response = await fetch(`/api/${endpoint}`, {
+  const response = await fetch(`${API_BASE}/${endpoint}`, {
     method: 'POST', headers, body: JSON.stringify(payload || {}),
   });
   let data = {};

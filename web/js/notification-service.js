@@ -122,6 +122,15 @@ export class NotificationService {
     }
   }
 
+  // Toast notification helpers matching Flutter SnackBar
+  showInAppToast(message, type = 'info') {
+    return this.showInAppBanner('EduPeak', message, type);
+  }
+
+  showLocalToast(message, type = 'info') {
+    return this.showInAppBanner('EduPeak', message, type);
+  }
+
   // In-app animated banner toast matching Flutter floating SnackBar
   showInAppBanner(title, message, type = 'info') {
     let container = document.getElementById('in-app-toast-container');

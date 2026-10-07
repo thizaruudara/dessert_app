@@ -69,12 +69,22 @@ class AppRouter {
     initialLocation: '/splash',
     refreshListenable: authProvider,
     redirect: (context, state) {
-      final loggedIn = authProvider.isLoggedIn;
-      final onAuth = state.matchedLocation.startsWith('/auth') ||
-          state.matchedLocation == '/splash';
+      final location = state.matchedLocation;
+      final isSplash = location == '/splash';
+      final onAuth = location.startsWith('/auth');
 
+      // Keep all protected pages behind the splash until Firebase reports its
+      // persisted session and the matching profile/claims have been resolved.
+      if (!authProvider.authInitialized) {
+        return isSplash ? null : '/splash';
+      }
+
+      // Let the splash complete its animation and choose the initial route.
+      if (isSplash) return null;
+
+      final loggedIn = authProvider.isLoggedIn;
       if (!loggedIn && !onAuth) return '/auth/login';
-      if (loggedIn && state.matchedLocation != '/splash' && onAuth) {
+      if (loggedIn && onAuth) {
         return authProvider.isAdmin ? '/admin' : '/student';
       }
       return null;

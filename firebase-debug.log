@@ -1,0 +1,99 @@
+[debug] [2026-10-05T03:19:49.179Z] ----------------------------------------------------------------------
+[debug] [2026-10-05T03:19:49.182Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\ozone computer\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting --debug
+[debug] [2026-10-05T03:19:49.183Z] CLI Version:   15.28.2
+[debug] [2026-10-05T03:19:49.183Z] Platform:      win32
+[debug] [2026-10-05T03:19:49.183Z] Node Version:  v24.19.0
+[debug] [2026-10-05T03:19:49.183Z] Detected Agent: codex_cli
+[debug] [2026-10-05T03:19:49.183Z] Time:          Mon Oct 05 2026 08:49:49 GMT+0530 (India Standard Time)
+[debug] [2026-10-05T03:19:49.183Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-10-05T03:19:50.653Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-10-05T03:19:50.653Z] > authorizing via signed-in user (thizaruu@gmail.com)
+[debug] [2026-10-05T03:19:50.654Z] [iam] checking project dessert-institute for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-10-05T03:19:50.666Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:50.666Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:50.667Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/dessert-institute:testIamPermissions [none]
+[debug] [2026-10-05T03:19:50.668Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/dessert-institute:testIamPermissions  x-goog-user-project=dessert-institute
+[debug] [2026-10-05T03:19:50.668Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/dessert-institute:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-05T03:19:52.324Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/dessert-institute:testIamPermissions 200
+[debug] [2026-10-05T03:19:52.324Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/dessert-institute:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-05T03:19:52.325Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:52.325Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:52.325Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/dessert-institute [none]
+[debug] [2026-10-05T03:19:53.033Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/dessert-institute 200
+[debug] [2026-10-05T03:19:53.033Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/dessert-institute {"projectId":"dessert-institute","projectNumber":"400647872169","displayName":"dessert-institute","name":"projects/dessert-institute","resources":{"hostingSite":"dessert-institute"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_5b5c27ee-1d53-4239-be50-076059a0fcac"}
+[info] 
+[info] === Deploying to 'dessert-institute'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-10-05T03:19:53.036Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:53.036Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:53.037Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/dessert-institute/sites/dessert-institute [none]
+[debug] [2026-10-05T03:19:54.242Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/dessert-institute/sites/dessert-institute 200
+[debug] [2026-10-05T03:19:54.243Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/dessert-institute/sites/dessert-institute {"name":"projects/dessert-institute/sites/dessert-institute","defaultUrl":"https://dessert-institute.web.app","type":"DEFAULT_SITE"}
+[debug] [2026-10-05T03:19:54.255Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:54.255Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:54.256Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions [none]
+[debug] [2026-10-05T03:19:54.257Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2026-10-05T03:19:55.465Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions 200
+[debug] [2026-10-05T03:19:55.465Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions {"name":"projects/400647872169/sites/dessert-institute/versions/c550189ee485110d","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[dessert-institute]: beginning deploy... 
+[info] i  hosting[dessert-institute]: found 41 files in web 
+[debug] [2026-10-05T03:19:55.480Z] [hosting] uploading with 200 concurrency
+[debug] [2026-10-05T03:19:55.486Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:55.486Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:55.486Z] [hosting] hash cache [d2Vi] stored for 41 files
+[debug] [2026-10-05T03:19:55.487Z] [hosting][hash queue][FINAL] {"max":3,"min":0,"avg":0,"active":0,"complete":41,"success":41,"errored":0,"retried":0,"total":41,"elapsed":5}
+[debug] [2026-10-05T03:19:55.487Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/400647872169/sites/dessert-institute/versions/c550189ee485110d:populateFiles [none]
+[debug] [2026-10-05T03:19:55.487Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/400647872169/sites/dessert-institute/versions/c550189ee485110d:populateFiles {"files":{"/vercel.json":"eee783234c63510d9e4a378c09cae8bbe05d496c2dc4ffc286328aedaecae928","/sw.js":"03d35b603044bccf137f64452a72a1609d4c6c194ad2c5285120025501095f86","/server.js":"7aee484d6cfe98710eae1dc6ae853516be29fd6a1f319dc1eb43b41b6064e967","/real_dashboard_light_v4.html":"83e0bcae5a758f47cea184c15541489e250cb8f2287e69f117b53f62930413cc","/package.json":"39a65d366d802668e64c18b69a035060f729a098046f4a5356537898a814e185","/package-lock.json":"86f615833b4b3b6820344f16508376c14ceb8f65faf47394a0d1a1829c4b93a9","/manifest.json":"82372df8acd972e4448e5b9dee494e741f58926cb2242bd57b0e6aa0c64c5187","/index.html":"5998910a70ab7a9dfbaf6e113a4f9478041afce50f158a6306b1169f53acaf1c","/dev-server.cjs":"562b26b91fea2f2affee4dd581f0dbff7c05ab2f51a81fbf13f5eedf0db717fd","/js/pwa-gatekeeper.js":"71006a24446248cf66d8fe03f899b5185bb12c01a59eec202fa6ca6ea621c1db","/js/notification-service.js":"b389941733bdbdc1773a0b5110586c95931db4e957f0a0ef7474e6a61dbe4952","/js/firebase-config.js":"af4664ea8e6cfd3901959503e23c0886dce6d77897bd1e3884cc34c649b20e0a","/js/db-service.js":"ec76dc9bdea655af0bb03e8a0caedb919b4c4f058526e93c003f03336980bf6a","/js/camera-service.js":"399ef4a9efc23ccde5af1e16173f4f0011d1baad4adfc89324b81cadeae9a0cb","/js/backend-api.js":"d71e1cd96d8599d85dda3c7b6bc740465990b28c1ccb3a9f476c7ffc9f8b1a7a","/js/auth-service.js":"9afbf36a03438c566912e3c78fb33fc833b350115ea29f641b452711c180c7c4","/js/app.js":"548a6e83d28e044865502f965e9213c96154ab50686e98703a327cefcbefa5ef","/js/app.bundle.js":"811c3d356c267dd7fcbbb41fe33a4027f5f60f6cf1a461ddcd16d7a1452f78ba","/icons/logo.png":"4ddbac72c7670b26ca2457a181999ed7e53409028f1884baa8f70f245a9f9e93","/icons/icon.svg":"b3305f317711869792d798c9cbecaa9a3930404cb8ba2c98a4bb870b2776a758","/icons/icon-512.png":"4ddbac72c7670b26ca2457a181999ed7e53409028f1884baa8f70f245a9f9e93","/icons/icon-192.png":"4ddbac72c7670b26ca2457a181999ed7e53409028f1884baa8f70f245a9f9e93","/icons/exam_3d_countdown.jpg":"eec2bde74612dddf379d8f3563a7cc52e1d8756bd5859a06cc4c4e45e36ad364","/icons/edupeak_logo.png":"4ddbac72c7670b26ca2457a181999ed7e53409028f1884baa8f70f245a9f9e93","/icons/apple-touch-icon.png":"4ddbac72c7670b26ca2457a181999ed7e53409028f1884baa8f70f245a9f9e93","/css/gatekeeper.css":"39427f9c45fb93f6872454b7839bd13a98295d2874d9559137346a54b76d6a32","/css/features.css":"62e50a7e5fe91d260d333378c62a411892d1801c2f8788b72ad26f3cea824891","/css/exam-room.css":"70eb3f3bc306b6f056dca585c18293eb027eda01bc1b0bc7f7e0502c1d0cd73f","/css/camera-scanner.css":"ed6f70555e998de56bb2db6f14b7ba2668ae4e56c9394e6171767bf4ca2705c4","/css/app.css":"eb9c9efde44f3b22327729e1b62fb76711ec40394eebd47eb7253b3451b57b67","/assets/images/edupeak_logo.png":"4ddbac72c7670b26ca2457a181999ed7e53409028f1884baa8f70f245a9f9e93","/api/_lib/http.js":"10de2e89a4cdd484baacec1a36d505fd2ee35eb7ec6b0a49dd7e49b32d7fa26a","/api/_lib/firebase-admin.js":"b949b18a5223826e96f28a71542f4a7b3bcabdc18fbdb0845e1f7bc9cc0460b1","/api/_lib/admin-phones.js":"943e9ab6e4800da88ed233dd95a78c28ec9a056d9eadcdc72dbb9899750c4621","/api/sprints/submit-attempt.js":"baaa911925f998571609044e345814b9bba9f48771d31216af848d726cd0775a","/api/papers/register-slot.js":"b1eb3179c0bc470daa9c33d47a2ec6abadf859e0711aad14a2831c82ec5e8af8","/api/auth/upgrade-legacy.js":"079169cbc3ee486e278316d44c1d9ee1dd58d473fd36532d50c6825431bf048b","/api/auth/ensure-profile.js":"73b5beca617498f343706037cf2a5363c7388e41fa4f2219f5688517cb04e843","/api/auth/ensure-admin.js":"1b54bb223777ba44c35e4fcd17f2d029738190767a1e440f60e8558f768a34a1","/.vercel/README.txt":"17190a6405df36feb9538f0081f12d4a513371102404a2f72577759481ea172a","/.vercel/project.json":"1238dc3cc93d3c48d78ce522d31565f14e797d23cb16906f7dbe93d7faa70809"}}
+[debug] [2026-10-05T03:19:56.409Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/400647872169/sites/dessert-institute/versions/c550189ee485110d:populateFiles 200
+[debug] [2026-10-05T03:19:56.409Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/400647872169/sites/dessert-institute/versions/c550189ee485110d:populateFiles {"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/dessert-institute/versions/c550189ee485110d/files"}
+[debug] [2026-10-05T03:19:56.410Z] [hosting][populate queue][FINAL] {"max":924,"min":924,"avg":924,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":925}
+[debug] [2026-10-05T03:19:56.411Z] [hosting] uploads queued: 0
+[debug] [2026-10-05T03:19:56.413Z] [hosting][upload queue][FINAL] {"max":0,"min":9999999999,"avg":0,"active":0,"complete":0,"success":0,"errored":0,"retried":0,"total":0,"elapsed":1791170396413}
+[info] i  hosting: upload complete 
+[info] +  hosting[dessert-institute]: file upload complete 
+[debug] [2026-10-05T03:19:56.415Z] [hosting] deploy completed after 948ms
+[debug] [2026-10-05T03:19:56.415Z] [
+  {
+    "config": {
+      "site": "dessert-institute",
+      "public": "web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    "version": "projects/400647872169/sites/dessert-institute/versions/c550189ee485110d"
+  }
+]
+[info] i  hosting[dessert-institute]: finalizing version... 
+[debug] [2026-10-05T03:19:56.417Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:56.417Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:56.417Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions/c550189ee485110d updateMask=status%2Cconfig
+[debug] [2026-10-05T03:19:56.417Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions/c550189ee485110d {"status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]}}
+[debug] [2026-10-05T03:19:57.118Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions/c550189ee485110d 200
+[debug] [2026-10-05T03:19:57.119Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/versions/c550189ee485110d {"name":"projects/400647872169/sites/dessert-institute/versions/c550189ee485110d","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-10-05T03:19:52.937288Z","createUser":{"email":"thizaruu@gmail.com"},"finalizeTime":"2026-10-05T03:19:55.289850Z","finalizeUser":{"email":"thizaruu@gmail.com"}}
+[debug] [2026-10-05T03:19:57.119Z] [hosting] finalized version for dessert-institute:[object Object]
+[info] +  hosting[dessert-institute]: version finalized 
+[info] i  hosting[dessert-institute]: releasing new version... 
+[debug] [2026-10-05T03:19:57.119Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:57.119Z] Checked if tokens are valid: true, expires at: 1791173929867
+[debug] [2026-10-05T03:19:57.120Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/channels/live/releases versionName=projects%2F400647872169%2Fsites%2Fdessert-institute%2Fversions%2Fc550189ee485110d
+[debug] [2026-10-05T03:19:57.120Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/channels/live/releases {}
+[debug] [2026-10-05T03:19:57.869Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/channels/live/releases 200
+[debug] [2026-10-05T03:19:57.869Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/dessert-institute/channels/live/releases {"name":"projects/400647872169/sites/dessert-institute/channels/live/releases/1791170395349000","version":{"name":"projects/400647872169/sites/dessert-institute/versions/c550189ee485110d","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-10-05T03:19:52.937288Z","createUser":{"email":"thizaruu@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocI4qS2PL7TbBJYQ9HdO8tGX4LXhBVhhXhOwo1siuA7J4kwq8A=mo"},"finalizeTime":"2026-10-05T03:19:55.289850Z","finalizeUser":{"email":"thizaruu@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocI4qS2PL7TbBJYQ9HdO8tGX4LXhBVhhXhOwo1siuA7J4kwq8A=mo"}},"type":"DEPLOY","releaseTime":"2026-10-05T03:19:55.349Z","releaseUser":{"email":"thizaruu@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocI4qS2PL7TbBJYQ9HdO8tGX4LXhBVhhXhOwo1siuA7J4kwq8A=mo"}}
+[debug] [2026-10-05T03:19:57.869Z] [hosting] release: {"name":"projects/400647872169/sites/dessert-institute/channels/live/releases/1791170395349000","version":{"name":"projects/400647872169/sites/dessert-institute/versions/c550189ee485110d","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-10-05T03:19:52.937288Z","createUser":{"email":"thizaruu@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocI4qS2PL7TbBJYQ9HdO8tGX4LXhBVhhXhOwo1siuA7J4kwq8A=mo"},"finalizeTime":"2026-10-05T03:19:55.289850Z","finalizeUser":{"email":"thizaruu@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocI4qS2PL7TbBJYQ9HdO8tGX4LXhBVhhXhOwo1siuA7J4kwq8A=mo"}},"type":"DEPLOY","releaseTime":"2026-10-05T03:19:55.349Z","releaseUser":{"email":"thizaruu@gmail.com","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocI4qS2PL7TbBJYQ9HdO8tGX4LXhBVhhXhOwo1siuA7J4kwq8A=mo"}}
+[info] +  hosting[dessert-institute]: release complete 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/dessert-institute/overview
+[info] Hosting URL: https://dessert-institute.web.app

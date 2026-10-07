@@ -9,6 +9,7 @@ import { PwaGatekeeper } from './pwa-gatekeeper.js';
 class AppController {
   constructor() {
     this.currentTab = 'home';
+    this.renderToken = 0;
     this.currentUser = authService.currentUser || null;
     this.countdownTimer = null;
     this.papersInterval = null;
@@ -21,11 +22,33 @@ class AppController {
   init() {
     authService.onAuthStateChanged((user) => {
       this.currentUser = user;
-      if (user && document.getElementById('app-root') && !document.getElementById('pwa-gatekeeper-overlay')) {
+      const appIsUnlocked = document.getElementById('app-root') && !document.getElementById('pwa-gatekeeper-overlay');
+      if (appIsUnlocked && !user && !authService.loading) {
+        this.renderAuthScreen();
+      } else if (user && appIsUnlocked) {
         if (user.role === 'admin') this.renderAdminApp();
         else this.renderApp();
       }
     });
+    window.addEventListener('popstate', () => {
+      if (this.currentUser?.role === 'admin') {
+        if (this.currentMode !== 'student') return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('view') !== 'student') {
+          this.returnToAdminDashboard();
+          return;
+        }
+        const requestedTab = params.get('tab');
+        const allowedTabs = ['home', 'papers', 'ranks', 'desserts', 'profile'];
+        this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : 'home', { historyMode: 'none' });
+        return;
+      }
+      if (!document.getElementById('main-viewport')) return;
+      const requestedTab = new URLSearchParams(window.location.search).get('tab');
+      const allowedTabs = ['home', 'papers', 'ranks', 'desserts', 'profile'];
+      this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : 'home', { historyMode: 'none' });
+    });
+
     // 0. Theme Initialization
     const savedTheme = localStorage.getItem('edupeak_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -37,8 +60,9 @@ class AppController {
 
     // 2. Initialize PWA Gatekeeper for iOS Add to Home Screen enforcement
     const gatekeeper = new PwaGatekeeper({
-      onUnlocked: () => {
+      onUnlocked: async () => {
         console.log('[App] PWA Standalone Mode active.');
+        await authService.waitForInitialAuth();
         if (!this.currentUser) {
           this.renderAuthScreen();
         } else if (this.currentUser?.role === 'admin') {
@@ -93,14 +117,16 @@ class AppController {
 
     document.body.appendChild(splash);
 
-    // Keep splash visible for 1900ms viewing time, then execute Swap-Up exit
-    setTimeout(() => {
-      splash.classList.add('swap-up-exit');
+    // Keep the splash in place until Firebase has resolved the persisted
+    // session, while preserving its minimum display time and exit animation.
+    const splashStartedAt = performance.now();
+    authService.waitForInitialAuth().then(() => {
+      const remaining = Math.max(0, 1900 - (performance.now() - splashStartedAt));
       setTimeout(() => {
-        splash.remove();
-      }, 550);
-    }, 1900);
-  }
+        splash.classList.add('swap-up-exit');
+        setTimeout(() => splash.remove(), 550);
+      }, remaining);
+    });  }
 
   // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
   renderAuthScreen(initialTab = 0) {
@@ -421,16 +447,41 @@ class AppController {
       });
     });
 
-    this.switchTab('home');
+    const requestedTab = new URLSearchParams(window.location.search).get('tab');
+    const allowedTabs = ['home', 'papers', 'ranks', 'desserts', 'profile'];
+    this.currentTab = null;
+    this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : 'home', { historyMode: 'replace' });
 
     // Init notification service
     notificationService.init(this.currentUser);
   }
 
-  switchTab(tabName) {
+  switchTab(tabName, { historyMode = 'push' } = {}) {
+    const allowedTabs = ['home', 'papers', 'ranks', 'desserts', 'profile'];
+    if (!allowedTabs.includes(tabName)) tabName = 'home';
+    const previousTab = this.currentTab;
     this.currentTab = tabName;
     const container = document.getElementById('main-viewport');
     if (!container) return;
+
+    if (historyMode !== 'none' && (historyMode === 'replace' || previousTab !== tabName)) {
+      const url = new URL(window.location.href);
+      if (tabName === 'home') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', tabName);
+      window.history[historyMode === 'replace' ? 'replaceState' : 'pushState'](
+        { ...(window.history.state || {}), edupeakTab: tabName }, '', url,
+      );
+    }
+    this.renderToken++;
+
+    // Show a stable loading state while an async screen loads. A render token
+    // below prevents a slow page request from replacing a newer tab.
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
+        <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+        <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page…</div>
+      </div>
+    `;
 
     document.querySelectorAll('.nav-tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -453,6 +504,7 @@ class AppController {
           </div>
         `;
         this.renderPapersScreen(container).catch(err => {
+          if (this.currentTab !== 'papers' || !container.isConnected) return;
           console.error('[Papers] Error rendering papers tab:', err);
           container.innerHTML = `
             <div style="padding:40px 20px; text-align:center; color:#DC2626;">
@@ -482,11 +534,13 @@ class AppController {
 
   // ── 1. The Exact Student Cockpit (Home) ──────────────────────────────────
   async renderHomeScreen(container) {
+    const renderToken = ++this.renderToken;
     const user = this.currentUser || {};
     const studentName = user.name || 'ThiZaru';
     const initial = studentName.charAt(0).toUpperCase();
 
     const insight = await dbService.getDailyInsight();
+    if (renderToken !== this.renderToken || !container.isConnected) return;
 
     container.innerHTML = `
       <!-- 1. Header (Avatar, Name, Verified Badge, 2027 Tag, 3 Days Streak) -->
@@ -868,6 +922,7 @@ class AppController {
 
   // ── 2. Papers Tab (Exam Sessions & Upcoming Hints - 1:1 Android Parity) ──
   async renderPapersScreen(container) {
+    const renderToken = ++this.renderToken;
     if (this.papersInterval) {
       clearInterval(this.papersInterval);
       this.papersInterval = null;
@@ -882,10 +937,12 @@ class AppController {
         dbService.getPaperSessions(activeTargetYear),
         dbService.getUpcomingPapers(activeTargetYear)
       ]);
+      const studentId = user.uid || user.id || 's_default';
       const registrations = new Map(await Promise.all(sessions.map(async session => [
         session.id,
-        await dbService.getStudentRegistration(session.id, user.uid)
+        await dbService.getStudentRegistration(session.id, studentId)
       ])));
+      if (renderToken !== this.renderToken || !container.isConnected) return;
 
       const formatHeaderSubtitle = () => {
         if (this.showAllBatches) {
@@ -1339,8 +1396,7 @@ class AppController {
           const sId = box.dataset.slotId;
           await dbService.registerStudentSlot({
             paperId: pId,
-            studentId: user.uid,
-            studentName: user.name || 'Scholar',
+            studentId: user.uid || user.id || "s_default", studentName: user.name || "Scholar",
             studentPhone: user.phone || '0770557769',
             slotId: sId
           });
@@ -1362,7 +1418,10 @@ class AppController {
       // Enter Exam / Waiting Room
       container.querySelectorAll('[data-enter-exam]').forEach(btn => {
         btn.addEventListener('click', () => {
-          this.openLiveExamRoom(btn.dataset.enterExam);
+          const paperId = btn.dataset.enterExam;
+          const reg = registrations.get(paperId);
+          const selectedSlot = reg?.selectedSlot || 'slot1';
+          this.openLiveExamRoom(paperId, selectedSlot);
         });
       });
 
@@ -1601,6 +1660,7 @@ class AppController {
 
   // ── 3. Ranks Tab (Dessert XP Leagues & Paper Leaderboard - 1:1 Android) ───
   async renderRanksScreen(container) {
+    const renderToken = ++this.renderToken;
     this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Dessert, 1: Paper
     this.selectedLeague = this.selectedLeague ?? 'All Scholars';
     const currentUser = this.currentUser || {};
@@ -1627,6 +1687,7 @@ class AppController {
       if (this.ranksBoardType === 0) leaderboardLoadError = true;
       else paperLeaderboardLoadError = true;
     }
+    if (renderToken !== this.renderToken || !container.isConnected) return;
     const leagues = [
       { name: 'All Scholars', icon: 'public' },
       { name: 'Diamond', icon: 'diamond' },
@@ -1668,7 +1729,8 @@ class AppController {
     const top3 = filtered.slice(0, 3);
     const showPodium = this.selectedLeague === 'All Scholars' && top3.length >= 2;
     const visibleRankRows = showPodium ? filtered.slice(3) : filtered;
-    const currentUserRank = filtered.findIndex((student) => student.id === currentUser.uid) + 1;
+    const currentUserId = currentUser.uid || currentUser.id;
+    const currentUserRank = filtered.findIndex((student) => student.id === currentUserId) + 1;
     const currentUserEntry = currentUserRank > 0 ? filtered[currentUserRank - 1] : null;
     const nextRankEntry = currentUserRank > 1 ? filtered[currentUserRank - 2] : null;
     const emptyBatchLabel = isAdmin
@@ -1715,14 +1777,14 @@ class AppController {
           ` : ''}
           <div class="ranks-list">
             ${visibleRankRows.map((student) => `
-              <div class="rank-list-item ${student.id === currentUser.uid ? 'is-current-user' : ''}">
+              <div class="rank-list-item ${student.id === (currentUser.uid || currentUser.id) ? 'is-current-user' : ''}">
                 <div class="rank-item-left">
                   <span class="rank-index">#${student.rank}</span>
                   <div class="rank-avatar">${escapeHTML(String(student.name || 'S').charAt(0).toUpperCase())}</div>
                   <div class="rank-name-box">
                     <div class="rank-student-name">
                       <span>${escapeHTML(student.name)}</span>
-                      ${student.id === currentUser.uid ? '<span class="rank-you-tag">You</span>' : ''}
+                      ${student.id === (currentUser.uid || currentUser.id) ? '<span class="rank-you-tag">You</span>' : ''}
                     </div>
                     <div class="rank-batch-tag">${escapeHTML(student.examYear || 'General Batch')}</div>
                   </div>
@@ -1764,7 +1826,7 @@ class AppController {
               const expanded = this.expandedPaperBoards.has(board.id);
               const myEntry = entries.find((entry) => {
                 const entryPhone = String(entry.studentPhone || '').replace(/\D/g, '');
-                return (entry.studentId && entry.studentId === currentUser.uid)
+                return (entry.studentId && entry.studentId === (currentUser.uid || currentUser.id))
                   || (ownPhone && entryPhone && ownPhone === entryPhone)
                   || (currentUser.name && entry.studentName.trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
               });
@@ -1939,13 +2001,15 @@ class AppController {
 
   // ── 4. Desserts Tab (Submit Homework & Submissions History - 1:1 Android) ──
   async renderDessertsScreen(container) {
+    const renderToken = ++this.renderToken;
     this.dessertsTab = this.dessertsTab ?? 0; // 0: Submit Homework, 1: History
     this.selectedTopic = this.selectedTopic ?? 'Mechanics';
     this.capturedHomeworkPhotos = this.capturedHomeworkPhotos ?? [];
     this.dessertHistoryFilter = this.dessertHistoryFilter ?? 'All';
 
     const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid, user.phone);
+    const desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone);
+    if (renderToken !== this.renderToken || !container.isConnected) return;
 
     const topics = [
       'Mechanics',
@@ -2191,9 +2255,7 @@ class AppController {
       }
 
       await dbService.submitDessert({
-        studentId: user.uid,
-        studentName: user.name,
-        studentPhone: user.phone,
+        studentId: user.uid || user.id, studentName: user.name, studentPhone: user.phone,
         subject: `Physics: ${this.selectedTopic}`,
         caption: caption || `Homework submission on ${this.selectedTopic}`,
         mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : ['./icons/exam_3d_countdown.jpg']
@@ -2214,6 +2276,7 @@ class AppController {
 
   // ── 5. Profile Tab (Trophy Room, Dark Mode, Exam Batch & Avatar Picker - 1:1 Android) ──
   async renderProfileScreen(container) {
+    const renderToken = ++this.renderToken;
     const user = this.currentUser || {};
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -2229,6 +2292,7 @@ class AppController {
     }
     const approvedCount = desserts.filter(d => d.status === 'approved').length;
     const pendingCount = desserts.filter(d => !d.status || d.status === 'pending').length;
+    if (renderToken !== this.renderToken || !container.isConnected) return;
     const totalCount = desserts.length;
     const creditsXP = user.credits ?? 155;
 
@@ -2408,6 +2472,12 @@ class AppController {
         </button>
 
 
+        ${this.currentUser?.role === 'admin' && this.currentMode === 'student' ? `
+          <button class="btn-primary" style="margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" id="btn-profile-admin-dashboard">
+            <span class="material-symbols-rounded" style="font-size:18px;">admin_panel_settings</span>
+            <span>Back to Admin Dashboard</span>
+          </button>
+        ` : ''}
         <!-- Sign Out Button -->
         <button class="btn-primary" style="background:#EF4444; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" id="btn-profile-logout">
           <span class="material-symbols-rounded" style="font-size:18px;">logout</span>
@@ -2451,6 +2521,10 @@ class AppController {
       this.openNotificationCenter();
     });
 
+
+    document.getElementById('btn-profile-admin-dashboard')?.addEventListener('click', () => {
+      this.returnToAdminDashboard();
+    });
 
     document.getElementById('btn-profile-logout')?.addEventListener('click', () => {
       this.confirmLogout();
@@ -2695,7 +2769,7 @@ class AppController {
   // ── Dessert Detail Modal ──────────────────────────────────────────────────
   async openDessertDetailModal(dessertId) {
     const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid, user.phone);
+    const desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone);
     const d = desserts.find(x => x.id === dessertId) || desserts[0];
     if (!d) return;
 
@@ -3086,7 +3160,7 @@ class AppController {
 
           document.getElementById('btn-sprint-view-ranks')?.addEventListener('click', () => {
             modal.remove();
-            this.switchTab('leaderboard');
+            this.switchTab('ranks');
           });
         }
       });
@@ -3526,6 +3600,14 @@ class AppController {
     this.switchAdminTab(this.adminTab);
   }
 
+  returnToAdminDashboard() {
+    this.currentMode = 'admin';
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.delete('tab');
+    window.history.replaceState({ ...(window.history.state || {}), edupeakView: 'admin' }, '', url);
+    this.renderAdminApp();
+  }
   switchAdminTab(tabName) {
     this.adminTab = tabName;
     const viewport = document.getElementById('admin-main-viewport');
@@ -3794,6 +3876,10 @@ class AppController {
     // Listeners
     document.getElementById('btn-admin-student-view')?.addEventListener('click', () => {
       this.currentMode = 'student';
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tab');
+      url.searchParams.set('view', 'student');
+      window.history.pushState({ ...(window.history.state || {}), edupeakView: 'student' }, '', url);
       this.renderApp();
     });
 
@@ -6067,14 +6153,27 @@ class AppController {
       return `${h}:${m}:${s}`;
     };
 
+    const isRecentPing = (lastPing) => {
+      if (!lastPing) return false;
+      let date;
+      if (typeof lastPing.toDate === 'function') date = lastPing.toDate();
+      else if (lastPing.seconds) date = new Date(lastPing.seconds * 1000);
+      else date = new Date(lastPing);
+      const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+      return diff >= -5 && diff <= 35;
+    };
+
     const render = () => {
       const slot1Students = allStudents.filter(s => (s.selectedSlot || 'slot1') === 'slot1');
       const slot2Students = allStudents.filter(s => s.selectedSlot === 'slot2');
       const submittedStudents = allStudents.filter(s => s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0));
 
       const currentSlotStudents = activeTab === 'slot2' ? slot2Students : slot1Students;
-      const liveCount = currentSlotStudents.filter(s => s.status !== 'submitted' && (s.isCameraActive || s.isOnline)).length;
-      const submittedSlotCount = currentSlotStudents.filter(s => s.status === 'submitted').length;
+      const liveCount = currentSlotStudents.filter(s => {
+        if (s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0)) return false;
+        return s.isCameraActive && (isRecentPing(s.lastCameraPing) || s.cameraSnapshotUrl);
+      }).length;
+      const submittedSlotCount = currentSlotStudents.filter(s => s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0)).length;
       const inactiveCount = Math.max(0, currentSlotStudents.length - liveCount - submittedSlotCount);
 
       const phase = session.currentPhase || 'waiting';
@@ -6299,28 +6398,29 @@ class AppController {
                 ` : `
                   <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
                     ${currentSlotStudents.map(student => {
-                      const isSubmitted = student.status === 'submitted';
-                      const isCameraActive = student.isCameraActive;
-                      const isOnline = student.isOnline || isCameraActive;
+                      const isSubmitted = student.status === 'submitted' || (student.submissionPhotos && student.submissionPhotos.length > 0);
+                      const pingActive = isRecentPing(student.lastCameraPing);
+                      const isCameraActive = !isSubmitted && !!(student.isCameraActive && (pingActive || student.cameraSnapshotUrl));
+                      const isOnline = !isSubmitted && (isCameraActive || pingActive || student.isOnline);
                       const borderColor = isSubmitted ? '#38BDF8' : isCameraActive ? '#22C55E' : isOnline ? '#3B82F6' : '#EF4444';
                       const statusBadge = isSubmitted ? 'SUBMITTED' : isCameraActive ? 'LIVE' : isOnline ? 'ONLINE' : 'OFFLINE';
 
                       return `
                         <div style="background:#1E293B; border-radius:14px; border:1.5px solid ${borderColor}; display:flex; flex-direction:column; overflow:hidden;">
                           <!-- Camera Preview Box -->
-                          <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                            ${student.cameraSnapshotUrl ? `
+                          <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                            ${(student.cameraSnapshotUrl && (isCameraActive || isOnline)) ? `
                               <img src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
                             ` : `
                               <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
-                                <span class="material-symbols-rounded" style="font-size:26px; color:${borderColor};">videocam</span>
+                                <span class="material-symbols-rounded" style="font-size:26px; color:${borderColor};">${isCameraActive ? 'videocam' : 'videocam_off'}</span>
                                 <span style="font-size:10px; font-weight:500; color:${isOnline ? '#4ADE80' : '#94A3B8'};">
                                   ${isSubmitted ? 'Paper Submitted' : isCameraActive ? 'Proctor Stream Active' : 'Camera Offline'}
                                 </span>
                               </div>
                             `}
                             <!-- Status Pill Top Left -->
-                            <div style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${borderColor}; color:#FFFFFF; font-size:8.5px; font-weight:700;">
+                            <div style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${borderColor}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
                               ${statusBadge}
                             </div>
                             <!-- Fullscreen Icon Top Right -->
@@ -6504,6 +6604,21 @@ class AppController {
     const unsubRegs = dbService.streamSlotRegistrations(session.id, 'all', (regs) => {
       allStudents = regs || [];
       render();
+      const fsModal = document.getElementById('proctor-fullscreen-modal');
+      if (fsModal) {
+        const currentFsStudent = allStudents.find(s => s.studentId === fsModal.dataset.studentId);
+        if (currentFsStudent && currentFsStudent.cameraSnapshotUrl) {
+          const img = fsModal.querySelector('#fs-student-stream');
+          if (img) {
+            img.src = currentFsStudent.cameraSnapshotUrl;
+          } else {
+            const feedContainer = fsModal.querySelector('#fs-feed-container');
+            if (feedContainer) {
+              feedContainer.innerHTML = `<img id="fs-student-stream" src="${currentFsStudent.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />`;
+            }
+          }
+        }
+      }
     });
     unsubs.push(unsubRegs);
 
@@ -6668,6 +6783,8 @@ class AppController {
   // Helper: Full Screen Student Viewer (_showFullScreenStudentViewer)
   _showFullScreenStudentViewer(paperId, student) {
     const modal = document.createElement('div');
+    modal.id = 'proctor-fullscreen-modal';
+    modal.dataset.studentId = student.studentId;
     modal.style.cssText = 'position:fixed; inset:0; background:#0F172A; display:flex; flex-direction:column; z-index:10002; font-family:Poppins,sans-serif;';
     modal.innerHTML = `
       <div style="background:#1E293B; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155;">
@@ -6681,11 +6798,11 @@ class AppController {
         </button>
       </div>
 
-      <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#000000; position:relative;">
+      <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#000000; position:relative; overflow:hidden;" id="fs-feed-container">
         ${student.cameraSnapshotUrl ? `
-          <img src="${student.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          <img id="fs-student-stream" src="${student.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
         ` : `
-          <div style="text-align:center; color:#94A3B8;">
+          <div id="fs-student-stream-placeholder" style="text-align:center; color:#94A3B8;">
             <span class="material-symbols-rounded" style="font-size:48px; margin-bottom:12px; color:#64748B;">videocam</span>
             <div style="font-size:14px; font-weight:600;">Active Proctoring Feed</div>
             <div style="font-size:11px;">Audio & Video Active • Real-time Monitoring</div>
@@ -6719,9 +6836,12 @@ class AppController {
   // ── B. Student Live Exam Writing Room (1:1 with live_exam_room_screen.dart & in_app_document_scanner_screen.dart) ──
   async openStudentLiveExamRoom(paperId, slotId = 'slot1') {
     const student = this.currentUser || { id: 's_default', name: 'Student', phone: '' };
+    const studentId = student.uid || student.id || 's_default';
+    const studentName = student.name || student.displayName || 'Student';
+    const studentPhone = student.phone || student.phoneNumber || '';
 
     // 1. Check if student already submitted this paper (matching _checkIfAlreadySubmitted)
-    const existingReg = await dbService.getStudentRegistration(paperId, student.uid || student.id);
+    const existingReg = await dbService.getStudentRegistration(paperId, studentId);
     if (existingReg && (existingReg.isSubmitted || existingReg.status === 'submitted')) {
       const alreadySubmittedModal = document.createElement('div');
       alreadySubmittedModal.className = 'app-modal';
@@ -6752,9 +6872,9 @@ class AppController {
     // Auto-register student if not yet registered (matching _ensureStudentRegistered)
     await dbService.registerStudentSlot({
       paperId,
-      studentId: student.id,
-      studentName: student.name,
-      studentPhone: student.phone || '',
+      studentId,
+      studentName,
+      studentPhone,
       slotId: slotId || 'slot1'
     });
 
@@ -6796,16 +6916,37 @@ class AppController {
     // Time calculations matching Flutter
     const getSlot = () => (slotId === 'slot2' && session.slot2 ? session.slot2 : (session.slot1 || { name: 'Morning Slot 1', startTime: '08:30' }));
     
+    let captureCanvas = null;
+    const captureSnapshot = () => {
+      if (!cameraActive || !cameraStream) return null;
+      const videoEl = roomContainer.querySelector('.proctor-video-feed');
+      if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth) return null;
+      try {
+        if (!captureCanvas) {
+          captureCanvas = document.createElement('canvas');
+        }
+        captureCanvas.width = 320;
+        captureCanvas.height = Math.round(320 * (videoEl.videoHeight / videoEl.videoWidth)) || 240;
+        const ctx = captureCanvas.getContext('2d');
+        ctx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
+        return captureCanvas.toDataURL('image/jpeg', 0.52);
+      } catch (err) {
+        return null;
+      }
+    };
+
     // Heartbeat function matching Flutter _sendHeartbeat
     const sendHeartbeat = async (isActive) => {
       try {
+        const snap = isActive ? captureSnapshot() : null;
         await dbService.updateCameraHeartbeat({
           paperId,
-          studentId: student.id,
-          studentName: student.name,
-          studentPhone: student.phone || '',
+          studentId,
+          studentName,
+          studentPhone,
           slotId: slotId || 'slot1',
           isCameraActive: isActive,
+          cameraSnapshotUrl: snap,
           status: 'in_exam'
         });
       } catch (e) {
@@ -6830,7 +6971,7 @@ class AppController {
           v.play().catch(() => {});
         });
         updateCameraStatusBadges(true);
-        sendHeartbeat(true);
+        setTimeout(() => sendHeartbeat(true), 800);
       } catch (err) {
         console.warn('Camera init error:', err);
         cameraActive = false;
@@ -7626,9 +7767,7 @@ class AppController {
               // Update Firestore paper_registrations record
               await dbService.updateCameraHeartbeat({
                 paperId,
-                studentId: student.id,
-                studentName: student.name,
-                studentPhone: student.phone || '',
+                studentId: studentId, studentName: studentName, studentPhone: studentPhone,
                 slotId: slotId || 'slot1',
                 isCameraActive: false,
                 status: 'submitted',
@@ -7660,7 +7799,7 @@ class AppController {
     const listenToProctorAlerts = () => {
       try {
         if (typeof dbService.streamStudentAlerts === 'function') {
-          dbService.streamStudentAlerts(paperId, student.id, (alerts) => {
+          dbService.streamStudentAlerts(paperId, studentId, (alerts) => {
             alerts.forEach(alert => {
               if (!alert.isRead && !shownAlertIds.has(alert.id)) {
                 shownAlertIds.add(alert.id);

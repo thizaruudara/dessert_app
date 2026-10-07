@@ -370,143 +370,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
-            // ── 2. Live Animated Hero Banner: Big Student Name & Live Quote ──
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildPopItem(
-                  index: 1,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF1E3A8A), // Deep Royal Navy
-                          Color(0xFF2563EB), // Vibrant Electric Blue
-                          Color(0xFF0284C7), // Sky Cyan Glow
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2563EB).withOpacity(0.30),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        // Subtle background decoration glow ring
-                        Positioned(
-                          right: -15,
-                          bottom: -20,
-                          child: Container(
-                            width: 110,
-                            height: 110,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withOpacity(0.08),
-                            ),
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Daily Inspiration Header Badge
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white.withOpacity(0.20)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Color(0xFF38BDF8),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Color(0xFF38BDF8),
-                                              blurRadius: 5,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'DAILY INSPIRATION',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                          color: const Color(0xFFE0F2FE),
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Spacer(),
-                                Icon(
-                                  Icons.format_quote_rounded,
-                                  color: Colors.white.withOpacity(0.40),
-                                  size: 24,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // Live Animated Rotating Quote with generous line height and no cutoff
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 600),
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(0.0, 0.15),
-                                      end: Offset.zero,
-                                    ).animate(animation),
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                _quotes[_quoteIndex],
-                                key: ValueKey<int>(_quoteIndex),
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 14.5,
-                                  fontStyle: FontStyle.italic,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // ── 3. Cockpit Radar & Daily Quests ────────────────────────────
+            // ── 2. Level & Daily Tasks ────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: _buildPopItem(
-                  index: 2,
+                  index: 1,
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -663,6 +532,137 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
 
+            // ── 3. Daily Inspiration Banner ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: _buildPopItem(
+                  index: 2,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF1E3A8A), // Deep Royal Navy
+                          Color(0xFF2563EB), // Vibrant Electric Blue
+                          Color(0xFF0284C7), // Sky Cyan Glow
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withOpacity(0.30),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        // Subtle background decoration glow ring
+                        Positioned(
+                          right: -15,
+                          bottom: -20,
+                          child: Container(
+                            width: 110,
+                            height: 110,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.08),
+                            ),
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Daily Inspiration Header Badge
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white.withOpacity(0.20)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Color(0xFF38BDF8),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Color(0xFF38BDF8),
+                                              blurRadius: 5,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'DAILY INSPIRATION',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFFE0F2FE),
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(
+                                  Icons.format_quote_rounded,
+                                  color: Colors.white.withOpacity(0.40),
+                                  size: 24,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // Live Animated Rotating Quote with generous line height and no cutoff
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 600),
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0.0, 0.15),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                _quotes[_quoteIndex],
+                                key: ValueKey<int>(_quoteIndex),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14.5,
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             // ── 4. Original Exam Countdown ───────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
@@ -680,75 +680,67 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildPopItem(
                   index: 4,
-                  child: Column(
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildGridActionCard(
-                              icon: Icons.bolt_rounded,
-                              title: 'Daily MCQ Sprint',
-                              subtitle: '5 Sprints • +50 XP 🔥',
-                              accentColor: const Color(0xFFD97706),
-                              bgGradient: const [Color(0xFFFFFBEB), Colors.white],
-                              borderColor: const Color(0xFFFDE68A),
-                              iconGradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-                              onTap: () {
-                                HapticFeedbackService.light();
-                                context.push('/student/sprint');
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildGridActionCard(
-                              icon: Icons.forum_rounded,
-                              title: 'AI Physics Tutor',
-                              subtitle: 'Instant Doubts 💬',
-                              accentColor: const Color(0xFF7C3AED),
-                              bgGradient: const [Color(0xFFFAF5FF), Colors.white],
-                              borderColor: const Color(0xFFE9D5FF),
-                              iconGradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-                              onTap: _openWhatsAppTutor,
-                            ),
-                          ),
-                        ],
+                      Expanded(
+                        child: _buildGridActionCard(
+                          icon: Icons.bolt_rounded,
+                          title: 'Daily MCQ',
+                          subtitle: '5 Sprints',
+                          accentColor: const Color(0xFFD97706),
+                          bgGradient: const [Color(0xFFFFFBEB), Colors.white],
+                          borderColor: const Color(0xFFFDE68A),
+                          iconGradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.push('/student/sprint');
+                          },
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildGridActionCard(
-                              icon: Icons.camera_alt_rounded,
-                              title: 'Submit Homework',
-                              subtitle: 'Photo HW • Earn XP 🚀',
-                              accentColor: const Color(0xFF0284C7),
-                              bgGradient: const [Color(0xFFF0F9FF), Colors.white],
-                              borderColor: const Color(0xFFBAE6FD),
-                              iconGradient: const [Color(0xFF0EA5E9), Color(0xFF0284C7)],
-                              onTap: () {
-                                HapticFeedbackService.light();
-                                context.go('/student/desserts');
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildGridActionCard(
-                              icon: Icons.emoji_events_rounded,
-                              title: 'Leaderboard',
-                              subtitle: 'Island Podium 👑',
-                              accentColor: const Color(0xFFEA580C),
-                              bgGradient: const [Color(0xFFFFF7ED), Colors.white],
-                              borderColor: const Color(0xFFFFEDD5),
-                              iconGradient: const [Color(0xFFF97316), Color(0xFFC2410C)],
-                              onTap: () {
-                                HapticFeedbackService.light();
-                                context.go('/student/leaderboard');
-                              },
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildGridActionCard(
+                          icon: Icons.forum_rounded,
+                          title: 'AI Tutor',
+                          subtitle: 'Instant',
+                          accentColor: const Color(0xFF7C3AED),
+                          bgGradient: const [Color(0xFFFAF5FF), Colors.white],
+                          borderColor: const Color(0xFFE9D5FF),
+                          iconGradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                          onTap: _openWhatsAppTutor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildGridActionCard(
+                          icon: Icons.camera_alt_rounded,
+                          title: 'Submit HW',
+                          subtitle: 'Earn XP',
+                          accentColor: const Color(0xFF0284C7),
+                          bgGradient: const [Color(0xFFF0F9FF), Colors.white],
+                          borderColor: const Color(0xFFBAE6FD),
+                          iconGradient: const [Color(0xFF0EA5E9), Color(0xFF0284C7)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.go('/student/desserts');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildGridActionCard(
+                          icon: Icons.emoji_events_rounded,
+                          title: 'Ranks',
+                          subtitle: 'Podium',
+                          accentColor: const Color(0xFFEA580C),
+                          bgGradient: const [Color(0xFFFFF7ED), Colors.white],
+                          borderColor: const Color(0xFFFFEDD5),
+                          iconGradient: const [Color(0xFFF97316), Color(0xFFC2410C)],
+                          onTap: () {
+                            HapticFeedbackService.light();
+                            context.go('/student/leaderboard');
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -882,16 +874,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: bgGradient,
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
@@ -908,7 +900,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(9),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(colors: iconGradient),
                       borderRadius: BorderRadius.circular(12),
@@ -920,20 +912,15 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                         ),
                       ],
                     ),
-                    child: Icon(icon, color: Colors.white, size: 19),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 12,
-                    color: accentColor.withOpacity(0.55),
+                    child: Icon(icon, color: Colors.white, size: 17),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
               Text(
                 title,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF0F172A),
                   letterSpacing: -0.2,
@@ -945,7 +932,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               Text(
                 subtitle,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.5,
+                  fontSize: 9,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF64748B),
                 ),

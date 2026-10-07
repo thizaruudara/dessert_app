@@ -1,8 +1,9 @@
 const crypto = require('crypto');
 const { getAdmin } = require('../_lib/firebase-admin');
-const { sendError, methodNotAllowed, getBody, requireUser } = require('../_lib/http');
+const { sendError, methodNotAllowed, handleCors, getBody, requireUser } = require('../_lib/http');
 
 module.exports = async function handler(req, res) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST') return methodNotAllowed(res);
   try {
     const admin = getAdmin();

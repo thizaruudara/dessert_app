@@ -27,6 +27,23 @@ function methodNotAllowed(res, allowed = 'POST') {
   return res.status(405).json({ error: { code: 'method-not-allowed', message: 'Method not allowed.' } });
 }
 
+function handleCors(req, res) {
+  const origin = String(req.headers.origin || '');
+  if (origin === 'https://dessert-institute.web.app') {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Allow', 'POST, OPTIONS');
+    res.status(204).end();
+    return true;
+  }
+  return false;
+}
+
 function getBody(req) {
   if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) return req.body;
   if (typeof req.body === 'string') {
@@ -74,4 +91,4 @@ async function requireUser(req, admin) {
   }
 }
 
-module.exports = { sendError, methodNotAllowed, getBody, normalizePhone, authEmail, requireUser };
+module.exports = { sendError, methodNotAllowed, handleCors, getBody, normalizePhone, authEmail, requireUser };

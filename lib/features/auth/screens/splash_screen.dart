@@ -128,20 +128,13 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final auth = context.read<AuthProvider>();
+    await auth.initialAuthReady;
+    if (!mounted) return;
+
     String target = '/auth/login';
 
     if (auth.isLoggedIn) {
       target = auth.isAdmin ? '/admin' : '/student';
-    } else {
-      // Check for up to 1.5s if background auth session is restoring
-      for (int i = 0; i < 3; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (!mounted) return;
-        if (auth.isLoggedIn) {
-          target = auth.isAdmin ? '/admin' : '/student';
-          break;
-        }
-      }
     }
 
     if (!mounted) return;

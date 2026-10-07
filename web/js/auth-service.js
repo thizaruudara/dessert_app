@@ -24,18 +24,49 @@ export class AuthService {
     this.currentUser = null;
     this.listeners = [];
     this.loading = true;
+    this.initialAuthReady = new Promise((resolve) => {
+      this.resolveInitialAuth = resolve;
+    });
+    let hasCheckedRestoredAccount = false;
     this.unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
-      this.currentUser = firebaseUser ? await this.readProfile(firebaseUser.uid) : null;
-      this.loading = false;
-      this.notify();
+      try {
+        let profile = firebaseUser ? await this.readProfile(firebaseUser.uid) : null;
+        // A persisted session skips the password-login method below. Recheck
+        // the server allowlist during restoration so an admin is routed to
+        // the correct dashboard without a login-screen flash.
+        if (firebaseUser && profile && !hasCheckedRestoredAccount) {
+          hasCheckedRestoredAccount = true;
+          if (firebaseUser.providerData.some((provider) => provider.providerId === 'password')) {
+            try {
+              await callBackend('auth/ensure-admin', {
+                phone: `+${normalizedPhone(profile.phone)}`,
+              });
+              await firebaseUser.getIdToken(true);
+              profile = await this.readProfile(firebaseUser.uid);
+            } catch (error) {
+              console.error('[Auth] Admin access verification failed:', error);
+            }
+          }
+        }
+        this.currentUser = profile;
+      } finally {
+        this.loading = false;
+        this.resolveInitialAuth?.();
+        this.resolveInitialAuth = null;
+        this.notify();
+      }
     });
   }
+
+  waitForInitialAuth() { return this.initialAuthReady; }
 
   async readProfile(uid) {
     try {
       const profileSnap = await getDoc(doc(db, 'users', uid));
       if (!profileSnap.exists()) return null;
-      const claims = await getIdTokenResult(auth.currentUser, true);
+      // The cached token already carries the persisted custom claims. Login
+      // explicitly refreshes the token after ensure-admin before reading here.
+      const claims = await getIdTokenResult(auth.currentUser);
       return { uid, id: uid, ...profileSnap.data(), role: claims.claims.admin === true ? 'admin' : 'student' };
     } catch (error) {
       console.error('[Auth] Profile load failed:', error);
