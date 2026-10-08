@@ -1075,6 +1075,10 @@ class AppController {
                     <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">
                       ${session.subject || 'A/L Physics'}
                     </span>
+                    <span style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; border:1px solid ${session.paperType === 'mcq' ? 'rgba(16,185,129,0.3)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.3)' : 'rgba(245,158,11,0.3)')}; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                      <span class="material-symbols-rounded" style="font-size:13px;">${session.paperType === 'mcq' ? 'check_circle' : (session.paperType === 'mcq_essay' ? 'auto_stories' : 'edit_document')}</span>
+                      <span>${session.paperType === 'mcq' ? `MCQ (${session.mcqCount || 50} Qs)` : (session.paperType === 'mcq_essay' ? 'MCQ & Essay' : 'Essay')}</span>
+                    </span>
                     <span style="background:#FFFFFF; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;">
                       ${session.examYear || '2027 A/L'}
                     </span>
@@ -4226,6 +4230,13 @@ class AppController {
       });
     });
 
+    container.querySelectorAll('[data-edit-mcq-answers]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = papers.find(x => x.id === btn.dataset.editMcqAnswers);
+        if (p) this._showAdminEditMcqAnswersDialog(p, container);
+      });
+    });
+
     container.querySelectorAll('[data-delete-paper]').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = papers.find(x => x.id === btn.dataset.deletePaper);
@@ -4363,6 +4374,10 @@ class AppController {
             <span style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px;">
               ${session.subject || 'Physics'}
             </span>
+            <span style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">${session.paperType === 'mcq' ? 'check_circle' : (session.paperType === 'mcq_essay' ? 'auto_stories' : 'edit_document')}</span>
+              <span>${session.paperType === 'mcq' ? `MCQ (${session.mcqCount || 50} Qs)` : (session.paperType === 'mcq_essay' ? `MCQ & Essay (${session.mcqCount || 50} Qs)` : 'Essay (ලිඛිත)')}</span>
+            </span>
             <span style="background:#FFFFFF; border:1px solid #E2E8F0; color:#64748B; font-size:11px; padding:4px 10px; border-radius:20px;">
               ${session.examYear || '2027 A/L'}
             </span>
@@ -4371,6 +4386,11 @@ class AppController {
               <span>${badgeText}</span>
             </span>
             <div style="margin-left:auto; display:flex; align-items:center; gap:4px;">
+              ${(session.paperType === 'mcq' || session.paperType === 'mcq_essay') ? `
+              <button class="apk-icon-action-btn" data-edit-mcq-answers="${session.id}" title="Pre-set / View MCQ Answer Key" style="color:#10B981; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
+                <span class="material-symbols-rounded" style="font-size:18px;">key</span>
+              </button>
+              ` : ''}
               <button class="apk-icon-action-btn" data-edit-times="${session.id}" title="Change Session Times (Slot 1 / Slot 2)" style="color:#2563EB; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:18px;">edit_calendar</span>
               </button>
@@ -5753,6 +5773,9 @@ class AppController {
     modal.className = 'app-modal';
     modal.style.display = 'flex';
 
+    let adminAnswerKey = {};
+    let currentMcqCount = 50;
+
     modal.innerHTML = `
       <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
         <div class="modal-header">
@@ -5787,6 +5810,56 @@ class AppController {
                 <option value="All Batches">All Batches</option>
               </select>
             </div>
+          </div>
+
+          <!-- Paper Session Type Selection (MCQ, Essay, MCQ & Essay) -->
+          <div>
+            <div class="form-label" style="font-weight:700;">Paper Session Type (ප්‍රශ්න පත්‍ර වර්ගය):</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:4px;">
+              <label id="label-type-mcq" style="display:flex; flex-direction:column; align-items:center; gap:4px; background:#EFF6FF; border:2px solid #2563EB; padding:10px 6px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer; text-align:center;">
+                <input type="radio" name="paper-type" value="mcq" id="radio-type-mcq" checked style="accent-color:#2563EB;" />
+                <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">check_circle</span>
+                <span style="color:#1E40AF;">MCQ (බහුවරණ)</span>
+              </label>
+              <label id="label-type-essay" style="display:flex; flex-direction:column; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px 6px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer; text-align:center;">
+                <input type="radio" name="paper-type" value="essay" id="radio-type-essay" style="accent-color:#2563EB;" />
+                <span class="material-symbols-rounded" style="font-size:22px; color:#D97706;">edit_document</span>
+                <span style="color:#64748B;">Essay (ලිඛිත)</span>
+              </label>
+              <label id="label-type-both" style="display:flex; flex-direction:column; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px 6px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer; text-align:center;">
+                <input type="radio" name="paper-type" value="mcq_essay" id="radio-type-both" style="accent-color:#2563EB;" />
+                <span class="material-symbols-rounded" style="font-size:22px; color:#7C3AED;">auto_stories</span>
+                <span style="color:#64748B;">MCQ & Essay</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Pre-give MCQ Answer Key Box (Shown for MCQ & MCQ & Essay) -->
+          <div id="new-paper-mcq-box" style="background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <div>
+                <div style="font-size:12.5px; font-weight:800; color:#166534; display:flex; align-items:center; gap:6px;">
+                  <span class="material-symbols-rounded filled" style="font-size:18px; color:#16A34A;">verified</span>
+                  <span>Pre-set MCQ Answer Key (නිවැරදි පිළිතුරු)</span>
+                </div>
+                <div style="font-size:10.5px; color:#15803D; margin-top:2px;">
+                  රහස්‍යයි: සිසුන්ට නොපෙනේ. Submit කළ සැනින් ලකුණු ගණනය වේ.
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:700; color:#166534;">MCQ Count:</span>
+                <input type="number" id="new-paper-mcq-count" min="1" max="50" value="50" class="form-textarea" style="height:32px; width:70px; text-align:center; font-weight:800; padding:4px;" />
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#DCFCE7; border-radius:8px; padding:6px 10px; font-size:11px; color:#166534;">
+              <span>Configured: <strong id="admin-ans-count-badge">0</strong> / <strong id="admin-ans-total-badge">50</strong> Questions</span>
+              <button type="button" id="btn-clear-admin-mcq" style="background:transparent; border:none; color:#DC2626; font-size:11px; font-weight:700; cursor:pointer;">
+                Clear All
+              </button>
+            </div>
+
+            <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
           </div>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
@@ -5894,6 +5967,90 @@ class AppController {
       if (slot2Box) slot2Box.style.display = 'block';
     });
 
+    // Admin MCQ Key Grid Renderer
+    const renderAdminMcqKeyGrid = () => {
+      const grid = modal.querySelector('#admin-mcq-key-grid');
+      const totalBadge = modal.querySelector('#admin-ans-total-badge');
+      const countBadge = modal.querySelector('#admin-ans-count-badge');
+      if (!grid) return;
+
+      currentMcqCount = Math.min(50, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
+      if (totalBadge) totalBadge.textContent = currentMcqCount;
+
+      let configuredCount = 0;
+      let html = '';
+      for (let q = 1; q <= currentMcqCount; q++) {
+        const currentAns = adminAnswerKey[q] || null;
+        if (currentAns !== null) configuredCount++;
+        html += `
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 8px; border-radius:8px; background:#F8FAFC; border:1px solid #E2E8F0;">
+            <span style="font-size:11.5px; font-weight:700; color:#334155; min-width:28px;">${String(q).padStart(2, '0')})</span>
+            <div style="display:flex; gap:3px;">
+              ${[1, 2, 3, 4, 5].map(opt => `
+                <button type="button" class="btn-admin-opt" data-q="${q}" data-opt="${opt}" style="width:28px; height:28px; border-radius:50%; border:1px solid ${currentAns === opt ? '#16A34A' : '#CBD5E1'}; background:${currentAns === opt ? '#16A34A' : '#FFFFFF'}; color:${currentAns === opt ? '#FFFFFF' : '#334155'}; font-size:11px; font-weight:700; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;">
+                  ${opt}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+      grid.innerHTML = html;
+      if (countBadge) countBadge.textContent = configuredCount;
+
+      grid.querySelectorAll('.btn-admin-opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const q = Number(btn.dataset.q);
+          const opt = Number(btn.dataset.opt);
+          if (adminAnswerKey[q] === opt) {
+            delete adminAnswerKey[q];
+          } else {
+            adminAnswerKey[q] = opt;
+          }
+          renderAdminMcqKeyGrid();
+        });
+      });
+    };
+
+    renderAdminMcqKeyGrid();
+
+    modal.querySelector('#new-paper-mcq-count')?.addEventListener('input', renderAdminMcqKeyGrid);
+    modal.querySelector('#btn-clear-admin-mcq')?.addEventListener('click', () => {
+      adminAnswerKey = {};
+      renderAdminMcqKeyGrid();
+    });
+
+    // Paper type UI toggle
+    const updatePaperTypeUI = () => {
+      const selectedType = modal.querySelector('input[name="paper-type"]:checked')?.value || 'mcq';
+      const mcqBox = modal.querySelector('#new-paper-mcq-box');
+      const labelMcq = modal.querySelector('#label-type-mcq');
+      const labelEssay = modal.querySelector('#label-type-essay');
+      const labelBoth = modal.querySelector('#label-type-both');
+
+      if (mcqBox) {
+        mcqBox.style.display = (selectedType === 'mcq' || selectedType === 'mcq_essay') ? 'flex' : 'none';
+      }
+
+      if (labelMcq) {
+        labelMcq.style.border = selectedType === 'mcq' ? '2px solid #2563EB' : '1px solid #E2E8F0';
+        labelMcq.style.background = selectedType === 'mcq' ? '#EFF6FF' : '#F8FAFC';
+      }
+      if (labelEssay) {
+        labelEssay.style.border = selectedType === 'essay' ? '2px solid #D97706' : '1px solid #E2E8F0';
+        labelEssay.style.background = selectedType === 'essay' ? '#FFFBEB' : '#F8FAFC';
+      }
+      if (labelBoth) {
+        labelBoth.style.border = selectedType === 'mcq_essay' ? '2px solid #7C3AED' : '1px solid #E2E8F0';
+        labelBoth.style.background = selectedType === 'mcq_essay' ? '#FAF5FF' : '#F8FAFC';
+      }
+    };
+
+    modal.querySelectorAll('input[name="paper-type"]').forEach(r => {
+      r.addEventListener('change', updatePaperTypeUI);
+    });
+    updatePaperTypeUI();
+
     document.getElementById('btn-save-new-paper')?.addEventListener('click', async () => {
       const title = document.getElementById('new-paper-title')?.value?.trim();
       const subject = document.getElementById('new-paper-subject')?.value || 'Physics';
@@ -5902,6 +6059,8 @@ class AppController {
       const marks = Number(document.getElementById('new-paper-marks')?.value) || 100;
       const examDate = document.getElementById('new-paper-date')?.value || today;
       const isTwoSlots = document.getElementById('radio-slot-2')?.checked;
+      const paperType = modal.querySelector('input[name="paper-type"]:checked')?.value || 'mcq';
+      const mcqCount = Math.min(50, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
 
       const s1Start = document.getElementById('new-s1-start')?.value || '08:30 AM';
       const s1End = document.getElementById('new-s1-end')?.value || '11:40 AM';
@@ -5959,6 +6118,9 @@ class AppController {
         title,
         subject,
         examYear,
+        paperType,
+        mcqCount,
+        mcqAnswerKey: adminAnswerKey,
         date: examDate,
         durationMinutes: duration,
         totalMarks: marks,
@@ -6766,8 +6928,32 @@ class AppController {
         </div>
 
         <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px;">
+          ${student.mcqScore !== undefined ? `
+            <div style="background:#0F172A; border-radius:12px; border:1px solid #22C55E; padding:12px 14px; margin-bottom:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:12px; font-weight:700; color:#4ADE80; display:inline-flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded filled" style="font-size:16px;">verified</span> MCQ Result
+                </span>
+                <span style="background:rgba(34,197,94,0.2); color:#4ADE80; font-size:12px; font-weight:800; padding:2px 8px; border-radius:8px;">
+                  ${student.mcqPercentage !== undefined ? student.mcqPercentage : Math.round((student.mcqScore / (student.mcqTotal || 50)) * 100)}%
+                </span>
+              </div>
+              <div style="font-size:18px; font-weight:800; color:#FFFFFF;">
+                ${student.mcqScore} / ${student.mcqTotal || 50} Correct
+                <span style="font-size:12px; color:#94A3B8; font-weight:600;">(${student.mcqMarks !== undefined ? student.mcqMarks : student.mcqScore} Marks)</span>
+              </div>
+              ${student.mcqAnswers ? `
+                <div style="margin-top:8px; padding-top:8px; border-top:1px solid #1E293B; max-height:100px; overflow-y:auto;">
+                  <div style="font-size:10px; color:#94A3B8; margin-bottom:4px; font-weight:600;">Selected Answers:</div>
+                  <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:4px; font-size:10px; color:#CBD5E1;">
+                    ${Object.entries(student.mcqAnswers).map(([q, ans]) => `<div style="background:#1E293B; padding:3px; border-radius:4px; text-align:center;">Q${q}: <strong>${ans}</strong></div>`).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
           ${photos.length === 0 ? `
-            <div style="text-align:center; padding:32px; color:#94A3B8; font-size:12px;">No answer sheet photos attached yet.</div>
+            <div style="text-align:center; padding:20px; color:#94A3B8; font-size:12px;">${student.mcqScore !== undefined ? 'No physical pages scanned.' : 'No answer sheet photos attached yet.'}</div>
           ` : photos.map((p, idx) => `
             <div style="background:#0F172A; border-radius:12px; border:1px solid #334155; overflow:hidden;">
               <div style="padding:8px 10px; background:#111827; font-size:11px; font-weight:700; color:#4ADE80;">Page ${idx + 1}</div>
@@ -7372,7 +7558,7 @@ ${!times.isWaiting ? `
                     </div>
                   </div>
                   <button id="btn-phase-scan" style="background:#FFFFFF; color:#EF4444; border:none; padding:8px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
-                    Scan & Submit
+                    ${session.paperType === 'mcq' ? 'Submit MCQs' : (session.paperType === 'mcq_essay' ? 'Submit All' : 'Scan & Submit')}
                   </button>
                 </div>
               ` : times.isEnded ? `
@@ -7399,8 +7585,8 @@ ${!times.isWaiting ? `
                   </div>
                 </div>
                 <button id="btn-bottom-submit" style="background:${times.isEnded ? '#334155' : (times.isTimeUp ? '#22C55E' : '#6366F1')}; color:#FFFFFF; border:none; padding:10px 16px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                  <span class="material-symbols-rounded filled" style="font-size:16px;">${times.isTimeUp ? 'description' : 'upload'}</span>
-                  <span>${times.isTimeUp ? 'Scan & Submit' : 'Submit Paper'}</span>
+                  <span class="material-symbols-rounded filled" style="font-size:16px;">${session.paperType === 'mcq' ? 'fact_check' : (session.paperType === 'mcq_essay' ? 'auto_stories' : (times.isTimeUp ? 'description' : 'upload'))}</span>
+                  <span>${session.paperType === 'mcq' ? 'Submit MCQ Answers' : (session.paperType === 'mcq_essay' ? 'Submit Answers' : (times.isTimeUp ? 'Scan & Submit' : 'Submit Paper'))}</span>
                 </button>
               </div>
             </div>
@@ -7443,13 +7629,22 @@ ${!times.isWaiting ? `
         renderRoom();
       });
 
-      roomContainer.querySelector('#btn-phase-scan')?.addEventListener('click', () => {
-        openDocumentScanner();
-      });
+      const handleStudentSubmitClick = () => {
+        if (times.isEnded) {
+          alert('මෙම විභාග සැසිය අවසන් කර ඇත (Session ended).');
+          return;
+        }
+        if (session.paperType === 'mcq') {
+          openMcqAnswerSheetModal();
+        } else if (session.paperType === 'mcq_essay') {
+          openCombinedAnswerSheetModal();
+        } else {
+          openDocumentScanner();
+        }
+      };
 
-      roomContainer.querySelector('#btn-bottom-submit')?.addEventListener('click', () => {
-        openDocumentScanner();
-      });
+      roomContainer.querySelector('#btn-phase-scan')?.addEventListener('click', handleStudentSubmitClick);
+      roomContainer.querySelector('#btn-bottom-submit')?.addEventListener('click', handleStudentSubmitClick);
 
 
     };
@@ -7498,6 +7693,674 @@ ${!times.isWaiting ? `
       sendHeartbeat(false);
       roomContainer.remove();
       this.renderApp();
+    };
+
+    // ── Instant MCQ Result Review Modal ──
+    const showInstantResultModal = ({
+      title,
+      totalQs,
+      correctCount,
+      wrongCount,
+      unansweredCount,
+      marks,
+      totalMarks,
+      percentage,
+      reviewDetails,
+      paperType = 'mcq',
+      scannedPagesCount = 0
+    }) => {
+      const resultModal = document.createElement('div');
+      resultModal.id = 'instant-result-modal-root';
+      resultModal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(11, 17, 32, 0.95); z-index: 10000005;
+        display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-family: 'Poppins', sans-serif;
+        padding: 16px;
+      `;
+
+      resultModal.innerHTML = `
+        <div style="background:#1E293B; border-radius:20px; border:1px solid #334155; width:100%; max-width:540px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 25px 50px rgba(0,0,0,0.6);">
+          <!-- Modal Header -->
+          <div style="padding:16px 20px; background:#0F172A; border-bottom:1px solid #334155; text-align:center;">
+            <div style="display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; background:rgba(34,197,94,0.15); border:1px solid #22C55E; color:#4ADE80; margin-bottom:8px;">
+              <span class="material-symbols-rounded" style="font-size:28px;">emoji_events</span>
+            </div>
+            <div style="font-size:16px; font-weight:800; color:#FFFFFF;">${paperType === 'mcq_essay' ? 'MCQ & Essay Result' : 'MCQ Examination Result'}</div>
+            <div style="font-size:11.5px; color:#94A3B8; margin-top:2px;">${title} • නිල ලකුණු වාර්තාව</div>
+          </div>
+
+          <!-- Score Card & Metrics -->
+          <div style="padding:16px 20px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px;">
+            <!-- Big Score Pill -->
+            <div style="background:linear-gradient(135deg, rgba(37,99,235,0.15), rgba(34,197,94,0.15)); border:1.5px solid rgba(56,189,248,0.4); border-radius:16px; padding:16px; text-align:center;">
+              <div style="font-size:11px; font-weight:700; color:#38BDF8; letter-spacing:0.5px; text-transform:uppercase;">MCQ Score</div>
+              <div style="font-size:42px; font-weight:900; color:#4ADE80; line-height:1.1; margin-top:4px;">
+                ${correctCount} <span style="font-size:22px; color:#94A3B8; font-weight:600;">/ ${totalQs}</span>
+              </div>
+              <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:8px;">
+                <span style="background:rgba(34,197,94,0.2); color:#4ADE80; border:1px solid rgba(34,197,94,0.4); font-size:14px; font-weight:800; padding:3px 14px; border-radius:20px;">
+                  ${percentage}%
+                </span>
+                <span style="font-size:13px; color:#CBD5E1; font-weight:700;">
+                  Marks: <strong style="color:#FFFFFF;">${marks} / ${totalMarks}</strong>
+                </span>
+              </div>
+            </div>
+
+            ${paperType === 'mcq_essay' ? `
+              <div style="background:rgba(124,58,237,0.15); border:1px solid rgba(139,92,246,0.3); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+                <span class="material-symbols-rounded filled" style="font-size:20px; color:#A78BFA;">auto_stories</span>
+                <div style="font-size:11.5px; color:#DDD6FE;">
+                  <strong>Essay Pages:</strong> ${scannedPagesCount} pages received successfully for teacher evaluation.
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- 3 Stat Blocks -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+              <div style="background:#0F172A; border:1px solid #16A34A; border-radius:12px; padding:10px 8px; text-align:center;">
+                <div style="color:#4ADE80; font-size:18px; font-weight:800;">${correctCount}</div>
+                <div style="font-size:10.5px; color:#86EFAC; font-weight:600; display:flex; align-items:center; justify-content:center; gap:2px; margin-top:2px;">
+                  <span class="material-symbols-rounded filled" style="font-size:13px;">check_circle</span> Correct
+                </div>
+              </div>
+              <div style="background:#0F172A; border:1px solid #EF4444; border-radius:12px; padding:10px 8px; text-align:center;">
+                <div style="color:#F87171; font-size:18px; font-weight:800;">${wrongCount}</div>
+                <div style="font-size:10.5px; color:#FCA5A5; font-weight:600; display:flex; align-items:center; justify-content:center; gap:2px; margin-top:2px;">
+                  <span class="material-symbols-rounded filled" style="font-size:13px;">cancel</span> Wrong
+                </div>
+              </div>
+              <div style="background:#0F172A; border:1px solid #64748B; border-radius:12px; padding:10px 8px; text-align:center;">
+                <div style="color:#94A3B8; font-size:18px; font-weight:800;">${unansweredCount}</div>
+                <div style="font-size:10.5px; color:#94A3B8; font-weight:600; display:flex; align-items:center; justify-content:center; gap:2px; margin-top:2px;">
+                  <span class="material-symbols-rounded" style="font-size:13px;">help</span> Skipped
+                </div>
+              </div>
+            </div>
+
+            <!-- Question Review Breakdown -->
+            <div>
+              <div style="font-size:12px; font-weight:700; color:#CBD5E1; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+                <span>Detailed Question Review (ප්‍රශ්න සමාලෝචනය)</span>
+                <span style="font-size:10.5px; color:#64748B;">All ${totalQs} Questions</span>
+              </div>
+              <div style="max-height:220px; overflow-y:auto; background:#0F172A; border:1px solid #334155; border-radius:12px; padding:8px; display:flex; flex-direction:column; gap:6px;">
+                ${reviewDetails.map(r => `
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:8px; background:${r.isCorrect ? 'rgba(34,197,94,0.1)' : (r.isAnswered ? 'rgba(239,68,68,0.1)' : 'rgba(100,116,139,0.1)')}; border:1px solid ${r.isCorrect ? 'rgba(34,197,94,0.3)' : (r.isAnswered ? 'rgba(239,68,68,0.3)' : 'rgba(100,116,139,0.2)')};">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <span style="font-size:12px; font-weight:800; color:#FFFFFF;">${String(r.questionNumber).padStart(2, '0')})</span>
+                      <span style="font-size:11px; color:#CBD5E1;">Your: <strong style="color:${r.isCorrect ? '#4ADE80' : '#F87171'};">[${r.studentAnswer || '—'}]</strong></span>
+                      <span style="font-size:11px; color:#94A3B8;">| Correct: <strong style="color:#4ADE80;">[${r.correctAnswer || '—'}]</strong></span>
+                    </div>
+                    <div>
+                      ${r.isCorrect ? `
+                        <span style="font-size:10px; font-weight:700; color:#4ADE80; display:inline-flex; align-items:center; gap:2px;">
+                          <span class="material-symbols-rounded filled" style="font-size:12px;">check</span> Correct
+                        </span>
+                      ` : r.isAnswered ? `
+                        <span style="font-size:10px; font-weight:700; color:#F87171; display:inline-flex; align-items:center; gap:2px;">
+                          <span class="material-symbols-rounded filled" style="font-size:12px;">close</span> Wrong
+                        </span>
+                      ` : `
+                        <span style="font-size:10px; font-weight:600; color:#94A3B8;">Skipped</span>
+                      `}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div style="padding:14px 20px; background:#0F172A; border-top:1px solid #334155;">
+            <button id="btn-result-finish-exit" style="width:100%; height:46px; border-radius:12px; background:#22C55E; color:#FFFFFF; border:none; font-size:13.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(34,197,94,0.35);">
+              <span class="material-symbols-rounded filled" style="font-size:20px;">task_alt</span>
+              <span>Finish & Exit Exam Hall (විභාග ශාලාවෙන් පිටවීම)</span>
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(resultModal);
+
+      resultModal.querySelector('#btn-result-finish-exit')?.addEventListener('click', () => {
+        resultModal.remove();
+        cleanupAndExit();
+      });
+    };
+
+    // ── Student Digital MCQ Answer Sheet Modal (Bubbles 1 to 5) ──
+    const openMcqAnswerSheetModal = () => {
+      const mcqModal = document.createElement('div');
+      mcqModal.id = 'mcq-sheet-modal-root';
+      mcqModal.style.cssText = `
+        position: fixed; inset: 0; background: #0B1120; z-index: 1000000;
+        display: flex; flex-direction: column; color: #FFFFFF; font-family: 'Poppins', sans-serif;
+      `;
+
+      const totalQs = Math.min(50, Math.max(1, Number(session.mcqCount) || 50));
+      const studentAnswers = {};
+      const answerKey = session.mcqAnswerKey || {};
+
+      mcqModal.innerHTML = `
+        <!-- Top App Bar -->
+        <div style="background:rgba(15,23,42,0.95); border-bottom:1px solid #334155; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; z-index:20;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="btn-close-mcq-sheet" style="background:transparent; border:none; color:#FFFFFF; font-size:22px; cursor:pointer; display:flex; align-items:center;">
+              <span class="material-symbols-rounded">arrow_back</span>
+            </button>
+            <div>
+              <div style="font-size:14px; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+                <span class="material-symbols-rounded filled" style="font-size:18px; color:#38BDF8;">ballot</span>
+                <span>Digital MCQ Answer Sheet</span>
+              </div>
+              <div style="font-size:11px; color:#94A3B8;">01 සිට ${String(totalQs).padStart(2, '0')} දක්වා බහුවරණ පිළිතුරු සලකුණු කරන්න</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="student-mcq-pill" style="background:#1E293B; border:1px solid #38BDF8; color:#38BDF8; font-size:11.5px; font-weight:800; padding:4px 12px; border-radius:20px;">
+              0 / ${totalQs} Answered
+            </span>
+          </div>
+        </div>
+
+        <!-- Sticky Progress Bar -->
+        <div style="height:4px; background:#1E293B; width:100%;">
+          <div id="student-mcq-progress" style="height:100%; width:0%; background:linear-gradient(90deg, #38BDF8, #22C55E); transition:width 0.25s ease;"></div>
+        </div>
+
+        <!-- Question List Container -->
+        <div style="flex:1; overflow-y:auto; padding:16px; max-width:680px; width:100%; margin:0 auto; display:flex; flex-direction:column; gap:10px;">
+          <div style="background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#38BDF8;">info</span>
+            <div style="font-size:11px; color:#BAE6FD; line-height:1.45;">
+              එක් එක් ප්‍රශ්නය සඳහා නිවැරදි පිළිතුර (1 සිට 5 දක්වා) තෝරන්න. සියලු පිළිතුරු සලකුණු කළ පසු පහත "Submit MCQ Answers" ඔබන්න.
+            </div>
+          </div>
+
+          ${Array.from({ length: totalQs }, (_, i) => {
+            const q = i + 1;
+            return `
+              <div class="mcq-q-card" id="mcq-q-card-${q}" style="background:#131D31; border:1px solid #233554; border-radius:14px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:all 0.2s ease;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:14px; font-weight:800; color:#38BDF8; min-width:32px;">${String(q).padStart(2, '0')})</span>
+                  <span id="mcq-q-status-${q}" style="font-size:10.5px; color:#64748B; font-weight:600;">Not Answered</span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  ${[1, 2, 3, 4, 5].map(opt => `
+                    <button type="button" class="mcq-bubble-btn" data-q="${q}" data-opt="${opt}" style="width:38px; height:38px; border-radius:50%; border:1.5px solid #334155; background:#0F172A; color:#E2E8F0; font-size:13.5px; font-weight:700; cursor:pointer; transition:all 0.15s ease; display:flex; align-items:center; justify-content:center;">
+                      ${opt}
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Bottom Action Bar -->
+        <div style="background:rgba(15,23,42,0.95); border-top:1px solid #334155; padding:12px 18px; display:flex; gap:12px; max-width:680px; width:100%; margin:0 auto;">
+          <button id="btn-back-from-mcq" style="flex:1; background:#1E293B; border:1px solid #334155; color:#CBD5E1; padding:12px; border-radius:12px; font-size:12.5px; font-weight:700; cursor:pointer;">
+            Back (ආපසු)
+          </button>
+          <button id="btn-submit-mcq-answers" style="flex:2; background:#22C55E; border:none; color:#FFFFFF; padding:12px; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(34,197,94,0.3);">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">cloud_upload</span>
+            <span>Submit MCQ Answers (පිළිතුරු භාරදෙන්න)</span>
+          </button>
+        </div>
+      `;
+
+      document.body.appendChild(mcqModal);
+
+      // Bubble click handler
+      mcqModal.querySelectorAll('.mcq-bubble-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const q = Number(btn.dataset.q);
+          const opt = Number(btn.dataset.opt);
+          studentAnswers[q] = opt;
+
+          // Update styles for this question's bubbles
+          const card = mcqModal.querySelector(`#mcq-q-card-${q}`);
+          const status = mcqModal.querySelector(`#mcq-q-status-${q}`);
+          if (card) {
+            card.style.borderColor = '#2563EB';
+            card.style.background = '#172554';
+          }
+          if (status) {
+            status.textContent = `Option (${opt}) Selected`;
+            status.style.color = '#38BDF8';
+          }
+
+          card?.querySelectorAll('.mcq-bubble-btn').forEach(b => {
+            const bOpt = Number(b.dataset.opt);
+            if (bOpt === opt) {
+              b.style.background = '#2563EB';
+              b.style.borderColor = '#60A5FA';
+              b.style.color = '#FFFFFF';
+              b.style.boxShadow = '0 0 12px rgba(37,99,235,0.7)';
+              b.style.transform = 'scale(1.08)';
+            } else {
+              b.style.background = '#0F172A';
+              b.style.borderColor = '#334155';
+              b.style.color = '#E2E8F0';
+              b.style.boxShadow = 'none';
+              b.style.transform = 'scale(1)';
+            }
+          });
+
+          // Update progress indicator
+          const answeredCount = Object.keys(studentAnswers).length;
+          const pct = Math.round((answeredCount / totalQs) * 100);
+          const pill = mcqModal.querySelector('#student-mcq-pill');
+          const prog = mcqModal.querySelector('#student-mcq-progress');
+          if (pill) pill.textContent = `${answeredCount} / ${totalQs} Answered (${pct}%)`;
+          if (prog) prog.style.width = `${pct}%`;
+        });
+      });
+
+      // Close / Back buttons
+      const handleBack = () => {
+        const count = Object.keys(studentAnswers).length;
+        if (count > 0) {
+          if (!confirm('ඔබගේ පිළිතුරු තවම Submit කර නොමැත. විභාග ශාලාවට ආපසු යාමට අවශ්‍යද? (Answers are kept)')) return;
+        }
+        mcqModal.remove();
+      };
+      mcqModal.querySelector('#btn-close-mcq-sheet')?.addEventListener('click', handleBack);
+      mcqModal.querySelector('#btn-back-from-mcq')?.addEventListener('click', handleBack);
+
+      // Submit MCQ Answers Handler
+      mcqModal.querySelector('#btn-submit-mcq-answers')?.addEventListener('click', () => {
+        const count = Object.keys(studentAnswers).length;
+        const unans = totalQs - count;
+
+        const confirmModal = document.createElement('div');
+        confirmModal.className = 'app-modal';
+        confirmModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:10000001;';
+        confirmModal.innerHTML = `
+          <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:22px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+              <span class="material-symbols-rounded filled" style="color:#22C55E; font-size:28px;">cloud_upload</span>
+              <h3 style="font-size:16px; font-weight:700; color:#FFFFFF; margin:0;">Submit MCQ Answers?</h3>
+            </div>
+            <p style="font-size:13px; color:#E2E8F0; line-height:1.5; margin:0 0 10px 0;">
+              ඔබ ප්‍රශ්න ${totalQs} න් <strong>${count}</strong> කට පිළිතුරු සලකුණු කර ඇත.
+            </p>
+            ${unans > 0 ? `
+              <div style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:10px; margin-bottom:14px; font-size:12px; color:#FCD34D;">
+                ⚠️ අවවාදයයි: ප්‍රශ්න ${unans} ක් සලකුණු කර නොමැත!
+              </div>
+            ` : `
+              <div style="background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.4); border-radius:8px; padding:10px; margin-bottom:14px; font-size:12px; color:#86EFAC;">
+                ✓ සියලුම ප්‍රශ්න (${totalQs}) සාර්ථකව සලකුණු කර ඇත.
+              </div>
+            `}
+            <p style="font-size:11.5px; color:#94A3B8; margin:0 0 16px 0;">
+              Submit කළ පසු නිවැරදි පිළිතුරු හා ලකුණු ස්වයංක්‍රීයව ලැබෙන අතර නැවත පිළිතුරු වෙනස් කළ නොහැක.
+            </p>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button id="btn-mcq-confirm-cancel" style="background:transparent; border:none; color:#94A3B8; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer;">
+                Cancel (ආපසු)
+              </button>
+              <button id="btn-mcq-confirm-yes" style="background:#22C55E; border:none; color:#FFFFFF; padding:8px 16px; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer;">
+                Yes, Submit Now
+              </button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(confirmModal);
+
+        confirmModal.querySelector('#btn-mcq-confirm-cancel')?.addEventListener('click', () => confirmModal.remove());
+        confirmModal.querySelector('#btn-mcq-confirm-yes')?.addEventListener('click', async () => {
+          confirmModal.remove();
+
+          // Show Grading Overlay
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; z-index:10000002; font-family:"Poppins",sans-serif;';
+          overlay.innerHTML = `
+            <div style="background:#1E293B; border-radius:16px; border:1px solid rgba(34,197,94,0.5); padding:28px; text-align:center; color:#FFFFFF;">
+              <div class="apk-spinner" style="margin:0 auto 16px auto; width:36px; height:36px; border-width:3px; border-color:#22C55E; border-top-color:transparent;"></div>
+              <div style="font-size:14px; font-weight:700; margin-bottom:6px;">ප්‍රතිඵල ගණනය වෙමින් පවතී...</div>
+              <div style="font-size:12px; color:#38BDF8;">Evaluating MCQ responses against Answer Key...</div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          try {
+            // Evaluate student answers
+            let correctCount = 0;
+            let wrongCount = 0;
+            let unansweredCount = 0;
+            const reviewDetails = [];
+
+            for (let q = 1; q <= totalQs; q++) {
+              const studentAns = studentAnswers[q] !== undefined ? Number(studentAnswers[q]) : null;
+              const correctAns = answerKey[q] !== undefined ? Number(answerKey[q]) : null;
+              const isAnswered = studentAns !== null;
+              const isCorrect = isAnswered && correctAns !== null && studentAns === correctAns;
+
+              if (!isAnswered) unansweredCount++;
+              else if (isCorrect) correctCount++;
+              else wrongCount++;
+
+              reviewDetails.push({
+                questionNumber: q,
+                studentAnswer: studentAns,
+                correctAnswer: correctAns,
+                isCorrect,
+                isAnswered
+              });
+            }
+
+            const percentage = totalQs > 0 ? Math.round((correctCount / totalQs) * 100) : 0;
+            const totalMarks = Number(session.totalMarks) || 100;
+            const marks = totalQs > 0 ? Math.round((correctCount / totalQs) * totalMarks) : 0;
+
+            // Save to Firestore
+            await dbService.updateCameraHeartbeat({
+              paperId: session.id,
+              studentId,
+              studentName,
+              studentPhone,
+              slotId: slotId || 'slot1',
+              isCameraActive: false,
+              status: 'submitted',
+              isSubmitted: true,
+              paperType: 'mcq',
+              mcqAnswers: studentAnswers,
+              mcqScore: correctCount,
+              mcqTotal: totalQs,
+              mcqMarks: marks,
+              mcqPercentage: percentage,
+              reviewDetails
+            });
+
+            // LocalStorage locks
+            localStorage.setItem(`paper_submitted_${session.id}_${studentId}`, 'true');
+            localStorage.setItem(`paper_submitted_${session.id}`, 'true');
+
+            overlay.remove();
+            mcqModal.remove();
+
+            // Stop camera and intervals in exam room
+            if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            if (syncInterval) clearInterval(syncInterval);
+            if (timerInterval) clearInterval(timerInterval);
+            sendHeartbeat(false);
+
+            // Show Instant Result Review Modal
+            showInstantResultModal({
+              title: session.title,
+              totalQs,
+              correctCount,
+              wrongCount,
+              unansweredCount,
+              marks,
+              totalMarks,
+              percentage,
+              reviewDetails,
+              paperType: 'mcq'
+            });
+          } catch (err) {
+            console.error('MCQ submission error:', err);
+            overlay.remove();
+            alert('Submission error: ' + err.message);
+          }
+        });
+      });
+    };
+
+    // ── Student Combined (MCQ & Essay) Answer Modal ──
+    const openCombinedAnswerSheetModal = () => {
+      const combModal = document.createElement('div');
+      combModal.id = 'combined-modal-root';
+      combModal.style.cssText = `
+        position: fixed; inset: 0; background: #0B1120; z-index: 1000000;
+        display: flex; flex-direction: column; color: #FFFFFF; font-family: 'Poppins', sans-serif;
+      `;
+
+      const totalQs = Math.min(50, Math.max(1, Number(session.mcqCount) || 50));
+      const studentAnswers = {};
+      const answerKey = session.mcqAnswerKey || {};
+      let activeTab = 'mcq'; // 'mcq' or 'essay'
+      let scannedPages = [];
+      let scannerStream = null;
+      let driveLink = '';
+      let isCapturing = false;
+
+      const renderComb = () => {
+        combModal.innerHTML = `
+          <!-- Top Header -->
+          <div style="background:rgba(15,23,42,0.95); border-bottom:1px solid #334155; padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button id="btn-close-comb" style="background:transparent; border:none; color:#FFFFFF; font-size:22px; cursor:pointer;">
+                <span class="material-symbols-rounded">arrow_back</span>
+              </button>
+              <div>
+                <div style="font-size:14px; font-weight:800;">MCQ & Essay Submission Hub</div>
+                <div style="font-size:10.5px; color:#94A3B8;">${session.title}</div>
+              </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button id="tab-mcq" style="background:${activeTab === 'mcq' ? '#2563EB' : '#1E293B'}; color:#FFFFFF; border:1px solid ${activeTab === 'mcq' ? '#3B82F6' : '#334155'}; padding:6px 14px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
+                Part I: MCQs (${Object.keys(studentAnswers).length}/${totalQs})
+              </button>
+              <button id="tab-essay" style="background:${activeTab === 'essay' ? '#2563EB' : '#1E293B'}; color:#FFFFFF; border:1px solid ${activeTab === 'essay' ? '#3B82F6' : '#334155'}; padding:6px 14px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">
+                Part II: Essay (${scannedPages.length} Pages)
+              </button>
+            </div>
+          </div>
+
+          <!-- Tab Content Area -->
+          <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+            ${activeTab === 'mcq' ? `
+              <div style="padding:16px; max-width:680px; width:100%; margin:0 auto; display:flex; flex-direction:column; gap:10px;">
+                <div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:12px; padding:10px 14px; font-size:11px; color:#BAE6FD;">
+                  ප්‍රශ්න 01 සිට ${totalQs} දක්වා බහුවරණ පිළිතුරු සලකුණු කර, අවශ්‍ය නම් ඉහත "Part II: Essay" ටැබ් එක මගින් ලිඛිත පිටුද එක් කරන්න.
+                </div>
+                ${Array.from({ length: totalQs }, (_, i) => {
+                  const q = i + 1;
+                  const currentAns = studentAnswers[q];
+                  return `
+                    <div style="background:#131D31; border:1px solid ${currentAns ? '#2563EB' : '#233554'}; border-radius:14px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between;">
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:14px; font-weight:800; color:#38BDF8; min-width:32px;">${String(q).padStart(2, '0')})</span>
+                        <span style="font-size:10.5px; color:${currentAns ? '#38BDF8' : '#64748B'}; font-weight:600;">${currentAns ? `Option (${currentAns})` : 'Not Answered'}</span>
+                      </div>
+                      <div style="display:flex; gap:6px;">
+                        ${[1, 2, 3, 4, 5].map(opt => `
+                          <button type="button" class="comb-mcq-bubble" data-q="${q}" data-opt="${opt}" style="width:36px; height:36px; border-radius:50%; border:1.5px solid ${currentAns === opt ? '#60A5FA' : '#334155'}; background:${currentAns === opt ? '#2563EB' : '#0F172A'}; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer;">
+                            ${opt}
+                          </button>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : `
+              <div style="flex:1; display:flex; flex-direction:column; padding:16px; max-width:680px; width:100%; margin:0 auto; gap:12px;">
+                <div style="background:#131D31; border:1px solid #334155; border-radius:14px; padding:16px; text-align:center;">
+                  <span class="material-symbols-rounded" style="font-size:36px; color:#38BDF8;">document_scanner</span>
+                  <div style="font-size:14px; font-weight:700; margin-top:6px;">Scan Handwritten Essay Answer Sheets</div>
+                  <div style="font-size:11px; color:#94A3B8; margin-top:4px;">ලිඛිත පිළිතුරු පත්‍ර කැමරාවෙන් ඡායාරූප ගත කරන්න හෝ Google Drive Link එකක් ඇතුළත් කරන්න.</div>
+                  
+                  <div style="margin-top:14px;">
+                    <input type="file" id="comb-essay-file-input" accept="image/*" capture="environment" style="display:none;" />
+                    <button id="btn-comb-snap-page" style="background:#2563EB; color:#FFFFFF; border:none; padding:10px 18px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                      <span class="material-symbols-rounded">photo_camera</span>
+                      <span>Capture / Upload Answer Page</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div style="background:#131D31; border:1px solid #334155; border-radius:14px; padding:14px;">
+                  <div style="font-size:12px; font-weight:700; margin-bottom:6px;">Google Drive / Cloud PDF Link (Optional):</div>
+                  <input type="url" id="comb-drive-input" value="${driveLink}" placeholder="https://drive.google.com/..." style="width:100%; height:38px; border-radius:8px; border:1px solid #334155; background:#0F172A; color:#FFFFFF; padding:8px 12px; font-size:12px;" />
+                </div>
+
+                <div>
+                  <div style="font-size:12px; font-weight:700; color:#CBD5E1; margin-bottom:8px;">Scanned Pages (${scannedPages.length}):</div>
+                  ${scannedPages.length === 0 ? `
+                    <div style="text-align:center; padding:20px; color:#64748B; font-size:11.5px; background:#0F172A; border-radius:10px;">තවම ලිඛිත පිටු එකතු කර නොමැත.</div>
+                  ` : `
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
+                      ${scannedPages.map((p, idx) => `
+                        <div style="position:relative; background:#0F172A; border-radius:10px; overflow:hidden; border:1px solid #334155;">
+                          <img src="${p.dataUrl}" style="width:100%; height:110px; object-fit:cover;" />
+                          <div style="position:absolute; bottom:0; inset-inline:0; background:rgba(0,0,0,0.7); font-size:10px; font-weight:700; padding:2px 6px; text-align:center;">Page ${idx + 1}</div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  `}
+                </div>
+              </div>
+            `}
+          </div>
+
+          <!-- Bottom Bar -->
+          <div style="background:rgba(15,23,42,0.95); border-top:1px solid #334155; padding:12px 18px; display:flex; gap:12px; max-width:680px; width:100%; margin:0 auto;">
+            <button id="btn-back-comb" style="flex:1; background:#1E293B; border:1px solid #334155; color:#CBD5E1; padding:12px; border-radius:12px; font-size:12.5px; font-weight:700; cursor:pointer;">
+              Back (ආපසු)
+            </button>
+            <button id="btn-submit-comb-final" style="flex:2; background:#22C55E; border:none; color:#FFFFFF; padding:12px; border-radius:12px; font-size:13px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+              <span class="material-symbols-rounded filled" style="font-size:18px;">cloud_upload</span>
+              <span>Submit All Answers (MCQ & Essay)</span>
+            </button>
+          </div>
+        `;
+
+        // Tab Switching
+        combModal.querySelector('#tab-mcq')?.addEventListener('click', () => { activeTab = 'mcq'; renderComb(); });
+        combModal.querySelector('#tab-essay')?.addEventListener('click', () => { activeTab = 'essay'; renderComb(); });
+
+        // MCQ Bubbles
+        combModal.querySelectorAll('.comb-mcq-bubble').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const q = Number(btn.dataset.q);
+            const opt = Number(btn.dataset.opt);
+            studentAnswers[q] = opt;
+            renderComb();
+          });
+        });
+
+        // Drive link input
+        combModal.querySelector('#comb-drive-input')?.addEventListener('input', (e) => {
+          driveLink = e.target.value.trim();
+        });
+
+        // Photo Upload
+        const fileInp = combModal.querySelector('#comb-essay-file-input');
+        combModal.querySelector('#btn-comb-snap-page')?.addEventListener('click', () => fileInp?.click());
+        fileInp?.addEventListener('change', (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            scannedPages.push({ dataUrl: evt.target.result, timestamp: new Date().toISOString() });
+            renderComb();
+          };
+          reader.readAsDataURL(file);
+        });
+
+        combModal.querySelector('#btn-close-comb')?.addEventListener('click', () => combModal.remove());
+        combModal.querySelector('#btn-back-comb')?.addEventListener('click', () => combModal.remove());
+
+        // Final Submit Combined
+        combModal.querySelector('#btn-submit-comb-final')?.addEventListener('click', async () => {
+          const mcqCountDone = Object.keys(studentAnswers).length;
+          if (mcqCountDone === 0 && scannedPages.length === 0 && !driveLink) {
+            alert('කරුණාකර අවම වශයෙන් MCQ පිළිතුරු හෝ Essay පිටුවක්වත් ඇතුළත් කරන්න.');
+            return;
+          }
+
+          if (!confirm(`ඔබ MCQ පිළිතුරු ${mcqCountDone}/${totalQs} ක් සහ Essay පිටු ${scannedPages.length} ක් භාරදීමට සූදානම්ද? (Submit කළ පසු වෙනස් කළ නොහැක)`)) return;
+
+          // Overlay
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; z-index:10000002; font-family:"Poppins",sans-serif;';
+          overlay.innerHTML = `
+            <div style="background:#1E293B; border-radius:16px; border:1px solid rgba(34,197,94,0.5); padding:28px; text-align:center; color:#FFFFFF;">
+              <div class="apk-spinner" style="margin:0 auto 16px auto; width:36px; height:36px; border-width:3px; border-color:#22C55E; border-top-color:transparent;"></div>
+              <div style="font-size:14px; font-weight:700;">පිළිතුරු භාරදෙමින් පවතී...</div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          try {
+            // Evaluate MCQs
+            let correctCount = 0, wrongCount = 0, unansweredCount = 0;
+            const reviewDetails = [];
+            for (let q = 1; q <= totalQs; q++) {
+              const studentAns = studentAnswers[q] !== undefined ? Number(studentAnswers[q]) : null;
+              const correctAns = answerKey[q] !== undefined ? Number(answerKey[q]) : null;
+              const isAnswered = studentAns !== null;
+              const isCorrect = isAnswered && correctAns !== null && studentAns === correctAns;
+              if (!isAnswered) unansweredCount++;
+              else if (isCorrect) correctCount++;
+              else wrongCount++;
+              reviewDetails.push({ questionNumber: q, studentAnswer: studentAns, correctAnswer: correctAns, isCorrect, isAnswered });
+            }
+
+            const percentage = totalQs > 0 ? Math.round((correctCount / totalQs) * 100) : 0;
+            const totalMarks = Number(session.totalMarks) || 100;
+            const marks = totalQs > 0 ? Math.round((correctCount / totalQs) * totalMarks) : 0;
+
+            const photoUrls = scannedPages.map(p => p.dataUrl);
+            if (driveLink) photoUrls.push(driveLink);
+
+            await dbService.updateCameraHeartbeat({
+              paperId: session.id,
+              studentId, studentName, studentPhone,
+              slotId: slotId || 'slot1',
+              isCameraActive: false,
+              status: 'submitted',
+              isSubmitted: true,
+              paperType: 'mcq_essay',
+              mcqAnswers: studentAnswers,
+              mcqScore: correctCount,
+              mcqTotal: totalQs,
+              mcqMarks: marks,
+              mcqPercentage: percentage,
+              submissionPhotos: photoUrls,
+              reviewDetails
+            });
+
+            localStorage.setItem(`paper_submitted_${session.id}_${studentId}`, 'true');
+            localStorage.setItem(`paper_submitted_${session.id}`, 'true');
+
+            overlay.remove();
+            combModal.remove();
+
+            if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            if (syncInterval) clearInterval(syncInterval);
+            if (timerInterval) clearInterval(timerInterval);
+            sendHeartbeat(false);
+
+            showInstantResultModal({
+              title: session.title,
+              totalQs,
+              correctCount,
+              wrongCount,
+              unansweredCount,
+              marks,
+              totalMarks,
+              percentage,
+              reviewDetails,
+              paperType: 'mcq_essay',
+              scannedPagesCount: photoUrls.length
+            });
+          } catch (err) {
+            console.error('Submission error:', err);
+            overlay.remove();
+            alert('Submission error: ' + err.message);
+          }
+        });
+      };
+
+      document.body.appendChild(combModal);
+      renderComb();
     };
 
     // In-App Document Scanner (1:1 with in_app_document_scanner_screen.dart)

@@ -314,6 +314,9 @@ export class DbService {
       id: id || raw.id || 'paper_' + Date.now(),
       title: raw.title || 'A/L Physics Paper Session',
       subject: raw.subject || 'A/L Physics',
+      paperType: raw.paperType || 'essay',
+      mcqCount: Math.min(50, Math.max(1, Number(raw.mcqCount) || 50)),
+      mcqAnswerKey: raw.mcqAnswerKey || {},
       examYear: raw.examYear || 'All Batches',
       date: raw.date || todayIso,
       durationMinutes: duration,
@@ -638,7 +641,14 @@ export class DbService {
     cameraSnapshotUrl,
     status,
     submissionPhotos,
-    agoraUid
+    agoraUid,
+    paperType,
+    mcqAnswers,
+    mcqScore,
+    mcqTotal,
+    mcqMarks,
+    mcqPercentage,
+    reviewDetails
   }) {
     if (!paperId || !studentId) return;
     try {
@@ -667,6 +677,27 @@ export class DbService {
       }
       if (agoraUid) {
         updates.agoraUid = agoraUid;
+      }
+      if (paperType) {
+        updates.paperType = paperType;
+      }
+      if (mcqAnswers) {
+        updates.mcqAnswers = mcqAnswers;
+      }
+      if (mcqScore !== undefined && mcqScore !== null) {
+        updates.mcqScore = Number(mcqScore);
+      }
+      if (mcqTotal !== undefined && mcqTotal !== null) {
+        updates.mcqTotal = Number(mcqTotal);
+      }
+      if (mcqMarks !== undefined && mcqMarks !== null) {
+        updates.mcqMarks = Number(mcqMarks);
+      }
+      if (mcqPercentage !== undefined && mcqPercentage !== null) {
+        updates.mcqPercentage = Number(mcqPercentage);
+      }
+      if (reviewDetails && Array.isArray(reviewDetails)) {
+        updates.reviewDetails = reviewDetails;
       }
       if (status) {
         updates.status = status;
