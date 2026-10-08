@@ -8422,6 +8422,57 @@ class AppController {
       const times = calculateTimes();
       const slot = getSlot();
 
+      // Format scheduled slot time and date to be human-friendly, real local time, and prominent
+      const formatScheduledSlot = (rawSlot, sessionObj) => {
+        let timeFormatted = '08:30 AM (පෙ.ව. 08:30)';
+        let dateFormatted = '';
+        const slotName = rawSlot?.name || (slotId === 'slot2' ? 'Slot 2 (Evening / සවස සැසිය)' : 'Slot 1 (Morning / උදෑසන සැසිය)');
+
+        const rawStart = rawSlot?.startTime || sessionObj?.date;
+        if (rawStart) {
+          try {
+            const d = new Date(rawStart);
+            if (!isNaN(d.getTime())) {
+              let h = d.getHours();
+              const m = String(d.getMinutes()).padStart(2, '0');
+              const ampm = h >= 12 ? 'PM' : 'AM';
+              const sinAmPm = h >= 12 ? 'ප.ව.' : 'පෙ.ව.';
+              const h12 = h % 12 === 0 ? 12 : h % 12;
+              timeFormatted = `${String(h12).padStart(2, '0')}:${m} ${ampm} (${sinAmPm} ${String(h12).padStart(2, '0')}:${m})`;
+
+              const monthsSin = ['ජනවාරි', 'පෙබරවාරි', 'මාර්තු', 'අප්‍රේල්', 'මැයි', 'ජූනි', 'ජූලි', 'අගෝස්තු', 'සැප්තැම්බර්', 'ඔක්තෝබර්', 'නොවැම්බර්', 'දෙසැම්බර්'];
+              const daysSin = ['ඉරිදා', 'සඳුදා', 'අඟහරුවාදා', 'බදාදා', 'බ්‍රහස්පතින්දා', 'සිකුරාදා', 'සෙනසුරාදා'];
+              dateFormatted = `${d.getFullYear()} ${monthsSin[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')} (${daysSin[d.getDay()]})`;
+            } else if (typeof rawStart === 'string' && rawStart.includes(':')) {
+              const parts = rawStart.trim().split(':');
+              let h = parseInt(parts[0], 10);
+              const m = parts[1] ? parts[1].slice(0, 2) : '00';
+              if (!isNaN(h)) {
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                const sinAmPm = h >= 12 ? 'ප.ව.' : 'පෙ.ව.';
+                const h12 = h % 12 === 0 ? 12 : h % 12;
+                timeFormatted = `${String(h12).padStart(2, '0')}:${m} ${ampm} (${sinAmPm} ${String(h12).padStart(2, '0')}:${m})`;
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (!dateFormatted && sessionObj?.date) {
+          try {
+            const d = new Date(sessionObj.date);
+            if (!isNaN(d.getTime())) {
+              const monthsSin = ['ජනවාරි', 'පෙබරවාරි', 'මාර්තු', 'අප්‍රේල්', 'මැයි', 'ජූනි', 'ජූලි', 'අගෝස්තු', 'සැප්තැම්බර්', 'ඔක්තෝබර්', 'නොවැම්බර්', 'දෙසැම්බර්'];
+              const daysSin = ['ඉරිදා', 'සඳුදා', 'අඟහරුවාදා', 'බදාදා', 'බ්‍රහස්පතින්දා', 'සිකුරාදා', 'සෙනසුරාදා'];
+              dateFormatted = `${d.getFullYear()} ${monthsSin[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')} (${daysSin[d.getDay()]})`;
+            }
+          } catch (_) {}
+        }
+
+        return { timeFormatted, dateFormatted, slotName };
+      };
+
+      const scheduleInfo = formatScheduledSlot(slot, session);
+
       // Top live timer pill text and colors matching Flutter
       let timerText = 'Waiting';
       let timerColor = '#818CF8';
@@ -8504,18 +8555,40 @@ ${!times.isWaiting ? `
             <!-- ── A. WAITING ROOM VIEW (_buildWaitingRoomView) ── -->
             <div style="flex:1; overflow-y:auto; padding:16px; max-width:680px; width:100%; margin:0 auto;">
               <!-- 1. Top Waiting Notice Card -->
-              <div style="padding:16px; border-radius:16px; background:linear-gradient(135deg, rgba(99,102,241,0.25), #0F172A); border:1px solid rgba(99,102,241,0.4); display:flex; gap:14px; align-items:flex-start;">
-                <div style="width:44px; height:44px; border-radius:50%; background:rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; color:#A5B4FC; flex-shrink:0;">
+              <div style="padding:16px 18px; border-radius:18px; background:linear-gradient(135deg, rgba(99,102,241,0.22), #0F172A); border:1px solid rgba(99,102,241,0.4); display:flex; gap:14px; align-items:flex-start; box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+                <div style="width:46px; height:46px; border-radius:50%; background:rgba(99,102,241,0.25); border:1px solid rgba(99,102,241,0.5); display:flex; align-items:center; justify-content:center; color:#A5B4FC; flex-shrink:0;">
                   <span class="material-symbols-rounded filled" style="font-size:24px;">hourglass_top</span>
                 </div>
-                <div>
-                  <div style="font-size:14px; font-weight:700; color:#FFFFFF; margin-bottom:4px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:15px; font-weight:800; color:#FFFFFF; margin-bottom:8px;">
                     විභාග පොරොත්තු ශාලාව (Waiting Room)
                   </div>
-                  <div style="font-size:12px; font-weight:600; color:#38BDF8; margin-bottom:6px;">
-                    නියමිත වේලාව: ${slot.startTime || '08:30'} (${slot.name || 'Slot 1'})
+
+                  <!-- Highly Visible Scheduled Session Card -->
+                  <div style="background:rgba(15, 23, 42, 0.85); border:1.5px solid #38BDF8; border-radius:12px; padding:10px 14px; margin-bottom:10px; box-shadow:0 0 16px rgba(56, 189, 248, 0.18);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="material-symbols-rounded filled" style="font-size:16px; color:#38BDF8;">schedule</span>
+                        <span style="font-size:11px; font-weight:800; color:#38BDF8; letter-spacing:0.4px; text-transform:uppercase;">නියමිත විභාග වේලාව (Scheduled Time)</span>
+                      </div>
+                      <span style="background:rgba(99,102,241,0.25); border:1px solid #818CF8; color:#C7D2FE; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:6px;">
+                        ${scheduleInfo.slotName}
+                      </span>
+                    </div>
+                    <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:2px;">
+                      <span style="font-size:17px; font-weight:900; color:#FFFFFF; letter-spacing:0.5px; text-shadow:0 0 10px rgba(255,255,255,0.2);">
+                        ${scheduleInfo.timeFormatted}
+                      </span>
+                      ${scheduleInfo.dateFormatted ? `
+                        <span style="font-size:12px; font-weight:700; color:#7DD3FC; display:inline-flex; align-items:center; gap:4px;">
+                          <span class="material-symbols-rounded" style="font-size:14px; color:#38BDF8;">event</span>
+                          ${scheduleInfo.dateFormatted}
+                        </span>
+                      ` : ''}
+                    </div>
                   </div>
-                  <div style="font-size:11px; color:#CBD5E1; line-height:1.45;">
+
+                  <div style="font-size:11.5px; color:#CBD5E1; line-height:1.5;">
                     විභාගය නියමිත වේලාවට ස්වයංක්‍රීයව ආරම්භ නොවේ. විභාග පරීක්ෂක විසින් විභාගය ආරම්භ කරන තෙක් කරුණාකර මෙම තිරයේ රැඳී සිටින්න. ඔවුන් සැසිය ආරම්භ කළ වහාම තිරය සජීවී විභාගයට මාරු වේ.
                   </div>
                 </div>

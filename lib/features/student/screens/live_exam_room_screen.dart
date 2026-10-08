@@ -1150,7 +1150,18 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   }
 
   Widget _buildWaitingRoomView(PaperSession session, PaperSlot slot) {
-    final startTimeStr = '${slot.startTime.hour.toString().padLeft(2, '0')}:${slot.startTime.minute.toString().padLeft(2, '0')}';
+    final localStart = slot.startTime.toLocal();
+    final hour = localStart.hour;
+    final minute = localStart.minute.toString().padLeft(2, '0');
+    final ampm = hour >= 12 ? 'PM' : 'AM';
+    final sinAmPm = hour >= 12 ? 'ප.ව.' : 'පෙ.ව.';
+    final h12 = hour % 12 == 0 ? 12 : hour % 12;
+    final timeFormatted = '${h12.toString().padLeft(2, '0')}:$minute $ampm ($sinAmPm ${h12.toString().padLeft(2, '0')}:$minute)';
+
+    final monthsSin = ['ජනවාරි', 'පෙබරවාරි', 'මාර්තු', 'අප්‍රේල්', 'මැයි', 'ජූනි', 'ජූලි', 'අගෝස්තු', 'සැප්තැම්බර්', 'ඔක්තෝබර්', 'නොවැම්බර්', 'දෙසැම්බර්'];
+    final daysSin = ['සඳුදා', 'අඟහරුවාදා', 'බදාදා', 'බ්‍රහස්පතින්දා', 'සිකුරාදා', 'සෙනසුරාදා', 'ඉරිදා'];
+    final weekdayName = (localStart.weekday >= 1 && localStart.weekday <= 7) ? daysSin[localStart.weekday - 1] : '';
+    final dateFormatted = '${localStart.year} ${monthsSin[localStart.month - 1]} ${localStart.day.toString().padLeft(2, '0')}${weekdayName.isNotEmpty ? ' ($weekdayName)' : ''}';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1190,14 +1201,99 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     children: [
                       Text(
                         'විභාග පොරොත්තු ශාලාව (Waiting Room)',
-                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'නියමිත වේලාව: $startTimeStr (${slot.name})',
-                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF38BDF8)),
+                      const SizedBox(height: 8),
+
+                      // Prominent Schedule Time Card
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A).withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF38BDF8).withOpacity(0.18),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.schedule, color: Color(0xFF38BDF8), size: 15),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'නියමිත විභාග වේලාව (Scheduled Time)',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF38BDF8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366F1).withOpacity(0.25),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFF818CF8)),
+                                  ),
+                                  child: Text(
+                                    slot.name,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFFC7D2FE),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              children: [
+                                Text(
+                                  timeFormatted,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.event, color: Color(0xFF38BDF8), size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      dateFormatted,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF7DD3FC),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
+
                       Text(
                         'විභාගය නියමිත වේලාවට ස්වයංක්‍රීයව ආරම්භ නොවේ. විභාග පරීක්ෂක විසින් විභාගය ආරම්භ කරන තෙක් කරුණාකර මෙම තිරයේ රැඳී සිටින්න. ඔවුන් සැසිය ආරම්භ කළ වහාම තිරය සජීවී විභාගයට මාරු වේ.',
                         style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFFCBD5E1), height: 1.4),
