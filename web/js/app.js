@@ -7937,9 +7937,16 @@ ${!times.isWaiting ? `
 
       // Update writing digital HUD clock
       if (times.isWriting) {
-        const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
-        const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
-        const s = String(times.writingSecsLeft % 60).padStart(2, '0');
+        let h, m, s;
+        if (!times.isOvertime) {
+          h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
+          m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
+          s = String(times.writingSecsLeft % 60).padStart(2, '0');
+        } else {
+          h = '00';
+          m = String(Math.floor(times.overtimeSecs / 60)).padStart(2, '0');
+          s = String(times.overtimeSecs % 60).padStart(2, '0');
+        }
         const tileH = roomContainer.querySelector('#hud-tile-hours');
         const tileM = roomContainer.querySelector('#hud-tile-minutes');
         const tileS = roomContainer.querySelector('#hud-tile-seconds');
@@ -7947,7 +7954,7 @@ ${!times.isWaiting ? `
         if (tileH && tileH.textContent.trim() !== h) tileH.textContent = h;
         if (tileM && tileM.textContent.trim() !== m) tileM.textContent = m;
         if (tileS && tileS.textContent.trim() !== s) tileS.textContent = s;
-        if (minTime) minTime.textContent = `${h}:${m}:${s}`;
+        if (minTime) minTime.textContent = times.isOvertime ? `+${m}:${s}` : `${h}:${m}:${s}`;
       }
     }, 1000);
   }
