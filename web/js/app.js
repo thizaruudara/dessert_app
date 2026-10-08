@@ -6614,7 +6614,7 @@ class AppController {
           } else {
             const feedContainer = fsModal.querySelector('#fs-feed-container');
             if (feedContainer) {
-              feedContainer.innerHTML = `<img id="fs-student-stream" src="${currentFsStudent.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />`;
+              feedContainer.innerHTML = `<img id="fs-student-stream" src="${currentFsStudent.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />`;
             }
           }
         }
@@ -6800,7 +6800,7 @@ class AppController {
 
       <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#000000; position:relative; overflow:hidden;" id="fs-feed-container">
         ${student.cameraSnapshotUrl ? `
-          <img id="fs-student-stream" src="${student.cameraSnapshotUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+          <img id="fs-student-stream" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />
         ` : `
           <div id="fs-student-stream-placeholder" style="text-align:center; color:#94A3B8;">
             <span class="material-symbols-rounded" style="font-size:48px; margin-bottom:12px; color:#64748B;">videocam</span>
@@ -6925,8 +6925,8 @@ class AppController {
         if (!captureCanvas) {
           captureCanvas = document.createElement('canvas');
         }
-        captureCanvas.width = 320;
-        captureCanvas.height = Math.round(320 * (videoEl.videoHeight / videoEl.videoWidth)) || 240;
+        captureCanvas.width = 540;
+        captureCanvas.height = Math.round(540 * (videoEl.videoHeight / videoEl.videoWidth)) || 380;
         const ctx = captureCanvas.getContext('2d');
         ctx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
         return captureCanvas.toDataURL('image/jpeg', 0.52);
