@@ -493,12 +493,34 @@ export class DbService {
       const snap = await getDocs(ref);
       if (!snap.empty) {
         const list = snap.docs.map(d => this.normalizePaperSession(d.data(), d.id)).filter(Boolean);
-        const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-        if (filtered.length > 0) return filtered;
-        // If no paper matches student batch, but active/live or upcoming real papers exist in Firestore, return them!
-        const liveOrUpcoming = list.filter(p => !p.isEnded && p.status !== 'ended' && p.currentPhase !== 'ended');
-        if (liveOrUpcoming.length > 0) return liveOrUpcoming;
-        if (list.length > 0) return list;
+        let result = list;
+        if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+          const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
+          if (filtered.length > 0) {
+            result = filtered;
+          } else {
+            const liveOrUpcoming = list.filter(p => !p.isEnded && p.status !== 'ended' && p.currentPhase !== 'ended');
+            result = liveOrUpcoming.length > 0 ? liveOrUpcoming : list;
+          }
+        }
+        const getSessionOrderTime = (p) => {
+          if (p.createdAt) {
+            const t = new Date(p.createdAt).getTime();
+            if (!isNaN(t)) return t;
+          }
+          if (p.date) {
+            const t = new Date(p.date).getTime();
+            if (!isNaN(t)) return t;
+          }
+          return 0;
+        };
+        result.sort((a, b) => {
+          const aEnded = !!(a.isEnded || a.status === 'ended' || a.currentPhase === 'ended');
+          const bEnded = !!(b.isEnded || b.status === 'ended' || b.currentPhase === 'ended');
+          if (aEnded !== bEnded) return aEnded ? 1 : -1;
+          return getSessionOrderTime(b) - getSessionOrderTime(a);
+        });
+        return result;
       }
     } catch (e) {
       console.warn('[DB] getPaperSessions error:', e);
@@ -558,7 +580,23 @@ export class DbService {
             result = liveOrUpcoming.length > 0 ? liveOrUpcoming : list;
           }
         }
-        result.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        const getSessionOrderTime = (p) => {
+          if (p.createdAt) {
+            const t = new Date(p.createdAt).getTime();
+            if (!isNaN(t)) return t;
+          }
+          if (p.date) {
+            const t = new Date(p.date).getTime();
+            if (!isNaN(t)) return t;
+          }
+          return 0;
+        };
+        result.sort((a, b) => {
+          const aEnded = !!(a.isEnded || a.status === 'ended' || a.currentPhase === 'ended');
+          const bEnded = !!(b.isEnded || b.status === 'ended' || b.currentPhase === 'ended');
+          if (aEnded !== bEnded) return aEnded ? 1 : -1;
+          return getSessionOrderTime(b) - getSessionOrderTime(a);
+        });
         callback(result);
       }, (err) => {
         console.warn('[DB] streamPaperSessions error:', err);
