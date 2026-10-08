@@ -7366,10 +7366,23 @@ class AppController {
     const attachAgoraStreams = () => {
       if (!this.agoraProctor) return;
       const fsModal = document.getElementById('proctor-fullscreen-modal');
-      const activeFsStudentId = this._fullScreenStudentId || fsModal?.dataset?.studentId;
+      if (!fsModal) {
+        this._fullScreenStudentId = null;
+      }
+      const activeFsStudentId = fsModal ? (this._fullScreenStudentId || fsModal.dataset?.studentId) : null;
 
       modal.querySelectorAll('.student-camera-box').forEach(box => {
         const studentId = box.dataset.studentId;
+        const student = allStudents.find(s => s.studentId === studentId);
+        if (!student) return;
+        const isSubmitted = isStudentSubmitted(student);
+
+        // If this student is submitted, clean up any full-screen indicator and do NOT mount Agora video
+        if (isSubmitted) {
+          const fsInd = box.querySelector('.fs-active-indicator');
+          if (fsInd) fsInd.remove();
+          return;
+        }
 
         // If this student is currently being viewed in full screen,
         // DO NOT mount or steal the video stream to this thumbnail box!
@@ -7384,10 +7397,12 @@ class AppController {
             `;
           }
           return;
+        } else {
+          // If not in full screen, ensure any stale indicator is removed
+          const fsInd = box.querySelector('.fs-active-indicator');
+          if (fsInd) fsInd.remove();
         }
 
-        const student = allStudents.find(s => s.studentId === studentId);
-        if (!student) return;
         const uid = student.agoraUid || getNumericUid(student.studentId);
         if (this.agoraProctor.hasStream(uid)) {
           if (!box.querySelector('.agora-active-player')) {
@@ -7450,17 +7465,28 @@ class AppController {
       return diff >= -5 && diff <= 35;
     };
 
+    const isStudentSubmitted = (s) => {
+      if (!s) return false;
+      return s.status === 'submitted' ||
+             s.isSubmitted === true ||
+             !!s.submittedAt ||
+             (Array.isArray(s.submissionPhotos) && s.submissionPhotos.length > 0) ||
+             (s.mcqScore !== undefined && s.mcqScore !== null) ||
+             (s.mcqAnswers && typeof s.mcqAnswers === 'object' && Object.keys(s.mcqAnswers).length > 0);
+    };
+
     const render = () => {
+      this._renderProctorHall = render;
       const slot1Students = allStudents.filter(s => (s.selectedSlot || 'slot1') === 'slot1');
       const slot2Students = allStudents.filter(s => s.selectedSlot === 'slot2');
-      const submittedStudents = allStudents.filter(s => s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0));
+      const submittedStudents = allStudents.filter(s => isStudentSubmitted(s));
 
       const currentSlotStudents = activeTab === 'slot2' ? slot2Students : slot1Students;
       const liveCount = currentSlotStudents.filter(s => {
-        if (s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0)) return false;
+        if (isStudentSubmitted(s)) return false;
         return s.isCameraActive && (isRecentPing(s.lastCameraPing) || s.cameraSnapshotUrl);
       }).length;
-      const submittedSlotCount = currentSlotStudents.filter(s => s.status === 'submitted' || (s.submissionPhotos && s.submissionPhotos.length > 0)).length;
+      const submittedSlotCount = currentSlotStudents.filter(s => isStudentSubmitted(s)).length;
       const inactiveCount = Math.max(0, currentSlotStudents.length - liveCount - submittedSlotCount);
 
       const phase = session.currentPhase || 'waiting';
@@ -7685,24 +7711,32 @@ class AppController {
                 ` : `
                   <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
                     ${currentSlotStudents.map(student => {
-                      const isSubmitted = student.status === 'submitted' || (student.submissionPhotos && student.submissionPhotos.length > 0);
+                      const isSubmitted = isStudentSubmitted(student);
                       const pingActive = isRecentPing(student.lastCameraPing);
                       const isCameraActive = !isSubmitted && !!(student.isCameraActive && (pingActive || student.cameraSnapshotUrl));
                       const isOnline = !isSubmitted && (isCameraActive || pingActive || student.isOnline);
-                      const borderColor = isSubmitted ? '#38BDF8' : isCameraActive ? '#22C55E' : isOnline ? '#3B82F6' : '#EF4444';
+                      const borderColor = isSubmitted ? '#22C55E' : isCameraActive ? '#22C55E' : isOnline ? '#3B82F6' : '#EF4444';
                       const statusBadge = isSubmitted ? 'SUBMITTED' : isCameraActive ? 'LIVE' : isOnline ? 'ONLINE' : 'OFFLINE';
 
                       return `
                         <div style="background:#1E293B; border-radius:14px; border:1.5px solid ${borderColor}; display:flex; flex-direction:column; overflow:hidden;">
                           <!-- Camera Preview Box -->
                           <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                            ${(student.cameraSnapshotUrl && (isCameraActive || isOnline)) ? `
+                            ${isSubmitted ? `
+                              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height:100%; width:100%; background:rgba(34,197,94,0.08); padding:12px; text-align:center;">
+                                <div style="width:40px; height:40px; border-radius:50%; background:rgba(34,197,94,0.2); border:1.5px solid #22C55E; display:flex; align-items:center; justify-content:center;">
+                                  <span class="material-symbols-rounded filled" style="font-size:24px; color:#22C55E;">check_circle</span>
+                                </div>
+                                <div style="font-size:11px; font-weight:700; color:#4ADE80;">පිළිතුරු පත්‍ර භාරදී ඇත</div>
+                                <div style="font-size:9.5px; color:#94A3B8;">${student.mcqScore !== undefined ? `MCQ Score: ${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)} (${student.mcqPercentage !== undefined ? student.mcqPercentage : Math.round((student.mcqScore / (student.mcqTotal || session.mcqCount || 50)) * 100)}%)` : `${student.submissionPhotos?.length || 1} Pages Submitted`}</div>
+                              </div>
+                            ` : (student.cameraSnapshotUrl && (isCameraActive || isOnline)) ? `
                               <img src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
                             ` : `
                               <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
                                 <span class="material-symbols-rounded" style="font-size:26px; color:${borderColor};">${isCameraActive ? 'videocam' : 'videocam_off'}</span>
                                 <span style="font-size:10px; font-weight:500; color:${isOnline ? '#4ADE80' : '#94A3B8'};">
-                                  ${isSubmitted ? 'Paper Submitted' : isCameraActive ? 'Proctor Stream Active' : 'Camera Offline'}
+                                  ${isCameraActive ? 'Proctor Stream Active' : 'Camera Offline'}
                                 </span>
                               </div>
                             `}
@@ -7711,9 +7745,11 @@ class AppController {
                               ${statusBadge}
                             </div>
                             <!-- Fullscreen Icon Top Right -->
+                            ${!isSubmitted ? `
                             <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
                               <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
                             </div>
+                            ` : ''}
                           </div>
 
                           <!-- Details & Actions -->
@@ -7727,20 +7763,21 @@ class AppController {
                               </div>
                             </div>
 
-                            ${(student.submissionPhotos?.length || isSubmitted) ? `
-                              <button class="btn-view-answers" data-student-id="${student.studentId}" style="width:100%; height:26px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:700; cursor:pointer;">
-                                View Answers (${student.submissionPhotos?.length || 1})
+                            ${isSubmitted ? `
+                              <button class="btn-view-answers" data-student-id="${student.studentId}" style="width:100%; height:28px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+                                <span class="material-symbols-rounded filled" style="font-size:14px;">description</span>
+                                <span>View Answers ${student.submissionPhotos?.length ? `(${student.submissionPhotos.length})` : (student.mcqScore !== undefined ? `(${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)})` : '')}</span>
                               </button>
-                            ` : ''}
-
-                            <div style="display:flex; gap:6px;">
-                              <button class="btn-full-view" data-student-id="${student.studentId}" style="flex:1; height:26px; background:transparent; border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
-                                Full View
-                              </button>
-                              <button class="btn-alert-student" data-student-id="${student.studentId}" style="flex:1; height:26px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
-                                Alert
-                              </button>
-                            </div>
+                            ` : `
+                              <div style="display:flex; gap:6px;">
+                                <button class="btn-full-view" data-student-id="${student.studentId}" style="flex:1; height:26px; background:transparent; border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
+                                  Full View
+                                </button>
+                                <button class="btn-alert-student" data-student-id="${student.studentId}" style="flex:1; height:26px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
+                                  Alert
+                                </button>
+                              </div>
+                            `}
                           </div>
                         </div>
                       `;
@@ -7880,7 +7917,13 @@ class AppController {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
-          if (student) this._showFullScreenStudentViewer(session.id, student);
+          if (student) {
+            if (isStudentSubmitted(student)) {
+              this._showSubmissionViewer(student);
+            } else {
+              this._showFullScreenStudentViewer(session.id, student);
+            }
+          }
         });
       });
       if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
@@ -8136,6 +8179,7 @@ class AppController {
     modal.querySelector('#fs-close-btn').onclick = () => {
       this._fullScreenStudentId = null;
       modal.remove();
+      if (typeof this._renderProctorHall === 'function') this._renderProctorHall();
       if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
     };
     modal.querySelector('#fs-warn-btn').onclick = () => {
@@ -8271,6 +8315,25 @@ class AppController {
     // Heartbeat function matching Flutter _sendHeartbeat
     const sendHeartbeat = async (isActive) => {
       try {
+        const isAlreadySubmitted = localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' ||
+          localStorage.getItem(`paper_submitted_${paperId}`) === 'true';
+
+        if (isAlreadySubmitted) {
+          await dbService.updateCameraHeartbeat({
+            paperId,
+            studentId,
+            studentName,
+            studentPhone,
+            slotId: slotId || 'slot1',
+            isCameraActive: false,
+            agoraUid: studentAgoraUid || getNumericUid(studentId),
+            cameraSnapshotUrl: null,
+            status: 'submitted',
+            isSubmitted: true
+          });
+          return;
+        }
+
         const snap = isActive ? captureSnapshot() : null;
         await dbService.updateCameraHeartbeat({
           paperId,

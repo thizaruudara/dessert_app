@@ -723,7 +723,8 @@ export class DbService {
     mcqTotal,
     mcqMarks,
     mcqPercentage,
-    reviewDetails
+    reviewDetails,
+    isSubmitted
   }) {
     if (!paperId || !studentId) return;
     try {
@@ -774,13 +775,23 @@ export class DbService {
       if (reviewDetails && Array.isArray(reviewDetails)) {
         updates.reviewDetails = reviewDetails;
       }
+      if (isSubmitted === true) {
+        updates.isSubmitted = true;
+        updates.status = 'submitted';
+        updates.isCameraActive = false;
+        if (!updates.submittedAt) updates.submittedAt = serverTimestamp();
+      }
       if (status) {
-        updates.status = status;
-        if (status === 'in_exam') {
-          updates.joinedAt = serverTimestamp();
-        } else if (status === 'submitted') {
-          updates.submittedAt = serverTimestamp();
+        if (status === 'submitted') {
+          updates.status = 'submitted';
           updates.isSubmitted = true;
+          updates.isCameraActive = false;
+          if (!updates.submittedAt) updates.submittedAt = serverTimestamp();
+        } else if (status === 'in_exam') {
+          updates.status = 'in_exam';
+          updates.joinedAt = serverTimestamp();
+        } else {
+          updates.status = status;
         }
       }
       if (submissionPhotos && Array.isArray(submissionPhotos) && submissionPhotos.length > 0) {
@@ -788,7 +799,22 @@ export class DbService {
         updates.submissionUrl = submissionPhotos[0];
         updates.isSubmitted = true;
         updates.status = 'submitted';
+        updates.isCameraActive = false;
       }
+
+      // Safeguard: Check existing record so a submitted student can NEVER be reverted back to 'in_exam'
+      try {
+        const existingSnap = await getDoc(regRef);
+        if (existingSnap.exists()) {
+          const prev = existingSnap.data() || {};
+          if (prev.isSubmitted === true || prev.status === 'submitted' || prev.submittedAt || (prev.submissionPhotos && prev.submissionPhotos.length > 0) || prev.mcqScore !== undefined) {
+            updates.isSubmitted = true;
+            updates.status = 'submitted';
+            updates.isCameraActive = false;
+            updates.cameraSnapshotUrl = null;
+          }
+        }
+      } catch (_) {}
 
       await setDoc(regRef, updates, { merge: true });
     } catch (e) {
