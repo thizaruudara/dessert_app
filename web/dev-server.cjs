@@ -18,6 +18,7 @@ const apiHandlers = new Map([
   ['/api/auth/ensure-profile', require('./api/auth/ensure-profile')],
   ['/api/papers/register-slot', require('./api/papers/register-slot')],
   ['/api/sprints/submit-attempt', require('./api/sprints/submit-attempt')],
+  ['/api/agora/token', require('./api/agora/token')],
 ]);
 
 const esbuild = path.join(root, 'node_modules', 'esbuild', 'bin', 'esbuild');

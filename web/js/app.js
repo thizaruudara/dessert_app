@@ -5,6 +5,7 @@ import { dbService } from './db-service.js';
 import { notificationService } from './notification-service.js';
 import { cameraService } from './camera-service.js';
 import { PwaGatekeeper } from './pwa-gatekeeper.js';
+import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid } from './agora-service.js';
 
 class AppController {
   constructor() {
@@ -17,6 +18,8 @@ class AppController {
     this.antiCheatViolations = 0;
     this.papersTab = 0; // 0: Live Sessions, 1: Upcoming Papers & Hints
     this.showAllBatches = false;
+    this.agoraProctor = null;
+    this.studentBroadcaster = null;
   }
 
   init() {
@@ -6310,6 +6313,49 @@ class AppController {
     let allStudents = [];
     let unsubs = [];
 
+    // Initialize Agora Real-time Proctor Audience
+    if (this.agoraProctor) {
+      this.agoraProctor.stop();
+      this.agoraProctor = null;
+    }
+    this.agoraProctor = new AgoraAdminAudience();
+    this.agoraProctor.start(session.id, () => {
+      if (attachAgoraStreams) attachAgoraStreams();
+    });
+
+    const attachAgoraStreams = () => {
+      if (!this.agoraProctor) return;
+      modal.querySelectorAll('.student-camera-box').forEach(box => {
+        const studentId = box.dataset.studentId;
+        const student = allStudents.find(s => s.studentId === studentId);
+        if (!student) return;
+        const uid = student.agoraUid || getNumericUid(student.studentId);
+        if (this.agoraProctor.hasStream(uid)) {
+          if (!box.querySelector('.agora-active-player')) {
+            box.innerHTML = '<div class="agora-active-player" style="width:100%; height:100%; position:relative;"></div>';
+            this.agoraProctor.playRemoteVideo(uid, box.querySelector('.agora-active-player'));
+            const badge = document.createElement('div');
+            badge.style.cssText = 'position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:#22C55E; color:#FFFFFF; font-size:8.5px; font-weight:700; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.5); display:flex; align-items:center; gap:3px;';
+            badge.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:10px;">videocam</span> AGORA 720p HD';
+            box.appendChild(badge);
+          }
+        }
+      });
+      const fsModal = document.getElementById('proctor-fullscreen-modal');
+      if (fsModal) {
+        const fsStudent = allStudents.find(s => s.studentId === fsModal.dataset.studentId);
+        if (fsStudent) {
+          const fsUid = fsStudent.agoraUid || getNumericUid(fsStudent.studentId);
+          const feedContainer = fsModal.querySelector('#fs-feed-container');
+          if (this.agoraProctor.hasStream(fsUid) && feedContainer && !feedContainer.querySelector('.agora-fs-player')) {
+            feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
+            this.agoraProctor.playRemoteVideo(fsUid, feedContainer.querySelector('.agora-fs-player'));
+          }
+        }
+      }
+    };
+    this._attachProctorStreams = attachAgoraStreams;
+
     const formatTimer = (secs) => {
       const h = String(Math.floor(secs / 3600)).padStart(2, '0');
       const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
@@ -6648,6 +6694,7 @@ class AppController {
     const attachEventHandlers = () => {
       // Close Hall
       document.getElementById('btn-close-proctor-hall')?.addEventListener('click', () => {
+        if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
         unsubs.forEach(fn => { try { fn(); } catch (_) {} });
         modal.remove();
       });
@@ -6662,6 +6709,7 @@ class AppController {
 
       // Test Student View
       document.getElementById('btn-hall-test-student')?.addEventListener('click', () => {
+        if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
         unsubs.forEach(fn => { try { fn(); } catch (_) {} });
         modal.remove();
         this.openStudentLiveExamRoom(session.id, 'slot1');
@@ -6754,6 +6802,10 @@ class AppController {
           if (student) this._showFullScreenStudentViewer(session.id, student);
         });
       });
+      if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
+
+
+
     };
 
     // Real-Time Listeners (Matching Dart _sessionStream & _allRegistrationsStream)
@@ -6771,7 +6823,24 @@ class AppController {
       const fsModal = document.getElementById('proctor-fullscreen-modal');
       if (fsModal) {
         const currentFsStudent = allStudents.find(s => s.studentId === fsModal.dataset.studentId);
-        if (currentFsStudent && currentFsStudent.cameraSnapshotUrl) {
+        if (currentFsStudent) {
+          const fsUid = currentFsStudent.agoraUid || getNumericUid(currentFsStudent.studentId);
+          const feedContainer = fsModal.querySelector('#fs-feed-container');
+          if (this.agoraProctor && this.agoraProctor.hasStream(fsUid)) {
+            if (feedContainer && !feedContainer.querySelector('.agora-fs-player')) {
+              feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
+              this.agoraProctor.playRemoteVideo(fsUid, feedContainer.querySelector('.agora-fs-player'));
+            }
+          } else if (currentFsStudent.cameraSnapshotUrl && feedContainer && !feedContainer.querySelector('.agora-fs-player')) {
+            const img = fsModal.querySelector('#fs-student-stream');
+            if (img) {
+              img.src = currentFsStudent.cameraSnapshotUrl;
+            } else {
+              feedContainer.innerHTML = `<img id="fs-student-stream" src="${currentFsStudent.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />`;
+            }
+          }
+        }
+        /* cleaned */ if (false) {
           const img = fsModal.querySelector('#fs-student-stream');
           if (img) {
             img.src = currentFsStudent.cameraSnapshotUrl;
@@ -7010,7 +7079,10 @@ class AppController {
       </div>
     `;
 
-    modal.querySelector('#fs-close-btn').onclick = () => modal.remove();
+    modal.querySelector('#fs-close-btn').onclick = () => {
+      modal.remove();
+      if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
+    };
     modal.querySelector('#fs-warn-btn').onclick = () => {
       this._showDirectAlertSheet(paperId, student);
     };
@@ -7019,6 +7091,15 @@ class AppController {
     });
 
     document.body.appendChild(modal);
+
+    const studentUid = student.agoraUid || getNumericUid(student.studentId);
+    if (this.agoraProctor && this.agoraProctor.hasStream(studentUid)) {
+      const feedContainer = modal.querySelector('#fs-feed-container');
+      if (feedContainer) {
+        feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
+        this.agoraProctor.playRemoteVideo(studentUid, feedContainer.querySelector('.agora-fs-player'));
+      }
+    }
   }
 
   // ── B. Student Live Exam Writing Room (1:1 with live_exam_room_screen.dart & in_app_document_scanner_screen.dart) ──
@@ -7104,6 +7185,7 @@ class AppController {
     let facingMode = 'user'; // front / user camera
     let now = new Date();
     let shownAlertIds = new Set();
+    let studentAgoraUid = null;
 
     // Time calculations matching Flutter
     const getSlot = () => (slotId === 'slot2' && session.slot2 ? session.slot2 : (session.slot1 || { name: 'Morning Slot 1', startTime: '08:30' }));
@@ -7117,11 +7199,11 @@ class AppController {
         if (!captureCanvas) {
           captureCanvas = document.createElement('canvas');
         }
-        captureCanvas.width = 540;
-        captureCanvas.height = Math.round(540 * (videoEl.videoHeight / videoEl.videoWidth)) || 380;
+        captureCanvas.width = 850;
+        captureCanvas.height = Math.round(850 * (videoEl.videoHeight / videoEl.videoWidth)) || 540;
         const ctx = captureCanvas.getContext('2d');
         ctx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
-        return captureCanvas.toDataURL('image/jpeg', 0.52);
+        return captureCanvas.toDataURL('image/jpeg', 0.72);
       } catch (err) {
         return null;
       }
@@ -7138,6 +7220,7 @@ class AppController {
           studentPhone,
           slotId: slotId || 'slot1',
           isCameraActive: isActive,
+          agoraUid: studentAgoraUid || getNumericUid(studentId),
           cameraSnapshotUrl: snap,
           status: 'in_exam'
         });
@@ -7174,6 +7257,20 @@ class AppController {
         });
         if (overlay) overlay.style.display = 'none';
         updateCameraStatusBadges(true);
+
+        try {
+          if (!this.studentBroadcaster) {
+            this.studentBroadcaster = new AgoraStudentBroadcaster();
+          }
+          const numUid = await this.studentBroadcaster.start({
+            paperId,
+            studentId,
+            mediaStream: cameraStream
+          });
+          if (numUid) studentAgoraUid = numUid;
+        } catch (agoraErr) {
+          console.warn('[Agora] Broadcaster startup error:', agoraErr);
+        }
         setTimeout(() => sendHeartbeat(true), 800);
       } catch (err) {
         console.warn('Camera init error:', err);
@@ -7689,6 +7786,10 @@ ${!times.isWaiting ? `
       if (timerInterval) clearInterval(timerInterval);
       if (cameraStream) {
         cameraStream.getTracks().forEach(t => t.stop());
+      }
+      if (this.studentBroadcaster) {
+        this.studentBroadcaster.stop();
+        this.studentBroadcaster = null;
       }
       sendHeartbeat(false);
       roomContainer.remove();
