@@ -1626,6 +1626,256 @@ class AppController {
     const existing = document.getElementById('submission-details-dialog');
     if (existing) existing.remove();
 
+    const isMcq = session?.paperType === 'mcq' || reg?.paperType === 'mcq' || reg?.mcqScore !== undefined || (reg?.mcqAnswers && Object.keys(reg.mcqAnswers).length > 0);
+    const isCombined = session?.paperType === 'mcq_essay' || reg?.paperType === 'mcq_essay';
+    const photos = reg?.submissionPhotos || [];
+    const hasPhotos = photos.length > 0;
+
+    const formatSubmittedTime = (raw) => {
+      if (!raw) return 'Today, Live Session Verified';
+      try {
+        let d = null;
+        if (typeof raw.toDate === 'function') d = raw.toDate();
+        else if (raw.seconds) d = new Date(raw.seconds * 1000);
+        else if (raw._seconds) d = new Date(raw._seconds * 1000);
+        else if (typeof raw === 'number') d = new Date(raw);
+        else d = new Date(raw);
+        if (d && !isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ' • ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+      } catch (_) {}
+      return 'Today, Live Session Verified';
+    };
+
+    const formattedTime = formatSubmittedTime(reg?.submittedAt);
+
+    let contentHtml = '';
+
+    if (isMcq && !isCombined) {
+      // ── MCQ SESSION SUBMISSION ──
+      const totalQuestions = reg?.mcqTotal || session?.mcqCount || 50;
+      const score = reg?.mcqScore;
+      const answeredCount = reg?.mcqAnswers ? Object.keys(reg.mcqAnswers).length : totalQuestions;
+      const percentage = reg?.mcqPercentage !== undefined ? reg.mcqPercentage : (score !== undefined ? Math.round((score / totalQuestions) * 100) : null);
+      const marks = reg?.mcqMarks !== undefined ? reg.mcqMarks : score;
+
+      contentHtml = `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:26px; color:#22C55E;">task_alt</span>
+            <div class="app-dialog-title" style="font-size:16px;">Submission Confirmed</div>
+          </div>
+          <span style="background:rgba(56,189,248,0.15); color:#38BDF8; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:6px; border:1px solid rgba(56,189,248,0.3);">
+            MCQ Paper
+          </span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12.5px; color:#CBD5E1;">
+          <div>
+            <div style="font-size:14px; font-weight:800; color:#A5B4FC;">${session?.title || 'Model Paper'}</div>
+            <div style="font-size:11.5px; color:#94A3B8; margin-top:2px;">Subject: <strong style="color:#FFFFFF;">${session?.subject || 'Paper'} (${session?.examYear || '2027 A/L'})</strong></div>
+          </div>
+
+          <div style="background:#0F172A; border:1px solid #334155; border-radius:12px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span style="font-size:11.5px; font-weight:700; color:#38BDF8; display:flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded filled" style="font-size:15px;">checklist</span> Online MCQ Answer Sheet
+              </span>
+              ${percentage !== null ? `
+                <span style="background:rgba(34,197,94,0.2); color:#4ADE80; font-size:12px; font-weight:800; padding:2px 8px; border-radius:6px;">
+                  ${percentage}%
+                </span>
+              ` : `
+                <span style="background:rgba(34,197,94,0.15); color:#4ADE80; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px;">
+                  Submitted
+                </span>
+              `}
+            </div>
+            ${score !== undefined ? `
+              <div style="font-size:18px; font-weight:800; color:#FFFFFF;">
+                ${score} / ${totalQuestions} Correct
+                <span style="font-size:12px; color:#94A3B8; font-weight:600;">(${marks} Marks)</span>
+              </div>
+            ` : `
+              <div style="font-size:15px; font-weight:700; color:#FFFFFF;">
+                ${answeredCount} / ${totalQuestions} Questions Answered
+              </div>
+            `}
+            <div style="font-size:11px; color:#64748B; margin-top:4px;">
+              Direct Online Evaluation • Verified
+            </div>
+          </div>
+
+          <div style="font-size:11px; color:#94A3B8; display:flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">schedule</span>
+            <span>Time: ${formattedTime}</span>
+          </div>
+
+          <div style="background:rgba(30,41,59,0.8); border:1px solid #334155; border-radius:10px; padding:10px; font-size:11px; color:#CBD5E1; line-height:1.45;">
+            ඔබගේ MCQ පිළිතුරු පත්‍රය සාර්ථකව පද්ධතිය වෙත ලැබී ඇති අතර, ලකුණු තහවුරු කර සුරක්ෂිතව සටහන් කර ඇත. නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.
+          </div>
+        </div>
+
+        <div class="app-dialog-actions" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+          ${(reg?.mcqAnswers || score !== undefined) ? `
+            <button class="btn-primary" style="background:#6366F1; width:100%; padding:10px; border-radius:8px; font-weight:700; font-size:12.5px; display:flex; align-items:center; justify-content:center; gap:6px;" id="btn-view-mcq-review">
+              <span class="material-symbols-rounded" style="font-size:16px;">visibility</span> පිළිතුරු පරීක්ෂා කරන්න (Review Answers)
+            </button>
+          ` : ''}
+          <button class="btn-primary" style="background:#22C55E; width:100%; padding:10px; border-radius:8px; font-weight:800; font-size:13px;" id="btn-close-sub-dialog">
+            හරි (Done)
+          </button>
+        </div>
+      `;
+    } else if (isCombined) {
+      // ── COMBINED (MCQ + ESSAY) SESSION SUBMISSION ──
+      const totalQuestions = reg?.mcqTotal || session?.mcqCount || 50;
+      const score = reg?.mcqScore;
+
+      contentHtml = `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:26px; color:#22C55E;">verified</span>
+            <div class="app-dialog-title" style="font-size:16px;">Submission Confirmed</div>
+          </div>
+          <span style="background:rgba(99,102,241,0.15); color:#818CF8; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:6px; border:1px solid rgba(99,102,241,0.3);">
+            MCQ & Essay
+          </span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12.5px; color:#CBD5E1;">
+          <div>
+            <div style="font-size:14px; font-weight:800; color:#A5B4FC;">${session?.title || 'Model Paper'}</div>
+            <div style="font-size:11.5px; color:#94A3B8; margin-top:2px;">Subject: <strong style="color:#FFFFFF;">${session?.subject || 'Paper'} (${session?.examYear || '2027 A/L'})</strong></div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div style="background:#0F172A; border:1px solid #334155; border-radius:10px; padding:10px;">
+              <div style="font-size:10.5px; font-weight:700; color:#38BDF8; margin-bottom:4px;">MCQ Result</div>
+              <div style="font-size:14px; font-weight:800; color:#FFFFFF;">
+                ${score !== undefined ? `${score} / ${totalQuestions}` : 'Submitted'}
+              </div>
+            </div>
+            <div style="background:#0F172A; border:1px solid #334155; border-radius:10px; padding:10px;">
+              <div style="font-size:10.5px; font-weight:700; color:#F59E0B; margin-bottom:4px;">Essay Sheets</div>
+              <div style="font-size:14px; font-weight:800; color:#4ADE80;">
+                ${photos.length} Pages
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:11px; color:#94A3B8; display:flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">schedule</span>
+            <span>Time: ${formattedTime}</span>
+          </div>
+
+          <div style="background:rgba(30,41,59,0.8); border:1px solid #334155; border-radius:10px; padding:10px; font-size:11px; color:#CBD5E1; line-height:1.45;">
+            ඔබගේ MCQ පිළිතුරු සහ ලිඛිත පිළිතුරු පත්‍රවල ඡායාරූප සාර්ථකව ගුරුභවතුන් වෙත ලැබී ඇත.
+          </div>
+        </div>
+
+        <div class="app-dialog-actions" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+          <button class="btn-primary" style="background:#2563EB; width:100%; padding:10px; border-radius:8px; font-weight:700; font-size:12.5px; display:flex; align-items:center; justify-content:center; gap:6px;" id="btn-view-submission-all">
+            <span class="material-symbols-rounded" style="font-size:16px;">visibility</span> පිළිතුරු පත්‍ර බලන්න (View All)
+          </button>
+          <button class="btn-primary" style="background:#22C55E; width:100%; padding:10px; border-radius:8px; font-weight:800; font-size:13px;" id="btn-close-sub-dialog">
+            හරි (Done)
+          </button>
+        </div>
+      `;
+    } else {
+      // ── ESSAY / WRITTEN SESSION SUBMISSION ──
+      contentHtml = `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:26px; color:#22C55E;">check_circle</span>
+            <div class="app-dialog-title" style="font-size:16px;">Submission Confirmed</div>
+          </div>
+          <span style="background:rgba(245,158,11,0.15); color:#F59E0B; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:6px; border:1px solid rgba(245,158,11,0.3);">
+            Essay Paper
+          </span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12.5px; color:#CBD5E1;">
+          <div>
+            <div style="font-size:14px; font-weight:800; color:#A5B4FC;">${session?.title || 'Model Paper'}</div>
+            <div style="font-size:11.5px; color:#94A3B8; margin-top:2px;">Subject: <strong style="color:#FFFFFF;">${session?.subject || 'Paper'} (${session?.examYear || '2027 A/L'})</strong></div>
+          </div>
+
+          <div style="background:#0F172A; border:1px solid #334155; border-radius:12px; padding:12px;">
+            <div style="font-size:11px; font-weight:700; color:#F59E0B; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded filled" style="font-size:15px;">description</span> Scanned Answer Sheets
+            </div>
+            <div style="font-size:17px; font-weight:800; color:#4ADE80;">
+              ${photos.length > 0 ? `${photos.length} Pages Uploaded` : 'Answer Sheets Received'}
+            </div>
+            <div style="font-size:11px; color:#64748B; margin-top:2px;">
+              Document Scanner High-Resolution Upload • Secured
+            </div>
+          </div>
+
+          <div style="font-size:11px; color:#94A3B8; display:flex; align-items:center; gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">schedule</span>
+            <span>Time: ${formattedTime}</span>
+          </div>
+
+          <div style="background:rgba(30,41,59,0.8); border:1px solid #334155; border-radius:10px; padding:10px; font-size:11px; color:#CBD5E1; line-height:1.45;">
+            ඔබගේ පිළිතුරු පත්‍රවල ඡායාරූප (Answer Sheets) ගුරුභවතුන් වෙත සුරක්ෂිතව ලැබී ඇති බැවින් නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.
+          </div>
+        </div>
+
+        <div class="app-dialog-actions" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+          ${hasPhotos ? `
+            <button class="btn-primary" style="background:#2563EB; width:100%; padding:10px; border-radius:8px; font-weight:700; font-size:12.5px; display:flex; align-items:center; justify-content:center; gap:6px;" id="btn-view-essay-pages">
+              <span class="material-symbols-rounded" style="font-size:16px;">photo_library</span> පිළිතුරු පත්‍ර බලන්න (${photos.length} Pages)
+            </button>
+          ` : ''}
+          <button class="btn-primary" style="background:#22C55E; width:100%; padding:10px; border-radius:8px; font-weight:800; font-size:13px;" id="btn-close-sub-dialog">
+            හරි (Done)
+          </button>
+        </div>
+      `;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'app-dialog-overlay';
+    overlay.id = 'submission-details-dialog';
+    overlay.innerHTML = `
+      <div class="app-dialog-box" style="max-width:390px; padding:20px; font-family:'Poppins',sans-serif;">
+        ${contentHtml}
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btn-close-sub-dialog')?.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    overlay.querySelector('#btn-view-mcq-review')?.addEventListener('click', () => {
+      overlay.remove();
+      this._showSubmissionViewer({ ...reg, studentName: this.currentUser?.name || session.title, submissionPhotos: [] });
+    });
+
+    overlay.querySelector('#btn-view-essay-pages')?.addEventListener('click', () => {
+      overlay.remove();
+      this._showSubmissionViewer({ ...reg, studentName: this.currentUser?.name || session.title });
+    });
+
+    overlay.querySelector('#btn-view-submission-all')?.addEventListener('click', () => {
+      overlay.remove();
+      this._showSubmissionViewer({ ...reg, studentName: this.currentUser?.name || session.title });
+    });
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    return;
+  }
+  _oldShowSubmissionDetailsDialog(session, reg) {
+    const existing = document.getElementById('submission-details-dialog');
+    if (existing) existing.remove();
+
     const overlay = document.createElement('div');
     overlay.className = 'app-dialog-overlay';
     overlay.id = 'submission-details-dialog';
