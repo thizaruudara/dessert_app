@@ -1031,7 +1031,9 @@ class AppController {
             </div>
           ` : sessions.map(session => {
             const reg = registrations.get(session.id);
-            const isSubmitted = reg?.status === 'submitted' || reg?.isSubmitted === true;
+            const uId = user.uid || user.id || 's_default';
+            const localSub = localStorage.getItem(`paper_submitted_${session.id}_${uId}`) === 'true' || localStorage.getItem(`paper_submitted_${session.id}`) === 'true';
+            const isSubmitted = localSub || reg?.status === 'submitted' || reg?.isSubmitted === true || (reg?.submissionPhotos && reg.submissionPhotos.length > 0);
             const selectedSlotId = reg?.selectedSlot || 'slot1';
 
             const slot1 = session.slot1 || {
@@ -6841,8 +6843,12 @@ class AppController {
     const studentPhone = student.phone || student.phoneNumber || '';
 
     // 1. Check if student already submitted this paper (matching _checkIfAlreadySubmitted)
+    const localSubmitted = localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' || localStorage.getItem(`paper_submitted_${paperId}`) === 'true';
     const existingReg = await dbService.getStudentRegistration(paperId, studentId);
-    if (existingReg && (existingReg.isSubmitted || existingReg.status === 'submitted')) {
+    const hasSubmittedPhotos = !!(existingReg?.submissionPhotos && existingReg.submissionPhotos.length > 0);
+    const isAlreadySubmitted = localSubmitted || hasSubmittedPhotos || existingReg?.isSubmitted === true || existingReg?.status === 'submitted';
+
+    if (isAlreadySubmitted) {
       const alreadySubmittedModal = document.createElement('div');
       alreadySubmittedModal.className = 'app-modal';
       alreadySubmittedModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:99999;';
@@ -7765,8 +7771,13 @@ ${!times.isWaiting ? `
                 slotId: slotId || 'slot1',
                 isCameraActive: false,
                 status: 'submitted',
+                isSubmitted: true,
                 submissionPhotos: photoUrls
               });
+
+              // Permanent local storage locks to prevent re-entering
+              localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
+              localStorage.setItem(`paper_submitted_${paperId}`, 'true');
 
               overlay.remove();
               if (scannerStream) scannerStream.getTracks().forEach(t => t.stop());

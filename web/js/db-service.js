@@ -553,6 +553,11 @@ export class DbService {
   }
 
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
+    if (!paperId || !studentId) return null;
+    const existing = await this.getStudentRegistration(paperId, studentId);
+    if (existing && (existing.status === 'submitted' || existing.isSubmitted === true || (existing.submissionPhotos && existing.submissionPhotos.length > 0))) {
+      return existing; // DO NOT OVERWRITE SUBMITTED STATE!
+    }
     const regData = { paperId, studentId, studentName, studentPhone, selectedSlot: slotId, status: 'registered', isCameraActive: false, registeredAt: new Date().toISOString() };
     try {
       await callBackend('papers/register-slot', { paperId, slotId });
@@ -669,11 +674,14 @@ export class DbService {
           updates.joinedAt = serverTimestamp();
         } else if (status === 'submitted') {
           updates.submittedAt = serverTimestamp();
+          updates.isSubmitted = true;
         }
       }
       if (submissionPhotos && Array.isArray(submissionPhotos) && submissionPhotos.length > 0) {
         updates.submissionPhotos = submissionPhotos;
         updates.submissionUrl = submissionPhotos[0];
+        updates.isSubmitted = true;
+        updates.status = 'submitted';
       }
 
       await setDoc(regRef, updates, { merge: true });
