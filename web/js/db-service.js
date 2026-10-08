@@ -443,8 +443,7 @@ export class DbService {
     ];
 
     if (!examYear || examYear === 'All' || examYear === 'All Batches') return list;
-    const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-    return filtered.length > 0 ? filtered : list;
+    return list.filter(p => this.matchesYear(p.examYear, examYear));
   }
 
   getMockUpcomingPapers(examYear) {
@@ -495,13 +494,7 @@ export class DbService {
         const list = snap.docs.map(d => this.normalizePaperSession(d.data(), d.id)).filter(Boolean);
         let result = list;
         if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
-          const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-          if (filtered.length > 0) {
-            result = filtered;
-          } else {
-            const liveOrUpcoming = list.filter(p => !p.isEnded && p.status !== 'ended' && p.currentPhase !== 'ended');
-            result = liveOrUpcoming.length > 0 ? liveOrUpcoming : list;
-          }
+          result = list.filter(p => this.matchesYear(p.examYear, examYear));
         }
         const getSessionOrderTime = (p) => {
           if (p.createdAt) {
@@ -572,13 +565,7 @@ export class DbService {
         const list = snapshot.docs.map(d => this.normalizePaperSession(d.data(), d.id)).filter(Boolean);
         let result = list;
         if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
-          const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-          if (filtered.length > 0) {
-            result = filtered;
-          } else {
-            const liveOrUpcoming = list.filter(p => !p.isEnded && p.status !== 'ended' && p.currentPhase !== 'ended');
-            result = liveOrUpcoming.length > 0 ? liveOrUpcoming : list;
-          }
+          result = list.filter(p => this.matchesYear(p.examYear, examYear));
         }
         const getSessionOrderTime = (p) => {
           if (p.createdAt) {
@@ -613,9 +600,10 @@ export class DbService {
       const snap = await getDocs(ref);
       if (!snap.empty) {
         const list = snap.docs.map(d => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
-        const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-        if (filtered.length > 0) return filtered;
-        if (list.length > 0 && (!examYear || examYear === 'All' || examYear === 'All Batches')) return list;
+        if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+          return list.filter(p => this.matchesYear(p.examYear, examYear));
+        }
+        return list;
       }
     } catch (e) {
       console.warn('[DB] getUpcomingPapers error:', e);
@@ -630,8 +618,7 @@ export class DbService {
         const list = snap.docs.map(d => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
         let result = list;
         if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
-          const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-          result = filtered.length > 0 ? filtered : list;
+          result = list.filter(p => this.matchesYear(p.examYear, examYear));
         }
         callback(result);
       }, (e) => {

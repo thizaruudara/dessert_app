@@ -958,10 +958,7 @@ class AppController {
             <span class="material-symbols-rounded" style="font-size:48px; color:#94A3B8;">menu_book</span>
           </div>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">නව Paper Sessions සූදානම් වෙමින් පවතී</div>
-          <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.' : `ඔබගේ කණ්ඩායම (${currentYear}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.`}</div>
-          <button class="btn-primary" id="btn-empty-toggle-batch" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
-            ${this.showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න'}
-          </button>
+          <div style="font-size:13px; line-height:1.5;">ඔබගේ කණ්ඩායම (${currentYear}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.</div>
         </div>
       `;
     }
@@ -1220,7 +1217,7 @@ class AppController {
         registrations.set(pId, updatedReg);
         const liveTab = container.querySelector('#papers-tab-live-content');
         if (liveTab) {
-          liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, this.showAllBatches ? null : (user.examYear || '2027 A/L'), user.examYear || '2027 A/L');
+          liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, user.examYear || '2027 A/L', user.examYear || '2027 A/L');
           this._bindStudentLiveSessionActions(container, sessions, registrations, user);
         }
       });
@@ -1262,10 +1259,7 @@ class AppController {
             <span class="material-symbols-rounded" style="font-size:48px; color:#94A3B8;">lightbulb</span>
           </div>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled Yet</div>
-          <div style="font-size:13px; line-height:1.5;">${this.showAllBatches ? 'Check back soon for new exam papers, scopes, and preparation hints.' : `Upcoming papers and hints for ${currentYear} will be announced here.`}</div>
-          <button class="btn-primary" id="btn-empty-toggle-batch-2" style="margin-top:16px; width:auto; padding:10px 20px; font-size:12.5px;">
-            ${this.showAllBatches ? 'Show My Batch Only' : 'Show All Batches'}
-          </button>
+          <div style="font-size:13px; line-height:1.5;">Upcoming papers and hints for ${currentYear} will be announced here.</div>
         </div>
       `;
     }
@@ -1390,7 +1384,7 @@ class AppController {
     try {
       const user = this.currentUser || { name: 'Scholar', phone: '', examYear: '2027 A/L' };
       const currentYear = user.examYear || '2027 A/L';
-      const activeTargetYear = this.showAllBatches ? null : currentYear;
+      const activeTargetYear = currentYear;
 
       const [sessions, upcomingList] = await Promise.all([
         dbService.getPaperSessions(activeTargetYear),
@@ -1403,13 +1397,6 @@ class AppController {
       ])));
       if (renderToken !== this.renderToken || !container.isConnected) return;
 
-      const formatHeaderSubtitle = () => {
-        if (this.showAllBatches) {
-          return 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි';
-        }
-        return `${currentYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි`;
-      };
-
       container.innerHTML = `
         <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
         <div class="screen-appbar">
@@ -1419,16 +1406,14 @@ class AppController {
             </div>
             <div>
               <div class="appbar-title">Paper Writing Sessions</div>
-              <div class="appbar-subtitle" id="papers-batch-subtitle">${formatHeaderSubtitle()}</div>
+              <div class="appbar-subtitle" id="papers-batch-subtitle">${currentYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි</div>
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <button class="appbar-badge-toggle" id="btn-toggle-papers-batch" title="Toggle Batch Filter">
-              <span style="display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded" style="font-size:14px;">${this.showAllBatches ? 'public' : 'school'}</span>
-                <span>${this.showAllBatches ? 'All' : 'Batch'}</span>
-              </span>
-            </button>
+            <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:10px; padding:5px 10px; font-size:12px; font-weight:700; color:#4F46E5; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:15px;">school</span>
+              <span>${currentYear}</span>
+            </div>
             <button class="btn-vault-refresh" id="btn-refresh-papers" title="Refresh Sessions">
               <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
             </button>
@@ -1478,15 +1463,7 @@ class AppController {
         this.renderPapersScreen(container);
       });
 
-      const toggleBatch = () => {
-        this.showAllBatches = !this.showAllBatches;
-        this.renderPapersScreen(container);
-      };
-
-      document.getElementById('btn-toggle-papers-batch')?.addEventListener('click', toggleBatch);
       document.getElementById('btn-refresh-papers')?.addEventListener('click', () => this.renderPapersScreen(container));
-      document.getElementById('btn-empty-toggle-batch')?.addEventListener('click', toggleBatch);
-      document.getElementById('btn-empty-toggle-batch-2')?.addEventListener('click', toggleBatch);
 
       this._bindStudentLiveSessionActions(container, sessions, registrations, user);
       this._bindStudentUpcomingActions(container, upcomingList);

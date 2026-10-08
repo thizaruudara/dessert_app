@@ -30,7 +30,6 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   String? _lastExamYear;
   List<PaperSession>? _cachedSessions;
   bool _initialFetchDone = false;
-  bool _showAllBatches = false;
 
   @override
   void initState() {
@@ -48,7 +47,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final user = context.read<AuthProvider>().userModel;
-    final targetYear = _showAllBatches ? null : user?.examYear;
+    final targetYear = user?.examYear;
     if (_sessionsStream == null || _lastExamYear != targetYear) {
       _lastExamYear = targetYear;
       _sessionsStream = _paperService.streamSessions(examYear: targetYear);
@@ -82,7 +81,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   }
 
   void _refreshSessions(String? examYear) async {
-    final targetYear = _showAllBatches ? null : examYear;
+    final targetYear = examYear;
     final data = await _paperService.getSessions(examYear: targetYear);
     if (mounted) {
       setState(() {
@@ -126,11 +125,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
                     ),
                   ),
                   Text(
-                    _showAllBatches
-                        ? 'සියලු Batches • සජීවී විභාග සහ අධීක්ෂණ සැසි'
-                        : (user?.examYear != null
-                            ? '${user!.examYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි'
-                            : 'සජීවී විභාග සහ අධීක්ෂණ සැසි'),
+                    user?.examYear != null
+                        ? '${user!.examYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි'
+                        : 'සජීවී විභාග සහ අධීක්ෂණ සැසි',
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       color: AppColors.textMuted,
@@ -298,7 +295,7 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
   Widget _buildUpcomingPapersView(String? userExamYear) {
     return StreamBuilder<List<UpcomingPaper>>(
       stream: _leaderboardService.streamUpcomingPapers(
-        examYear: _showAllBatches ? null : userExamYear,
+        examYear: userExamYear,
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
@@ -340,32 +337,9 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _showAllBatches
-                    ? 'Check back soon for new exam papers, scopes, and preparation hints.'
-                    : 'Upcoming papers and hints for ${userExamYear ?? "your batch"} will be announced here.',
+                'Upcoming papers and hints for ${userExamYear ?? "your batch"} will be announced here.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF6366F1)),
-                    backgroundColor: const Color(0xFFEEF2FF).withOpacity(0.5),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _showAllBatches = !_showAllBatches;
-                    });
-                  },
-                  icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.visibility, size: 16, color: const Color(0xFF6366F1)),
-                  label: Text(
-                    _showAllBatches ? 'Show My Batch Only' : 'Show All Batches',
-                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF6366F1)),
-                  ),
-                ),
               ),
             ],
           );
@@ -877,37 +851,11 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          _showAllBatches
-              ? 'දැනට කිසිදු Paper Session එකක් සැලසුම් කර නොමැත.'
-              : 'ඔබගේ කණ්ඩායම (${userExamYear ?? "2027 A/L"}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.',
+          'ඔබගේ කණ්ඩායම (${userExamYear ?? "2027 A/L"}) සඳහා ඉදිරි විභාග සැසි මෙහි දිස්වනු ඇත.',
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
             fontSize: 13,
             color: const Color(0xFF64748B),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Center(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF6366F1)),
-              backgroundColor: const Color(0xFFEEF2FF).withOpacity(0.5),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              setState(() {
-                _showAllBatches = !_showAllBatches;
-                final target = _showAllBatches ? null : userExamYear;
-                _sessionsStream = _paperService.streamSessions(examYear: target);
-                _loadInitialData(target);
-              });
-            },
-            icon: Icon(_showAllBatches ? Icons.filter_alt : Icons.all_inclusive, color: const Color(0xFF6366F1), size: 18),
-            label: Text(
-              _showAllBatches ? 'මගේ Batch එක පමණක් බලන්න' : 'සියලු Batches වල Sessions බලන්න',
-              style: GoogleFonts.poppins(color: const Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w600),
-            ),
           ),
         ),
       ],
