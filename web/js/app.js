@@ -7026,9 +7026,17 @@ class AppController {
 
       // Package opening 10 mins countdown (600s)
       let pkgSecsLeft = 600;
-      if (isPackageOpening && session.packageOpeningStartedAt) {
-        const started = new Date(session.packageOpeningStartedAt);
-        const elapsed = Math.max(0, Math.floor((new Date() - started) / 1000));
+      if (isPackageOpening) {
+        let startTime = session.packageOpeningStartedAt ? new Date(session.packageOpeningStartedAt) : null;
+        if (!startTime) {
+          const cached = localStorage.getItem(`paper_pkg_start_${session.id}`);
+          if (cached) startTime = new Date(cached);
+          else {
+            startTime = new Date();
+            localStorage.setItem(`paper_pkg_start_${session.id}`, startTime.toISOString());
+          }
+        }
+        const elapsed = Math.max(0, Math.floor((new Date() - startTime) / 1000));
         pkgSecsLeft = Math.max(0, 600 - elapsed);
       }
 
@@ -7129,23 +7137,7 @@ class AppController {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <!-- Instant Phase Switcher Bar -->
-            <div style="display:flex; background:#0F172A; border:1px solid #334155; border-radius:12px; padding:2px; gap:2px;">
-              <button class="btn-phase-tab" data-phase="waiting" style="background:${times.isWaiting ? '#6366F1' : 'transparent'}; color:${times.isWaiting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
-                <span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Waiting Room
-              </button>
-              <button class="btn-phase-tab" data-phase="package_opening" style="background:${times.isPackageOpening ? '#F59E0B' : 'transparent'}; color:${times.isPackageOpening ? '#000000' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
-                <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; margin-right:4px;">inventory_2</span>Parcel Open (10m)
-              </button>
-              <button class="btn-phase-tab" data-phase="writing" style="background:${times.isWriting ? '#22C55E' : 'transparent'}; color:${times.isWriting ? '#FFFFFF' : '#94A3B8'}; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
-                <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; margin-right:4px;">edit_note</span>Writing Session
-              </button>
-              <button class="btn-phase-tab" data-phase="scanner" style="background:transparent; color:#38BDF8; border:none; padding:4px 9px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center;">
-                <span class="material-symbols-rounded filled" style="font-size:14px; vertical-align:middle; margin-right:4px;">description</span>Answer Submission
-              </button>
-            </div>
-
-            ${!times.isWaiting ? `
+${!times.isWaiting ? `
               <button id="btn-appbar-flip" title="Flip Camera" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; padding:6px; display:flex; align-items:center;">
                 <span class="material-symbols-rounded">flip_camera_ios</span>
               </button>
@@ -7295,7 +7287,7 @@ class AppController {
                         </div>
                       </div>
                     </div>
-                    <div style="background:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'}; color:${times.pkgSecsLeft <= 0 ? '#FFFFFF' : '#000000'}; padding:4px 8px; border-radius:8px; font-size:12px; font-weight:800;">
+                    <div id="pkg-timer-banner-pill" style="background:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'}; color:${times.pkgSecsLeft <= 0 ? '#FFFFFF' : '#000000'}; padding:4px 8px; border-radius:8px; font-size:12px; font-weight:800;">
                       ${String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0')}:${String(times.pkgSecsLeft % 60).padStart(2, '0')}
                     </div>
                   </div>
@@ -7316,7 +7308,7 @@ class AppController {
                       <span style="font-size:11.5px; font-weight:600; color:#FFFFFF; display:inline-flex; align-items:center;"><span class="material-symbols-rounded filled" style="font-size:15px; vertical-align:middle; margin-right:4px;">edit_note</span>ලිවීම සක්‍රීයයි • ඉතිරි කාලය:</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
-                      <span style="font-size:16px; font-weight:800; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                      <span id="hud-minimized-time" style="font-size:16px; font-weight:800; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
                         ${String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0')}:${String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0')}:${String(times.writingSecsLeft % 60).padStart(2, '0')}
                       </span>
                       <button id="btn-toggle-hud" style="background:rgba(255,255,255,0.12); border:none; color:#FFFFFF; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; display:flex; align-items:center;">
@@ -7338,21 +7330,21 @@ class AppController {
                     <!-- Digit Tiles -->
                     <div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0;">
                       <div style="display:flex; flex-direction:column; align-items:center;">
-                        <div style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                        <div id="hud-tile-hours" style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
                           ${String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0')}
                         </div>
                         <span style="font-size:8.5px; font-weight:600; color:#64748B; margin-top:3px;">HOURS</span>
                       </div>
                       <span style="font-size:24px; font-weight:bold; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'};">:</span>
                       <div style="display:flex; flex-direction:column; align-items:center;">
-                        <div style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                        <div id="hud-tile-minutes" style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
                           ${String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0')}
                         </div>
                         <span style="font-size:8.5px; font-weight:600; color:#64748B; margin-top:3px;">MINUTES</span>
                       </div>
                       <span style="font-size:24px; font-weight:bold; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'};">:</span>
                       <div style="display:flex; flex-direction:column; align-items:center;">
-                        <div style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
+                        <div id="hud-tile-seconds" style="background:#1E293B; border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}80; border-radius:10px; padding:6px 10px; min-width:54px; font-size:26px; font-weight:900; color:${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; font-family:monospace;">
                           ${String(times.writingSecsLeft % 60).padStart(2, '0')}
                         </div>
                         <span style="font-size:8.5px; font-weight:600; color:#64748B; margin-top:3px;">SECONDS</span>
@@ -7453,24 +7445,7 @@ class AppController {
         openDocumentScanner();
       });
 
-      // Instant Phase Switcher Clicks
-      roomContainer.querySelectorAll('.btn-phase-tab').forEach(tab => {
-        tab.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const targetPhase = tab.dataset.phase;
-          if (targetPhase === 'scanner') {
-            openDocumentScanner();
-            return;
-          }
-          session.currentPhase = targetPhase;
-          if (targetPhase === 'package_opening') {
-            session.packageOpeningStartedAt = new Date().toISOString();
-          } else if (targetPhase === 'writing') {
-            session.writingStartedAt = new Date().toISOString();
-          }
-          renderRoom();
-        });
-      });
+
     };
 
     // Exit Warning Dialog matching _showExitWarningDialog()
@@ -7945,6 +7920,34 @@ class AppController {
         pill.style.borderColor = timerColor;
         if (iconEl) iconEl.style.color = timerColor;
         if (textEl) textEl.style.color = timerColor;
+      }
+
+      // Update package opening 10-minute banner pill
+      const pkgBannerPill = roomContainer.querySelector('#pkg-timer-banner-pill');
+      if (pkgBannerPill && times.isPackageOpening) {
+        const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');
+        const s = String(times.pkgSecsLeft % 60).padStart(2, '0');
+        const timeStr = `${m}:${s}`;
+        if (pkgBannerPill.textContent.trim() !== timeStr) {
+          pkgBannerPill.textContent = timeStr;
+          pkgBannerPill.style.background = times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B';
+          pkgBannerPill.style.color = times.pkgSecsLeft <= 0 ? '#FFFFFF' : '#000000';
+        }
+      }
+
+      // Update writing digital HUD clock
+      if (times.isWriting) {
+        const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
+        const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
+        const s = String(times.writingSecsLeft % 60).padStart(2, '0');
+        const tileH = roomContainer.querySelector('#hud-tile-hours');
+        const tileM = roomContainer.querySelector('#hud-tile-minutes');
+        const tileS = roomContainer.querySelector('#hud-tile-seconds');
+        const minTime = roomContainer.querySelector('#hud-minimized-time');
+        if (tileH && tileH.textContent.trim() !== h) tileH.textContent = h;
+        if (tileM && tileM.textContent.trim() !== m) tileM.textContent = m;
+        if (tileS && tileS.textContent.trim() !== s) tileS.textContent = s;
+        if (minTime) minTime.textContent = `${h}:${m}:${s}`;
       }
     }, 1000);
   }
