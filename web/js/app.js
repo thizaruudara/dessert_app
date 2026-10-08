@@ -6956,6 +6956,16 @@ class AppController {
 
     // Camera Init using WebRTC getUserMedia
     const initCamera = async () => {
+      const overlay = roomContainer.querySelector('#camera-loading-overlay');
+      const loadText = roomContainer.querySelector('#camera-loading-text');
+      const loadIcon = roomContainer.querySelector('#camera-loading-icon');
+      const retryBtn = roomContainer.querySelector('#btn-retry-camera');
+      if (overlay && !cameraActive) {
+        overlay.style.display = 'flex';
+        if (loadText) loadText.textContent = 'කැමරාව ආරම්භ වෙමින් පවතී...';
+        if (loadIcon) loadIcon.textContent = 'videocam_off';
+        if (retryBtn) { retryBtn.textContent = 'සම්බන්ධ වෙමින්...'; retryBtn.disabled = true; }
+      }
       try {
         if (cameraStream) {
           cameraStream.getTracks().forEach(t => t.stop());
@@ -6970,13 +6980,22 @@ class AppController {
           v.srcObject = cameraStream;
           v.play().catch(() => {});
         });
+        if (overlay) overlay.style.display = 'none';
         updateCameraStatusBadges(true);
         setTimeout(() => sendHeartbeat(true), 800);
       } catch (err) {
         console.warn('Camera init error:', err);
         cameraActive = false;
+        if (overlay) {
+          overlay.style.display = 'flex';
+          if (loadText) loadText.textContent = 'කැමරා ප්‍රවේශය අසාර්ථක විය (Camera Failed)';
+          if (loadIcon) loadIcon.textContent = 'error';
+          if (retryBtn) { retryBtn.textContent = 'නැවත උත්සාහ කරන්න (Retry)'; retryBtn.disabled = false; }
+        }
         updateCameraStatusBadges(false);
         sendHeartbeat(false);
+      } finally {
+        if (retryBtn) retryBtn.disabled = false;
       }
     };
 
@@ -7175,13 +7194,11 @@ class AppController {
                 </div>
                 <div style="height:220px; width:100%; background:#000000; position:relative; display:flex; align-items:center; justify-content:center;">
                   <video class="proctor-video-feed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
-                  ${!cameraActive ? `
-                    <div style="position:absolute; display:flex; flex-direction:column; align-items:center; gap:8px; color:#94A3B8; text-align:center; padding:16px;">
-                      <span class="material-symbols-rounded" style="font-size:32px; color:#64748B;">videocam_off</span>
-                      <div style="font-size:11px;">කැමරාව ආරම්භ වෙමින් පවතී...</div>
-                      <button id="btn-retry-camera" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer;">නැවත උත්සාහ කරන්න (Retry)</button>
-                    </div>
-                  ` : ''}
+                  <div id="camera-loading-overlay" style="position:absolute; display:${cameraActive ? 'none' : 'flex'}; flex-direction:column; align-items:center; gap:8px; color:#94A3B8; text-align:center; padding:16px; background:rgba(0,0,0,0.6); border-radius:12px; pointer-events:auto;">
+                    <span id="camera-loading-icon" class="material-symbols-rounded" style="font-size:32px; color:#64748B;">videocam_off</span>
+                    <div id="camera-loading-text" style="font-size:11px;">කැමරාව ආරම්භ වෙමින් පවතී...</div>
+                    <button id="btn-retry-camera" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer;">නැවත උත්සාහ කරන්න (Retry)</button>
+                  </div>
                 </div>
                 <div style="padding:12px; display:flex; align-items:center; justify-content:space-between;">
                   <div style="display:flex; align-items:center; gap:6px; font-size:10.5px; color:#94A3B8;">
@@ -7417,8 +7434,10 @@ class AppController {
         initCamera();
       });
 
-      roomContainer.querySelector('#btn-retry-camera')?.addEventListener('click', () => {
-        initCamera();
+      roomContainer.querySelector('#btn-retry-camera')?.addEventListener('click', async () => {
+        const retryBtn = roomContainer.querySelector('#btn-retry-camera');
+        if (retryBtn) { retryBtn.textContent = 'සම්බන්ධ වෙමින්...'; retryBtn.disabled = true; }
+        await initCamera();
       });
 
       roomContainer.querySelector('#btn-toggle-hud')?.addEventListener('click', () => {
