@@ -4755,32 +4755,34 @@ class AppController {
     return `
       <div class="admin-paper-card" style="background:#FFFFFF; border-radius:16px; border:1px solid #E2E8F0; box-shadow:0 3px 12px rgba(15,23,42,0.04); margin-bottom:4px; overflow:hidden;">
         <!-- Top Badges & Actions matching Flutter 1:1 -->
-        <div style="padding:16px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px;">
-              ${session.subject || 'Physics'}
-            </span>
-            <span style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">${session.paperType === 'mcq' ? 'check_circle' : (session.paperType === 'mcq_essay' ? 'auto_stories' : 'edit_document')}</span>
-              <span>${session.paperType === 'mcq' ? `MCQ (${session.mcqCount || 50} Qs)` : (session.paperType === 'mcq_essay' ? `MCQ & Essay (${session.mcqCount || 50} Qs)` : 'Essay (ලිඛිත)')}</span>
-            </span>
-            <span style="background:#FFFFFF; border:1px solid #E2E8F0; color:#64748B; font-size:11px; padding:4px 10px; border-radius:20px;">
-              ${session.examYear || '2027 A/L'}
-            </span>
-            <span style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded ${isLive ? 'filled' : ''}" style="font-size:13px;">${badgeIcon}</span>
-              <span>${badgeText}</span>
-            </span>
-            <div style="margin-left:auto; display:flex; align-items:center; gap:4px;">
+        <div style="padding:14px 16px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; flex:1; min-width:0;">
+              <span style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px;">
+                ${session.subject || 'Physics'}
+              </span>
+              <span style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px;">${session.paperType === 'mcq' ? 'check_circle' : (session.paperType === 'mcq_essay' ? 'auto_stories' : 'edit_document')}</span>
+                <span>${session.paperType === 'mcq' ? `MCQ (${session.mcqCount || 50} Qs)` : (session.paperType === 'mcq_essay' ? `MCQ & Essay (${session.mcqCount || 50} Qs)` : 'Essay (ලිඛිත)')}</span>
+              </span>
+              <span style="background:#FFFFFF; border:1px solid #E2E8F0; color:#64748B; font-size:11px; padding:4px 10px; border-radius:20px;">
+                ${session.examYear || '2027 A/L'}
+              </span>
+              <span style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded ${isLive ? 'filled' : ''}" style="font-size:13px;">${badgeIcon}</span>
+                <span>${badgeText}</span>
+              </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
               ${(session.paperType === 'mcq' || session.paperType === 'mcq_essay') ? `
-              <button class="apk-icon-action-btn" data-edit-mcq-answers="${session.id}" title="Pre-set / View MCQ Answer Key" style="color:#10B981; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
+              <button class="apk-icon-action-btn" data-edit-mcq-answers="${session.id}" title="Pre-set / View MCQ Answer Key" style="color:#059669; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #A7F3D0; background:#ECFDF5; border-radius:8px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:18px;">key</span>
               </button>
               ` : ''}
-              <button class="apk-icon-action-btn" data-edit-times="${session.id}" title="Change Session Times (Slot 1 / Slot 2)" style="color:#2563EB; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
+              <button class="apk-icon-action-btn" data-edit-times="${session.id}" title="Change Session Times (Slot 1 / Slot 2)" style="color:#2563EB; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #BFDBFE; background:#EFF6FF; border-radius:8px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:18px;">edit_calendar</span>
               </button>
-              <button class="apk-icon-action-btn" data-delete-paper="${session.id}" title="Delete Paper Session (සැසිය මකා දැමීම)" style="color:#EF4444; font-size:16px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">
+              <button class="apk-icon-action-btn" data-delete-paper="${session.id}" title="Delete Paper Session (සැසිය මකා දැමීම)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:8px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
               </button>
             </div>
@@ -4843,10 +4845,10 @@ class AppController {
             <span>Live Camera Proctor Monitor (අධීක්ෂණ මධ්‍යස්ථානය)</span>
           </button>
 
-          <!-- Secondary Row matching Flutter 1:1 -->
-          <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+          <!-- Secondary Row matching Flutter 1:1 with clear Delete Button -->
+          <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;">
             ${!isEnded ? `
-              <button data-end-session="${session.id}" style="flex:1; padding:10px; border-radius:10px; border:1px solid #EF4444; background:transparent; color:#EF4444; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
+              <button data-end-session="${session.id}" style="flex:1; min-width:140px; padding:10px; border-radius:10px; border:1px solid #EF4444; background:transparent; color:#EF4444; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:16px;">stop_circle</span>
                 <span>End Session (සැසිය අවසන් කරන්න)</span>
               </button>
@@ -4856,13 +4858,21 @@ class AppController {
                   <span>Start Now</span>
                 </button>
               ` : ''}
+              <button data-delete-paper="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #FCA5A5; background:#FEF2F2; color:#DC2626; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;" title="Delete Session (මකා දමන්න)">
+                <span class="material-symbols-rounded" style="font-size:16px;">delete</span>
+                <span>Delete</span>
+              </button>
             ` : `
-              <div style="flex:1; padding:8px; border-radius:8px; background:#F1F5F9; border:1px solid #E2E8F0; text-align:center; font-size:11px; color:#64748B; font-weight:500;">
+              <div style="flex:1; min-width:130px; padding:8px 10px; border-radius:8px; background:#F1F5F9; border:1px solid #E2E8F0; text-align:center; font-size:11px; color:#64748B; font-weight:500;">
                 සැසිය අවසන් කර ඇත (Session Ended)
               </div>
-              <button data-reopen-session="${session.id}" style="padding:8px 12px; border-radius:8px; border:none; background:transparent; color:#2563EB; font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; cursor:pointer;">
+              <button data-reopen-session="${session.id}" style="padding:8px 12px; border-radius:8px; border:1px solid #DBEAFE; background:#EFF6FF; color:#2563EB; font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:16px;">replay</span>
                 <span>Reopen</span>
+              </button>
+              <button data-delete-paper="${session.id}" style="padding:8px 14px; border-radius:8px; border:1px solid #FCA5A5; background:#FEF2F2; color:#DC2626; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" title="Delete Session (මකා දමන්න)">
+                <span class="material-symbols-rounded" style="font-size:16px;">delete</span>
+                <span>Delete</span>
               </button>
             `}
           </div>
@@ -5061,12 +5071,22 @@ class AppController {
     `;
 
     document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     document.getElementById('btn-cancel-delete')?.addEventListener('click', () => modal.remove());
-    document.getElementById('btn-confirm-delete')?.addEventListener('click', async () => {
-      await dbService.deletePaperSession(session.id);
-      notificationService.showInAppBanner('Session Deleted', 'Paper Session එක සාර්ථකව මකා දමන ලදී (Deleted).', 'warning');
-      modal.remove();
-      this.renderAdminPapersScreen(container);
+    const confirmBtn = document.getElementById('btn-confirm-delete');
+    confirmBtn?.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Deleting...';
+      try {
+        await dbService.deletePaperSession(session.id);
+        notificationService.showInAppBanner('Session Deleted', 'Paper Session එක සාර්ථකව මකා දමන ලදී (Deleted).', 'warning');
+      } catch (err) {
+        console.error('Delete error:', err);
+        notificationService.showInAppBanner('Error', 'Failed to delete session', 'error');
+      } finally {
+        modal.remove();
+        this.renderAdminPapersScreen(container);
+      }
     });
   }
 
