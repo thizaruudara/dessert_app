@@ -179,12 +179,12 @@ export class AgoraAdminAudience {
     return !!(user && user.videoTrack);
   }
 
-  playRemoteVideo(uid, domElement) {
+  playRemoteVideo(uid, domElement, options = {}) {
     const user = this.remoteUsers.get(Number(uid));
     if (user && user.videoTrack && domElement) {
       try {
         domElement.innerHTML = '';
-        user.videoTrack.play(domElement);
+        user.videoTrack.play(domElement, options);
         return true;
       } catch (err) {
         console.warn(`[Agora Admin] playRemoteVideo failed for UID ${uid}:`, err);

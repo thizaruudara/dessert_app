@@ -7365,15 +7365,34 @@ class AppController {
 
     const attachAgoraStreams = () => {
       if (!this.agoraProctor) return;
+      const fsModal = document.getElementById('proctor-fullscreen-modal');
+      const activeFsStudentId = this._fullScreenStudentId || fsModal?.dataset?.studentId;
+
       modal.querySelectorAll('.student-camera-box').forEach(box => {
         const studentId = box.dataset.studentId;
+
+        // If this student is currently being viewed in full screen,
+        // DO NOT mount or steal the video stream to this thumbnail box!
+        // WebRTC video tracks can only be played in ONE DOM container at a time.
+        if (activeFsStudentId && activeFsStudentId === studentId) {
+          if (!box.querySelector('.fs-active-indicator')) {
+            box.innerHTML = `
+              <div class="fs-active-indicator" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:100%; color:#38BDF8; background:#0B132B;">
+                <span class="material-symbols-rounded" style="font-size:28px;">fullscreen</span>
+                <span style="font-size:10px; font-weight:700; letter-spacing:0.5px;">VIEWING IN FULL SCREEN</span>
+              </div>
+            `;
+          }
+          return;
+        }
+
         const student = allStudents.find(s => s.studentId === studentId);
         if (!student) return;
         const uid = student.agoraUid || getNumericUid(student.studentId);
         if (this.agoraProctor.hasStream(uid)) {
           if (!box.querySelector('.agora-active-player')) {
             box.innerHTML = '<div class="agora-active-player" style="width:100%; height:100%; position:relative;"></div>';
-            this.agoraProctor.playRemoteVideo(uid, box.querySelector('.agora-active-player'));
+            this.agoraProctor.playRemoteVideo(uid, box.querySelector('.agora-active-player'), { fit: 'cover' });
             const badge = document.createElement('div');
             badge.style.cssText = 'position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:#22C55E; color:#FFFFFF; font-size:8.5px; font-weight:700; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.5); display:flex; align-items:center; gap:3px;';
             badge.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:10px;">videocam</span> AGORA 720p HD';
@@ -7381,15 +7400,33 @@ class AppController {
           }
         }
       });
-      const fsModal = document.getElementById('proctor-fullscreen-modal');
-      if (fsModal) {
-        const fsStudent = allStudents.find(s => s.studentId === fsModal.dataset.studentId);
+
+      // Maintain Full Screen Stream Without Disruption
+      if (fsModal && activeFsStudentId) {
+        const fsStudent = allStudents.find(s => s.studentId === activeFsStudentId);
         if (fsStudent) {
           const fsUid = fsStudent.agoraUid || getNumericUid(fsStudent.studentId);
           const feedContainer = fsModal.querySelector('#fs-feed-container');
-          if (this.agoraProctor.hasStream(fsUid) && feedContainer && !feedContainer.querySelector('.agora-fs-player')) {
-            feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
-            this.agoraProctor.playRemoteVideo(fsUid, feedContainer.querySelector('.agora-fs-player'));
+          if (feedContainer) {
+            if (this.agoraProctor.hasStream(fsUid)) {
+              const fsPlayer = feedContainer.querySelector('.agora-fs-player');
+              const hasVideo = fsPlayer && fsPlayer.querySelector('video');
+              // Only mount if video element is not yet attached! Never disrupt active playing video.
+              if (!hasVideo) {
+                feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
+                this.agoraProctor.playRemoteVideo(fsUid, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
+              }
+            } else if (fsStudent.cameraSnapshotUrl) {
+              const hasVideo = feedContainer.querySelector('.agora-fs-player video');
+              if (!hasVideo) {
+                const img = fsModal.querySelector('#fs-student-stream');
+                if (img) {
+                  img.src = fsStudent.cameraSnapshotUrl;
+                } else {
+                  feedContainer.innerHTML = `<img id="fs-student-stream" src="${fsStudent.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />`;
+                }
+              }
+            }
           }
         }
       }
@@ -7736,6 +7773,8 @@ class AppController {
       document.getElementById('btn-close-proctor-hall')?.addEventListener('click', () => {
         if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
         unsubs.forEach(fn => { try { fn(); } catch (_) {} });
+        document.getElementById('proctor-fullscreen-modal')?.remove();
+        this._fullScreenStudentId = null;
         modal.remove();
       });
 
@@ -7751,6 +7790,8 @@ class AppController {
       document.getElementById('btn-hall-test-student')?.addEventListener('click', () => {
         if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
         unsubs.forEach(fn => { try { fn(); } catch (_) {} });
+        document.getElementById('proctor-fullscreen-modal')?.remove();
+        this._fullScreenStudentId = null;
         modal.remove();
         this.openStudentLiveExamRoom(session.id, 'slot1');
       });
@@ -7860,38 +7901,6 @@ class AppController {
     const unsubRegs = dbService.streamSlotRegistrations(session.id, 'all', (regs) => {
       allStudents = regs || [];
       render();
-      const fsModal = document.getElementById('proctor-fullscreen-modal');
-      if (fsModal) {
-        const currentFsStudent = allStudents.find(s => s.studentId === fsModal.dataset.studentId);
-        if (currentFsStudent) {
-          const fsUid = currentFsStudent.agoraUid || getNumericUid(currentFsStudent.studentId);
-          const feedContainer = fsModal.querySelector('#fs-feed-container');
-          if (this.agoraProctor && this.agoraProctor.hasStream(fsUid)) {
-            if (feedContainer && !feedContainer.querySelector('.agora-fs-player')) {
-              feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
-              this.agoraProctor.playRemoteVideo(fsUid, feedContainer.querySelector('.agora-fs-player'));
-            }
-          } else if (currentFsStudent.cameraSnapshotUrl && feedContainer && !feedContainer.querySelector('.agora-fs-player')) {
-            const img = fsModal.querySelector('#fs-student-stream');
-            if (img) {
-              img.src = currentFsStudent.cameraSnapshotUrl;
-            } else {
-              feedContainer.innerHTML = `<img id="fs-student-stream" src="${currentFsStudent.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />`;
-            }
-          }
-        }
-        /* cleaned */ if (false) {
-          const img = fsModal.querySelector('#fs-student-stream');
-          if (img) {
-            img.src = currentFsStudent.cameraSnapshotUrl;
-          } else {
-            const feedContainer = fsModal.querySelector('#fs-feed-container');
-            if (feedContainer) {
-              feedContainer.innerHTML = `<img id="fs-student-stream" src="${currentFsStudent.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />`;
-            }
-          }
-        }
-      }
     });
     unsubs.push(unsubRegs);
 
@@ -8079,6 +8088,11 @@ class AppController {
 
   // Helper: Full Screen Student Viewer (_showFullScreenStudentViewer)
   _showFullScreenStudentViewer(paperId, student) {
+    const existing = document.getElementById('proctor-fullscreen-modal');
+    if (existing) existing.remove();
+
+    this._fullScreenStudentId = student.studentId;
+
     const modal = document.createElement('div');
     modal.id = 'proctor-fullscreen-modal';
     modal.dataset.studentId = student.studentId;
@@ -8120,6 +8134,7 @@ class AppController {
     `;
 
     modal.querySelector('#fs-close-btn').onclick = () => {
+      this._fullScreenStudentId = null;
       modal.remove();
       if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
     };
@@ -8132,12 +8147,15 @@ class AppController {
 
     document.body.appendChild(modal);
 
+    // Update background grid to mark this student as viewing in full screen
+    if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
+
     const studentUid = student.agoraUid || getNumericUid(student.studentId);
     if (this.agoraProctor && this.agoraProctor.hasStream(studentUid)) {
       const feedContainer = modal.querySelector('#fs-feed-container');
       if (feedContainer) {
         feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
-        this.agoraProctor.playRemoteVideo(studentUid, feedContainer.querySelector('.agora-fs-player'));
+        this.agoraProctor.playRemoteVideo(studentUid, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
       }
     }
   }
