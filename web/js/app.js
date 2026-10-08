@@ -6629,7 +6629,7 @@ class AppController {
   // Helper: Confirmation Dialog matching Flutter AlertDialog
   _confirmProctorAction({ title, content, confirmText, confirmColor = '#6366F1', onConfirm }) {
     const dialog = document.createElement('div');
-    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10001;';
+    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10025;';
     dialog.innerHTML = `
       <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:380px; color:#FFFFFF; font-family:'Poppins',sans-serif; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
         <div style="font-size:15px; font-weight:700; margin-bottom:10px;">${title}</div>
@@ -6651,7 +6651,7 @@ class AppController {
   // Helper: Broadcast Announcement Dialog (_showBroadcastDialog)
   _showProctorBroadcastDialog(paperId) {
     const dialog = document.createElement('div');
-    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10001;';
+    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10025;';
     dialog.innerHTML = `
       <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:400px; color:#FFFFFF; font-family:'Poppins',sans-serif;">
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -6685,7 +6685,7 @@ class AppController {
   // Helper: Direct Proctor Alert Sheet (_showDirectMessageSheet)
   _showDirectAlertSheet(paperId, student) {
     const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:flex-end; z-index:10001;';
+    sheet.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:flex-end; z-index:10020;';
     const quickWarnings = [
       'කරුණාකර ඔබගේ මේසය සහ පිළිතුරු පත්‍රය පෙනෙන සේ කැමරාව සකසන්න. (Please adjust camera angle)',
       'ඔබගේ මුහුණ සහ පරිසරය පැහැදිලිව නොපෙනේ. (Please improve lighting/position)',
@@ -6748,7 +6748,7 @@ class AppController {
   // Helper: Submission Viewer (_showStudentSubmissionViewer)
   _showSubmissionViewer(student) {
     const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:10002;';
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:10020;';
     const photos = student.submissionPhotos || [];
 
     modal.innerHTML = `
