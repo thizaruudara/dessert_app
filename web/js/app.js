@@ -4501,20 +4501,13 @@ class AppController {
     `;
 
     // Render FAB strictly inside the contained admin-fab-slot
-    const fabSlot = document.getElementById('admin-fab-slot');
-    if (fabSlot) {
-      fabSlot.innerHTML = `
-        <button class="apk-fab-button" id="btn-fab-admin-paper" style="display:inline-flex; align-items:center; gap:6px;">
-          <span class="material-symbols-rounded" style="font-size:20px;">add</span>
-          <span>${this.adminPaperTab === 0 ? 'Add Live Session' : (this.adminPaperTab === 1 ? 'Add Upcoming Paper' : 'Create Leaderboard')}</span>
-        </button>
-      `;
-    }
+    this._updateAdminPaperFab();
 
     // Tab switcher events
     container.querySelectorAll('[data-paper-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.adminPaperTab = Number(btn.dataset.paperTab);
+        this._updateAdminPaperFab();
         this.renderAdminPapersScreen(container);
       });
     });
@@ -4545,19 +4538,35 @@ class AppController {
       this.openExamCountdownsModal();
     });
 
-    // Add buttons
-    const triggerAdd = () => {
-      if (this.adminPaperTab === 0) this.openAdminCreatePaperModal();
-      else if (this.adminPaperTab === 1) this.openAdminCreatePaperModal();
-      else this.openAdminCreateLeaderboardModal();
-    };
+    // Top AppBar Add button with strict tab routing
+    const headAddBtn = document.getElementById('btn-admin-add-paper-head');
+    if (headAddBtn) {
+      headAddBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (Number(this.adminPaperTab) === 2) {
+          this.openAdminCreateLeaderboardModal();
+        } else {
+          this.openAdminCreatePaperModal();
+        }
+      };
+    }
 
-    document.getElementById('btn-admin-add-paper-head')?.addEventListener('click', triggerAdd);
-    document.getElementById('btn-fab-admin-paper')?.addEventListener('click', triggerAdd);
-    document.getElementById('btn-empty-create-paper')?.addEventListener('click', triggerAdd);
+    // Empty state create button for Live Sessions
+    const emptyPaperBtn = document.getElementById('btn-empty-create-paper');
+    if (emptyPaperBtn) {
+      emptyPaperBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.openAdminCreatePaperModal();
+      };
+    }
 
     // Interactive paper action handlers matching Flutter 1:1
     this._bindAdminLiveSessionActions(container, papers);
+    if (this.adminPaperTab === 2) {
+      this._bindAdminLeaderboardActions(container, adminPaperBoards);
+    }
 
     this._adminPapersUnsub = dbService.streamPaperSessions(null, (livePapers) => {
       if (!container.isConnected) return;
@@ -4590,9 +4599,103 @@ class AppController {
         const tabContent = container.querySelector('.apk-admin-paper-tab-content');
         if (tabContent) {
           tabContent.innerHTML = this._buildAdminPaperLeaderboardHTML(filteredBoards, false, this.adminSelectedPaperBatch);
-          this._bindAdminLeaderboardActions(container, liveBoards);
+          this._bindAdminLeaderboardActions(container, filteredBoards);
         }
       });
+    }
+  }
+
+  _updateAdminPaperFab() {
+    const fabSlot = document.getElementById('admin-fab-slot');
+    if (!fabSlot) return;
+    const tab = Number(this.adminPaperTab ?? 0);
+    if (tab === 2) {
+      fabSlot.innerHTML = `
+        <button class="apk-fab-button" id="btn-fab-admin-paper" data-tab="2" style="display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:20px;">add</span>
+          <span>Create Leaderboard</span>
+        </button>
+      `;
+      const btn = fabSlot.querySelector('#btn-fab-admin-paper');
+      if (btn) {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openAdminCreateLeaderboardModal();
+        };
+      }
+    } else if (tab === 1) {
+      fabSlot.innerHTML = `
+        <button class="apk-fab-button" id="btn-fab-admin-paper" data-tab="1" style="display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:20px;">add</span>
+          <span>Add Upcoming Paper</span>
+        </button>
+      `;
+      const btn = fabSlot.querySelector('#btn-fab-admin-paper');
+      if (btn) {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openAdminCreatePaperModal();
+        };
+      }
+    } else {
+      fabSlot.innerHTML = `
+        <button class="apk-fab-button" id="btn-fab-admin-paper" data-tab="0" style="display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:20px;">add</span>
+          <span>Add Live Session</span>
+        </button>
+      `;
+      const btn = fabSlot.querySelector('#btn-fab-admin-paper');
+      if (btn) {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openAdminCreatePaperModal();
+        };
+      }
+    }
+  }
+
+  _bindAdminLeaderboardActions(container, boards) {
+    if (!container) return;
+
+    // Expand / collapse card toggles
+    container.querySelectorAll('[data-admin-paper-board]').forEach((button) => {
+      button.onclick = (e) => {
+        e.stopPropagation();
+        const boardId = button.dataset.adminPaperBoard;
+        if (this.adminExpandedPaperBoards.has(boardId)) this.adminExpandedPaperBoards.delete(boardId);
+        else this.adminExpandedPaperBoards.add(boardId);
+        this.renderAdminPapersScreen(container);
+      };
+    });
+
+    // Delete leaderboard buttons
+    container.querySelectorAll('[data-delete-paper-board]').forEach((btn) => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.deletePaperBoard;
+        if (!id) return;
+        if (!confirm('මෙම Paper Leaderboard එක සදහටම මකා දැමීමට අවශ්‍ය බව තහවුරු කරන්න (Are you sure you want to delete this leaderboard)?')) return;
+        try {
+          await dbService.deletePaperLeaderboard(id);
+          notificationService.showInAppBanner('Leaderboard Deleted', 'Paper Leaderboard එක සාර්ථකව මකා දමන ලදී.', 'info');
+          this.renderAdminPapersScreen(container);
+        } catch (err) {
+          alert('Failed to delete leaderboard: ' + err.message);
+        }
+      };
+    });
+
+    // Empty state create button
+    const emptyLbBtn = container.querySelector('#btn-empty-create-leaderboard');
+    if (emptyLbBtn) {
+      emptyLbBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.openAdminCreateLeaderboardModal();
+      };
     }
   }
 
@@ -5272,6 +5375,9 @@ class AppController {
         <span class="material-symbols-rounded">military_tech</span>
         <strong>No published paper results for ${escapeHTML(selectedBatch)}</strong>
         <span>Published evaluations will appear here.</span>
+        <button class="apk-btn-primary" id="btn-empty-create-leaderboard" type="button" style="margin-top:14px; padding:10px 20px; border-radius:12px; display:inline-flex; align-items:center; gap:8px;">
+          <span class="material-symbols-rounded" style="font-size:18px;">add</span> Create Paper Leaderboard
+        </button>
       </div>`;
     this.adminExpandedPaperBoards ??= new Set();
     if (!this.adminPaperBoardsInitialized) {
@@ -5285,17 +5391,22 @@ class AppController {
         const expanded = this.adminExpandedPaperBoards.has(board.id);
         const published = board.publishedAt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
         return `<article class="paper-board-card ${index === 0 ? 'is-latest' : ''}">
-          <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}">
-            <span class="paper-board-heading-content">
-              <span class="paper-board-tag">${escapeHTML(board.subject)} · ${escapeHTML(board.examYear)}</span>
-              ${index === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ''}
-              <span class="paper-board-date">${escapeHTML(published)}</span>
-              <strong class="paper-board-title">${escapeHTML(board.paperTitle)}</strong>
-              <span class="paper-board-stats"><span>Max: ${board.totalMarks} marks</span><span>${entries.length} candidates</span></span>
-              ${!expanded && entries[0] ? `<span class="paper-winner-snippet">Rank 1: ${escapeHTML(entries[0].studentName)} (${entries[0].marks} marks · ${escapeHTML(entries[0].grade)})</span>` : ''}
-            </span>
-            <span class="material-symbols-rounded paper-expand-icon">${expanded ? 'expand_less' : 'expand_more'}</span>
-          </button>
+          <div style="display:flex; align-items:center; justify-content:space-between; padding-right:12px; background:#FFFFFF; border-radius:14px;">
+            <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}" style="flex:1;">
+              <span class="paper-board-heading-content">
+                <span class="paper-board-tag">${escapeHTML(board.subject)} · ${escapeHTML(board.examYear)}</span>
+                ${index === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ''}
+                <span class="paper-board-date">${escapeHTML(published)}</span>
+                <strong class="paper-board-title">${escapeHTML(board.paperTitle)}</strong>
+                <span class="paper-board-stats"><span>Max: ${board.totalMarks} marks</span><span>${entries.length} candidates</span></span>
+                ${!expanded && entries[0] ? `<span class="paper-winner-snippet">Rank 1: ${escapeHTML(entries[0].studentName)} (${entries[0].marks} marks · ${escapeHTML(entries[0].grade)})</span>` : ''}
+              </span>
+              <span class="material-symbols-rounded paper-expand-icon">${expanded ? 'expand_less' : 'expand_more'}</span>
+            </button>
+            <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (මකා දැමීම)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:8px; cursor:pointer; flex-shrink:0;">
+              <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+            </button>
+          </div>
           ${expanded ? `<div class="paper-results-content">
             <div class="paper-results-list-heading">Full Candidate Rankings <span>${entries.length} ranked</span></div>
             ${entries.length ? entries.map((entry) => `
