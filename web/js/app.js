@@ -4498,11 +4498,32 @@ class AppController {
   }
 
   _showEditTimesDialog(session, container) {
-    const s1Start = this._formatSessionTime(session.slot1?.startTime, '08:30 AM');
-    const s1End = this._formatSessionTime(session.slot1?.endTime, '11:40 AM');
+    const toTimeInput = (val, fallback = '08:30') => {
+      if (!val) return fallback;
+      try {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        const s = String(val).trim();
+        if (s.toUpperCase().includes('AM') || s.toUpperCase().includes('PM')) {
+          const parts = s.split(' ');
+          const [hStr, mStr] = parts[0].split(':');
+          let h = parseInt(hStr, 10);
+          const m = parseInt(mStr, 10);
+          if (parts[1]?.toUpperCase() === 'PM' && h < 12) h += 12;
+          if (parts[1]?.toUpperCase() === 'AM' && h === 12) h = 0;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+        if (s.includes(':')) return s;
+      } catch (_) {}
+      return fallback;
+    };
+    const s1Start = toTimeInput(session.slot1?.startTime, '08:30');
+    const s1End = toTimeInput(session.slot1?.endTime, '11:40');
     const hasSlot2 = !!(session.slot2 && session.slot2.startTime);
-    const s2Start = this._formatSessionTime(session.slot2?.startTime, '04:00 PM');
-    const s2End = this._formatSessionTime(session.slot2?.endTime, '07:10 PM');
+    const s2Start = toTimeInput(session.slot2?.startTime, '16:00');
+    const s2End = toTimeInput(session.slot2?.endTime, '19:10');
 
     const modal = document.createElement('div');
     modal.className = 'app-modal';
@@ -4523,11 +4544,11 @@ class AppController {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
               <div>
                 <div class="form-label" style="font-size:11px;">Start Time:</div>
-                <input type="text" id="edit-s1-start" class="form-textarea" style="height:38px;" value="${s1Start}" />
+                <input type="time" id="edit-s1-start" class="form-textarea" style="height:38px; cursor:pointer;" value="${s1Start}" />
               </div>
               <div>
                 <div class="form-label" style="font-size:11px;">End Time:</div>
-                <input type="text" id="edit-s1-end" class="form-textarea" style="height:38px;" value="${s1End}" />
+                <input type="time" id="edit-s1-end" class="form-textarea" style="height:38px; cursor:pointer;" value="${s1End}" />
               </div>
             </div>
           </div>
@@ -4540,11 +4561,11 @@ class AppController {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
               <div>
                 <div class="form-label" style="font-size:11px;">Start Time:</div>
-                <input type="text" id="edit-s2-start" class="form-textarea" style="height:38px;" value="${s2Start}" />
+                <input type="time" id="edit-s2-start" class="form-textarea" style="height:38px; cursor:pointer;" value="${s2Start}" />
               </div>
               <div>
                 <div class="form-label" style="font-size:11px;">End Time:</div>
-                <input type="text" id="edit-s2-end" class="form-textarea" style="height:38px;" value="${s2End}" />
+                <input type="time" id="edit-s2-end" class="form-textarea" style="height:38px; cursor:pointer;" value="${s2End}" />
               </div>
             </div>
           </div>
@@ -4566,14 +4587,46 @@ class AppController {
     document.getElementById('btn-close-edit-times')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-cancel-edit-times')?.addEventListener('click', () => modal.remove());
 
+    ['edit-s1-start', 'edit-s1-end', 'edit-s2-start', 'edit-s2-end'].forEach(id => {
+      const el = document.getElementById(id);
+      el?.addEventListener('click', () => {
+        try { el.showPicker?.(); } catch (_) {}
+      });
+    });
+
     document.getElementById('btn-save-edit-times')?.addEventListener('click', async () => {
       const newS1Start = document.getElementById('edit-s1-start')?.value || s1Start;
       const newS1End = document.getElementById('edit-s1-end')?.value || s1End;
+
+      const makeIsoTimeForEdit = (timeVal) => {
+        try {
+          if (!timeVal) return new Date().toISOString();
+          const raw = String(timeVal).trim();
+          let h = 0, m = 0;
+          if (raw.toUpperCase().includes('AM') || raw.toUpperCase().includes('PM')) {
+            const parts = raw.split(' ');
+            const [hStr, mStr] = parts[0].split(':');
+            h = parseInt(hStr, 10);
+            m = parseInt(mStr, 10);
+            if (parts[1]?.toUpperCase() === 'PM' && h < 12) h += 12;
+            if (parts[1]?.toUpperCase() === 'AM' && h === 12) h = 0;
+          } else if (raw.includes(':')) {
+            const [hStr, mStr] = raw.split(':');
+            h = parseInt(hStr, 10);
+            m = parseInt(mStr, 10);
+          }
+          const baseDate = session.date ? new Date(session.date) : new Date();
+          baseDate.setHours(h, m, 0, 0);
+          return baseDate.toISOString();
+        } catch (_) {
+          return new Date().toISOString();
+        }
+      };
       
       const updatedSlot1 = {
         ...(session.slot1 || {}),
-        startTime: newS1Start,
-        endTime: newS1End
+        startTime: makeIsoTimeForEdit(newS1Start),
+        endTime: makeIsoTimeForEdit(newS1End)
       };
 
       let updatedSlot2 = null;
@@ -4582,8 +4635,8 @@ class AppController {
         const newS2End = document.getElementById('edit-s2-end')?.value || s2End;
         updatedSlot2 = {
           ...(session.slot2 || {}),
-          startTime: newS2Start,
-          endTime: newS2End
+          startTime: makeIsoTimeForEdit(newS2Start),
+          endTime: makeIsoTimeForEdit(newS2End)
         };
       }
 
@@ -5913,11 +5966,11 @@ class AppController {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
               <div>
                 <span style="font-size:10.5px; color:#64748B;">Start:</span>
-                <input type="text" id="new-s1-start" class="form-textarea" style="height:36px; font-size:11px;" value="08:30 AM" />
+                <input type="time" id="new-s1-start" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="08:30" />
               </div>
               <div>
                 <span style="font-size:10.5px; color:#64748B;">End:</span>
-                <input type="text" id="new-s1-end" class="form-textarea" style="height:36px; font-size:11px;" value="11:40 AM" />
+                <input type="time" id="new-s1-end" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="11:40" />
               </div>
             </div>
 
@@ -5928,11 +5981,11 @@ class AppController {
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <div>
                   <span style="font-size:10.5px; color:#64748B;">Start:</span>
-                  <input type="text" id="new-s2-start" class="form-textarea" style="height:36px; font-size:11px;" value="04:00 PM" />
+                  <input type="time" id="new-s2-start" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="16:00" />
                 </div>
                 <div>
                   <span style="font-size:10.5px; color:#64748B;">End:</span>
-                  <input type="text" id="new-s2-end" class="form-textarea" style="height:36px; font-size:11px;" value="07:10 PM" />
+                  <input type="time" id="new-s2-end" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="19:10" />
                 </div>
               </div>
             </div>
@@ -5969,6 +6022,38 @@ class AppController {
     document.getElementById('radio-slot-2')?.addEventListener('change', () => {
       if (slot2Box) slot2Box.style.display = 'block';
     });
+
+    ['new-s1-start', 'new-s1-end', 'new-s2-start', 'new-s2-end'].forEach(id => {
+      const el = document.getElementById(id);
+      el?.addEventListener('click', () => {
+        try { el.showPicker?.(); } catch (_) {}
+      });
+    });
+
+    const updateCalculatedEndTimes = () => {
+      const dur = Number(document.getElementById('new-paper-duration')?.value) || 120;
+      const s1Val = document.getElementById('new-s1-start')?.value || '08:30';
+      const [h1, m1] = s1Val.split(':').map(Number);
+      if (!isNaN(h1) && !isNaN(m1)) {
+        const total = h1 * 60 + m1 + dur;
+        const eh = Math.floor(total / 60) % 24;
+        const em = total % 60;
+        const s1End = document.getElementById('new-s1-end');
+        if (s1End) s1End.value = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+      }
+      const s2Val = document.getElementById('new-s2-start')?.value || '16:00';
+      const [h2, m2] = s2Val.split(':').map(Number);
+      if (!isNaN(h2) && !isNaN(m2)) {
+        const total2 = h2 * 60 + m2 + dur;
+        const eh2 = Math.floor(total2 / 60) % 24;
+        const em2 = total2 % 60;
+        const s2End = document.getElementById('new-s2-end');
+        if (s2End) s2End.value = `${String(eh2).padStart(2, '0')}:${String(em2).padStart(2, '0')}`;
+      }
+    };
+    document.getElementById('new-paper-duration')?.addEventListener('input', updateCalculatedEndTimes);
+    document.getElementById('new-s1-start')?.addEventListener('change', updateCalculatedEndTimes);
+    document.getElementById('new-s2-start')?.addEventListener('change', updateCalculatedEndTimes);
 
     // Admin MCQ Key Grid Renderer
     const renderAdminMcqKeyGrid = () => {
@@ -6065,10 +6150,10 @@ class AppController {
       const paperType = modal.querySelector('input[name="paper-type"]:checked')?.value || 'mcq';
       const mcqCount = Math.min(50, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
 
-      const s1Start = document.getElementById('new-s1-start')?.value || '08:30 AM';
-      const s1End = document.getElementById('new-s1-end')?.value || '11:40 AM';
-      const s2Start = document.getElementById('new-s2-start')?.value || '04:00 PM';
-      const s2End = document.getElementById('new-s2-end')?.value || '07:10 PM';
+      const s1Start = document.getElementById('new-s1-start')?.value || '08:30';
+      const s1End = document.getElementById('new-s1-end')?.value || '11:40';
+      const s2Start = document.getElementById('new-s2-start')?.value || '16:00';
+      const s2End = document.getElementById('new-s2-end')?.value || '19:10';
 
       if (!title) {
         alert('කරුණාකර Paper Title එක ඇතුළත් කරන්න (Please enter Paper Title)');
