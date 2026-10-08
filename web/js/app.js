@@ -5040,6 +5040,103 @@ class AppController {
     });
   }
 
+  _showAdminEditMcqAnswersDialog(session, container) {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    const mcqCount = Math.min(100, Math.max(1, Number(session.mcqCount) || 50));
+    let editKey = { ...(session.mcqAnswerKey || {}) };
+
+    const renderGrid = () => {
+      const grid = modal.querySelector('#edit-admin-mcq-grid');
+      const countEl = modal.querySelector('#edit-mcq-configured-count');
+      if (!grid) return;
+
+      let configured = 0;
+      let html = '';
+      for (let q = 1; q <= mcqCount; q++) {
+        const cur = editKey[q] || null;
+        if (cur !== null) configured++;
+        html += `
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 8px; border-radius:8px; background:#F8FAFC; border:1px solid #E2E8F0;">
+            <span style="font-size:11.5px; font-weight:700; color:#334155; min-width:28px;">${String(q).padStart(2, '0')})</span>
+            <div style="display:flex; gap:3px;">
+              ${[1, 2, 3, 4, 5].map(opt => `
+                <button type="button" class="btn-edit-opt" data-q="${q}" data-opt="${opt}" style="width:28px; height:28px; border-radius:50%; border:1px solid ${cur === opt ? '#16A34A' : '#CBD5E1'}; background:${cur === opt ? '#16A34A' : '#FFFFFF'}; color:${cur === opt ? '#FFFFFF' : '#334155'}; font-size:11px; font-weight:700; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">
+                  ${opt}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+      grid.innerHTML = html;
+      if (countEl) countEl.textContent = `${configured} / ${mcqCount}`;
+
+      grid.querySelectorAll('.btn-edit-opt').forEach(b => {
+        b.addEventListener('click', () => {
+          const q = Number(b.dataset.q);
+          const opt = Number(b.dataset.opt);
+          if (editKey[q] === opt) delete editKey[q];
+          else editKey[q] = opt;
+          renderGrid();
+        });
+      });
+    };
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:85vh; overflow-y:auto; max-width:440px;">
+        <div class="modal-header">
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#0F172A;">Pre-set MCQ Answer Key</div>
+            <div style="font-size:11px; color:#64748B;">${session.title} (${mcqCount} Questions)</div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-edit-mcq">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:#DCFCE7; padding:8px 12px; border-radius:10px; font-size:11.5px; color:#166534;">
+            <span>Configured: <strong id="edit-mcq-configured-count">0 / ${mcqCount}</strong></span>
+            <button type="button" id="btn-clear-edit-mcq" style="background:transparent; border:none; color:#DC2626; font-size:11px; font-weight:700; cursor:pointer;">
+              Clear All
+            </button>
+          </div>
+
+          <div id="edit-admin-mcq-grid" style="max-height:300px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button class="apk-btn-primary" id="btn-cancel-edit-mcq" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+              Cancel
+            </button>
+            <button class="apk-btn-primary" id="btn-save-edit-mcq" style="flex:1.5; background:#16A34A;">
+              Save Answers
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.getElementById('btn-close-edit-mcq')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-cancel-edit-mcq')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-clear-edit-mcq')?.addEventListener('click', () => {
+      editKey = {};
+      renderGrid();
+    });
+    renderGrid();
+
+    document.getElementById('btn-save-edit-mcq')?.addEventListener('click', async () => {
+      await dbService.updatePaperSession(session.id, { mcqAnswerKey: editKey });
+      notificationService.showInAppBanner('Answers Saved', 'MCQ Answer Key එක සාර්ථකව Save කරන ලදී.', 'success');
+      modal.remove();
+      this.renderAdminPapersScreen(container);
+    });
+  }
+
   _showDeleteConfirmation(session, container) {
     const modal = document.createElement('div');
     modal.className = 'app-modal';
@@ -6234,6 +6331,7 @@ class AppController {
 
     let adminAnswerKey = {};
     let currentMcqCount = 50;
+    let isAnswerKeyEnabled = false;
 
     modal.innerHTML = `
       <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
@@ -6293,32 +6391,70 @@ class AppController {
             </div>
           </div>
 
-          <!-- Pre-give MCQ Answer Key Box (Shown for MCQ & MCQ & Essay) -->
-          <div id="new-paper-mcq-box" style="background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px;">
+          <!-- ── NEW SECTION: Change MCQ Question Count (Shown for MCQ & MCQ & Essay) ── -->
+          <div id="new-paper-mcq-count-section" style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
               <div>
-                <div style="font-size:12.5px; font-weight:800; color:#166534; display:flex; align-items:center; gap:6px;">
-                  <span class="material-symbols-rounded filled" style="font-size:18px; color:#16A34A;">verified</span>
-                  <span>Pre-set MCQ Answer Key (නිවැරදි පිළිතුරු)</span>
+                <div style="font-size:12.5px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
+                  <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">format_list_numbered</span>
+                  <span>MCQ Question Count (බහුවරණ ප්‍රශ්න ගණන)</span>
                 </div>
-                <div style="font-size:10.5px; color:#15803D; margin-top:2px;">
-                  රහස්‍යයි: සිසුන්ට නොපෙනේ. Submit කළ සැනින් ලකුණු ගණනය වේ.
+                <div style="font-size:10.5px; color:#64748B; margin-top:2px;">
+                  ප්‍රශ්න 50 ට අඩුවෙන් (උදා: 20, 25, 30) හෝ කැමති ප්‍රමාණයක් සකසන්න
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:11px; font-weight:700; color:#166534;">MCQ Count:</span>
-                <input type="number" id="new-paper-mcq-count" min="1" max="50" value="50" class="form-textarea" style="height:32px; width:70px; text-align:center; font-weight:800; padding:4px;" />
+                <input type="number" id="new-paper-mcq-count" min="1" max="100" value="50" class="form-textarea" style="height:34px; width:72px; text-align:center; font-weight:800; font-size:14px; padding:4px;" />
+                <span style="font-size:11px; font-weight:700; color:#475569;">Qs</span>
               </div>
             </div>
 
-            <div style="display:flex; align-items:center; justify-content:space-between; background:#DCFCE7; border-radius:8px; padding:6px 10px; font-size:11px; color:#166534;">
-              <span>Configured: <strong id="admin-ans-count-badge">0</strong> / <strong id="admin-ans-total-badge">50</strong> Questions</span>
-              <button type="button" id="btn-clear-admin-mcq" style="background:transparent; border:none; color:#DC2626; font-size:11px; font-weight:700; cursor:pointer;">
+            <!-- Quick Preset Chips -->
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+              <span style="font-size:10.5px; color:#64748B; font-weight:600;">Quick Select:</span>
+              <button type="button" class="btn-mcq-quick-count" data-count="10" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">10 Qs</button>
+              <button type="button" class="btn-mcq-quick-count" data-count="20" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">20 Qs</button>
+              <button type="button" class="btn-mcq-quick-count" data-count="25" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">25 Qs</button>
+              <button type="button" class="btn-mcq-quick-count" data-count="30" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">30 Qs</button>
+              <button type="button" class="btn-mcq-quick-count" data-count="40" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">40 Qs</button>
+              <button type="button" class="btn-mcq-quick-count" data-count="50" style="border:1px solid #2563EB; background:#EFF6FF; color:#2563EB; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">50 Qs</button>
+            </div>
+          </div>
+
+          <!-- ── Pre-set MCQ Answer Key Box with Tick to Enable ── -->
+          <div id="new-paper-mcq-box" style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; transition:all 0.2s ease;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+              <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; flex:1; min-width:0; user-select:none;">
+                <input type="checkbox" id="chk-enable-answer-key" style="width:19px; height:19px; margin-top:2px; accent-color:#16A34A; cursor:pointer;" />
+                <div>
+                  <div style="font-size:12.5px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
+                    <span class="material-symbols-rounded filled" id="ico-answer-key-status" style="font-size:18px; color:#64748B;">verified</span>
+                    <span>Pre-set MCQ Answer Key (නිවැරදි පිළිතුරු ඇතුළත් කිරීම)</span>
+                  </div>
+                  <div id="desc-answer-key-status" style="font-size:10.5px; color:#64748B; margin-top:2px; line-height:1.4;">
+                    Tick සක්‍රීය (Enable) කළහොත් ප්‍රශ්න <strong id="lbl-mcq-required-count">50</strong> ටම අනිවාර්යයෙන්ම පිළිතුරු තිබිය යුතුය.
+                  </div>
+                </div>
+              </label>
+              <button type="button" id="btn-clear-admin-mcq" style="background:transparent; border:none; color:#DC2626; font-size:11px; font-weight:700; cursor:pointer; padding:4px 6px;">
                 Clear All
               </button>
             </div>
 
-            <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+            <!-- Answer Key interactive container -->
+            <div id="admin-mcq-key-container" style="display:none; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; background:#DCFCE7; border-radius:8px; padding:6px 10px; font-size:11px; color:#166534;">
+                <span>Configured: <strong id="admin-ans-count-badge">0</strong> / <strong id="admin-ans-total-badge">50</strong> Questions</span>
+                <span id="admin-ans-status-badge" style="font-size:10.5px; font-weight:700; color:#DC2626;">⚠️ Answers Required</span>
+              </div>
+
+              <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+            </div>
+
+            <!-- Hint shown when Answer Key tick is unchecked -->
+            <div id="admin-mcq-disabled-hint" style="padding:10px 12px; background:#F1F5F9; border:1px dashed #CBD5E1; border-radius:8px; font-size:11px; color:#64748B; line-height:1.45;">
+              <span style="font-weight:700; color:#334155;">💡 Answer Key Disabled:</span> ඔබට දැනට පිළිතුරු ඇතුළත් නොකර සැසිය සෑදිය හැක. (පසුව Card එකේ ඇති <strong style="color:#059669;">Key</strong> බොත්තමෙන් ඕනෑම වේලාවක පිළිතුරු ඇතුළත් කළ හැක).
+            </div>
           </div>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
@@ -6415,6 +6551,7 @@ class AppController {
     `;
 
     document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     document.getElementById('btn-close-new-paper')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-cancel-create-paper')?.addEventListener('click', () => modal.remove());
 
@@ -6463,10 +6600,13 @@ class AppController {
       const grid = modal.querySelector('#admin-mcq-key-grid');
       const totalBadge = modal.querySelector('#admin-ans-total-badge');
       const countBadge = modal.querySelector('#admin-ans-count-badge');
+      const reqCountLabel = modal.querySelector('#lbl-mcq-required-count');
+      const statusBadge = modal.querySelector('#admin-ans-status-badge');
       if (!grid) return;
 
-      currentMcqCount = Math.min(50, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
+      currentMcqCount = Math.min(100, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
       if (totalBadge) totalBadge.textContent = currentMcqCount;
+      if (reqCountLabel) reqCountLabel.textContent = currentMcqCount;
 
       let configuredCount = 0;
       let html = '';
@@ -6489,6 +6629,16 @@ class AppController {
       grid.innerHTML = html;
       if (countBadge) countBadge.textContent = configuredCount;
 
+      if (statusBadge) {
+        if (configuredCount === currentMcqCount) {
+          statusBadge.style.color = '#16A34A';
+          statusBadge.textContent = '✓ All Answers Completed';
+        } else {
+          statusBadge.style.color = '#DC2626';
+          statusBadge.textContent = `⚠️ ${currentMcqCount - configuredCount} answers remaining`;
+        }
+      }
+
       grid.querySelectorAll('.btn-admin-opt').forEach(btn => {
         btn.addEventListener('click', () => {
           const q = Number(btn.dataset.q);
@@ -6503,25 +6653,101 @@ class AppController {
       });
     };
 
-    renderAdminMcqKeyGrid();
+    // MCQ Count change handler (Custom input + Quick Chips)
+    const setMcqCount = (count) => {
+      const sanitized = Math.min(100, Math.max(1, Number(count) || 50));
+      const input = modal.querySelector('#new-paper-mcq-count');
+      if (input) input.value = sanitized;
 
-    modal.querySelector('#new-paper-mcq-count')?.addEventListener('input', renderAdminMcqKeyGrid);
+      // Update quick chips active styling
+      modal.querySelectorAll('.btn-mcq-quick-count').forEach(btn => {
+        const val = Number(btn.dataset.count);
+        if (val === sanitized) {
+          btn.style.border = '1px solid #2563EB';
+          btn.style.background = '#EFF6FF';
+          btn.style.color = '#2563EB';
+        } else {
+          btn.style.border = '1px solid #CBD5E1';
+          btn.style.background = '#FFFFFF';
+          btn.style.color = '#475569';
+        }
+      });
+
+      renderAdminMcqKeyGrid();
+    };
+
+    modal.querySelector('#new-paper-mcq-count')?.addEventListener('input', (e) => {
+      setMcqCount(e.target.value);
+    });
+
+    modal.querySelectorAll('.btn-mcq-quick-count').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setMcqCount(btn.dataset.count);
+      });
+    });
+
     modal.querySelector('#btn-clear-admin-mcq')?.addEventListener('click', () => {
       adminAnswerKey = {};
       renderAdminMcqKeyGrid();
     });
 
+    // Toggle Answer Key Tick handler
+    const updateAnswerKeyTickUI = () => {
+      const chk = modal.querySelector('#chk-enable-answer-key');
+      isAnswerKeyEnabled = !!chk?.checked;
+      const box = modal.querySelector('#new-paper-mcq-box');
+      const container = modal.querySelector('#admin-mcq-key-container');
+      const hint = modal.querySelector('#admin-mcq-disabled-hint');
+      const ico = modal.querySelector('#ico-answer-key-status');
+      const desc = modal.querySelector('#desc-answer-key-status');
+
+      if (isAnswerKeyEnabled) {
+        if (box) {
+          box.style.background = '#F0FDF4';
+          box.style.border = '1.5px solid #86EFAC';
+        }
+        if (container) container.style.display = 'flex';
+        if (hint) hint.style.display = 'none';
+        if (ico) {
+          ico.style.color = '#16A34A';
+        }
+        if (desc) {
+          desc.innerHTML = `<strong>Tick සක්‍රීය (Enabled):</strong> සැසිය නිර්මාණය කිරීමට පෙර ප්‍රශ්න <strong id="lbl-mcq-required-count">${currentMcqCount}</strong> ටම පිළිතුරු අනිවාර්යයෙන්ම ලබාදිය යුතුය.`;
+          desc.style.color = '#15803D';
+        }
+        renderAdminMcqKeyGrid();
+      } else {
+        if (box) {
+          box.style.background = '#F8FAFC';
+          box.style.border = '1.5px solid #E2E8F0';
+        }
+        if (container) container.style.display = 'none';
+        if (hint) hint.style.display = 'block';
+        if (ico) {
+          ico.style.color = '#64748B';
+        }
+        if (desc) {
+          desc.innerHTML = 'Tick අක්‍රීය (Disabled): දැනට පිළිතුරු ඇතුළත් කිරීම අනිවාර්ය නොවේ. සැසිය සෑදූ පසු ඕනෑම වේලාවක පිළිතුරු ඇතුළත් කළ හැක.';
+          desc.style.color = '#64748B';
+        }
+      }
+    };
+
+    modal.querySelector('#chk-enable-answer-key')?.addEventListener('change', updateAnswerKeyTickUI);
+    updateAnswerKeyTickUI();
+
     // Paper type UI toggle
     const updatePaperTypeUI = () => {
       const selectedType = modal.querySelector('input[name="paper-type"]:checked')?.value || 'mcq';
+      const mcqCountSection = modal.querySelector('#new-paper-mcq-count-section');
       const mcqBox = modal.querySelector('#new-paper-mcq-box');
       const labelMcq = modal.querySelector('#label-type-mcq');
       const labelEssay = modal.querySelector('#label-type-essay');
       const labelBoth = modal.querySelector('#label-type-both');
 
-      if (mcqBox) {
-        mcqBox.style.display = (selectedType === 'mcq' || selectedType === 'mcq_essay') ? 'flex' : 'none';
-      }
+      const isMcqApplicable = (selectedType === 'mcq' || selectedType === 'mcq_essay');
+      if (mcqCountSection) mcqCountSection.style.display = isMcqApplicable ? 'flex' : 'none';
+      if (mcqBox) mcqBox.style.display = isMcqApplicable ? 'flex' : 'none';
 
       if (labelMcq) {
         labelMcq.style.border = selectedType === 'mcq' ? '2px solid #2563EB' : '1px solid #E2E8F0';
@@ -6551,7 +6777,8 @@ class AppController {
       const examDate = document.getElementById('new-paper-date')?.value || today;
       const isTwoSlots = document.getElementById('radio-slot-2')?.checked;
       const paperType = modal.querySelector('input[name="paper-type"]:checked')?.value || 'mcq';
-      const mcqCount = Math.min(50, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
+      const mcqCount = Math.min(100, Math.max(1, Number(modal.querySelector('#new-paper-mcq-count')?.value) || 50));
+      const answerKeyEnforced = isAnswerKeyEnabled;
 
       const s1Start = document.getElementById('new-s1-start')?.value || '08:30';
       const s1End = document.getElementById('new-s1-end')?.value || '11:40';
@@ -6561,6 +6788,26 @@ class AppController {
       if (!title) {
         alert('කරුණාකර Paper Title එක ඇතුළත් කරන්න (Please enter Paper Title)');
         return;
+      }
+
+      // VALIDATION: If Paper is MCQ and Answer Key Tick is enabled, ALL mcqCount questions MUST have answers!
+      if ((paperType === 'mcq' || paperType === 'mcq_essay') && answerKeyEnforced) {
+        const missing = [];
+        for (let q = 1; q <= mcqCount; q++) {
+          if (!adminAnswerKey[q]) {
+            missing.push(q);
+          }
+        }
+        if (missing.length > 0) {
+          alert(`⚠️ කරුණාකර සියලුම MCQ ප්‍රශ්න ${mcqCount} සඳහාම පිළිතුරු ලබා දෙන්න!\n\nපිළිතුරු නොමැති ප්‍රශ්න (${missing.length}): Q${missing.slice(0, 15).join(', Q')}${missing.length > 15 ? '...' : ''}\n\n💡 Answer Key එක පසුව ඇතුළත් කිරීමට අවශ්‍ය නම්, ඉහත 'Pre-set MCQ Answer Key' Tick එක අක්‍රීය (Uncheck) කර Create කරන්න.`);
+          return;
+        }
+      }
+
+      // Filter adminAnswerKey to only include keys up to mcqCount
+      const cleanAnswerKey = {};
+      for (let q = 1; q <= mcqCount; q++) {
+        if (adminAnswerKey[q]) cleanAnswerKey[q] = adminAnswerKey[q];
       }
 
       // Convert date + time strings to ISO timestamps for slot1 and slot2
@@ -6604,30 +6851,44 @@ class AppController {
         };
       }
 
-      // Sessions ALWAYS start in 'upcoming' status and 'waiting' phase!
-      await dbService.savePaperSession({
-        title,
-        subject,
-        examYear,
-        paperType,
-        mcqCount,
-        mcqAnswerKey: adminAnswerKey,
-        date: examDate,
-        durationMinutes: duration,
-        totalMarks: marks,
-        status: 'upcoming',
-        currentPhase: 'waiting',
-        isEnded: false,
-        isLive: false,
-        isTimeUp: false,
-        slot1,
-        slot2
-      });
+      const saveBtn = document.getElementById('btn-save-new-paper');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Creating Session...';
+      }
 
-      notificationService.showInAppBanner('Paper Created!', 'Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
-      modal.remove();
-      const vp = document.getElementById('admin-main-viewport');
-      if (vp) this.renderAdminPapersScreen(vp);
+      try {
+        await dbService.savePaperSession({
+          title,
+          subject,
+          examYear,
+          paperType,
+          mcqCount,
+          mcqAnswerKey: cleanAnswerKey,
+          date: examDate,
+          durationMinutes: duration,
+          totalMarks: marks,
+          status: 'upcoming',
+          currentPhase: 'waiting',
+          isEnded: false,
+          isLive: false,
+          isTimeUp: false,
+          slot1,
+          slot2
+        });
+
+        notificationService.showInAppBanner('Paper Created!', 'Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
+        modal.remove();
+        const vp = document.getElementById('admin-main-viewport');
+        if (vp) this.renderAdminPapersScreen(vp);
+      } catch (err) {
+        console.error('Failed to create paper session:', err);
+        alert('Error creating paper session: ' + err.message);
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Create Paper (නිර්මාණය කරන්න)';
+        }
+      }
     });
   }
 
@@ -8630,7 +8891,7 @@ ${!times.isWaiting ? `
         display: flex; flex-direction: column; color: #FFFFFF; font-family: 'Poppins', sans-serif;
       `;
 
-      const totalQs = Math.min(50, Math.max(1, Number(session.mcqCount) || 50));
+      const totalQs = Math.min(100, Math.max(1, Number(session.mcqCount) || 50));
       const studentAnswers = {};
       const answerKey = session.mcqAnswerKey || {};
 
@@ -8912,7 +9173,7 @@ ${!times.isWaiting ? `
         display: flex; flex-direction: column; color: #FFFFFF; font-family: 'Poppins', sans-serif;
       `;
 
-      const totalQs = Math.min(50, Math.max(1, Number(session.mcqCount) || 50));
+      const totalQs = Math.min(100, Math.max(1, Number(session.mcqCount) || 50));
       const studentAnswers = {};
       const answerKey = session.mcqAnswerKey || {};
       let activeTab = 'mcq'; // 'mcq' or 'essay'

@@ -315,7 +315,7 @@ export class DbService {
       title: raw.title || 'A/L Physics Paper Session',
       subject: raw.subject || 'A/L Physics',
       paperType: raw.paperType || 'essay',
-      mcqCount: Math.min(50, Math.max(1, Number(raw.mcqCount) || 50)),
+      mcqCount: Math.min(100, Math.max(1, Number(raw.mcqCount) || 50)),
       mcqAnswerKey: raw.mcqAnswerKey || {},
       examYear: raw.examYear || 'All Batches',
       date: raw.date || todayIso,
