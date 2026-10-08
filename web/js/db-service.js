@@ -539,6 +539,36 @@ export class DbService {
     }
   }
 
+  streamPaperSessions(examYear, callback) {
+    if (this.useMockData) {
+      callback(this.getMockPaperSessions(examYear));
+      return () => {};
+    }
+    try {
+      const ref = collection(db, 'paper_sessions');
+      return onSnapshot(ref, (snapshot) => {
+        const list = snapshot.docs.map(d => this.normalizePaperSession(d.data(), d.id)).filter(Boolean);
+        let result = list;
+        if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+          const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
+          if (filtered.length > 0) {
+            result = filtered;
+          } else {
+            const liveOrUpcoming = list.filter(p => !p.isEnded && p.status !== 'ended' && p.currentPhase !== 'ended');
+            result = liveOrUpcoming.length > 0 ? liveOrUpcoming : list;
+          }
+        }
+        result.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        callback(result);
+      }, (err) => {
+        console.warn('[DB] streamPaperSessions error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] streamPaperSessions setup error:', e);
+      return () => {};
+    }
+  }
+
   async getUpcomingPapers(examYear) {
     try {
       const ref = collection(db, 'upcoming_papers');
@@ -553,6 +583,26 @@ export class DbService {
       console.warn('[DB] getUpcomingPapers error:', e);
     }
     return [];
+  }
+
+  streamUpcomingPapers(examYear, callback) {
+    try {
+      const ref = collection(db, 'upcoming_papers');
+      return onSnapshot(ref, (snap) => {
+        const list = snap.docs.map(d => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
+        let result = list;
+        if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+          const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
+          result = filtered.length > 0 ? filtered : list;
+        }
+        callback(result);
+      }, (e) => {
+        console.warn('[DB] streamUpcomingPapers error:', e);
+      });
+    } catch (e) {
+      console.warn('[DB] streamUpcomingPapers setup error:', e);
+      return () => {};
+    }
   }
 
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
@@ -1081,6 +1131,110 @@ export class DbService {
         entries,
       };
     }).sort((a, b) => b.publishedAt - a.publishedAt);
+  }
+
+  streamLeaderboard(batch, callback) {
+    try {
+      const ref = collection(db, 'leaderboard_public');
+      return onSnapshot(ref, (snapshot) => {
+        const list = snapshot.docs.map((studentDoc) => {
+          const student = studentDoc.data();
+          return {
+            rank: 0,
+            id: studentDoc.id,
+            role: 'student',
+            name: student.name || 'Student',
+            examYear: student.examYear || '',
+            credits: Number(student.credits) || 0,
+            avatarUrl: student.avatarUrl || student.photoUrl || '',
+          };
+        }).filter((student) => !batch || batch === 'All Batches'
+          || String(student.examYear).replace(/\s+/g, '').toUpperCase() === String(batch).replace(/\s+/g, '').toUpperCase()
+          || ['ALL', 'ALLBATCHES'].includes(String(student.examYear).replace(/\s+/g, '').toUpperCase()))
+          .sort((a, b) => b.credits - a.credits || a.name.localeCompare(b.name));
+        callback(list);
+      }, (err) => {
+        console.warn('[DB] streamLeaderboard error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] streamLeaderboard setup error:', e);
+      return () => {};
+    }
+  }
+
+  streamPaperLeaderboards(callback) {
+    try {
+      const ref = collection(db, 'paper_leaderboards');
+      return onSnapshot(ref, (snapshot) => {
+        const list = snapshot.docs.map((paperDoc) => {
+          const data = paperDoc.data();
+          const rawPublishedAt = data.publishedAt;
+          const publishedAt = rawPublishedAt?.toDate
+            ? rawPublishedAt.toDate()
+            : new Date(rawPublishedAt || Date.now());
+          const entries = Array.isArray(data.entries) ? data.entries.map((entry, index) => ({
+            rank: Number(entry?.rank) || index + 1,
+            studentId: String(entry?.studentId || ''),
+            studentName: String(entry?.studentName || 'Student'),
+            studentPhone: String(entry?.studentPhone || ''),
+            indexNumber: String(entry?.indexNumber || ''),
+            marks: Number(entry?.marks) || 0,
+            grade: String(entry?.grade || 'F').toUpperCase(),
+            remarks: String(entry?.remarks || ''),
+          })).sort((a, b) => a.rank - b.rank) : [];
+
+          return {
+            id: paperDoc.id,
+            paperTitle: String(data.paperTitle || 'Paper Evaluation Leaderboard'),
+            subject: String(data.subject || 'Physics'),
+            examYear: String(data.examYear || ''),
+            paperDate: String(data.paperDate || ''),
+            totalMarks: Number(data.totalMarks) || 100,
+            publishedAt: Number.isNaN(publishedAt.getTime()) ? new Date(0) : publishedAt,
+            entries,
+          };
+        }).sort((a, b) => b.publishedAt - a.publishedAt);
+        callback(list);
+      }, (err) => {
+        console.warn('[DB] streamPaperLeaderboards error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] streamPaperLeaderboards setup error:', e);
+      return () => {};
+    }
+  }
+
+  async savePaperLeaderboard(leaderboard) {
+    try {
+      const isNew = !leaderboard.id;
+      const ref = collection(db, 'paper_leaderboards');
+      if (isNew) {
+        const docRef = await addDoc(ref, {
+          ...leaderboard,
+          publishedAt: leaderboard.publishedAt || new Date().toISOString()
+        });
+        return docRef.id;
+      } else {
+        await setDoc(doc(db, 'paper_leaderboards', leaderboard.id), {
+          ...leaderboard,
+          publishedAt: leaderboard.publishedAt || new Date().toISOString()
+        }, { merge: true });
+        return leaderboard.id;
+      }
+    } catch (e) {
+      console.warn('[DB] savePaperLeaderboard error:', e);
+      throw e;
+    }
+  }
+
+  async deletePaperLeaderboard(id) {
+    if (!id) return;
+    try {
+      await deleteDoc(doc(db, 'paper_leaderboards', id));
+    } catch (e) {
+      console.warn('[DB] deletePaperLeaderboard error:', e);
+      throw e;
+    }
   }
 
   async getSprintAttempts(date) {

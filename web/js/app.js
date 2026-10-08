@@ -477,6 +477,10 @@ class AppController {
     }
     this.renderToken++;
 
+    if (this._papersUnsub) { try { this._papersUnsub(); } catch (_) {} this._papersUnsub = null; }
+    if (this._upcomingPapersUnsub) { try { this._upcomingPapersUnsub(); } catch (_) {} this._upcomingPapersUnsub = null; }
+    if (this._ranksUnsub) { try { this._ranksUnsub(); } catch (_) {} this._ranksUnsub = null; }
+
     // Show a stable loading state while an async screen loads. A render token
     // below prevents a slow page request from replacing a newer tab.
     container.innerHTML = `
@@ -929,6 +933,10 @@ class AppController {
     if (this.papersInterval) {
       clearInterval(this.papersInterval);
       this.papersInterval = null;
+    }
+    if (this._papersUnsub) {
+      try { this._papersUnsub(); } catch (_) {}
+      this._papersUnsub = null; if (this._upcomingPapersUnsub) { try { this._upcomingPapersUnsub(); } catch (_) {} this._upcomingPapersUnsub = null; }
     }
 
     try {
@@ -1449,6 +1457,25 @@ class AppController {
           if (paper) this.showUpcomingPaperDetailsModal(paper);
         });
       });
+
+      // Real-time listener: immediately re-render when admin publishes, deletes, or changes paper state
+      this._papersUnsub = dbService.streamPaperSessions(activeTargetYear, (liveSessions) => {
+        if (!container.isConnected || renderToken !== this.renderToken) return;
+        const currentSummary = sessions.map(s => `${s.id}_${s.status}_${s.currentPhase}_${s.slot1?.startTime}_${s.slot1?.registeredCount}`).join('|');
+        const liveSummary = liveSessions.map(s => `${s.id}_${s.status}_${s.currentPhase}_${s.slot1?.startTime}_${s.slot1?.registeredCount}`).join('|');
+        if (currentSummary !== liveSummary) {
+          this.renderPapersScreen(container);
+        }
+      });
+
+      this._upcomingPapersUnsub = dbService.streamUpcomingPapers(activeTargetYear, (liveUpcoming) => {
+        if (!container.isConnected || renderToken !== this.renderToken) return;
+        const currentSummary = upcomingList.map(p => `${p.id}_${p.scheduledDate}_${p.title}`).join('|');
+        const liveSummary = liveUpcoming.map(p => `${p.id}_${p.scheduledDate}_${p.title}`).join('|');
+        if (currentSummary !== liveSummary) {
+          this.renderPapersScreen(container);
+        }
+      });
     } catch (renderError) {
       console.error('[PapersScreen] Critical render error caught:', renderError);
       container.innerHTML = `
@@ -1930,6 +1957,7 @@ class AppController {
       : studentBatch;
     this.expandedPaperBoards = this.expandedPaperBoards ?? new Set();
     this.paperBoardsInitialized = this.paperBoardsInitialized ?? false;
+    if (this._ranksUnsub) { try { this._ranksUnsub(); } catch (_) {} this._ranksUnsub = null; }
 
     let leaders = [];
     let paperBoards = [];
@@ -2247,6 +2275,26 @@ class AppController {
     document.getElementById('btn-ranks-retry')?.addEventListener('click', () => {
       this.renderRanksScreen(container);
     });
+
+    if (this.ranksBoardType === 0) {
+      this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : undefined, (liveLeaders) => {
+        if (!container.isConnected || renderToken !== this.renderToken) return;
+        const currentSummary = leaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
+        const liveSummary = liveLeaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
+        if (currentSummary !== liveSummary) {
+          this.renderRanksScreen(container);
+        }
+      });
+    } else {
+      this._ranksUnsub = dbService.streamPaperLeaderboards((livePaperBoards) => {
+        if (!container.isConnected || renderToken !== this.renderToken) return;
+        const currentSummary = paperBoards.map(b => `${b.id}_${b.entries?.length}_${b.totalMarks}`).join('|');
+        const liveSummary = livePaperBoards.map(b => `${b.id}_${b.entries?.length}_${b.totalMarks}`).join('|');
+        if (currentSummary !== liveSummary) {
+          this.renderRanksScreen(container);
+        }
+      });
+    }
 
     container.querySelectorAll('[data-paper-board]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -3876,6 +3924,10 @@ class AppController {
     const fabSlot = document.getElementById('admin-fab-slot');
     if (fabSlot) fabSlot.innerHTML = '';
 
+    if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
+    if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
+    if (this._adminUpcomingUnsub) { try { this._adminUpcomingUnsub(); } catch (_) {} this._adminUpcomingUnsub = null; }
+
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.adminTab === tabName);
     });
@@ -4332,6 +4384,9 @@ class AppController {
   async renderAdminPapersScreen(container) {
     this.adminPaperTab = this.adminPaperTab ?? 0; // 0: Live Sessions, 1: Upcoming Papers, 2: Leaderboard
     this.adminSelectedPaperBatch = this.adminSelectedPaperBatch || 'All Batches';
+    if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
+    if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
+    if (this._adminUpcomingUnsub) { try { this._adminUpcomingUnsub(); } catch (_) {} this._adminUpcomingUnsub = null; }
     const papers = await dbService.getPaperSessions();
     let adminUpcomingPapers = [];
     let adminUpcomingPapersError = false;
@@ -4456,7 +4511,7 @@ class AppController {
     const triggerAdd = () => {
       if (this.adminPaperTab === 0) this.openAdminCreatePaperModal();
       else if (this.adminPaperTab === 1) this.openAdminCreatePaperModal();
-      else this.openAdminCreatePaperModal();
+      else this.openAdminCreateLeaderboardModal();
     };
 
     document.getElementById('btn-admin-add-paper-head')?.addEventListener('click', triggerAdd);
@@ -4464,6 +4519,45 @@ class AppController {
     document.getElementById('btn-empty-create-paper')?.addEventListener('click', triggerAdd);
 
     // Interactive paper action handlers matching Flutter 1:1
+    this._bindAdminLiveSessionActions(container, papers);
+
+    this._adminPapersUnsub = dbService.streamPaperSessions(null, (livePapers) => {
+      if (!container.isConnected) return;
+      if (this.adminPaperTab === 0) {
+        const liveSection = container.querySelector('.apk-admin-paper-tab-content');
+        if (liveSection) {
+          liveSection.innerHTML = this._buildAdminLiveSessionsHTML(livePapers);
+          this._bindAdminLiveSessionActions(container, livePapers);
+        }
+      }
+    });
+
+    if (this.adminPaperTab === 1) {
+      this._adminUpcomingUnsub = dbService.streamUpcomingPapers('All Batches', (liveUpcoming) => {
+        if (!container.isConnected || this.adminPaperTab !== 1) return;
+        const tabContent = container.querySelector('.apk-admin-paper-tab-content');
+        if (tabContent) {
+          tabContent.innerHTML = this._buildAdminUpcomingPapersHTML(liveUpcoming, false);
+        }
+      });
+    }
+
+    if (this.adminPaperTab === 2) {
+      this._adminBoardsUnsub = dbService.streamPaperLeaderboards((liveBoards) => {
+        if (!container.isConnected || this.adminPaperTab !== 2) return;
+        const selectedBatch = this.adminSelectedPaperBatch.replace(/\s+/g, '').toUpperCase();
+        const filteredBoards = liveBoards.filter((board) => this.adminSelectedPaperBatch === 'All Batches'
+          || board.examYear.replace(/\s+/g, '').toUpperCase() === selectedBatch
+          || ['ALL', 'ALLBATCHES'].includes(board.examYear.replace(/\s+/g, '').toUpperCase()));
+        const tabContent = container.querySelector('.apk-admin-paper-tab-content');
+        if (tabContent) {
+          tabContent.innerHTML = this._buildAdminPaperLeaderboardHTML(filteredBoards, false, this.adminSelectedPaperBatch);
+        }
+      });
+    }
+  }
+
+  _bindAdminLiveSessionActions(container, papers) {
     container.querySelectorAll('[data-view-proctor]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.openAdminLiveProctorHall(btn.dataset.viewProctor);
@@ -6478,6 +6572,209 @@ class AppController {
     });
   }
 
+  openAdminCreateLeaderboardModal() {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    let entries = [
+      { studentName: '', indexNumber: '', marks: 85, grade: 'A', remarks: 'Excellent' }
+    ];
+
+    const calculateGrade = (marks) => {
+      const m = Number(marks) || 0;
+      if (m >= 75) return 'A';
+      if (m >= 65) return 'B';
+      if (m >= 55) return 'C';
+      if (m >= 35) return 'S';
+      return 'F';
+    };
+
+    const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]);
+
+    const renderCandidateRows = () => {
+      const listEl = modal.querySelector('#leaderboard-candidates-list');
+      if (!listEl) return;
+      listEl.innerHTML = entries.map((entry, idx) => `
+        <div class="lb-candidate-row" style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr 36px; gap:8px; align-items:center; background:#F8FAFC; border:1px solid #E2E8F0; padding:8px 10px; border-radius:10px;">
+          <div>
+            <input type="text" class="form-textarea lb-entry-name" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Student Name" value="${escapeHTML(entry.studentName)}" />
+          </div>
+          <div>
+            <input type="text" class="form-textarea lb-entry-index" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Index / Phone" value="${escapeHTML(entry.indexNumber)}" />
+          </div>
+          <div>
+            <input type="number" class="form-textarea lb-entry-marks" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Marks" value="${entry.marks}" min="0" max="100" />
+          </div>
+          <div style="font-size:12px; font-weight:700; color:#2563EB; text-align:center;">
+            Grade: <span class="grade-badge grade-${entry.grade}">${entry.grade}</span>
+          </div>
+          <button type="button" class="btn-remove-lb-entry" data-idx="${idx}" style="background:transparent; border:none; color:#EF4444; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:18px;">close</span>
+          </button>
+        </div>
+      `).join('');
+
+      listEl.querySelectorAll('.lb-entry-name').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          entries[Number(e.target.dataset.idx)].studentName = e.target.value;
+        });
+      });
+      listEl.querySelectorAll('.lb-entry-index').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          entries[Number(e.target.dataset.idx)].indexNumber = e.target.value;
+        });
+      });
+      listEl.querySelectorAll('.lb-entry-marks').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const val = Number(e.target.value) || 0;
+          const idx = Number(e.target.dataset.idx);
+          entries[idx].marks = val;
+          entries[idx].grade = calculateGrade(val);
+          renderCandidateRows();
+        });
+      });
+      listEl.querySelectorAll('.btn-remove-lb-entry').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.dataset.idx);
+          if (entries.length > 1) {
+            entries.splice(idx, 1);
+            renderCandidateRows();
+          }
+        });
+      });
+    };
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:88vh; max-width:620px; width:92%; overflow-y:auto;">
+        <div class="modal-header">
+          <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="color:#D97706; font-size:22px;">emoji_events</span>
+            <span>Publish Paper Leaderboard</span>
+          </div>
+          <button class="modal-close-btn" id="btn-close-new-lb">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+          <div>
+            <div class="form-label">Paper Title / Evaluation Name:</div>
+            <input type="text" id="new-lb-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 Official Leaderboard" />
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <div class="form-label">Subject:</div>
+              <select id="new-lb-subject" class="form-textarea" style="height:40px; padding:8px;">
+                <option value="Physics" selected>Physics</option>
+              </select>
+            </div>
+            <div>
+              <div class="form-label">Exam Year / Batch:</div>
+              <select id="new-lb-year" class="form-textarea" style="height:40px; padding:8px;">
+                <option value="2024 A/L">2024 A/L</option>
+                <option value="2025 A/L">2025 A/L</option>
+                <option value="2026 A/L">2026 A/L</option>
+                <option value="2027 A/L" selected>2027 A/L</option>
+                <option value="2028 A/L">2028 A/L</option>
+                <option value="2029 A/L">2029 A/L</option>
+                <option value="All Batches">All Batches</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <div class="form-label">Total Marks:</div>
+              <input type="number" id="new-lb-total-marks" class="form-textarea" style="height:40px;" value="100" min="1" max="1000" />
+            </div>
+            <div>
+              <div class="form-label">Evaluation Date:</div>
+              <input type="date" id="new-lb-date" class="form-textarea" style="height:40px;" value="${new Date().toISOString().split('T')[0]}" />
+            </div>
+          </div>
+
+          <div style="margin-top:6px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <div class="form-label" style="font-weight:700; margin:0;">Candidate Rankings & Marks:</div>
+              <button type="button" id="btn-add-lb-candidate" class="apk-btn-primary" style="background:#2563EB; padding:6px 14px; font-size:12px; height:auto; box-shadow:none;">
+                <span class="material-symbols-rounded" style="font-size:16px;">add</span> Add Student
+              </button>
+            </div>
+            <div id="leaderboard-candidates-list" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding-right:4px;">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:14px;">
+            <button class="apk-btn-primary" id="btn-cancel-new-lb" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+              Cancel
+            </button>
+            <button class="apk-btn-primary" id="btn-save-new-lb" style="flex:1.5; background:#D97706; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px;">publish</span>
+              <span>Publish Leaderboard</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    renderCandidateRows();
+
+    modal.querySelector('#btn-close-new-lb')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('#btn-cancel-new-lb')?.addEventListener('click', () => modal.remove());
+
+    modal.querySelector('#btn-add-lb-candidate')?.addEventListener('click', () => {
+      entries.push({ studentName: '', indexNumber: '', marks: 75, grade: 'A', remarks: '' });
+      renderCandidateRows();
+    });
+
+    modal.querySelector('#btn-save-new-lb')?.addEventListener('click', async () => {
+      const paperTitle = modal.querySelector('#new-lb-title')?.value?.trim();
+      const subject = modal.querySelector('#new-lb-subject')?.value || 'Physics';
+      const examYear = modal.querySelector('#new-lb-year')?.value || '2027 A/L';
+      const totalMarks = Number(modal.querySelector('#new-lb-total-marks')?.value) || 100;
+      const paperDate = modal.querySelector('#new-lb-date')?.value || new Date().toISOString().split('T')[0];
+
+      if (!paperTitle) {
+        alert('කරුණාකර Leaderboard Title එක ඇතුළත් කරන්න (Please enter Leaderboard Title)');
+        return;
+      }
+
+      const sortedEntries = entries
+        .filter(e => e.studentName && e.studentName.trim().length > 0)
+        .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+        .map((e, index) => ({
+          rank: index + 1,
+          studentName: e.studentName.trim(),
+          studentPhone: e.indexNumber.trim(),
+          indexNumber: e.indexNumber.trim(),
+          studentId: 'candidate_' + (index + 1),
+          marks: Number(e.marks) || 0,
+          grade: calculateGrade(e.marks),
+          remarks: e.remarks || ''
+        }));
+
+      await dbService.savePaperLeaderboard({
+        paperTitle,
+        subject,
+        examYear,
+        totalMarks,
+        paperDate,
+        publishedAt: new Date().toISOString(),
+        entries: sortedEntries
+      });
+
+      notificationService.showInAppBanner('Leaderboard Published!', 'Paper Leaderboard එක සාර්ථකව Real-Time Publish කරන ලදී.', 'success');
+      modal.remove();
+      const vp = document.getElementById('admin-main-viewport');
+      if (vp) this.renderAdminPapersScreen(vp);
+    });
+  }
+
   openCreateSprintSheet() {
     document.getElementById('create-sprint-modal')?.remove();
     const modal = document.createElement('div');
@@ -7515,6 +7812,7 @@ class AppController {
     let cameraActive = false;
     let heartbeatInterval = null;
     let syncInterval = null;
+    let liveSessionUnsub = null;
     let timerInterval = null;
     let isBigTimerMinimized = false;
     let facingMode = 'user'; // front / user camera
@@ -8117,7 +8415,7 @@ ${!times.isWaiting ? `
     // Cleanup and Exit
     const cleanupAndExit = () => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
-      if (syncInterval) clearInterval(syncInterval);
+      if (syncInterval) clearInterval(syncInterval); if (liveSessionUnsub) { try { liveSessionUnsub(); } catch (_) {} liveSessionUnsub = null; }
       if (timerInterval) clearInterval(timerInterval);
       if (cameraStream) {
         cameraStream.getTracks().forEach(t => t.stop());
@@ -9161,7 +9459,18 @@ ${!times.isWaiting ? `
       sendHeartbeat(cameraActive);
     }, 4000);
 
-    // Periodic Session Sync every 3 seconds (matching _sessionSyncTimer)
+    // Real-Time Session Sync via Firestore onSnapshot
+    try {
+      liveSessionUnsub = dbService.streamPaperSession(paperId, (s) => {
+        if (s) {
+          const changed = session.currentPhase !== s.currentPhase || session.status !== s.status || session.isTimeUp !== s.isTimeUp || session.writingStartedAt !== s.writingStartedAt || session.packageOpeningStartedAt !== s.packageOpeningStartedAt;
+          session = s;
+          if (changed) renderRoom();
+        }
+      });
+    } catch (_) {}
+
+    // Periodic Session Sync fallback (matching _sessionSyncTimer)
     syncInterval = setInterval(async () => {
       try {
         const s = await dbService.getPaperSession(paperId);
