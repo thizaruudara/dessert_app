@@ -7867,32 +7867,109 @@ class AppController {
       });
 
       // Phase Control Buttons
+      // Phase Control Buttons with Admin Confirmation
       modal.querySelectorAll('[data-set-phase]').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', () => {
           const targetPhase = btn.dataset.setPhase;
-          await dbService.setSessionPhase(session.id, targetPhase);
-          notificationService.showInAppBanner('Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
+          const isCurrentlyEnded = session.isEnded || session.status === 'ended' || session.currentPhase === 'ended';
+
+          if (isCurrentlyEnded) {
+            // Reopen Session confirmation
+            this._confirmProctorAction({
+              title: 'Reopen Session? (සැසිය නැවත අරඹන්නද?)',
+              content: 'අවසන් කරන ලද මෙම විභාග සැසිය නැවත සිසුන් සඳහා සක්‍රීය කිරීමට (Reopen) ඔබට අවශ්‍ය බව සහතිකද?\n\nසියලුම සිසුන්ගේ Screen එකෙහි විභාගය නැවත Live වන අතර ඔවුන්ට නැවත පිළිතුරු ලිවීමට හැකි වේ.',
+              confirmText: 'Reopen Session (නැවත අරඹන්න)',
+              confirmColor: '#6366F1',
+              onConfirm: async () => {
+                await dbService.reopenPaperSession(session.id);
+                notificationService.showInAppBanner('Session Reopened', 'Exam session has been reopened and is live!', 'success');
+              }
+            });
+            return;
+          }
+
+          if (targetPhase === 'package_opening') {
+            this._confirmProctorAction({
+              title: 'Start Package Opening? (පාර්සලය විවෘත කිරීම අරඹන්නද?)',
+              content: 'සිසුන්ට විනාඩි 10 ක කාලයක් ලබාදෙමින් ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට පටන් ගැනීමට අවශ්‍ය බව සහතිකද?',
+              confirmText: 'Start Package Opening (අරඹන්න)',
+              confirmColor: '#F59E0B',
+              onConfirm: async () => {
+                await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
+                notificationService.showInAppBanner('Package Opening', '10-minute package opening started.', 'info');
+              }
+            });
+          } else if (targetPhase === 'writing') {
+            const isResume = session.currentPhase === 'time_up';
+            this._confirmProctorAction({
+              title: isResume ? 'Resume Writing? (නැවත ලිවීම සක්‍රීය කරන්නද?)' : 'Start Exam Writing? (විභාගය ලිවීම අරඹන්නද?)',
+              content: isResume
+                ? 'කාලය අවසන් වූ සැසිය නැවත ලිවීමේ අදියරට (Writing Phase) මාරු කිරීමට අවශ්‍ය බව සහතිකද?'
+                : 'සියලුම සිසුන්ට පිළිතුරු ලිවීම ආරම්භ කිරීමට සහ ප්‍රධාන විභාග ටයිමරය (Exam Timer) ක්‍රියාත්මක කිරීමට අවශ්‍ය බව සහතිකද?',
+              confirmText: isResume ? 'Resume Writing (ලිවීම අරඹන්න)' : 'Start Writing (ලිවීම අරඹන්න)',
+              confirmColor: '#22C55E',
+              onConfirm: async () => {
+                await dbService.setSessionPhase(session.id, 'writing');
+                notificationService.showInAppBanner('Exam Writing Live', 'Exam writing phase active for all students.', 'success');
+              }
+            });
+          } else {
+            this._confirmProctorAction({
+              title: `Change Phase to ${targetPhase.toUpperCase()}?`,
+              content: `ඔබට සැසියේ අදියර ${targetPhase.toUpperCase()} වෙත මාරු කිරීමට අවශ්‍ය බව සහතිකද?`,
+              confirmText: 'Confirm',
+              confirmColor: '#6366F1',
+              onConfirm: async () => {
+                await dbService.setSessionPhase(session.id, targetPhase);
+                notificationService.showInAppBanner('Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
+              }
+            });
+          }
         });
       });
 
       modal.querySelectorAll('[data-restart-10m]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
-          notificationService.showInAppBanner('10m Timer Restarted', 'Package opening timer reset to 10:00', 'info');
+        btn.addEventListener('click', () => {
+          this._confirmProctorAction({
+            title: 'Restart 10m Package Timer? (ටයිමරය නැවත අරඹන්නද?)',
+            content: 'පැකේජය විවෘත කිරීමේ විනාඩි 10 ක කාල ගණනය නැවත මුල සිට ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
+            confirmText: 'Restart Timer (නැවත අරඹන්න)',
+            confirmColor: '#F59E0B',
+            onConfirm: async () => {
+              await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
+              notificationService.showInAppBanner('10m Timer Restarted', 'Package opening timer reset to 10:00', 'info');
+            }
+          });
         });
       });
 
       modal.querySelectorAll('[data-trigger-time-up]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          await dbService.triggerTimeUp(session.id);
-          notificationService.showInAppBanner('Time Up Triggered', 'Time is Up alert sent!', 'info');
+        btn.addEventListener('click', () => {
+          this._confirmProctorAction({
+            title: 'Trigger Time Up? (වේලාව අවසන් කරන්නද?)',
+            content: 'සියලුම සිසුන්ගේ ලිවීමේ කාලය අවසන් කර, පිළිතුරු පත්‍ර In-App Scanner එකෙන් Scan කර Submit කිරීමට නියෝග කිරීමට අවශ්‍ය බව සහතිකද?',
+            confirmText: 'Trigger Time Up (කාලය අවසන්)',
+            confirmColor: '#EA580C',
+            onConfirm: async () => {
+              await dbService.triggerTimeUp(session.id);
+              notificationService.showInAppBanner('Time Up Triggered', 'Time is Up alert sent to all students!', 'warning');
+            }
+          });
         });
       });
 
       modal.querySelectorAll('[data-end-now]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          await dbService.endPaperSession(session.id);
-          notificationService.showInAppBanner('Session Ended', 'Session closed.', 'warning');
+        btn.addEventListener('click', () => {
+          this._confirmProctorAction({
+            title: 'End Paper Session? (සැසිය අවසන් කරන්නද?)',
+            content: 'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සියලුම සිසුන්ගේ විභාග කාමරය වසා දැමෙන අතර නව submissions ලබාගත නොහැක.',
+            confirmText: 'End Session (අවසන් කරන්න)',
+            confirmColor: '#EF4444',
+            onConfirm: async () => {
+              await dbService.endPaperSession(session.id);
+              notificationService.showInAppBanner('Session Ended', 'Exam session closed officially.', 'error');
+            }
+          });
         });
       });
 

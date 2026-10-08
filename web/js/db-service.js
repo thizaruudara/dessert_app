@@ -832,10 +832,20 @@ export class DbService {
 
     if (phase === 'waiting') {
       updates.status = 'upcoming';
+      updates.currentPhase = 'waiting';
       updates.isTimeUp = false;
+      updates.timeUpAt = null;
+      updates.isEnded = false;
+      updates.endedAt = null;
+      updates.isLive = false;
     } else if (phase === 'package_opening') {
       updates.status = 'active';
+      updates.currentPhase = 'package_opening';
       updates.isTimeUp = false;
+      updates.timeUpAt = null;
+      updates.isEnded = false;
+      updates.endedAt = null;
+      updates.isLive = true;
       if (forceResetTimer) {
         updates.packageOpeningStartedAt = nowIso;
       }
@@ -843,7 +853,12 @@ export class DbService {
       alertType = 'urgent';
     } else if (phase === 'writing') {
       updates.status = 'active';
+      updates.currentPhase = 'writing';
       updates.isTimeUp = false;
+      updates.timeUpAt = null;
+      updates.isEnded = false;
+      updates.endedAt = null;
+      updates.isLive = true;
       if (forceResetTimer) {
         updates.writingStartedAt = nowIso;
       }
@@ -852,12 +867,20 @@ export class DbService {
       alertType = 'info';
     } else if (phase === 'time_up') {
       updates.status = 'active';
+      updates.currentPhase = 'time_up';
       updates.isTimeUp = true;
       updates.timeUpAt = nowIso;
+      updates.isEnded = false;
+      updates.endedAt = null;
+      updates.isLive = true;
       alertMessage = '⏰ වේලාව අවසන් විය! ලිවීම නවතා ඔබගේ පිළිතුරු පත්‍ර In-App Scanner එකෙන් Scan කර දැන්ම Submit කරන්න.';
       alertType = 'urgent';
     } else if (phase === 'ended') {
       updates.status = 'ended';
+      updates.currentPhase = 'ended';
+      updates.isTimeUp = false;
+      updates.isEnded = true;
+      updates.isLive = false;
       updates.endedAt = nowIso;
       alertMessage = '🛑 මෙම විභාග සැසිය නිල වශයෙන් අවසන් විය. (Session Ended by Examiner)';
       alertType = 'urgent';
@@ -888,6 +911,10 @@ export class DbService {
       await updateDoc(docRef, {
         isTimeUp: true,
         currentPhase: 'time_up',
+        status: 'active',
+        isEnded: false,
+        endedAt: null,
+        isLive: true,
         timeUpAt: nowIso
       });
     } catch (e) {
@@ -911,6 +938,7 @@ export class DbService {
         currentPhase: 'ended',
         isLive: false,
         isEnded: true,
+        isTimeUp: false,
         endedAt: nowIso
       });
     } catch (e) {
@@ -935,13 +963,22 @@ export class DbService {
       const docRef = doc(db, 'paper_sessions', paperId);
       await updateDoc(docRef, {
         status: 'active',
-        currentPhase: 'waiting',
+        currentPhase: 'writing',
         isLive: true,
-        isEnded: false
+        isEnded: false,
+        endedAt: null,
+        isTimeUp: false,
+        timeUpAt: null
       });
     } catch (e) {
       console.warn('[DB] reopenPaperSession error:', e);
     }
+    this.broadcastProctorAlert({
+      paperId,
+      senderName: 'Admin / Examiner',
+      message: '🔄 විභාග සැසිය නැවත විවෘත කරන ලදී. සිසුන්ට දැන් නැවත සම්බන්ධ විය හැක. (Session Reopened by Admin)',
+      type: 'info'
+    }).catch(() => {});
   }
 
   async deletePaperSession(paperId) {
