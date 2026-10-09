@@ -156,13 +156,21 @@ export class DbService {
     }
   }
 
-  // Admin: Get student roster
+    // Admin: Get student roster (excludes admin/teacher accounts)
   async getAllStudents() {
     try {
       const usersRef = collection(db, 'users');
       const snap = await getDocs(usersRef);
       if (!snap.empty) {
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(u => {
+            const role = String(u.role || '').toLowerCase().trim();
+            const name = String(u.name || '').toLowerCase().trim();
+            const isAdmin = u.isAdmin === true || role === 'admin' || role === 'teacher' || u.isTeacher === true;
+            const isStaffName = name === 'teacher / admin' || name === 'teacher' || name === 'admin';
+            return !isAdmin && !isStaffName;
+          });
       }
     } catch (_) {}
     return [];

@@ -5806,13 +5806,45 @@ class AppController {
           </div>
         ` : `
           <div style="display:flex; flex-direction:column; gap:10px;">
-            ${filtered.map(st => `
-              <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
+            ${(() => {
+              const phoneCounts = {};
+              allStudents.forEach(s => {
+                const ph = String(s.phone || '').trim();
+                if (ph) phoneCounts[ph] = (phoneCounts[ph] || 0) + 1;
+              });
+
+              const getAvatarGrad = (str) => {
+                const grads = [
+                  'linear-gradient(135deg, #2563EB, #1D4ED8)',
+                  'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                  'linear-gradient(135deg, #059669, #047857)',
+                  'linear-gradient(135deg, #D97706, #B45309)',
+                  'linear-gradient(135deg, #DB2777, #9D174D)',
+                  'linear-gradient(135deg, #0891B2, #0E7490)',
+                  'linear-gradient(135deg, #4F46E5, #3730A3)'
+                ];
+                let hash = 0;
+                for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                return grads[Math.abs(hash) % grads.length];
+              };
+
+              return filtered.map(st => {
+                const isDup = phoneCounts[st.phone] > 1;
+                return `
+              <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
                 <div style="display:flex; align-items:center; gap:12px;">
-                  <div class="admin-sub-avatar" style="width:40px; height:40px; font-size:16px;">${(st.name || 'S').charAt(0).toUpperCase()}</div>
+                  <div style="width:42px; height:42px; border-radius:50%; background:${getAvatarGrad(st.name || st.id)}; color:#FFFFFF; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.12); flex-shrink:0;">
+                    ${(st.name || 'S').charAt(0).toUpperCase()}
+                  </div>
                   <div>
-                    <div style="font-size:14px; font-weight:800; color:#0F172A;">${st.name || 'Student'}</div>
-                    <div style="font-size:11.5px; color:#64748B;">${st.phone || 'No phone'} • <span style="color:#2563EB; font-weight:700;">${st.examYear || '2026 A/L'}</span></div>
+                    <div style="font-size:14px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <span>${st.name || 'Student'}</span>
+                      ${isDup ? '<span style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:1px 6px; border-radius:6px; font-size:10px; font-weight:700;">⚠️ Duplicate Phone</span>' : ''}
+                    </div>
+                    <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
+                      ${st.phone || 'No phone'} • <span style="color:#2563EB; font-weight:700;">${st.examYear || '2026 A/L'}</span>
+                      ${st.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${st.studentId}</span>` : ''}
+                    </div>
                   </div>
                 </div>
 
@@ -5820,12 +5852,14 @@ class AppController {
                   <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; font-size:16px;">
                     <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
                   </button>
-                  <button class="apk-icon-action-btn" title="Delete Account" data-delete-student="${st.id}" style="color:#EF4444; font-size:16px;">
+                  <button class="apk-icon-action-btn" title="Delete Account" data-delete-student="${st.id}" style="color:#EF4444; font-size:16px; background:#FEF2F2;">
                     <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
                   </button>
                 </div>
               </div>
-            `).join('')}
+            `;
+              }).join('');
+            })()}
           </div>
         `}
       </div>
@@ -7427,15 +7461,19 @@ class AppController {
     });
   }
 
-  confirmDeleteStudent(student) {
-    if (!confirm(`Are you sure you want to permanently delete the account of ${student.name} (${student.phone})? This will purge all associated submissions and records.`)) {
+  async confirmDeleteStudent(student) {
+    if (!confirm(`Are you sure you want to permanently delete the account of ${student.name} (${student.phone} • ${student.examYear || ''})?\n\nThis will purge all associated submissions and records.`)) {
       return;
     }
 
-    dbService.deleteStudent(student.id);
-    notificationService.showInAppBanner('Account Purged', `All data for ${student.name} removed.`, 'warning');
-    const vp = document.getElementById('admin-main-viewport');
-    if (vp) this.renderAdminStudentsScreen(vp);
+    try {
+      await dbService.deleteStudent(student.id);
+      notificationService.showInAppBanner('Account Purged', `Record for ${student.name} removed.`, 'warning');
+      const vp = document.getElementById('admin-main-viewport');
+      if (vp) await this.renderAdminStudentsScreen(vp);
+    } catch (e) {
+      alert('Failed to delete student: ' + (e.message || e));
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════════════

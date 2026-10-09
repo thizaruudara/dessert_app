@@ -2808,6 +2808,8 @@ html[data-theme="dark"] .splash-loading-text {
   background: #F8FAFC;
   border: 1px solid #CBD5E1;
   white-space: nowrap;
+  flex-shrink: 0 !important;
+  min-width: max-content !important;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -2860,7 +2862,6 @@ button:focus-visible {
 
 /* Prevent flex child blowouts */
 .apk-command-btn,
-.apk-filter-chip,
 .apk-segmented-tab-btn,
 .sub-tab-btn {
   min-width: 0;
