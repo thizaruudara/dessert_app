@@ -2154,8 +2154,7 @@ class AppController {
 
     filtered.forEach((student, index) => { student.rank = index + 1; });
     const top3 = filtered.slice(0, 3);
-    const showPodium = this.selectedLeague === 'All Scholars' && top3.length >= 2;
-    const visibleRankRows = showPodium ? filtered.slice(3) : filtered;
+    const visibleRankRows = filtered;
     const currentUserId = currentUser.uid || currentUser.id;
     const currentUserRank = filtered.findIndex((student) => student.id === currentUserId) + 1;
     const currentUserEntry = currentUserRank > 0 ? filtered[currentUserRank - 1] : null;
@@ -2180,54 +2179,11 @@ class AppController {
             <strong>${!emptyBatchLabel ? 'No students ranked yet' : `No students ranked in ${escapeHTML(emptyBatchLabel)} yet`}</strong>
             <span>Rankings appear here when student XP records are available.</span>
           </div>`
-        : `${showPodium ? `
-            <div class="stepped-podium-container">
-              <div class="stepped-podium-col col-rank-2">
-                <div class="podium-avatar-box avatar-silver-border">
-                  <span class="podium-rank-pill pill-silver">#2</span>
-                  <div class="podium-avatar ${getAvatarClass(top3[1].name)}">${getInitials(top3[1].name)}</div>
-                </div>
-                <div class="podium-student-name" title="${escapeHTML(top3[1].name)}">${escapeHTML(top3[1].name.split(' ')[0])}</div>
-                <div class="podium-score-pill pill-silver-score">${top3[1].credits} <small>XP</small></div>
-                <div class="podium-pedestal pedestal-silver">
-                  <div class="pedestal-rank-num">2</div>
-                  <div class="pedestal-ribbon"><span class="material-symbols-rounded filled">military_tech</span> SILVER</div>
-                </div>
-              </div>
-              <div class="stepped-podium-col col-rank-1">
-                <div class="podium-crown-badge">👑</div>
-                <div class="podium-avatar-box avatar-gold-border avatar-gold-glow">
-                  <span class="podium-rank-pill pill-gold">#1</span>
-                  <div class="podium-avatar ${getAvatarClass(top3[0].name)}">${getInitials(top3[0].name)}</div>
-                </div>
-                <div class="podium-student-name podium-name-gold" title="${escapeHTML(top3[0].name)}">${escapeHTML(top3[0].name.split(' ')[0])}</div>
-                <div class="podium-score-pill pill-gold-score">${top3[0].credits} <small>XP</small></div>
-                <div class="podium-pedestal pedestal-gold">
-                  <div class="pedestal-rank-num">1</div>
-                  <div class="pedestal-ribbon"><span class="material-symbols-rounded filled">emoji_events</span> CHAMPION</div>
-                </div>
-              </div>
-              ${top3[2] ? `
-              <div class="stepped-podium-col col-rank-3">
-                <div class="podium-avatar-box avatar-bronze-border">
-                  <span class="podium-rank-pill pill-bronze">#3</span>
-                  <div class="podium-avatar ${getAvatarClass(top3[2].name)}">${getInitials(top3[2].name)}</div>
-                </div>
-                <div class="podium-student-name" title="${escapeHTML(top3[2].name)}">${escapeHTML(top3[2].name.split(' ')[0])}</div>
-                <div class="podium-score-pill pill-bronze-score">${top3[2].credits} <small>XP</small></div>
-                <div class="podium-pedestal pedestal-bronze">
-                  <div class="pedestal-rank-num">3</div>
-                  <div class="pedestal-ribbon"><span class="material-symbols-rounded filled">military_tech</span> BRONZE</div>
-                </div>
-              </div>
-              ` : '<div class="stepped-podium-col col-rank-3 col-empty"></div>'}
-            </div>
-          ` : ''}
-          <div class="ranks-list">
+        : `<div class="ranks-list">
             ${visibleRankRows.map((student) => `
               <div class="rank-list-item ${student.id === (currentUser.uid || currentUser.id) ? 'is-current-user' : ''}">
                 <div class="rank-item-left">
-                  <span class="rank-index">#${student.rank}</span>
+                  <span class="rank-index ${student.rank <= 3 ? `top-rank-${student.rank}` : ''}">#${student.rank}</span>
                   <div class="rank-avatar">${escapeHTML(String(student.name || 'S').charAt(0).toUpperCase())}</div>
                   <div class="rank-name-box">
                     <div class="rank-student-name">
@@ -2264,7 +2220,7 @@ class AppController {
         </div>`
       : visiblePaperBoards.length === 0
         ? `<div class="leaderboard-state" role="status">
-            <span class="material-symbols-rounded">military_tech</span>
+            <span class="material-symbols-rounded">assignment</span>
             <strong>No Paper Leaderboards for ${escapeHTML(paperBatchFilter || 'your batch')}</strong>
             <span>Official rankings and marks will appear here after an evaluation is published.</span>
           </div>`
@@ -2279,13 +2235,10 @@ class AppController {
                   || (currentUser.name && entry.studentName.trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
               });
               const publishedDate = board.publishedAt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-              const topThree = entries.slice(0, 3);
-              const rank1 = topThree[0];
-              const rank2 = topThree[1];
-              const rank3 = topThree[2];
-              const myPercentile = myEntry && entries.length > 0
-                ? Math.max(1, Math.round(((entries.length - myEntry.rank + 1) / entries.length) * 100))
-                : null;
+              const totalMarks = board.totalMarks || 100;
+              const avgScore = entries.length
+                ? (entries.reduce((sum, e) => sum + (Number(e.marks) || 0), 0) / entries.length).toFixed(1)
+                : '—';
 
               return `
                 <article class="paper-board-card ${boardIndex === 0 ? 'is-latest' : ''}">
@@ -2293,21 +2246,16 @@ class AppController {
                     <div class="paper-board-heading-content">
                       <div class="pb-badges-row">
                         <span class="paper-board-tag">${escapeHTML(board.subject)} · ${escapeHTML(board.examYear)}</span>
-                        ${boardIndex === 0 ? '<span class="paper-latest-tag"><span class="material-symbols-rounded filled" style="font-size:12px;">bolt</span> LATEST</span>' : ''}
-                        <span class="paper-board-date"><span class="material-symbols-rounded" style="font-size:12px;">calendar_today</span> ${escapeHTML(publishedDate)}</span>
+                        ${boardIndex === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ''}
+                        <span class="paper-board-date">${escapeHTML(publishedDate)}</span>
                       </div>
-                      <strong class="paper-board-title">${escapeHTML(board.paperTitle)}</strong>
+                      <h3 class="paper-board-title">${escapeHTML(board.paperTitle)}</h3>
                       <div class="paper-board-stats">
-                        <span class="pb-stat-pill"><span class="material-symbols-rounded" style="font-size:13px;">target</span> Max: ${board.totalMarks} marks</span>
-                        <span class="pb-stat-pill"><span class="material-symbols-rounded" style="font-size:13px;">groups</span> ${entries.length} candidates</span>
-                        ${myEntry ? `<span class="pb-stat-pill pb-my-result"><span class="material-symbols-rounded filled" style="font-size:13px;">star</span> You: #${myEntry.rank} · ${myEntry.marks}/${board.totalMarks}</span>` : ''}
+                        <span class="pb-stat-pill">Max: ${totalMarks} marks</span>
+                        <span>·</span>
+                        <span class="pb-stat-pill">${entries.length} candidates</span>
+                        ${myEntry ? `<span>·</span><span class="pb-stat-pill pb-my-result">Your Rank: #${myEntry.rank} (${myEntry.marks}/${totalMarks})</span>` : ''}
                       </div>
-                      ${!expanded && entries[0] ? `
-                        <div class="paper-winner-snippet">
-                          <span class="pws-trophy">🏆</span>
-                          <span>Rank 1: <strong>${escapeHTML(entries[0].studentName)}</strong> (${entries[0].marks} marks · Grade ${escapeHTML(entries[0].grade)})</span>
-                        </div>
-                      ` : ''}
                     </div>
                     <div class="paper-expand-circle">
                       <span class="material-symbols-rounded paper-expand-icon">${expanded ? 'expand_less' : 'expand_more'}</span>
@@ -2315,122 +2263,77 @@ class AppController {
                   </button>
                   ${expanded ? `
                     <div class="paper-results-content">
+                      <!-- Performance Summary Strip -->
+                      <div class="exam-summary-strip">
+                        <div class="ess-item">
+                          <span class="ess-label">Top Score</span>
+                          <span class="ess-val">${entries[0] ? `${entries[0].marks} / ${totalMarks}` : '—'}</span>
+                        </div>
+                        <div class="ess-item">
+                          <span class="ess-label">Average</span>
+                          <span class="ess-val">${avgScore}</span>
+                        </div>
+                        <div class="ess-item">
+                          <span class="ess-label">Candidates</span>
+                          <span class="ess-val">${entries.length} Students</span>
+                        </div>
+                      </div>
+
                       ${myEntry ? `
-                        <div class="paper-my-spotlight-card">
-                          <div class="pmsc-top">
-                            <div class="pmsc-title">
-                              <span class="material-symbols-rounded filled" style="color:#10B981; font-size:18px;">verified</span>
-                              <span>Your Official Result</span>
+                        <div class="student-result-banner">
+                          <div class="srb-left">
+                            <span class="material-symbols-rounded" style="color:#16A34A; font-size:20px;">verified</span>
+                            <div>
+                              <div class="srb-title">Your Result</div>
+                              <div class="srb-sub">${escapeHTML(myEntry.studentName)}</div>
                             </div>
-                            <span class="grade-badge grade-${escapeHTML(myEntry.grade)}">Grade ${escapeHTML(myEntry.grade)}</span>
                           </div>
-                          <div class="pmsc-stats">
-                            <div class="pmsc-stat-item">
-                              <span class="pmsc-stat-label">Batch Rank</span>
-                              <span class="pmsc-stat-val text-emerald">#${myEntry.rank}</span>
-                              <span class="pmsc-stat-hint">of ${entries.length} students</span>
-                            </div>
-                            <div class="pmsc-stat-item">
-                              <span class="pmsc-stat-label">Your Marks</span>
-                              <span class="pmsc-stat-val">${myEntry.marks} <small>/ ${board.totalMarks}</small></span>
-                              <span class="pmsc-stat-hint">${Math.round((myEntry.marks / board.totalMarks) * 100)}% accuracy</span>
-                            </div>
-                            <div class="pmsc-stat-item">
-                              <span class="pmsc-stat-label">Standing</span>
-                              <span class="pmsc-stat-val text-blue">Top ${100 - myPercentile + 1}%</span>
-                              <span class="pmsc-stat-hint">Class Standing</span>
-                            </div>
+                          <div class="srb-right">
+                            <span class="srb-metric">Rank <strong>#${myEntry.rank}</strong></span>
+                            <span class="grade-pill grade-${escapeHTML(myEntry.grade)}">${escapeHTML(myEntry.grade)}</span>
+                            <span class="srb-score"><strong>${myEntry.marks}</strong> <small style="color:#64748B;">/ ${totalMarks}</small></span>
                           </div>
                         </div>
                       ` : ''}
 
-                      ${topThree.length >= 2 ? `
-                        <div class="stepped-podium-container">
-                          <!-- Rank 2 (Silver) -->
-                          <div class="stepped-podium-col col-rank-2">
-                            <div class="podium-avatar-box avatar-silver-border">
-                              <span class="podium-rank-pill pill-silver">#2</span>
-                              <div class="podium-avatar ${getAvatarClass(rank2.studentName)}">${getInitials(rank2.studentName)}</div>
-                            </div>
-                            <div class="podium-student-name" title="${escapeHTML(rank2.studentName)}">${escapeHTML(rank2.studentName)}</div>
-                            <div class="podium-score-pill pill-silver-score">${rank2.marks} <small>marks</small></div>
-                            <div class="podium-pedestal pedestal-silver">
-                              <div class="pedestal-rank-num">2</div>
-                              <div class="pedestal-ribbon"><span class="material-symbols-rounded filled">military_tech</span> SILVER</div>
-                            </div>
-                          </div>
-
-                          <!-- Rank 1 (Gold / Champion) -->
-                          <div class="stepped-podium-col col-rank-1">
-                            <div class="podium-crown-badge">👑</div>
-                            <div class="podium-avatar-box avatar-gold-border avatar-gold-glow">
-                              <span class="podium-rank-pill pill-gold">#1</span>
-                              <div class="podium-avatar ${getAvatarClass(rank1.studentName)}">${getInitials(rank1.studentName)}</div>
-                            </div>
-                            <div class="podium-student-name podium-name-gold" title="${escapeHTML(rank1.studentName)}">${escapeHTML(rank1.studentName)}</div>
-                            <div class="podium-score-pill pill-gold-score">${rank1.marks} <small>marks</small></div>
-                            <div class="podium-pedestal pedestal-gold">
-                              <div class="pedestal-rank-num">1</div>
-                              <div class="pedestal-ribbon"><span class="material-symbols-rounded filled">emoji_events</span> CHAMPION</div>
-                            </div>
-                          </div>
-
-                          <!-- Rank 3 (Bronze) -->
-                          ${rank3 ? `
-                          <div class="stepped-podium-col col-rank-3">
-                            <div class="podium-avatar-box avatar-bronze-border">
-                              <span class="podium-rank-pill pill-bronze">#3</span>
-                              <div class="podium-avatar ${getAvatarClass(rank3.studentName)}">${getInitials(rank3.studentName)}</div>
-                            </div>
-                            <div class="podium-student-name" title="${escapeHTML(rank3.studentName)}">${escapeHTML(rank3.studentName)}</div>
-                            <div class="podium-score-pill pill-bronze-score">${rank3.marks} <small>marks</small></div>
-                            <div class="podium-pedestal pedestal-bronze">
-                              <div class="pedestal-rank-num">3</div>
-                              <div class="pedestal-ribbon"><span class="material-symbols-rounded filled">military_tech</span> BRONZE</div>
-                            </div>
-                          </div>
-                          ` : '<div class="stepped-podium-col col-rank-3 col-empty"></div>'}
+                      <!-- Clean Rankings Table -->
+                      <div class="paper-table-wrapper">
+                        <div class="paper-table-header">
+                          <span class="pth-col-rank">Rank</span>
+                          <span class="pth-col-student">Candidate</span>
+                          <span class="pth-col-grade">Grade</span>
+                          <span class="pth-col-marks">Score</span>
                         </div>
-                      ` : ''}
-
-                      <div class="paper-rankings-section">
-                        <div class="paper-rankings-header">
-                          <span class="prh-title"><span class="material-symbols-rounded" style="font-size:16px;">leaderboard</span> Full Candidate Rankings</span>
-                          <span class="prh-badge">${entries.length} ranked</span>
-                        </div>
-                        <div class="paper-rankings-cards">
+                        <div class="paper-table-body">
                           ${entries.length ? entries.map((entry) => {
                             const isMe = myEntry && entry.rank === myEntry.rank;
-                            const pct = Math.round((entry.marks / board.totalMarks) * 100);
+                            const pct = Math.round((entry.marks / totalMarks) * 100);
                             return `
-                              <div class="paper-rank-card ${isMe ? 'is-current-user' : ''}">
-                                <div class="prc-left">
-                                  <div class="prc-rank-badge ${entry.rank <= 3 ? `rank-${entry.rank}` : ''}">
-                                    ${entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                              <div class="paper-table-row ${isMe ? 'is-current-user' : ''}">
+                                <div class="ptr-rank">
+                                  <span class="rank-num ${entry.rank <= 3 ? `top-rank-${entry.rank}` : ''}">${entry.rank}</span>
+                                </div>
+                                <div class="ptr-student">
+                                  <div class="ptr-name-line">
+                                    <span class="ptr-name">${escapeHTML(entry.studentName)}</span>
+                                    ${isMe ? '<span class="ptr-you-badge">You</span>' : ''}
                                   </div>
-                                  <div class="prc-avatar ${getAvatarClass(entry.studentName)}">${getInitials(entry.studentName)}</div>
-                                  <div class="prc-name-col">
-                                    <div class="prc-name-line">
-                                      <span class="prc-name">${escapeHTML(entry.studentName)}</span>
-                                      ${isMe ? '<span class="prc-you-tag">YOU</span>' : ''}
-                                    </div>
-                                    <div class="prc-sub-info">
-                                      ${entry.indexNumber ? `<span class="prc-index">ID: ${escapeHTML(entry.indexNumber)}</span> · ` : ''}
-                                      <span class="prc-pct">${pct}% Score</span>
-                                      ${entry.remarks ? ` · <span>${escapeHTML(entry.remarks)}</span>` : ''}
-                                    </div>
+                                  <div class="ptr-meta">
+                                    ${entry.indexNumber ? `<span>ID: ${escapeHTML(entry.indexNumber)}</span> · ` : ''}
+                                    <span>${pct}%</span>
+                                    ${entry.remarks ? ` · <span>${escapeHTML(entry.remarks)}</span>` : ''}
                                   </div>
                                 </div>
-                                <div class="prc-right">
-                                  <span class="grade-badge grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
-                                  <div class="prc-marks-box">
-                                    <span class="prc-marks-val">${entry.marks}</span>
-                                    <span class="prc-marks-denom">/${board.totalMarks}</span>
-                                  </div>
+                                <div class="ptr-grade">
+                                  <span class="grade-pill grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
+                                </div>
+                                <div class="ptr-marks">
+                                  <span class="ptr-marks-value">${entry.marks}</span>
+                                  <span class="ptr-marks-max">/${totalMarks}</span>
                                 </div>
                               </div>
                             `;
-                          }).join('') : '<div class="paper-results-empty">No candidate records published yet.</div>'}
+                          }).join('') : '<div class="paper-table-empty">No candidate records published yet.</div>'}
                         </div>
                       </div>
                     </div>
@@ -2514,14 +2417,11 @@ class AppController {
           </div>
         ` : `
           <div class="leaderboard-batch-banner paper-batch-banner">
-            <div class="lbb-icon-box">
-              <span class="material-symbols-rounded filled">school</span>
-            </div>
             <div class="lbb-content">
-              <strong>${escapeHTML(studentBatch || 'General Batch')} Official Paper Results</strong>
-              <span>Verified physics exam evaluations & rankings for your batch</span>
+              <strong>${escapeHTML(studentBatch || 'General Batch')} Paper Results</strong>
+              <span>Official examination marks & batch standings</span>
             </div>
-            <span class="lbb-verified-tag"><span class="lbb-dot"></span> Official</span>
+            <span class="lbb-verified-tag">Official</span>
           </div>
         `}
         ${paperViewContent}
