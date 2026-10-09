@@ -220,10 +220,27 @@ export class AuthService {
     for (const key of ['name', 'avatarUrl', 'photoUrl', 'examYear']) {
       if (Object.hasOwn(updates, key)) allowed[key] = updates[key];
     }
-    await setDoc(doc(db, 'users', this.currentUser.uid), allowed, { merge: true });
+    // Optimistic local update: ensure currentUser and localStorage are immediately updated
     this.currentUser = { ...this.currentUser, ...allowed };
-    localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
+    try {
+      localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
+      if (allowed.examYear) localStorage.setItem('edupeak_exam_batch', allowed.examYear);
+    } catch (_) {}
     this.notify();
+
+    // Persist to Firestore with timeout safety so network or permissions never block UI
+    try {
+      const uid = this.currentUser.uid || this.currentUser.id;
+      if (uid) {
+        await Promise.race([
+          setDoc(doc(db, 'users', uid), allowed, { merge: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Update timeout')), 2500))
+        ]);
+      }
+    } catch (e) {
+      console.warn('[Auth] Remote profile update note (saved locally):', e);
+    }
+
     return this.currentUser;
   }
 

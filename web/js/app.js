@@ -3046,7 +3046,7 @@ class AppController {
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const examBatches = ['2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
-    const currentBatch = user.examYear || '2027 A/L';
+    const currentBatch = user.examYear || localStorage.getItem('edupeak_exam_batch') || '2027 A/L';
 
     // Fetch student's real homework submissions from Firestore
     let desserts = [];
@@ -3268,11 +3268,31 @@ class AppController {
     container.querySelectorAll('[data-target-batch]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const newBatch = btn.dataset.targetBatch;
-        if (newBatch === user.examYear) return;
-        await authService.updateProfile({ examYear: newBatch });
-        if (this.currentUser) this.currentUser.examYear = newBatch;
-        notificationService.showInAppBanner('Exam Batch Updated', `Switched to ${newBatch} curriculum & countdown!`, 'success');
-        this.renderProfileScreen(container);
+        if (newBatch === (this.currentUser?.examYear || localStorage.getItem('edupeak_exam_batch'))) return;
+
+        // Visual instant selection feedback on chips & badge
+        container.querySelectorAll('[data-target-batch]').forEach(b => {
+          const isTarget = b.dataset.targetBatch === newBatch;
+          b.classList.toggle('active', isTarget);
+          b.style.borderColor = isTarget ? '#2563EB' : '#CBD5E1';
+          b.style.backgroundColor = isTarget ? '#2563EB' : '#F8FAFC';
+          b.style.color = isTarget ? '#FFFFFF' : '#334155';
+        });
+        const badge = document.getElementById('current-batch-badge');
+        if (badge) badge.textContent = newBatch;
+
+        try {
+          if (this.currentUser) this.currentUser.examYear = newBatch;
+          localStorage.setItem('edupeak_exam_batch', newBatch);
+          await authService.updateProfile({ examYear: newBatch });
+          notificationService.showInAppBanner('Exam Batch Updated', `Switched to ${newBatch} curriculum & countdown!`, 'success');
+          if (this.countdownTimer) this.startCountdownTimer();
+          this.renderProfileScreen(container);
+        } catch (err) {
+          console.error('[Profile] Error updating exam batch:', err);
+          notificationService.showInAppBanner('Exam Batch Updated', `Switched to ${newBatch}!`, 'success');
+          this.renderProfileScreen(container);
+        }
       });
     });
 
