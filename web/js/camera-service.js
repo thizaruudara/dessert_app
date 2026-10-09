@@ -97,35 +97,86 @@ export class CameraService {
     return false;
   }
 
+  // Compress and resize image dataUrl to keep payload size lightweight (<100KB)
+  compressImage(dataUrl, maxDim = 1200, quality = 0.72) {
+    return new Promise((resolve) => {
+      if (!dataUrl || typeof dataUrl !== 'string') return resolve(dataUrl);
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }
+
   // Capture high-resolution photo from the live video feed
   capturePhoto(applyFilter = 'none') {
     if (!this.videoElement || !this.stream) {
-      throw new Error('Camera is not active');
+      throw new Error('Camera is not active. Please grant camera permission or select images from Gallery.');
     }
 
     const video = this.videoElement;
-    const width = video.videoWidth || 1280;
-    const height = video.videoHeight || 720;
+    let width = video.videoWidth || 1280;
+    let height = video.videoHeight || 720;
+    if (width === 0 || height === 0) {
+      width = 1280;
+      height = 720;
+    }
+
+    // Downscale if dimension exceeds 1200 to prevent oversized payloads
+    const maxDim = 1200;
+    let targetW = width;
+    let targetH = height;
+    if (targetW > maxDim || targetH > maxDim) {
+      if (targetW > targetH) {
+        targetH = Math.round((targetH * maxDim) / targetW);
+        targetW = maxDim;
+      } else {
+        targetW = Math.round((targetW * maxDim) / targetH);
+        targetH = maxDim;
+      }
+    }
 
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = targetW;
+    canvas.height = targetH;
     const ctx = canvas.getContext('2d');
 
     // If front camera, flip horizontally for natural mirror feel
     if (this.currentFacingMode === 'user') {
-      ctx.translate(width, 0);
+      ctx.translate(targetW, 0);
       ctx.scale(-1, 1);
     }
 
-    ctx.drawImage(video, 0, 0, width, height);
+    try {
+      ctx.drawImage(video, 0, 0, targetW, targetH);
+    } catch (err) {
+      console.warn('[Camera] drawImage fallback error:', err);
+    }
 
     // Apply document contrast or B&W filter if requested
     if (applyFilter === 'bw' || applyFilter === 'document') {
-      this.applyDocumentFilter(ctx, width, height, applyFilter);
+      this.applyDocumentFilter(ctx, targetW, targetH, applyFilter);
     }
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
     this.scannedPages.push(dataUrl);
 
     // Trigger haptic vibration if supported

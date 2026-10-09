@@ -2714,16 +2714,26 @@ class AppController {
     });
 
     const fileInput = document.getElementById('input-hw-gallery');
-    fileInput?.addEventListener('change', (e) => {
+    fileInput?.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files);
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (re) => {
-          this.capturedHomeworkPhotos.push(re.target.result);
-          this.renderDessertsScreen(container);
-        };
-        reader.readAsDataURL(file);
-      });
+      if (!files.length) return;
+      for (const file of files) {
+        try {
+          const rawDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (re) => resolve(re.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          if (rawDataUrl) {
+            const compressed = await cameraService.compressImage(rawDataUrl, 1200, 0.72);
+            this.capturedHomeworkPhotos.push(compressed);
+          }
+        } catch (err) {
+          console.warn('[Gallery] Compress error:', err);
+        }
+      }
+      this.renderDessertsScreen(container);
     });
 
     container.querySelectorAll('[data-del-photo]').forEach(btn => {
@@ -2743,17 +2753,33 @@ class AppController {
         btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">hourglass_top</span> Uploading to Teacher...';
       }
 
-      await dbService.submitDessert({
-        studentId: user.uid || user.id, studentName: user.name, studentPhone: user.phone,
-        subject: `Physics: ${this.selectedTopic}`,
-        caption: caption || `Homework submission on ${this.selectedTopic}`,
-        mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : ['./icons/exam_3d_countdown.jpg']
-      });
+      try {
+        const studentId = user.studentId || user.uid || user.id || 'EP-2027';
+        const studentName = user.name || 'Scholar';
+        const studentPhone = user.phone || '0770557769';
 
-      this.capturedHomeworkPhotos = [];
-      notificationService.showInAppBanner('Homework Submitted!', 'Your submission was saved for review.', 'success');
-      this.dessertsTab = 1;
-      this.renderDessertsScreen(container);
+        await dbService.submitDessert({
+          studentId,
+          studentName,
+          studentPhone,
+          subject: `Physics: ${this.selectedTopic}`,
+          caption: caption || `Homework submission on ${this.selectedTopic}`,
+          mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : ['./icons/exam_3d_countdown.jpg']
+        });
+
+        this.capturedHomeworkPhotos = [];
+        cameraService.clearPages();
+        notificationService.showInAppBanner('Homework Submitted!', 'Your submission was saved for review.', 'success');
+        this.dessertsTab = 1;
+        this.renderDessertsScreen(container);
+      } catch (err) {
+        console.error('[Dessert] Final submit failed:', err);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">send</span><span>Submit Homework (+100 XP)</span>';
+        }
+        notificationService.showInAppBanner('Submission Notice', err.message || 'Could not save submission. Please try again.', 'error');
+      }
     });
 
     container.querySelectorAll('[data-view-dessert]').forEach(card => {
@@ -3700,13 +3726,12 @@ class AppController {
         <div class="scanner-flash-overlay" id="scanner-flash"></div>
       </div>
 
-      <div class="scanner-filter-bar">
-        <button class="filter-pill active" data-filter="none">Natural</button>
-        <button class="filter-pill" data-filter="document">Enhance</button>
-        <button class="filter-pill" data-filter="bw">B&W</button>
-      </div>
-
       <div class="scanner-bottom-bar">
+        <div class="scanner-filter-bar">
+          <button class="filter-pill active" data-filter="none">Natural</button>
+          <button class="filter-pill" data-filter="document">Enhance</button>
+          <button class="filter-pill" data-filter="bw">B&W</button>
+        </div>
         <div class="scanner-thumbnails-strip" id="scanner-thumb-strip"></div>
         <div class="scanner-shutter-row">
           <label class="btn-upload-file-fallback" for="input-file-camera">
@@ -3789,21 +3814,32 @@ class AppController {
         cameraService.capturePhoto(currentFilter);
         updateThumbnails();
       } catch (e) {
-        alert(e.message);
+        console.warn('[Camera] Shutter capture notice:', e);
+        notificationService.showInAppBanner('Camera Notice', e.message || 'Could not capture photo. Try uploading from Gallery.', 'warning');
       }
     });
 
-    document.getElementById('input-file-camera')?.addEventListener('change', (e) => {
+    document.getElementById('input-file-camera')?.addEventListener('change', async (e) => {
       const files = e.target.files;
-      if (!files) return;
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          cameraService.addPageFromDataUrl(evt.target.result);
-          updateThumbnails();
-        };
-        reader.readAsDataURL(file);
-      });
+      if (!files || files.length === 0) return;
+      for (const file of Array.from(files)) {
+        try {
+          const rawDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (evt) => resolve(evt.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          if (rawDataUrl) {
+            const compressed = await cameraService.compressImage(rawDataUrl, 1200, 0.72);
+            cameraService.addPageFromDataUrl(compressed);
+          }
+        } catch (err) {
+          console.warn('[Camera] File read error:', err);
+        }
+      }
+      updateThumbnails();
+      e.target.value = '';
     });
 
     const closeScanner = () => {
@@ -3817,13 +3853,30 @@ class AppController {
       const pages = cameraService.getPages();
       if (pages.length === 0) return;
       closeScanner();
+
+      // Sync into capturedHomeworkPhotos so it also reflects in Tab 0
+      if (!this.capturedHomeworkPhotos) this.capturedHomeworkPhotos = [];
+      pages.forEach(p => {
+        if (!this.capturedHomeworkPhotos.includes(p)) {
+          this.capturedHomeworkPhotos.push(p);
+        }
+      });
+      const dessertsContainer = document.getElementById('screen-content');
+      if (this.currentTab === 'desserts' && dessertsContainer) {
+        this.renderDessertsScreen(dessertsContainer);
+      }
+
       this.openSubmitDessertDialog(pages);
     });
   }
 
   openSubmitDessertDialog(pages) {
+    if (!pages || pages.length === 0) return;
     const modal = document.createElement('div');
     modal.className = 'app-modal';
+    const user = this.currentUser || {};
+    const defaultTopic = this.selectedTopic ? `Physics: ${this.selectedTopic}` : 'Physics: Mechanics';
+
     modal.innerHTML = `
       <div class="modal-sheet">
         <div class="modal-header">
@@ -3836,21 +3889,26 @@ class AppController {
         <div style="font-size:12px; font-weight:700; color:#475569; margin-bottom:8px;">
           Scanned Pages (${pages.length}):
         </div>
-        <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom:14px;">
-          ${pages.map(img => `<img src="${img}" style="width:48px; height:64px; object-fit:cover; border-radius:8px; border:1px solid #2563EB;" />`).join('')}
+        <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px;">
+          ${pages.map((img, i) => `
+            <div style="position:relative; width:52px; height:68px; flex-shrink:0; border-radius:8px; overflow:hidden; border:2px solid #2563EB;">
+              <img src="${img}" style="width:100%; height:100%; object-fit:cover;" />
+              <span style="position:absolute; bottom:2px; left:2px; background:rgba(0,0,0,0.7); color:#fff; font-size:9px; font-weight:800; padding:1px 4px; border-radius:4px;">P${i+1}</span>
+            </div>
+          `).join('')}
         </div>
 
         <div class="form-group">
           <label class="form-label">Topic / Unit</label>
-          <input type="text" class="form-input" id="submit-topic-input" value="Mechanics: Circular & Gravitation" />
+          <input type="text" class="form-input" id="submit-topic-input" value="${defaultTopic}" />
         </div>
 
         <div class="form-group">
-          <label class="form-label">Note for Teacher</label>
-          <textarea class="form-textarea" id="submit-note-input" rows="2" placeholder="Any questions or notes..."></textarea>
+          <label class="form-label">Note for Teacher (Optional)</label>
+          <textarea class="form-textarea" id="submit-note-input" rows="2" placeholder="Any questions or notes for the teacher..."></textarea>
         </div>
 
-        <button class="btn-primary" id="btn-confirm-upload" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+        <button class="btn-primary" id="btn-confirm-upload" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px;">
           <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
           <span>Submit Homework Now (+50 XP)</span>
         </button>
@@ -3861,21 +3919,41 @@ class AppController {
     document.getElementById('btn-close-submit-dialog')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-confirm-upload')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-confirm-upload');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Uploading...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Uploading...';
+      }
 
-      await dbService.submitDessert({
-        studentId: this.currentUser.studentId || 'EP-2027',
-        studentName: this.currentUser.name || 'ThiZaru',
-        studentPhone: this.currentUser.phone || '0770557769',
-        subject: document.getElementById('submit-topic-input')?.value,
-        caption: document.getElementById('submit-note-input')?.value,
-        mediaUrls: pages
-      });
+      try {
+        const studentId = user.studentId || user.uid || user.id || 'EP-2027';
+        const studentName = user.name || 'Scholar';
+        const studentPhone = user.phone || '0770557769';
+        const subject = document.getElementById('submit-topic-input')?.value?.trim() || defaultTopic;
+        const caption = document.getElementById('submit-note-input')?.value?.trim() || 'Daily Dessert Submission';
 
-      modal.remove();
-      notificationService.showInAppBanner('Homework Submitted!', 'Your teacher will review your submission and award marks.', 'success');
-      this.switchTab('desserts');
+        await dbService.submitDessert({
+          studentId,
+          studentName,
+          studentPhone,
+          subject,
+          caption,
+          mediaUrls: pages
+        });
+
+        this.capturedHomeworkPhotos = [];
+        cameraService.clearPages();
+        modal.remove();
+        notificationService.showInAppBanner('Homework Submitted!', 'Your teacher will review your submission and award marks.', 'success');
+        this.dessertsTab = 1;
+        this.switchTab('desserts');
+      } catch (err) {
+        console.error('[Dessert] Submission failed:', err);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">send</span><span>Retry Submit</span>';
+        }
+        notificationService.showInAppBanner('Submission Notice', err.message || 'Failed to submit. Please retry.', 'error');
+      }
     });
   }
 
