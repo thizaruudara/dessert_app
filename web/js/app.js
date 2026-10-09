@@ -545,9 +545,27 @@ class AppController {
     const user = this.currentUser || {};
     const studentName = user.name || 'ThiZaru';
     const initial = studentName.charAt(0).toUpperCase();
+    const activeTargetYear = user.examYear || '2027 A/L';
 
-    const insight = await dbService.getDailyInsight();
+    const [insight, sessions, upcomingList] = await Promise.all([
+      dbService.getDailyInsight(),
+      dbService.getPaperSessions(activeTargetYear).catch(() => []),
+      dbService.getUpcomingPapers(activeTargetYear).catch(() => [])
+    ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
+
+    // Determine the most relevant real paper for the student
+    const liveSession = sessions.find(s => {
+      const st = dbService.computeSessionStatus(s);
+      return st.isLive || st.isPackageOpening || st.isWriting || st.isTimeUp;
+    });
+    const waitingSession = sessions.find(s => dbService.computeSessionStatus(s).isWaiting);
+    const scheduledSession = sessions.find(s => !dbService.computeSessionStatus(s).isEnded);
+    const upcomingPaper = (upcomingList && upcomingList.length > 0) ? upcomingList[0] : null;
+    const pastEndedSession = (sessions && sessions.length > 0) ? sessions[0] : null;
+
+    const featuredSession = liveSession || waitingSession || scheduledSession || pastEndedSession;
+    const featuredUpcoming = !featuredSession ? upcomingPaper : null;
 
     container.innerHTML = `
       <!-- 1. Header (Avatar, Name, Verified Badge, 2027 Tag, 3 Days Streak) -->
@@ -774,39 +792,123 @@ class AppController {
         </div>
       </div>
 
-      <!-- 8. Upcoming Live Exam Room & Paper Session Showcase -->
-      <div class="evaluation-card">
-        <div class="evaluation-top">
-          <div class="evaluation-badge">
-            <div class="eval-dot"></div>
-            <span class="eval-badge-text">UPCOMING EVALUATION</span>
+      <!-- 8. Real-Time Exam Room & Paper Session Showcase -->
+      ${featuredSession ? (() => {
+        const statusInfo = dbService.computeSessionStatus(featuredSession);
+        let badgeText = 'SCHEDULED EVALUATION';
+        let badgeDot = '<div class="eval-dot"></div>';
+        let badgeStyle = '';
+        let subText = `${featuredSession.subject || 'A/L Physics'} • ${this._safeFormatDate(featuredSession.date)} • Timed Slots`;
+        let pillExtra = `<span class="material-symbols-rounded" style="font-size:14px;">schedule</span><span>${this._safeFormatTime(featuredSession.slot1?.startTime, '08:30 AM')}</span>`;
+        let btnText = 'View Exam Room & Select Slot';
+        let btnStyle = 'background:#0F172A;';
+
+        if (statusInfo.isLive || statusInfo.isPackageOpening || statusInfo.isWriting || statusInfo.isTimeUp) {
+          badgeText = 'LIVE EXAM SESSION';
+          badgeDot = '<div class="eval-dot" style="background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>';
+          badgeStyle = 'background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.3); color:#15803D;';
+          subText = `${featuredSession.subject || 'A/L Physics'} • විභාගය ක්‍රියාත්මකයි (Exam Live In Progress)`;
+          pillExtra = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#22C55E;">sensors</span><span style="color:#15803D; font-weight:700;">Live Now</span>';
+          btnText = 'Enter Live Exam Room';
+          btnStyle = 'background:#16A34A;';
+        } else if (statusInfo.isWaiting) {
+          badgeText = 'WAITING ROOM OPEN';
+          badgeDot = '<div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>';
+          badgeStyle = 'background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;';
+          subText = `${featuredSession.subject || 'A/L Physics'} • පොරොත්තු ශාලාව විවෘතයි (Waiting Room)`;
+          pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">meeting_room</span><span style="color:#4F46E5; font-weight:700;">Waiting</span>';
+          btnText = 'Enter Waiting Room';
+          btnStyle = 'background:#6366F1;';
+        } else if (statusInfo.isEnded) {
+          badgeText = 'EVALUATION CONCLUDED';
+          badgeDot = '<span style="width:7px; height:7px; border-radius:50%; background:#64748B; display:inline-block;"></span>';
+          badgeStyle = 'background:rgba(100,116,139,0.12); border-color:rgba(100,116,139,0.3); color:#475569;';
+          subText = `${featuredSession.subject || 'A/L Physics'} • විභාග සැසිය නිල වශයෙන් අවසන් විය (Session Ended)`;
+          pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">check_circle</span><span style="color:#64748B; font-weight:600;">Ended</span>';
+          btnText = 'View Completed Papers & Details';
+          btnStyle = 'background:#475569;';
+        }
+
+        const durationMinutes = featuredSession.durationMinutes || 120;
+        const durationText = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60 ? (durationMinutes % 60) + 'm' : ''} Duration` : `${durationMinutes}m Duration`;
+        const paperTypeLabel = featuredSession.paperType === 'mcq' ? `MCQ (${featuredSession.mcqCount || 50} Qs)` : (featuredSession.paperType === 'mcq_essay' ? 'MCQ + Essays' : 'Essay');
+
+        return `
+          <div class="evaluation-card" style="${statusInfo.isEnded ? 'border-color:#E2E8F0; background:#F8FAFC;' : (statusInfo.isLive ? 'border-color:rgba(34,197,94,0.4); box-shadow:0 8px 24px rgba(34,197,94,0.12);' : '')}">
+            <div class="evaluation-top">
+              <div class="evaluation-badge" style="${badgeStyle}">
+                ${badgeDot}
+                <span class="eval-badge-text" style="${statusInfo.isEnded ? 'color:#475569;' : ''}">${badgeText}</span>
+              </div>
+              <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px; ${statusInfo.isLive ? 'color:#15803D; font-weight:700;' : ''}">
+                <span>${statusInfo.isEnded ? 'Past Session' : 'Live Proctoring'}</span>
+                <span class="material-symbols-rounded ${statusInfo.isLive ? 'filled' : ''}" style="font-size:14px; ${statusInfo.isLive ? 'color:#22C55E;' : ''}">${statusInfo.isEnded ? 'task_alt' : 'videocam'}</span>
+              </span>
+            </div>
+            <div class="evaluation-title" style="${statusInfo.isEnded ? 'color:#1E293B;' : ''}">${featuredSession.title || 'Physics Examination Paper'}</div>
+            <div class="evaluation-sub">${subText}</div>
+            <div class="evaluation-pills-row">
+              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+                <span>${durationText}</span>
+              </div>
+              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
+                <span>${paperTypeLabel}</span>
+              </div>
+              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+                ${pillExtra}
+              </div>
+            </div>
+            <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; ${btnStyle}">
+              <span>${btnText}</span>
+              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+            </button>
           </div>
-          <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
-            <span>Live Proctoring</span>
-            <span class="material-symbols-rounded filled" style="font-size:14px;">videocam</span>
-          </span>
+        `;
+      })() : featuredUpcoming ? `
+        <div class="evaluation-card">
+          <div class="evaluation-top">
+            <div class="evaluation-badge" style="background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;">
+              <div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>
+              <span class="eval-badge-text" style="color:#4F46E5;">UPCOMING EVALUATION</span>
+            </div>
+            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
+              <span>Scope & Hints</span>
+              <span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">lightbulb</span>
+            </span>
+          </div>
+          <div class="evaluation-title">${featuredUpcoming.title}</div>
+          <div class="evaluation-sub">${featuredUpcoming.subject || 'A/L Physics'} • ${featuredUpcoming.paperStructure || 'Scheduled Examination'}</div>
+          <div class="evaluation-pills-row">
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>${featuredUpcoming.durationMinutes || 150}m Duration</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
+              <span>${this._safeFormatDate(featuredUpcoming.scheduledDate)}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">lightbulb</span>
+              <span>Hints Available</span>
+            </div>
+          </div>
+          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#6366F1;">
+            <span>View Upcoming Paper & Scope</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+          </button>
         </div>
-        <div class="evaluation-title">2027 A/L Physics Term Paper 01</div>
-        <div class="evaluation-sub">Full Examination Syllabus • Real-time AI Proctoring & Timed Slots</div>
-        <div class="evaluation-pills-row">
-          <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-            <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-            <span>2h 30m Duration</span>
-          </div>
-          <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-            <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
-            <span>MCQ + Essays</span>
-          </div>
-          <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-            <span class="material-symbols-rounded" style="font-size:14px;">emoji_events</span>
-            <span>Island Rank</span>
-          </div>
+      ` : `
+        <div class="evaluation-card" style="border-color:#E2E8F0; background:#F8FAFC; text-align:center; padding:20px;">
+          <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:4px;">නව විභාග සැසි සූදානම් වෙමින් පවතී</div>
+          <div style="font-size:11.5px; color:#94A3B8; margin-bottom:12px;">ඔබගේ කණ්ඩායම (${activeTargetYear}) සඳහා ඉදිරි විභාග සැසි පිළිබඳව ඉක්මනින් දැනුම් දෙනු ලැබේ.</div>
+          <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : null" style="width:auto; padding:8px 18px; margin:0 auto; font-size:12px; background:#475569; display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
+            <span>View Exam Sessions</span>
+          </button>
         </div>
-        <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px;">
-          <span>View Exam Room & Select Slot</span>
-          <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-        </button>
-      </div>
+      `}
 
       <!-- 9. High-Yield Physics Concept & Formula Vault (Bilingual) -->
       <div class="insight-vault-card">
@@ -950,6 +1052,20 @@ class AppController {
     }
   }
 
+  _computeLiveTabSubtitle(sessions) {
+    if (!sessions || sessions.length === 0) return 'No Sessions';
+    const hasLive = sessions.some(s => {
+      const st = dbService.computeSessionStatus(s);
+      return st.isLive || st.isPackageOpening || st.isWriting || st.isTimeUp;
+    });
+    if (hasLive) return '🔴 Live Now';
+    const hasWaiting = sessions.some(s => dbService.computeSessionStatus(s).isWaiting);
+    if (hasWaiting) return '⏳ Waiting Room Open';
+    const hasScheduled = sessions.some(s => !dbService.computeSessionStatus(s).isEnded);
+    if (hasScheduled) return 'Scheduled';
+    return 'Completed / Past';
+  }
+
   _buildStudentLiveSessionsHTML(sessions, registrations, user, activeTargetYear, currentYear) {
     if (!sessions || sessions.length === 0) {
       return `
@@ -1025,6 +1141,10 @@ class AppController {
                 <span style="width:7px; height:7px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
                 <span>LIVE NOW</span>
               </span>
+            ` : isEnded ? `
+              <span style="background:rgba(100,116,139,0.12); color:#64748B; border:1px solid rgba(100,116,139,0.3); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">check_circle</span> <span>ENDED</span>
+              </span>
             ` : ''}
           </div>
 
@@ -1047,9 +1167,9 @@ class AppController {
 
           <!-- Slot Selector -->
           <div style="font-size:11.5px; font-weight:700; color:#475569; margin-top:4px;">
-            ${slot2 ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:' : 'විභාග සැසිය (Exam Session):'}
+            ${isEnded ? 'විභාග සැසි වේලාව (Session Slot Time - Completed):' : (slot2 ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:' : 'විභාග සැසිය (Exam Session):')}
           </div>
-          <div class="slots-container">
+          <div class="slots-container" style="${isEnded ? 'pointer-events:none; opacity:0.85;' : ''}">
             <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1">
               <div class="slot-name">
                 <span style="display:inline-flex; align-items:center; gap:5px;">
@@ -1137,11 +1257,11 @@ class AppController {
               </div>
             </div>
           ` : isEnded ? `
-            <div class="phase-status-banner-box ended">
+            <div class="phase-status-banner-box ended" style="margin-bottom:0; background:#F8FAFC; border:1px solid #E2E8F0; padding:13px 15px; border-radius:14px; display:flex; align-items:center; gap:12px;">
               <span class="material-symbols-rounded" style="font-size:26px; color:#64748B;">cancel</span>
               <div>
-                <div style="font-size:11.5px; font-weight:800; color:#64748B;">සැසිය අවසන් (Session Completed)</div>
-                <div style="font-size:12px; color:#94A3B8; margin-top:2px;">ස්තුතියි, මෙම විභාග සැසිය අවසන් කර ඇත.</div>
+                <div style="font-size:12px; font-weight:800; color:#334155;">විභාග සැසිය නිල වශයෙන් අවසන් විය (Session Ended)</div>
+                <div style="font-size:11.5px; color:#64748B; margin-top:2px;">ස්තූතියි, මෙම විභාග සැසිය අවසන් කර ඇති බැවින් ප්‍රවේශය වසා ඇත.</div>
               </div>
             </div>
           ` : `
@@ -1182,12 +1302,7 @@ class AppController {
               <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
               <span>Enter Waiting Room (පොරොත්තු ශාලාව)</span>
             </button>
-          ` : isEnded ? `
-            <button class="btn-primary" style="background:#F1F5F9; color:#94A3B8; border:1px solid #CBD5E1; cursor:not-allowed; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="alert('මෙම විභාග සැසිය නිල වශයෙන් අවසන් කර ඇත (Session Ended).')">
-              <span class="material-symbols-rounded" style="font-size:18px;">cancel</span>
-              <span>විභාග සැසිය අවසන් විය (Ended)</span>
-            </button>
-          ` : `
+          ` : isEnded ? '' : `
             <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
               <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
               <span>Enter Waiting Room (පොරොත්තු ශාලාව)</span>
@@ -1217,6 +1332,8 @@ class AppController {
         registrations.set(pId, updatedReg);
         const liveTab = container.querySelector('#papers-tab-live-content');
         if (liveTab) {
+          const subSpan = container.querySelector('#tab-papers-live-sub');
+          if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(sessions);
           liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, user.examYear || '2027 A/L', user.examYear || '2027 A/L');
           this._bindStudentLiveSessionActions(container, sessions, registrations, user);
         }
@@ -1427,7 +1544,7 @@ class AppController {
               <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
               <span>Live Exam Sessions</span>
             </span>
-            <span class="tab-sub">Active & Scheduled</span>
+            <span class="tab-sub" id="tab-papers-live-sub">${this._computeLiveTabSubtitle(sessions)}</span>
           </button>
           <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
             <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
@@ -1479,6 +1596,8 @@ class AppController {
           await dbService.getStudentRegistration(session.id, studentId)
         ])));
         if (!container.isConnected || renderToken !== this.renderToken) return;
+        const subSpan = container.querySelector('#tab-papers-live-sub');
+        if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(liveSessions);
         liveTab.innerHTML = this._buildStudentLiveSessionsHTML(liveSessions, liveRegistrations, user, activeTargetYear, currentYear);
         this._bindStudentLiveSessionActions(container, liveSessions, liveRegistrations, user);
         this.startPapersTimer(container, liveSessions);
