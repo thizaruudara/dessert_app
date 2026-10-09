@@ -2307,7 +2307,6 @@ class AppController {
                         <div class="paper-table-body">
                           ${entries.length ? entries.map((entry) => {
                             const isMe = myEntry && entry.rank === myEntry.rank;
-                            const pct = Math.round((entry.marks / totalMarks) * 100);
                             return `
                               <div class="paper-table-row ${isMe ? 'is-current-user' : ''}">
                                 <div class="ptr-rank">
@@ -2318,11 +2317,13 @@ class AppController {
                                     <span class="ptr-name">${escapeHTML(entry.studentName)}</span>
                                     ${isMe ? '<span class="ptr-you-badge">You</span>' : ''}
                                   </div>
-                                  <div class="ptr-meta">
-                                    ${entry.indexNumber ? `<span>ID: ${escapeHTML(entry.indexNumber)}</span> · ` : ''}
-                                    <span>${pct}%</span>
-                                    ${entry.remarks ? ` · <span>${escapeHTML(entry.remarks)}</span>` : ''}
-                                  </div>
+                                  ${(entry.indexNumber || entry.remarks) ? `
+                                    <div class="ptr-meta">
+                                      ${entry.indexNumber ? `<span>ID: ${escapeHTML(entry.indexNumber)}</span>` : ''}
+                                      ${(entry.indexNumber && entry.remarks) ? ' · ' : ''}
+                                      ${entry.remarks ? `<span>${escapeHTML(entry.remarks)}</span>` : ''}
+                                    </div>
+                                  ` : ''}
                                 </div>
                                 <div class="ptr-grade">
                                   <span class="grade-pill grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
