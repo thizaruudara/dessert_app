@@ -126,8 +126,12 @@ export class AuthService {
         throw error;
       }
     }
-    await callBackend('auth/ensure-admin', { phone: `+${normalizedPhone(phone)}` });
-    await credential.user.getIdToken(true);
+    try {
+      await callBackend('auth/ensure-admin', { phone: `+${normalizedPhone(phone)}` });
+      await credential.user.getIdToken(true);
+    } catch (adminErr) {
+      console.warn('[Auth] ensure-admin non-fatal warning:', adminErr);
+    }
     const profile = await this.readProfile(credential.user.uid);
     if (!profile) throw new Error('Account profile is unavailable. Contact the institute administrator.');
     this.currentUser = profile;

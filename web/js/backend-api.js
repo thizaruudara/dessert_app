@@ -1,11 +1,7 @@
 import { auth } from './firebase-config.js';
 
 function getApiBase() {
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return '/api';
-  }
-  if (host.includes('vercel.app')) {
+  if (typeof window !== 'undefined') {
     return '/api';
   }
   return 'https://edupeak-web.vercel.app/api';

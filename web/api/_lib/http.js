@@ -29,7 +29,18 @@ function methodNotAllowed(res, allowed = 'POST') {
 
 function handleCors(req, res) {
   const origin = String(req.headers.origin || '');
-  if (origin === 'https://dessert-institute.web.app') {
+  const allowed = [
+    'https://app.edupeak.lk',
+    'https://edupeak.lk',
+    'https://edupeak-web.vercel.app',
+    'https://dessert-institute.web.app',
+  ];
+  const isAllowed = allowed.includes(origin) ||
+    origin.endsWith('.vercel.app') ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:');
+
+  if (isAllowed) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
