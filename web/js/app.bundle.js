@@ -65600,37 +65600,51 @@ var DbService = class {
     const cleanName = String(studentName || "").toLowerCase().trim();
     const cleanId = String(studentId || "").trim();
     const cleanIdx = String(studentIndex || "").trim();
-    const keysToCheck = [
-      cleanId && `edupeak_credits_${cleanId}`,
-      cleanIdx && `edupeak_credits_${cleanIdx}`,
-      cleanPhone && `edupeak_credits_${cleanPhone}`,
-      studentPhone && `edupeak_credits_${studentPhone}`,
-      cleanName && `edupeak_credits_${cleanName}`
-    ].filter(Boolean);
-    for (const k2 of keysToCheck) {
+    const idsToFetch = Array.from(new Set([cleanIdx, cleanId].filter(Boolean)));
+    for (const fetchId of idsToFetch) {
       try {
-        const val = localStorage.getItem(k2);
-        if (val) credits = Math.max(credits, Number(val) || 0);
+        const lbSnap = await Promise.race([
+          getDoc(doc(db, "leaderboard_public", fetchId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1800))
+        ]).catch(() => null);
+        if (lbSnap && lbSnap.exists()) {
+          const lbCredits = Number(lbSnap.data()?.credits) || 0;
+          if (lbCredits > 0) credits = Math.max(credits, lbCredits);
+        }
       } catch (_) {
       }
     }
+    for (const fetchId of idsToFetch) {
+      try {
+        const uSnap = await Promise.race([
+          getDoc(doc(db, "users", fetchId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1800))
+        ]).catch(() => null);
+        if (uSnap && uSnap.exists()) {
+          const uCredits = Number(uSnap.data()?.credits) || 0;
+          if (uCredits > 0) credits = Math.max(credits, uCredits);
+        }
+      } catch (_) {
+      }
+    }
+    let approvedDessertCredits = 0;
     try {
       const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-      const dessertCredits = localDesserts.filter((d) => {
-        if (d.status !== "approved") return false;
-        const dPhone2 = String(d.studentPhone || d.phone || "").replace(/\D/g, "");
-        const dId = String(d.studentId || d.id || "").trim();
-        const dName = String(d.studentName || "").toLowerCase().trim();
-        if (cleanId && dId === cleanId) return true;
-        if (cleanIdx && dId === cleanIdx) return true;
-        if (cleanPhone && dPhone2 && (dPhone2.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone2.slice(-9)))) return true;
-        if (cleanName && dName && dName === cleanName) return true;
-        return false;
-      }).reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
-      if (dessertCredits > 0) {
-        credits = Math.max(credits, dessertCredits);
-      }
+      localDesserts.forEach((d) => {
+        if (d.status === "approved") {
+          const dPhone2 = String(d.studentPhone || d.phone || "").replace(/\D/g, "");
+          const dId = String(d.studentId || d.id || "").trim();
+          const dName = String(d.studentName || "").toLowerCase().trim();
+          const matches = cleanId && dId === cleanId || cleanIdx && dId === cleanIdx || cleanPhone && dPhone2 && (dPhone2.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone2.slice(-9))) || cleanName && dName && dName === cleanName;
+          if (matches) {
+            approvedDessertCredits += Number(d.creditsAwarded) || 0;
+          }
+        }
+      });
     } catch (_) {
+    }
+    if (approvedDessertCredits > 0) {
+      credits = Math.max(credits, approvedDessertCredits);
     }
     try {
       const localLb = JSON.parse(localStorage.getItem("edupeak_local_leaderboard") || "[]");
@@ -65645,35 +65659,46 @@ var DbService = class {
         return false;
       });
       if (entry && entry.credits) {
-        credits = Math.max(credits, Number(entry.credits) || 0);
+        let entryCr = Number(entry.credits) || 0;
+        if (entryCr > 0 && approvedDessertCredits > 0 && entryCr === approvedDessertCredits + 155) {
+          entryCr = approvedDessertCredits;
+          entry.credits = approvedDessertCredits;
+          localStorage.setItem("edupeak_local_leaderboard", JSON.stringify(localLb));
+        }
+        credits = Math.max(credits, entryCr);
       }
     } catch (_) {
     }
-    const idsToFetch = Array.from(new Set([cleanId, cleanIdx].filter(Boolean)));
-    for (const fetchId of idsToFetch) {
+    const keysToCheck = [
+      cleanId && `edupeak_credits_${cleanId}`,
+      cleanIdx && `edupeak_credits_${cleanIdx}`,
+      cleanPhone && `edupeak_credits_${cleanPhone}`,
+      studentPhone && `edupeak_credits_${studentPhone}`,
+      cleanName && `edupeak_credits_${cleanName}`
+    ].filter(Boolean);
+    for (const k2 of keysToCheck) {
       try {
-        const uSnap = await Promise.race([
-          getDoc(doc(db, "users", fetchId)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1800))
-        ]).catch(() => null);
-        if (uSnap && uSnap.exists()) {
-          const uCredits = Number(uSnap.data()?.credits) || 0;
-          if (uCredits > 0) credits = Math.max(credits, uCredits);
+        const val = localStorage.getItem(k2);
+        if (val) {
+          let num = Number(val) || 0;
+          if (num > 0 && credits > 0 && num === credits + 155) {
+            num = credits;
+            localStorage.setItem(k2, String(credits));
+          } else if (credits === 0 && num === 155) {
+            num = 0;
+            localStorage.setItem(k2, "0");
+          }
+          credits = Math.max(credits, num);
         }
       } catch (_) {
       }
     }
-    for (const fetchId of idsToFetch) {
-      try {
-        const lbSnap = await Promise.race([
-          getDoc(doc(db, "leaderboard_public", fetchId)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1800))
-        ]).catch(() => null);
-        if (lbSnap && lbSnap.exists()) {
-          const lbCredits = Number(lbSnap.data()?.credits) || 0;
-          if (lbCredits > 0) credits = Math.max(credits, lbCredits);
+    if (credits > 0) {
+      for (const k2 of keysToCheck) {
+        try {
+          localStorage.setItem(k2, String(credits));
+        } catch (_) {
         }
-      } catch (_) {
       }
     }
     return credits > 0 ? credits : 0;
@@ -71260,11 +71285,20 @@ var AppController = class {
     if (renderToken !== this.renderToken || !container.isConnected) return;
     const totalCount = desserts.length;
     const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
-    let memberSinceStr = "September 2026";
+    let memberSinceStr = "October 2026";
     if (user.createdAt) {
       try {
-        const d = new Date(user.createdAt);
-        memberSinceStr = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        let d = null;
+        if (typeof user.createdAt?.toDate === "function") {
+          d = user.createdAt.toDate();
+        } else if (user.createdAt?.seconds) {
+          d = new Date(user.createdAt.seconds * 1e3);
+        } else if (typeof user.createdAt === "string" || typeof user.createdAt === "number") {
+          d = new Date(user.createdAt);
+        }
+        if (d && !isNaN(d.getTime())) {
+          memberSinceStr = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        }
       } catch (_) {
       }
     }

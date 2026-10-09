@@ -3221,12 +3221,21 @@ class AppController {
     const totalCount = desserts.length;
     const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
 
-    // Format member since date
-    let memberSinceStr = 'September 2026';
+    // Format member since date with full Firestore Timestamp support
+    let memberSinceStr = 'October 2026';
     if (user.createdAt) {
       try {
-        const d = new Date(user.createdAt);
-        memberSinceStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        let d = null;
+        if (typeof user.createdAt?.toDate === 'function') {
+          d = user.createdAt.toDate();
+        } else if (user.createdAt?.seconds) {
+          d = new Date(user.createdAt.seconds * 1000);
+        } else if (typeof user.createdAt === 'string' || typeof user.createdAt === 'number') {
+          d = new Date(user.createdAt);
+        }
+        if (d && !isNaN(d.getTime())) {
+          memberSinceStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
       } catch (_) {}
     }
 

@@ -234,63 +234,22 @@ export class DbService {
     const cleanId = String(studentId || '').trim();
     const cleanIdx = String(studentIndex || '').trim();
 
-    // 1. Check localStorage caches
-    const keysToCheck = [
-      cleanId && `edupeak_credits_${cleanId}`,
-      cleanIdx && `edupeak_credits_${cleanIdx}`,
-      cleanPhone && `edupeak_credits_${cleanPhone}`,
-      studentPhone && `edupeak_credits_${studentPhone}`,
-      cleanName && `edupeak_credits_${cleanName}`
-    ].filter(Boolean);
-
-    for (const k of keysToCheck) {
+    // 1. Check live Firestore leaderboard_public (authoritative source for student XP)
+    const idsToFetch = Array.from(new Set([cleanIdx, cleanId].filter(Boolean)));
+    for (const fetchId of idsToFetch) {
       try {
-        const val = localStorage.getItem(k);
-        if (val) credits = Math.max(credits, Number(val) || 0);
+        const lbSnap = await Promise.race([
+          getDoc(doc(db, 'leaderboard_public', fetchId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1800))
+        ]).catch(() => null);
+        if (lbSnap && lbSnap.exists()) {
+          const lbCredits = Number(lbSnap.data()?.credits) || 0;
+          if (lbCredits > 0) credits = Math.max(credits, lbCredits);
+        }
       } catch (_) {}
     }
 
-    // 2. Sum up all approved dessert submissions for this student
-    try {
-      const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-      const dessertCredits = localDesserts
-        .filter(d => {
-          if (d.status !== 'approved') return false;
-          const dPhone = String(d.studentPhone || d.phone || '').replace(/\D/g, '');
-          const dId = String(d.studentId || d.id || '').trim();
-          const dName = String(d.studentName || '').toLowerCase().trim();
-          if (cleanId && dId === cleanId) return true;
-          if (cleanIdx && dId === cleanIdx) return true;
-          if (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
-          if (cleanName && dName && dName === cleanName) return true;
-          return false;
-        })
-        .reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
-      if (dessertCredits > 0) {
-        credits = Math.max(credits, dessertCredits);
-      }
-    } catch (_) {}
-
-    // 3. Check local leaderboard cache
-    try {
-      const localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
-      const entry = localLb.find(x => {
-        const xPhone = String(x.studentPhone || '').replace(/\D/g, '');
-        const xId = String(x.id || '').trim();
-        const xName = String(x.name || '').toLowerCase().trim();
-        if (cleanId && xId === cleanId) return true;
-        if (cleanIdx && xId === cleanIdx) return true;
-        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
-        if (cleanName && xName && xName === cleanName) return true;
-        return false;
-      });
-      if (entry && entry.credits) {
-        credits = Math.max(credits, Number(entry.credits) || 0);
-      }
-    } catch (_) {}
-
-    // 4. Read live credits from Firestore users collection
-    const idsToFetch = Array.from(new Set([cleanId, cleanIdx].filter(Boolean)));
+    // 2. Read live credits from Firestore users collection
     for (const fetchId of idsToFetch) {
       try {
         const uSnap = await Promise.race([
@@ -304,18 +263,87 @@ export class DbService {
       } catch (_) {}
     }
 
-    // 5. Read from Firestore leaderboard_public
-    for (const fetchId of idsToFetch) {
+    // 3. Sum up all approved dessert submissions for this student from localDesserts & Firestore
+    let approvedDessertCredits = 0;
+    try {
+      const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+      localDesserts.forEach(d => {
+        if (d.status === 'approved') {
+          const dPhone = String(d.studentPhone || d.phone || '').replace(/\D/g, '');
+          const dId = String(d.studentId || d.id || '').trim();
+          const dName = String(d.studentName || '').toLowerCase().trim();
+          const matches = (cleanId && dId === cleanId) ||
+            (cleanIdx && dId === cleanIdx) ||
+            (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) ||
+            (cleanName && dName && dName === cleanName);
+          if (matches) {
+            approvedDessertCredits += Number(d.creditsAwarded) || 0;
+          }
+        }
+      });
+    } catch (_) {}
+    if (approvedDessertCredits > 0) {
+      credits = Math.max(credits, approvedDessertCredits);
+    }
+
+    // 4. Check local leaderboard cache and sanitize any +155 contamination
+    try {
+      const localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
+      const entry = localLb.find(x => {
+        const xPhone = String(x.studentPhone || '').replace(/\D/g, '');
+        const xId = String(x.id || '').trim();
+        const xName = String(x.name || '').toLowerCase().trim();
+        if (cleanId && xId === cleanId) return true;
+        if (cleanIdx && xId === cleanIdx) return true;
+        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
+        if (cleanName && xName && xName === cleanName) return true;
+        return false;
+      });
+      if (entry && entry.credits) {
+        let entryCr = Number(entry.credits) || 0;
+        if (entryCr > 0 && approvedDessertCredits > 0 && entryCr === approvedDessertCredits + 155) {
+          entryCr = approvedDessertCredits;
+          entry.credits = approvedDessertCredits;
+          localStorage.setItem('edupeak_local_leaderboard', JSON.stringify(localLb));
+        }
+        credits = Math.max(credits, entryCr);
+      }
+    } catch (_) {}
+
+    // 5. Inspect localStorage cached keys and sanitize legacy +155 contamination
+    const keysToCheck = [
+      cleanId && `edupeak_credits_${cleanId}`,
+      cleanIdx && `edupeak_credits_${cleanIdx}`,
+      cleanPhone && `edupeak_credits_${cleanPhone}`,
+      studentPhone && `edupeak_credits_${studentPhone}`,
+      cleanName && `edupeak_credits_${cleanName}`
+    ].filter(Boolean);
+
+    for (const k of keysToCheck) {
       try {
-        const lbSnap = await Promise.race([
-          getDoc(doc(db, 'leaderboard_public', fetchId)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1800))
-        ]).catch(() => null);
-        if (lbSnap && lbSnap.exists()) {
-          const lbCredits = Number(lbSnap.data()?.credits) || 0;
-          if (lbCredits > 0) credits = Math.max(credits, lbCredits);
+        const val = localStorage.getItem(k);
+        if (val) {
+          let num = Number(val) || 0;
+          // Auto-heal legacy mock offset (e.g., 200 + 155 = 355)
+          if (num > 0 && credits > 0 && num === credits + 155) {
+            num = credits;
+            localStorage.setItem(k, String(credits));
+          } else if (credits === 0 && num === 155) {
+            num = 0;
+            localStorage.setItem(k, '0');
+          }
+          credits = Math.max(credits, num);
         }
       } catch (_) {}
+    }
+
+    // Always sanitize localStorage with authoritative credits
+    if (credits > 0) {
+      for (const k of keysToCheck) {
+        try {
+          localStorage.setItem(k, String(credits));
+        } catch (_) {}
+      }
     }
 
     return credits > 0 ? credits : 0;
