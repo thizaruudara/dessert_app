@@ -626,8 +626,162 @@ class AppController {
     this.currentTab = null;
     this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : 'home', { historyMode: 'replace' });
 
-    // Init notification service
+    // Init notification service & enforce mandatory student notification permission
     notificationService.init(this.currentUser);
+    this.enforceNotificationPermission();
+  }
+
+  // ── Mandatory Student Push Notification Gatekeeper ────────────────────────
+  enforceNotificationPermission() {
+    // Only enforce for students; admin console is exempt
+    if (this.currentUser?.role === 'admin' && this.currentMode !== 'student') return;
+
+    // Check browser Notification API support
+    if (!('Notification' in window)) {
+      console.warn('[Notification] Window.Notification API not supported on this platform/browser.');
+      return;
+    }
+
+    // If notifications are already enabled, continue without interruption
+    if (Notification.permission === 'granted') {
+      return;
+    }
+
+    // Avoid duplicate overlays
+    if (document.getElementById('mandatory-notif-overlay')) {
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'mandatory-notif-overlay';
+    overlay.className = 'mandatory-notif-overlay';
+    overlay.innerHTML = `
+      <div class="mandatory-notif-card" role="dialog" aria-modal="true" aria-labelledby="notif-title">
+        <div class="notif-card-glow"></div>
+        <div class="notif-bell-badge">
+          <span class="material-symbols-rounded filled notif-bell-icon">notifications_active</span>
+          <div class="notif-bell-pulse"></div>
+        </div>
+
+        <div class="notif-badge-pill">REQUIRED TO CONTINUE</div>
+        
+        <h2 class="notif-modal-title" id="notif-title">Enable Notifications</h2>
+        <div class="notif-modal-subtitle-si">ඉදිරියට යාමට Push Notifications සක්‍රීය කරන්න</div>
+        
+        <p class="notif-modal-desc">
+          EduPeak requires notifications for live examination countdowns, paper unlocks, and real-time homework approval. You cannot proceed to the student dashboard without enabling notifications.
+        </p>
+
+        <div class="notif-perks-list">
+          <div class="notif-perk-item">
+            <span class="material-symbols-rounded filled" style="color:#22C55E;">timer</span>
+            <div>
+              <strong>Live Exam Room Alerts</strong>
+              <span>Immediate ping when sealed exam papers open.</span>
+            </div>
+          </div>
+          <div class="notif-perk-item">
+            <span class="material-symbols-rounded filled" style="color:#3B82F6;">assignment_turned_in</span>
+            <div>
+              <strong>Homework Approval & XP</strong>
+              <span>Instant alerts when your teacher approves submissions.</span>
+            </div>
+          </div>
+          <div class="notif-perk-item">
+            <span class="material-symbols-rounded filled" style="color:#F59E0B;">military_tech</span>
+            <div>
+              <strong>Island Rank Shifts</strong>
+              <span>Real-time rank updates on the leaderboard.</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="notif-blocked-instructions" class="notif-blocked-box" style="display:none;">
+          <div class="notif-blocked-header">
+            <span class="material-symbols-rounded" style="color:#EF4444;">block</span>
+            <strong>Notifications are blocked in your browser</strong>
+          </div>
+          <div class="notif-blocked-text">
+            1. Tap the <strong>lock 🔒 or site settings icon</strong> in your browser address bar.<br>
+            2. Toggle <strong>Notifications</strong> to <strong>Allow</strong>.<br>
+            3. Then tap <strong>Check Permission Again</strong> below.
+          </div>
+        </div>
+
+        <button class="notif-enable-btn" id="btn-mandatory-enable-notif" type="button">
+          <span class="material-symbols-rounded filled">notifications</span>
+          <span id="btn-mandatory-enable-text">Enable Notifications Now</span>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const btn = overlay.querySelector('#btn-mandatory-enable-notif');
+    const btnText = overlay.querySelector('#btn-mandatory-enable-text');
+    const blockedBox = overlay.querySelector('#notif-blocked-instructions');
+
+    const dismissOverlay = () => {
+      btnText.textContent = '✅ Notifications Active! Entering...';
+      btn.style.background = '#10B981';
+      overlay.classList.add('fade-out');
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.remove();
+      }, 400);
+    };
+
+    const updateState = () => {
+      if (Notification.permission === 'granted') {
+        dismissOverlay();
+      } else if (Notification.permission === 'denied') {
+        blockedBox.style.display = 'block';
+        btnText.textContent = 'Check Permission Again 🔄';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      } else {
+        blockedBox.style.display = 'none';
+        btnText.textContent = 'Enable Notifications Now';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+    };
+
+    updateState();
+
+    // Auto-check when student returns to tab from browser settings
+    const onVisibilityOrFocus = () => {
+      if (Notification.permission === 'granted') {
+        window.removeEventListener('focus', onVisibilityOrFocus);
+        document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+        dismissOverlay();
+      } else {
+        updateState();
+      }
+    };
+    window.addEventListener('focus', onVisibilityOrFocus);
+    document.addEventListener('visibilitychange', onVisibilityOrFocus);
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+
+      if (Notification.permission === 'granted') {
+        dismissOverlay();
+        return;
+      }
+
+      try {
+        const granted = await notificationService.requestPermission(this.currentUser);
+        if (granted || Notification.permission === 'granted') {
+          dismissOverlay();
+        } else {
+          updateState();
+        }
+      } catch (err) {
+        console.error('[Notification] Error requesting permission:', err);
+        updateState();
+      }
+    });
   }
 
   switchTab(tabName, { historyMode = 'push' } = {}) {

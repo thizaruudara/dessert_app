@@ -31,8 +31,12 @@ export class NotificationService {
   }
 
   async requestPermission(user = null) {
-    if (!this.isSupported) {
-      alert('Push notifications require an iOS device running iOS 16.4+ added to your Home Screen.');
+    if (!('Notification' in window)) {
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        alert('Push notifications require an iOS device running iOS 16.4+ added to your Home Screen.');
+      } else {
+        alert('Push notifications are not supported on this browser.');
+      }
       return false;
     }
 

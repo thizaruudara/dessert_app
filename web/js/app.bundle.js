@@ -67637,8 +67637,12 @@ var NotificationService = class {
     }
   }
   async requestPermission(user = null) {
-    if (!this.isSupported) {
-      alert("Push notifications require an iOS device running iOS 16.4+ added to your Home Screen.");
+    if (!("Notification" in window)) {
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        alert("Push notifications require an iOS device running iOS 16.4+ added to your Home Screen.");
+      } else {
+        alert("Push notifications are not supported on this browser.");
+      }
       return false;
     }
     try {
@@ -68957,6 +68961,141 @@ var AppController = class {
     this.currentTab = null;
     this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : "home", { historyMode: "replace" });
     notificationService.init(this.currentUser);
+    this.enforceNotificationPermission();
+  }
+  // ── Mandatory Student Push Notification Gatekeeper ────────────────────────
+  enforceNotificationPermission() {
+    if (this.currentUser?.role === "admin" && this.currentMode !== "student") return;
+    if (!("Notification" in window)) {
+      console.warn("[Notification] Window.Notification API not supported on this platform/browser.");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      return;
+    }
+    if (document.getElementById("mandatory-notif-overlay")) {
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.id = "mandatory-notif-overlay";
+    overlay.className = "mandatory-notif-overlay";
+    overlay.innerHTML = `
+      <div class="mandatory-notif-card" role="dialog" aria-modal="true" aria-labelledby="notif-title">
+        <div class="notif-card-glow"></div>
+        <div class="notif-bell-badge">
+          <span class="material-symbols-rounded filled notif-bell-icon">notifications_active</span>
+          <div class="notif-bell-pulse"></div>
+        </div>
+
+        <div class="notif-badge-pill">REQUIRED TO CONTINUE</div>
+        
+        <h2 class="notif-modal-title" id="notif-title">Enable Notifications</h2>
+        <div class="notif-modal-subtitle-si">\u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DA7 \u0DBA\u0DCF\u0DB8\u0DA7 Push Notifications \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1</div>
+        
+        <p class="notif-modal-desc">
+          EduPeak requires notifications for live examination countdowns, paper unlocks, and real-time homework approval. You cannot proceed to the student dashboard without enabling notifications.
+        </p>
+
+        <div class="notif-perks-list">
+          <div class="notif-perk-item">
+            <span class="material-symbols-rounded filled" style="color:#22C55E;">timer</span>
+            <div>
+              <strong>Live Exam Room Alerts</strong>
+              <span>Immediate ping when sealed exam papers open.</span>
+            </div>
+          </div>
+          <div class="notif-perk-item">
+            <span class="material-symbols-rounded filled" style="color:#3B82F6;">assignment_turned_in</span>
+            <div>
+              <strong>Homework Approval & XP</strong>
+              <span>Instant alerts when your teacher approves submissions.</span>
+            </div>
+          </div>
+          <div class="notif-perk-item">
+            <span class="material-symbols-rounded filled" style="color:#F59E0B;">military_tech</span>
+            <div>
+              <strong>Island Rank Shifts</strong>
+              <span>Real-time rank updates on the leaderboard.</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="notif-blocked-instructions" class="notif-blocked-box" style="display:none;">
+          <div class="notif-blocked-header">
+            <span class="material-symbols-rounded" style="color:#EF4444;">block</span>
+            <strong>Notifications are blocked in your browser</strong>
+          </div>
+          <div class="notif-blocked-text">
+            1. Tap the <strong>lock \u{1F512} or site settings icon</strong> in your browser address bar.<br>
+            2. Toggle <strong>Notifications</strong> to <strong>Allow</strong>.<br>
+            3. Then tap <strong>Check Permission Again</strong> below.
+          </div>
+        </div>
+
+        <button class="notif-enable-btn" id="btn-mandatory-enable-notif" type="button">
+          <span class="material-symbols-rounded filled">notifications</span>
+          <span id="btn-mandatory-enable-text">Enable Notifications Now</span>
+        </button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const btn = overlay.querySelector("#btn-mandatory-enable-notif");
+    const btnText = overlay.querySelector("#btn-mandatory-enable-text");
+    const blockedBox = overlay.querySelector("#notif-blocked-instructions");
+    const dismissOverlay = () => {
+      btnText.textContent = "\u2705 Notifications Active! Entering...";
+      btn.style.background = "#10B981";
+      overlay.classList.add("fade-out");
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.remove();
+      }, 400);
+    };
+    const updateState = () => {
+      if (Notification.permission === "granted") {
+        dismissOverlay();
+      } else if (Notification.permission === "denied") {
+        blockedBox.style.display = "block";
+        btnText.textContent = "Check Permission Again \u{1F504}";
+        btn.disabled = false;
+        btn.style.opacity = "1";
+      } else {
+        blockedBox.style.display = "none";
+        btnText.textContent = "Enable Notifications Now";
+        btn.disabled = false;
+        btn.style.opacity = "1";
+      }
+    };
+    updateState();
+    const onVisibilityOrFocus = () => {
+      if (Notification.permission === "granted") {
+        window.removeEventListener("focus", onVisibilityOrFocus);
+        document.removeEventListener("visibilitychange", onVisibilityOrFocus);
+        dismissOverlay();
+      } else {
+        updateState();
+      }
+    };
+    window.addEventListener("focus", onVisibilityOrFocus);
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.style.opacity = "0.7";
+      if (Notification.permission === "granted") {
+        dismissOverlay();
+        return;
+      }
+      try {
+        const granted = await notificationService.requestPermission(this.currentUser);
+        if (granted || Notification.permission === "granted") {
+          dismissOverlay();
+        } else {
+          updateState();
+        }
+      } catch (err) {
+        console.error("[Notification] Error requesting permission:", err);
+        updateState();
+      }
+    });
   }
   switchTab(tabName, { historyMode = "push" } = {}) {
     const allowedTabs = ["home", "papers", "ranks", "desserts", "profile"];
