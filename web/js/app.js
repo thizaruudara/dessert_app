@@ -3331,30 +3331,23 @@ class AppController {
         </div>
       </div>
 
-      <!-- Target A/L Exam Batch Card (1:1 examYear parity) -->
+      <!-- Target A/L Exam Batch Card (Locked / Read-Only for Students) -->
       <div class="hero-card" style="padding:16px 18px; margin-top:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">track_changes</span>
+            <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">lock</span>
             <div>
-              <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Target Examination Batch</div>
-              <div style="font-size:11px; color:#64748B;">Select your A/L year for countdown & papers</div>
+              <div style="font-size:13.5px; font-weight:800; color:#0F172A;">Assigned Examination Batch</div>
+              <div style="font-size:11px; color:#64748B;">Official A/L cohort locked by Institute Admin</div>
             </div>
           </div>
-          <span style="font-size:12px; font-weight:800; color:#2563EB; background:#EFF6FF; padding:4px 10px; border-radius:12px; border:1px solid #BFDBFE;" id="current-batch-badge">
+          <span style="font-size:12px; font-weight:800; color:#2563EB; background:#EFF6FF; padding:5px 12px; border-radius:12px; border:1px solid #BFDBFE;" id="current-batch-badge">
             ${currentBatch}
           </span>
         </div>
-
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          ${examBatches.map(b => {
-            const isSel = b === currentBatch;
-            return `
-              <button class="batch-select-chip ${isSel ? 'active' : ''}" data-target-batch="${b}" style="flex:1; min-width:64px; padding:8px 6px; border-radius:10px; border:1px solid ${isSel ? '#2563EB' : '#CBD5E1'}; background:${isSel ? '#2563EB' : '#F8FAFC'}; color:${isSel ? '#FFFFFF' : '#334155'}; font-size:11.5px; font-weight:700; cursor:pointer; transition:all 0.2s ease;">
-                ${b}
-              </button>
-            `;
-          }).join('')}
+        <div style="display:flex; align-items:center; gap:6px; margin-top:10px; font-size:11px; color:#64748B; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:8px 12px;">
+          <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">verified_user</span>
+          <span>Students cannot change exam batches. Contact administration to request a batch transfer.</span>
         </div>
       </div>
 
@@ -3449,37 +3442,7 @@ class AppController {
       this.openAvatarPickerSheet(container);
     });
 
-    // Target Batch Switchers
-    container.querySelectorAll('[data-target-batch]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const newBatch = btn.dataset.targetBatch;
-        if (newBatch === (this.currentUser?.examYear || localStorage.getItem('edupeak_exam_batch'))) return;
-
-        // Visual instant selection feedback on chips & badge
-        container.querySelectorAll('[data-target-batch]').forEach(b => {
-          const isTarget = b.dataset.targetBatch === newBatch;
-          b.classList.toggle('active', isTarget);
-          b.style.borderColor = isTarget ? '#2563EB' : '#CBD5E1';
-          b.style.backgroundColor = isTarget ? '#2563EB' : '#F8FAFC';
-          b.style.color = isTarget ? '#FFFFFF' : '#334155';
-        });
-        const badge = document.getElementById('current-batch-badge');
-        if (badge) badge.textContent = newBatch;
-
-        try {
-          if (this.currentUser) this.currentUser.examYear = newBatch;
-          localStorage.setItem('edupeak_exam_batch', newBatch);
-          await authService.updateProfile({ examYear: newBatch });
-          notificationService.showInAppBanner('Exam Batch Updated', `Switched to ${newBatch} curriculum & countdown!`, 'success');
-          if (this.countdownTimer) this.startCountdownTimer();
-          this.renderProfileScreen(container);
-        } catch (err) {
-          console.error('[Profile] Error updating exam batch:', err);
-          notificationService.showInAppBanner('Exam Batch Updated', `Switched to ${newBatch}!`, 'success');
-          this.renderProfileScreen(container);
-        }
-      });
-    });
+    // Target Batch is locked for students (managed by admin)
 
     document.getElementById('chk-dark-mode')?.addEventListener('change', (e) => {
       const dark = e.target.checked;

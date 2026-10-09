@@ -216,7 +216,10 @@ export class AuthService {
   async updateProfile(updates = {}) {
     if (!this.currentUser) return null;
     const allowed = {};
-    for (const key of ['name', 'avatarUrl', 'photoUrl', 'examYear']) {
+    const permittedKeys = (this.currentUser.role === 'admin' || this.currentUser.role === 'teacher')
+      ? ['name', 'avatarUrl', 'photoUrl', 'examYear']
+      : ['name', 'avatarUrl', 'photoUrl'];
+    for (const key of permittedKeys) {
       if (Object.hasOwn(updates, key)) allowed[key] = updates[key];
     }
     // Optimistic local update: ensure currentUser and localStorage are immediately updated
