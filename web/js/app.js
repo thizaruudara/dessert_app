@@ -5975,38 +5975,58 @@ class AppController {
   }
 
   // ── Helper Modal Dialogs ───────────────────────────────────────────────
+    // ── Helper Modal Dialogs ───────────────────────────────────────────────
   async openAdminDailyInsightModal() {
+    // Remove any existing insight modal first
+    document.querySelectorAll('.app-modal.modal-insight').forEach(m => m.remove());
+
+    const modal = document.createElement('div');
+    modal.className = 'app-modal modal-insight';
+    modal.style.display = 'flex';
+    document.body.appendChild(modal);
+
+    const closeModal = () => {
+      window.removeEventListener('keydown', onKeyDown);
+      modal.remove();
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // Backdrop click dismiss
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
     const current = await dbService.getDailyInsight();
     const presets = dbService.getPresetPhysicsInsights();
 
     let isCustom = current.isCustom || false;
     let selectedPresetIdx = isCustom ? -1 : 0;
 
-    const modal = document.createElement('div');
-    modal.className = 'app-modal';
-    modal.style.display = 'flex';
-
     const renderModalContent = () => {
       modal.innerHTML = `
-        <div class="modal-sheet" style="max-height:90vh; overflow-y:auto; padding:18px;">
-          <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div style="width:38px; height:38px; border-radius:12px; background:rgba(16, 185, 129, 0.12); display:flex; align-items:center; justify-content:center; color:#10B981;">
-                <span class="material-symbols-rounded" style="font-size:22px;">science</span>
+        <div class="modal-sheet" style="max-height:90vh; overflow-y:auto; padding:20px; box-sizing:border-box;">
+          <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:40px; height:40px; border-radius:12px; background:rgba(16, 185, 129, 0.12); display:flex; align-items:center; justify-content:center; color:#10B981; flex-shrink:0;">
+                <span class="material-symbols-rounded" style="font-size:24px;">science</span>
               </div>
               <div>
-                <div style="font-size:16px; font-weight:800; color:#0F172A;">Daily Physics Insight Manager</div>
-                <div style="font-size:11px; color:#64748B;">Control formula rotation & custom pinned concepts for students</div>
+                <div style="font-size:16px; font-weight:800; color:#0F172A; line-height:1.2;">Daily Physics Insight Manager</div>
+                <div style="font-size:11.5px; color:#64748B; margin-top:2px;">Control formula rotation & custom pinned concepts for students</div>
               </div>
             </div>
-            <button class="modal-close-btn" id="btn-close-insight-modal">
-              <span class="material-symbols-rounded">close</span>
+            <button class="modal-close-btn" id="btn-close-insight-modal" type="button" aria-label="Close" style="cursor:pointer; width:34px; height:34px; border-radius:50%; border:none; background:#F1F5F9; color:#475569; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
+              <span class="material-symbols-rounded" style="font-size:20px; pointer-events:none;">close</span>
             </button>
           </div>
 
           <!-- Mode Toggle Cards (1:1 with Flutter _isCustomMode) -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
-            <div id="btn-mode-random" style="border:2px solid ${!isCustom ? '#10B981' : '#E2E8F0'}; background:${!isCustom ? '#ECFDF5' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s;">
+            <div id="btn-mode-random" style="border:2px solid ${!isCustom ? '#10B981' : '#E2E8F0'}; background:${!isCustom ? '#ECFDF5' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s; user-select:none;">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span class="material-symbols-rounded" style="font-size:18px; color:${!isCustom ? '#065F46' : '#475569'};">sync</span>
                 <span style="font-size:12.5px; font-weight:700; color:${!isCustom ? '#065F46' : '#475569'};">Random Mode</span>
@@ -6014,7 +6034,7 @@ class AppController {
               <div style="font-size:10.5px; color:${!isCustom ? '#047857' : '#94A3B8'}; margin-top:4px; line-height:1.35;">Auto-rotates daily across 10 official A/L formula presets.</div>
             </div>
 
-            <div id="btn-mode-custom" style="border:2px solid ${isCustom ? '#2563EB' : '#E2E8F0'}; background:${isCustom ? '#EFF6FF' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s;">
+            <div id="btn-mode-custom" style="border:2px solid ${isCustom ? '#2563EB' : '#E2E8F0'}; background:${isCustom ? '#EFF6FF' : '#FFFFFF'}; padding:12px; border-radius:14px; cursor:pointer; transition:all 0.2s; user-select:none;">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span class="material-symbols-rounded" style="font-size:18px; color:${isCustom ? '#1E40AF' : '#475569'};">push_pin</span>
                 <span style="font-size:12.5px; font-weight:700; color:${isCustom ? '#1E40AF' : '#475569'};">Custom Pinned</span>
@@ -6032,7 +6052,7 @@ class AppController {
                 </span>
                 <span style="font-size:10px; color:#64748B;">10 Official Presets</span>
               </div>
-              <select id="preset-select" class="form-textarea" style="height:38px; padding:6px 10px; font-size:12px;">
+              <select id="preset-select" class="form-textarea" style="height:38px; padding:6px 10px; font-size:12px; border-radius:8px; width:100%; box-sizing:border-box;">
                 <option value="-1">-- Choose a concept preset to populate --</option>
                 ${presets.map((p, idx) => `
                   <option value="${idx}" ${selectedPresetIdx === idx ? 'selected' : ''}>${p.unitSinhala} • ${p.titleSinhala} (${p.titleEnglish})</option>
@@ -6044,44 +6064,44 @@ class AppController {
             <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
-                  <div class="form-label">මාතෘකාව (Sinhala Title):</div>
-                  <input type="text" id="ins-title-si" class="form-textarea" style="height:38px;" value="${current.titleSinhala || ''}" placeholder="උදා: කාර්යය-ශක්ති ප්‍රමේයය" />
+                  <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">මාතෘකාව (Sinhala Title):</div>
+                  <input type="text" id="ins-title-si" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" value="${current.titleSinhala || ''}" placeholder="උදා: කාර්යය-ශක්ති ප්‍රමේයය" />
                 </div>
                 <div>
-                  <div class="form-label">Concept (English Title):</div>
-                  <input type="text" id="ins-title-en" class="form-textarea" style="height:38px;" value="${current.titleEnglish || ''}" placeholder="e.g. Work-Energy Theorem" />
+                  <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Concept (English Title):</div>
+                  <input type="text" id="ins-title-en" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" value="${current.titleEnglish || ''}" placeholder="e.g. Work-Energy Theorem" />
                 </div>
               </div>
 
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div>
-                  <div class="form-label">පාඩම (Sinhala Unit):</div>
-                  <input type="text" id="ins-unit-si" class="form-textarea" style="height:38px;" value="${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'}" />
+                  <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">පාඩම (Sinhala Unit):</div>
+                  <input type="text" id="ins-unit-si" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" value="${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'}" />
                 </div>
                 <div>
-                  <div class="form-label">Physics Unit (English):</div>
-                  <input type="text" id="ins-unit-en" class="form-textarea" style="height:38px;" value="${current.unitEnglish || 'Mechanics'}" />
+                  <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Physics Unit (English):</div>
+                  <input type="text" id="ins-unit-en" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" value="${current.unitEnglish || 'Mechanics'}" />
                 </div>
               </div>
 
               <div>
-                <div class="form-label">භෞතික විද්‍යා සූත්‍රය (Physics Formula):</div>
-                <input type="text" id="ins-formula" class="form-textarea" style="height:42px; font-family:monospace; font-weight:700; color:#1E3A8A; background:#EFF6FF; border-color:#BFDBFE;" value="${current.formula || ''}" placeholder="e.g. W_net = ΔK = ½ m v² - ½ m u²" />
+                <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">භෞතික විද්‍යා සූත්‍රය (Physics Formula):</div>
+                <input type="text" id="ins-formula" class="form-textarea" style="height:42px; width:100%; box-sizing:border-box; font-family:monospace; font-weight:700; color:#1E3A8A; background:#EFF6FF; border-color:#BFDBFE; border-radius:8px; padding:6px 10px; font-size:13px;" value="${current.formula || ''}" placeholder="e.g. W_net = ΔK = ½ m v² - ½ m u²" />
               </div>
 
               <div>
-                <div class="form-label">විභාග උපදෙස (Sinhala Exam Tip):</div>
-                <textarea id="ins-tip-si" class="form-textarea" style="height:55px; resize:none;" placeholder="සිසුන්ට මතක තබාගත යුතු ප්‍රධාන උපක්‍රමය හෝ ফাঁද...">${current.tipSinhala || ''}</textarea>
+                <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">විභාග උපදෙස (Sinhala Exam Tip):</div>
+                <textarea id="ins-tip-si" class="form-textarea" style="height:55px; width:100%; box-sizing:border-box; resize:none; border-radius:8px; padding:6px 10px; font-size:12px;" placeholder="සිසුන්ට මතක තබාගත යුතු ප්‍රධාන උපක්‍රමය හෝ ফাঁද...">${current.tipSinhala || ''}</textarea>
               </div>
 
               <div>
-                <div class="form-label">Exam Tip (English Explanation):</div>
-                <textarea id="ins-tip-en" class="form-textarea" style="height:55px; resize:none;" placeholder="Important exam nuance or common pitfall in English...">${current.tipEnglish || ''}</textarea>
+                <div class="form-label" style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Exam Tip (English Explanation):</div>
+                <textarea id="ins-tip-en" class="form-textarea" style="height:55px; width:100%; box-sizing:border-box; resize:none; border-radius:8px; padding:6px 10px; font-size:12px;" placeholder="Important exam nuance or common pitfall in English...">${current.tipEnglish || ''}</textarea>
               </div>
             </div>
           ` : `
             <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px; margin-bottom:14px; display:flex; align-items:flex-start; gap:10px;">
-              <span class="material-symbols-rounded" style="font-size:22px; color:#166534;">sync</span>
+              <span class="material-symbols-rounded" style="font-size:22px; color:#166534; flex-shrink:0;">sync</span>
               <div>
                 <div style="font-size:13px; font-weight:700; color:#166534;">Daily Random Mode is Currently Active</div>
                 <div style="font-size:11px; color:#15803D; margin-top:3px; line-height:1.4;">
@@ -6100,30 +6120,30 @@ class AppController {
               <span style="font-size:10px; color:#10B981; font-weight:700;">● Pixel-Perfect 1:1</span>
             </div>
 
-            <div class="insight-vault-card" id="ins-preview-card" style="margin:0; box-shadow:0 4px 16px rgba(15,23,42,0.06);">
-              <div class="vault-top">
-                <div class="vault-pill">
+            <div class="insight-vault-card" id="ins-preview-card" style="margin:0; box-shadow:0 4px 16px rgba(15,23,42,0.06); border-radius:16px; border:1px solid #E2E8F0; padding:16px; background:#FFFFFF;">
+              <div class="vault-top" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div class="vault-pill" style="display:inline-flex; align-items:center; gap:5px; background:rgba(37,99,235,0.08); color:#2563EB; font-weight:800; font-size:10.5px; padding:3px 10px; border-radius:20px;">
                   <span class="material-symbols-rounded" style="font-size:14px;">science</span>
                   <span>PHYSICS MICRO-INSIGHT</span>
                 </div>
-                <span class="vault-tag-pill">${isCustom ? '<span class="material-symbols-rounded" style="font-size:12px; vertical-align:middle;">push_pin</span> Custom Pinned' : 'අද දවසේ සූත්‍රය • Daily'}</span>
+                <span class="vault-tag-pill" style="font-size:11px; font-weight:600; color:#64748B; background:#F1F5F9; padding:2px 8px; border-radius:12px;">${isCustom ? '<span class="material-symbols-rounded" style="font-size:12px; vertical-align:middle; color:#2563EB;">push_pin</span> Custom Pinned' : 'අද දවසේ සූත්‍රය • Daily'}</span>
               </div>
-              <div class="vault-topic-meta" id="prev-unit">${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'} • ${current.unitEnglish || 'Mechanics'}</div>
-              <div class="vault-concept-name" id="prev-title">
+              <div class="vault-topic-meta" id="prev-unit" style="font-size:12px; font-weight:700; color:#2563EB; margin-bottom:4px;">${current.unitSinhala || 'යාන්ත්‍ර විද්‍යාව'} • ${current.unitEnglish || 'Mechanics'}</div>
+              <div class="vault-concept-name" id="prev-title" style="font-size:15px; font-weight:800; color:#0F172A; margin-bottom:10px;">
                 ${current.titleSinhala || 'කාර්යය-ශක්ති ප්‍රමේයය'} <span style="font-size: 12.5px; font-weight:600; color:#64748B;" id="prev-title-en">(${current.titleEnglish || 'Work-Energy Theorem'})</span>
               </div>
-              <div class="vault-formula-box" id="prev-formula">
+              <div class="vault-formula-box" id="prev-formula" style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:12px; font-family:monospace; font-weight:700; font-size:14px; color:#166534; text-align:center; margin-bottom:12px;">
                 ${current.formula || 'W_net  =  ΔK  =  ½ m v²  -  ½ m u²'}
               </div>
-              <div class="vault-exam-tip-box">
-                <div class="tip-header">
+              <div class="vault-exam-tip-box" style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; padding:12px;">
+                <div class="tip-header" style="font-size:11.5px; font-weight:700; color:#92400E; display:flex; align-items:center; gap:4px; margin-bottom:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:16px; color:#D97706;">lightbulb</span>
                   <span>විභාග උපදෙස (Exam Tip):</span>
                 </div>
-                <div class="tip-sinhala" id="prev-tip-si">
+                <div class="tip-sinhala" id="prev-tip-si" style="font-size:12px; color:#78350F; line-height:1.45; margin-bottom:4px;">
                   ${current.tipSinhala || 'ආනත තලයක චලිතයේදී ඝර්ෂණයට එරෙහි කාර්යය යාන්ත්‍රික ශක්ති සමීකරණයට පෙර වෙන්ව සලකා බලන්න.'}
                 </div>
-                <div class="tip-english" id="prev-tip-en">
+                <div class="tip-english" id="prev-tip-en" style="font-size:11px; color:#92400E; font-style:italic;">
                   En: ${current.tipEnglish || 'Always compute work done against friction separately.'}
                 </div>
               </div>
@@ -6133,14 +6153,14 @@ class AppController {
           <!-- Action Buttons Row -->
           <div style="display:flex; gap:10px;">
             ${isCustom ? `
-              <button class="apk-paper-btn-secondary" id="btn-revert-random" style="flex:1; border-color:#EF4444; color:#EF4444; height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <button class="apk-paper-btn-secondary" id="btn-revert-random" type="button" style="flex:1; border-color:#EF4444; color:#EF4444; height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:16px;">sync</span> Revert to Random
               </button>
-              <button class="primary-btn" id="btn-save-custom-insight" style="flex:2; height:44px; margin-top:0; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <button class="primary-btn" id="btn-save-custom-insight" type="button" style="flex:2; height:44px; margin-top:0; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students
               </button>
             ` : `
-              <button class="apk-paper-btn-secondary" id="btn-switch-custom-mode" style="flex:1; border-color:#2563EB; color:#2563EB; height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <button class="apk-paper-btn-secondary" id="btn-switch-custom-mode" type="button" style="flex:1; border-color:#2563EB; color:#2563EB; height:44px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; cursor:pointer; background:#EFF6FF;">
                 <span class="material-symbols-rounded" style="font-size:16px;">edit</span> Switch to Custom Pinned Mode
               </button>
             `}
@@ -6148,121 +6168,147 @@ class AppController {
         </div>
       `;
 
-      // Attach Event Listeners
-      document.getElementById('btn-close-insight-modal')?.addEventListener('click', () => modal.remove());
+      // 1. Close Button Handler
+      const closeBtn = modal.querySelector('#btn-close-insight-modal');
+      if (closeBtn) {
+        closeBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        };
+      }
 
-      document.getElementById('btn-mode-random')?.addEventListener('click', () => {
+      // 2. Mode Switching Handlers
+      modal.querySelector('#btn-mode-random')?.addEventListener('click', () => {
         if (isCustom) {
           isCustom = false;
           renderModalContent();
         }
       });
 
-      document.getElementById('btn-mode-custom')?.addEventListener('click', () => {
+      modal.querySelector('#btn-mode-custom')?.addEventListener('click', () => {
         if (!isCustom) {
           isCustom = true;
           renderModalContent();
         }
       });
 
-      document.getElementById('btn-switch-custom-mode')?.addEventListener('click', () => {
+      modal.querySelector('#btn-switch-custom-mode')?.addEventListener('click', () => {
         isCustom = true;
         renderModalContent();
       });
 
-      document.getElementById('preset-select')?.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.value);
-        if (idx >= 0 && idx < presets.length) {
-          selectedPresetIdx = idx;
-          const p = presets[idx];
-          current.titleSinhala = p.titleSinhala;
-          current.titleEnglish = p.titleEnglish;
-          current.unitSinhala = p.unitSinhala;
-          current.unitEnglish = p.unitEnglish;
-          current.formula = p.formula;
-          current.tipSinhala = p.tipSinhala;
-          current.tipEnglish = p.tipEnglish;
-          current.topicCode = p.topicCode;
-          renderModalContent();
-        }
-      });
+      // 3. Preset Selector Handler
+      const presetSelect = modal.querySelector('#preset-select');
+      if (presetSelect) {
+        presetSelect.onchange = (e) => {
+          const idx = parseInt(e.target.value);
+          if (idx >= 0 && idx < presets.length) {
+            selectedPresetIdx = idx;
+            const p = presets[idx];
+            current.titleSinhala = p.titleSinhala;
+            current.titleEnglish = p.titleEnglish;
+            current.unitSinhala = p.unitSinhala;
+            current.unitEnglish = p.unitEnglish;
+            current.formula = p.formula;
+            current.tipSinhala = p.tipSinhala;
+            current.tipEnglish = p.tipEnglish;
+            current.topicCode = p.topicCode;
+            renderModalContent();
+          }
+        };
+      }
 
-      // Live typing updates for preview
+      // 4. Live Typing Updates for Preview Card
       const updatePreview = () => {
-        const titleSi = document.getElementById('ins-title-si')?.value || '';
-        const titleEn = document.getElementById('ins-title-en')?.value || '';
-        const unitSi = document.getElementById('ins-unit-si')?.value || '';
-        const unitEn = document.getElementById('ins-unit-en')?.value || '';
-        const formula = document.getElementById('ins-formula')?.value || '';
-        const tipSi = document.getElementById('ins-tip-si')?.value || '';
-        const tipEn = document.getElementById('ins-tip-en')?.value || '';
+        const titleSi = modal.querySelector('#ins-title-si')?.value || '';
+        const titleEn = modal.querySelector('#ins-title-en')?.value || '';
+        const unitSi = modal.querySelector('#ins-unit-si')?.value || '';
+        const unitEn = modal.querySelector('#ins-unit-en')?.value || '';
+        const formula = modal.querySelector('#ins-formula')?.value || '';
+        const tipSi = modal.querySelector('#ins-tip-si')?.value || '';
+        const tipEn = modal.querySelector('#ins-tip-en')?.value || '';
 
-        const prevTitle = document.getElementById('prev-title');
+        const prevTitle = modal.querySelector('#prev-title');
         if (prevTitle) prevTitle.innerHTML = `${titleSi || 'Formula Title'} <span style="font-size:12.5px; font-weight:600; color:#64748B;">(${titleEn || 'English Concept'})</span>`;
-        const prevUnit = document.getElementById('prev-unit');
+        const prevUnit = modal.querySelector('#prev-unit');
         if (prevUnit) prevUnit.innerText = `${unitSi} • ${unitEn}`;
-        const prevFormula = document.getElementById('prev-formula');
+        const prevFormula = modal.querySelector('#prev-formula');
         if (prevFormula) prevFormula.innerText = formula;
-        const prevTipSi = document.getElementById('prev-tip-si');
+        const prevTipSi = modal.querySelector('#prev-tip-si');
         if (prevTipSi) prevTipSi.innerText = tipSi;
-        const prevTipEn = document.getElementById('prev-tip-en');
+        const prevTipEn = modal.querySelector('#prev-tip-en');
         if (prevTipEn) prevTipEn.innerText = `En: ${tipEn}`;
       };
 
       ['ins-title-si', 'ins-title-en', 'ins-unit-si', 'ins-unit-en', 'ins-formula', 'ins-tip-si', 'ins-tip-en'].forEach(id => {
-        document.getElementById(id)?.addEventListener('input', updatePreview);
+        modal.querySelector(`#${id}`)?.addEventListener('input', updatePreview);
       });
 
-      // Save custom
-      document.getElementById('btn-save-custom-insight')?.addEventListener('click', async () => {
-        const titleSi = document.getElementById('ins-title-si')?.value.trim();
-        const formula = document.getElementById('ins-formula')?.value.trim();
-        if (!titleSi || !formula) {
-          notificationService.showInAppToast('කරුණාකර මාතෘකාව සහ සූත්‍රය ඇතුළත් කරන්න (Please fill title and formula)', 'warning');
-          return;
-        }
+      // 5. Save Custom Insight Handler
+      const saveBtn = modal.querySelector('#btn-save-custom-insight');
+      if (saveBtn) {
+        saveBtn.onclick = async () => {
+          const titleSi = modal.querySelector('#ins-title-si')?.value.trim();
+          const formula = modal.querySelector('#ins-formula')?.value.trim();
+          if (!titleSi || !formula) {
+            notificationService.showInAppToast('කරුණාකර මාතෘකාව සහ සූත්‍රය ඇතුළත් කරන්න (Please fill title and formula)', 'warning');
+            return;
+          }
 
-        const data = {
-          titleSinhala: titleSi,
-          titleEnglish: document.getElementById('ins-title-en')?.value.trim() || '',
-          unitSinhala: document.getElementById('ins-unit-si')?.value.trim() || '',
-          unitEnglish: document.getElementById('ins-unit-en')?.value.trim() || '',
-          formula: formula,
-          tipSinhala: document.getElementById('ins-tip-si')?.value.trim() || '',
-          tipEnglish: document.getElementById('ins-tip-en')?.value.trim() || '',
-          topicCode: current.topicCode || 'topic_custom'
+          const data = {
+            titleSinhala: titleSi,
+            titleEnglish: modal.querySelector('#ins-title-en')?.value.trim() || '',
+            unitSinhala: modal.querySelector('#ins-unit-si')?.value.trim() || '',
+            unitEnglish: modal.querySelector('#ins-unit-en')?.value.trim() || '',
+            formula: formula,
+            tipSinhala: modal.querySelector('#ins-tip-si')?.value.trim() || '',
+            tipEnglish: modal.querySelector('#ins-tip-en')?.value.trim() || '',
+            topicCode: current.topicCode || 'topic_custom'
+          };
+
+          saveBtn.innerText = 'Saving to Cloud...';
+          saveBtn.disabled = true;
+
+          try {
+            await dbService.saveCustomPhysicsInsight(data, this.currentUser?.name || 'Admin');
+            notificationService.showInAppToast('Daily Physics Insight successfully pinned to all students!', 'success');
+            closeModal();
+            const mainVp = document.getElementById('main-viewport') || document.getElementById('admin-main-viewport');
+            if (mainVp && this.renderHomeScreen) this.renderHomeScreen(mainVp);
+          } catch (err) {
+            notificationService.showInAppToast('Save error: ' + err.message, 'error');
+            saveBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students';
+            saveBtn.disabled = false;
+          }
         };
+      }
 
-        const btn = document.getElementById('btn-save-custom-insight');
-        btn.innerText = 'Saving to Cloud...';
-        btn.disabled = true;
-
-        try {
-          await dbService.saveCustomPhysicsInsight(data, this.currentUser?.name || 'Admin');
-          notificationService.showInAppToast('Daily Physics Insight successfully pinned to all students!', 'success');
-          modal.remove();
-        } catch (e) {
-          notificationService.showInAppToast('Save error: ' + e.message, 'error');
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students';
-          btn.disabled = false;
-        }
-      });
-
-      // Revert to Random
-      document.getElementById('btn-revert-random')?.addEventListener('click', async () => {
-        try {
-          await dbService.setRandomPhysicsInsightMode(this.currentUser?.name || 'Admin');
-          notificationService.showInAppToast('Successfully reverted to Automatic Daily Random Mode', 'success');
-          modal.remove();
-        } catch (e) {
-          notificationService.showInAppToast('Revert error: ' + e.message, 'error');
-        }
-      });
+      // 6. Revert to Random Mode Handler
+      const revertBtn = modal.querySelector('#btn-revert-random');
+      if (revertBtn) {
+        revertBtn.onclick = async () => {
+          try {
+            revertBtn.disabled = true;
+            revertBtn.innerText = 'Reverting...';
+            await dbService.setRandomPhysicsInsightMode(this.currentUser?.name || 'Admin');
+            notificationService.showInAppToast('Successfully reverted to Automatic Daily Random Mode', 'success');
+            closeModal();
+            const mainVp = document.getElementById('main-viewport') || document.getElementById('admin-main-viewport');
+            if (mainVp && this.renderHomeScreen) this.renderHomeScreen(mainVp);
+          } catch (err) {
+            notificationService.showInAppToast('Revert error: ' + err.message, 'error');
+            revertBtn.disabled = false;
+            revertBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">sync</span> Revert to Random';
+          }
+        };
+      }
     };
 
     renderModalContent();
-    document.body.appendChild(modal);
   }
+
+  
 
   // ── Examination Countdowns Manager (1:1 with admin_exam_countdowns_screen.dart) ──
     // ── Examination Countdowns Manager (1:1 with admin_exam_countdowns_screen.dart) ──
