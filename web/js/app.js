@@ -34,14 +34,62 @@ class AppController {
       }
     });
 
-    window.addEventListener('edupeak:credits-updated', () => {
+    const refreshStudentViews = () => {
       if (this.currentMode === 'student') {
         const vp = document.getElementById('main-viewport');
         if (vp) {
-          if (this.currentTab === 'home') this.renderHomeScreen(vp);
+          if (this.currentTab === 'desserts') this.renderDessertsScreen(vp);
+          else if (this.currentTab === 'home') this.renderHomeScreen(vp);
           else if (this.currentTab === 'ranks') this.renderRanksScreen(vp);
           else if (this.currentTab === 'profile') this.renderProfileScreen(vp);
         }
+      }
+    };
+
+    window.addEventListener('edupeak:credits-updated', () => {
+      refreshStudentViews();
+    });
+
+    window.addEventListener('edupeak:dessert-reviewed', (e) => {
+      const detail = e.detail;
+      const user = this.currentUser || {};
+      const userPhone = String(user.phone || '').replace(/\D/g, '');
+      const eventPhone = String(detail?.studentPhone || '').replace(/\D/g, '');
+      const isTargetStudent = !detail?.studentId ||
+        detail.studentId === user.uid ||
+        detail.studentId === user.id ||
+        detail.studentId === user.studentId ||
+        (userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9))));
+
+      if (isTargetStudent) {
+        if (detail?.creditsAwarded && this.currentUser) {
+          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+        }
+        refreshStudentViews();
+      }
+    });
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'edupeak_last_sync_event' || e.key === 'edupeak_local_desserts') {
+        try {
+          const syncData = JSON.parse(e.newValue || '{}');
+          if (syncData.type === 'dessert-reviewed') {
+            const detail = syncData.data;
+            const user = this.currentUser || {};
+            const userPhone = String(user.phone || '').replace(/\D/g, '');
+            const eventPhone = String(detail?.studentPhone || '').replace(/\D/g, '');
+            const isTargetStudent = !detail?.studentId ||
+              detail.studentId === user.uid ||
+              detail.studentId === user.id ||
+              detail.studentId === user.studentId ||
+              (userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9))));
+
+            if (isTargetStudent && detail?.creditsAwarded && this.currentUser) {
+              this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+            }
+          }
+        } catch (_) {}
+        refreshStudentViews();
       }
     });
 
@@ -588,6 +636,7 @@ class AppController {
     if (this._papersUnsub) { try { this._papersUnsub(); } catch (_) {} this._papersUnsub = null; }
     if (this._upcomingPapersUnsub) { try { this._upcomingPapersUnsub(); } catch (_) {} this._upcomingPapersUnsub = null; }
     if (this._ranksUnsub) { try { this._ranksUnsub(); } catch (_) {} this._ranksUnsub = null; }
+    if (this._dessertsUnsub) { try { this._dessertsUnsub(); } catch (_) {} this._dessertsUnsub = null; }
 
     // Show a stable loading state while an async screen loads. A render token
     // below prevents a slow page request from replacing a newer tab.
@@ -661,8 +710,8 @@ class AppController {
       dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.uid || user.id, user.phone).catch(() => 155),
-      dbService.getStudentDesserts(user.uid || user.id, user.phone).catch(() => [])
+      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 155),
+      dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
 
@@ -2637,7 +2686,11 @@ class AppController {
     this.dessertHistoryFilter = this.dessertHistoryFilter ?? 'All';
 
     const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone);
+    const sId = user.studentId || user.uid || user.id || 'EP-2027';
+    const sPhone = user.phone || '';
+    const sName = user.name || '';
+    const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
+    this._cachedDesserts = desserts;
     if (renderToken !== this.renderToken || !container.isConnected) return;
 
     const topics = [
@@ -2927,6 +2980,48 @@ class AppController {
         this.openDessertDetailModal(card.dataset.viewDessert);
       });
     });
+
+    // Real-time listener for instant dessert approval & feedback updates
+    if (typeof this._dessertsUnsub === 'function') {
+      try { this._dessertsUnsub(); } catch (_) {}
+      this._dessertsUnsub = null;
+    }
+
+    this._dessertsUnsub = dbService.listenToStudentDesserts(sId, sPhone, (realtimeDesserts) => {
+      if (!container.isConnected || this.currentTab !== 'desserts') {
+        if (typeof this._dessertsUnsub === 'function') {
+          try { this._dessertsUnsub(); } catch (_) {}
+          this._dessertsUnsub = null;
+        }
+        return;
+      }
+
+      // Check for newly approved submissions
+      const prevList = this._cachedDesserts || desserts || [];
+      const newlyApproved = realtimeDesserts.filter(d =>
+        d.status === 'approved' &&
+        prevList.some(old => (old.id === d.id || old.submittedAt === d.submittedAt) && old.status === 'pending')
+      );
+
+      this._cachedDesserts = realtimeDesserts;
+
+      if (newlyApproved.length > 0) {
+        const approvedItem = newlyApproved[0];
+        notificationService.showInAppBanner(
+          'Homework Approved! 🎉',
+          `"${approvedItem.subject || 'Dessert'}" has been approved (+${approvedItem.creditsAwarded || 100} XP)!`,
+          'success'
+        );
+        dbService.getStudentCredits(sId, sPhone).then(pts => {
+          if (this.currentUser) this.currentUser.credits = pts;
+        }).catch(() => {});
+      }
+
+      // Re-render if currently viewing History tab (Tab 1) and no modal is blocking
+      if (this.dessertsTab === 1 && !document.querySelector('.app-modal')) {
+        this.renderDessertsScreen(container);
+      }
+    }, sName);
   }
 
   // ── 5. Profile Tab (Trophy Room, Dark Mode, Exam Batch & Avatar Picker - 1:1 Android) ──
@@ -2941,7 +3036,7 @@ class AppController {
     // Fetch student's real homework submissions from Firestore
     let desserts = [];
     try {
-      desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone) || [];
+      desserts = await dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, user.name) || [];
     } catch (_) {
       desserts = [];
     }
@@ -2949,7 +3044,7 @@ class AppController {
     const pendingCount = desserts.filter(d => !d.status || d.status === 'pending').length;
     if (renderToken !== this.renderToken || !container.isConnected) return;
     const totalCount = desserts.length;
-    const creditsXP = await dbService.getStudentCredits(user.uid || user.id, user.phone);
+    const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
 
     // Format member since date
     let memberSinceStr = 'September 2026';
@@ -3424,7 +3519,9 @@ class AppController {
   // ── Dessert Detail Modal ──────────────────────────────────────────────────
   async openDessertDetailModal(dessertId) {
     const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone);
+    const desserts = (this._cachedDesserts && this._cachedDesserts.length > 0)
+      ? this._cachedDesserts
+      : await dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, user.name);
     const d = desserts.find(x => x.id === dessertId) || desserts[0];
     if (!d) return;
 
@@ -4341,6 +4438,7 @@ class AppController {
     if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
     if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
     if (this._adminUpcomingUnsub) { try { this._adminUpcomingUnsub(); } catch (_) {} this._adminUpcomingUnsub = null; }
+    if (this._adminDessertsUnsub) { try { this._adminDessertsUnsub(); } catch (_) {} this._adminDessertsUnsub = null; }
 
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.adminTab === tabName);
@@ -4658,6 +4756,26 @@ class AppController {
         const sub = allDesserts.find(x => x.id === id);
         this.openAdminReviewModal(sub);
       });
+    });
+
+    // Real-time listener for admin homework submissions
+    if (typeof this._adminDessertsUnsub === 'function') {
+      try { this._adminDessertsUnsub(); } catch (_) {}
+      this._adminDessertsUnsub = null;
+    }
+
+    this._adminDessertsUnsub = dbService.listenToAllDessertsForAdmin((allList) => {
+      if (!container.isConnected || this.adminTab !== 'dashboard') {
+        if (typeof this._adminDessertsUnsub === 'function') {
+          try { this._adminDessertsUnsub(); } catch (_) {}
+          this._adminDessertsUnsub = null;
+        }
+        return;
+      }
+      // Re-render admin dashboard only if no review modal is currently open
+      if (!document.querySelector('.app-modal')) {
+        this.renderAdminDashboardScreen(container);
+      }
     });
   }
 

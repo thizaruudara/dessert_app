@@ -26,91 +26,167 @@ export class DbService {
   }
 
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
-  async getStudentDesserts(studentId, studentPhone) {
+  async getStudentDesserts(studentId, studentPhone, studentName) {
     let localList = [];
     try {
       localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-      if (studentId || studentPhone) {
-        localList = localList.filter(d => 
-          (studentId && (d.studentId === String(studentId) || d.studentId === 'EP-2027' || d.studentId === 'anon')) ||
-          (studentPhone && d.studentPhone === String(studentPhone))
-        );
-      }
     } catch (_) {}
 
-    if (!studentId && !studentPhone) return localList.length > 0 ? localList : (this.getMockDesserts ? this.getMockDesserts() : []);
+    const cleanId = String(studentId || '').trim();
+    const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
+    const cleanName = String(studentName || '').trim().toLowerCase();
+
+    const list = [];
     try {
       const dessertsRef = collection(db, 'desserts');
-      const q = studentId
-        ? query(dessertsRef, where('studentId', '==', String(studentId)), limit(50))
-        : query(dessertsRef, where('studentPhone', '==', String(studentPhone)), limit(50));
-      
+      const q = query(dessertsRef, orderBy('submittedAt', 'desc'), limit(60));
       const snap = await Promise.race([
         getDocs(q),
         new Promise((_, reject) => setTimeout(() => reject(new Error('getStudentDesserts timeout')), 2800))
       ]);
-      const list = [];
+
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        if ((studentId && data.studentId === studentId) || (studentPhone && data.studentPhone === studentPhone)) {
-          list.push({ id: docSnap.id, ...data });
+        const docId = docSnap.id;
+        const dPhone = String(data.studentPhone || data.phone || '').replace(/\D/g, '');
+        const dId = String(data.studentId || data.id || data.userUid || '').trim();
+        const dName = String(data.studentName || '').trim().toLowerCase();
+
+        const matchesStudent = (!cleanId && !cleanPhone && !cleanName) ||
+          (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) ||
+          (cleanId && (dId === cleanId || dId === 'EP-2027' || dId === 'anon')) ||
+          (cleanName && dName && cleanName === dName);
+
+        if (matchesStudent) {
+          list.push({ ...data, id: docId });
         }
       });
+    } catch (e) {
+      console.warn('[DB] Student dessert query note, falling back to local:', e?.message || e);
+    }
 
-      // Merge localList and list without duplicates
-      const seen = new Set(list.map(d => d.id));
-      for (const loc of localList) {
-        if (!seen.has(loc.id)) {
+    // Merge with localList: Firestore status is authoritative!
+    for (const loc of localList) {
+      const locPhone = String(loc.studentPhone || loc.phone || '').replace(/\D/g, '');
+      const locId = String(loc.studentId || loc.id || '').trim();
+      const locName = String(loc.studentName || '').trim().toLowerCase();
+      const matchesLoc = (!cleanId && !cleanPhone && !cleanName) ||
+        (cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9)))) ||
+        (cleanId && (locId === cleanId || locId === 'EP-2027' || locId === 'anon')) ||
+        (cleanName && locName && cleanName === locName);
+
+      if (matchesLoc) {
+        const fsMatch = list.find(fs =>
+          fs.id === loc.id ||
+          (fs.submittedAt && fs.submittedAt === loc.submittedAt) ||
+          (fs.caption && fs.caption === loc.caption && locPhone && fs.studentPhone && locPhone.endsWith(cleanPhone.slice(-9)))
+        );
+        if (fsMatch) {
+          if (fsMatch.status) loc.status = fsMatch.status;
+          if (fsMatch.adminFeedback) loc.adminFeedback = fsMatch.adminFeedback;
+          if (fsMatch.creditsAwarded !== undefined) loc.creditsAwarded = fsMatch.creditsAwarded;
+          if (fsMatch.reviewedAt) loc.reviewedAt = fsMatch.reviewedAt;
+        } else {
           list.push(loc);
-          seen.add(loc.id);
         }
       }
-
-      list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
-      return list;
-    } catch (e) {
-      console.warn('[DB] Student dessert query failed, falling back:', e);
-      if (localList.length > 0) return localList;
-      return this.getMockDesserts ? this.getMockDesserts(studentId) : [];
     }
+
+    try {
+      localStorage.setItem('edupeak_local_desserts', JSON.stringify(list));
+    } catch (_) {}
+
+    list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+    return list.length > 0 ? list : (this.getMockDesserts ? this.getMockDesserts(studentId) : []);
   }
 
   // Real-time listener for student's homework status
-  listenToStudentDesserts(studentId, studentPhone, callback) {
-    if (!studentId && !studentPhone) return () => {};
+  listenToStudentDesserts(studentId, studentPhone, callback, studentName) {
+    const cleanId = String(studentId || '').trim();
+    const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
+    const cleanName = String(studentName || '').trim().toLowerCase();
+
     try {
       const dessertsRef = collection(db, 'desserts');
-      const q = studentId
-        ? query(dessertsRef, where('studentId', '==', String(studentId)), limit(40))
-        : query(dessertsRef, where('studentPhone', '==', String(studentPhone)), limit(40));
+      const q = query(dessertsRef, orderBy('submittedAt', 'desc'), limit(60));
 
-      return onSnapshot(q, (snapshot) => {
+      const unsub = onSnapshot(q, (snapshot) => {
         const list = [];
         snapshot.forEach(docSnap => {
           const data = docSnap.data();
-          if (data.studentId === studentId || data.studentPhone === studentPhone) {
-            list.push({ id: docSnap.id, ...data });
+          const docId = docSnap.id;
+          const dPhone = String(data.studentPhone || data.phone || '').replace(/\D/g, '');
+          const dId = String(data.studentId || data.id || data.userUid || '').trim();
+          const dName = String(data.studentName || '').trim().toLowerCase();
+
+          const matchesStudent = (!cleanId && !cleanPhone && !cleanName) ||
+            (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) ||
+            (cleanId && (dId === cleanId || dId === 'EP-2027' || dId === 'anon')) ||
+            (cleanName && dName && cleanName === dName);
+
+          if (matchesStudent) {
+            list.push({ ...data, id: docId });
           }
         });
+
+        // Sync with local storage
+        try {
+          let localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+          for (const fsItem of list) {
+            const idx = localList.findIndex(l =>
+              l.id === fsItem.id ||
+              (l.submittedAt && l.submittedAt === fsItem.submittedAt)
+            );
+            if (idx >= 0) {
+              localList[idx] = { ...localList[idx], ...fsItem };
+            } else {
+              localList.unshift(fsItem);
+            }
+          }
+
+          // Also pull in any locally staged submissions
+          for (const loc of localList) {
+            const locPhone = String(loc.studentPhone || loc.phone || '').replace(/\D/g, '');
+            const locId = String(loc.studentId || loc.id || '').trim();
+            const locName = String(loc.studentName || '').trim().toLowerCase();
+            const matchesLoc = (!cleanId && !cleanPhone && !cleanName) ||
+              (cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9)))) ||
+              (cleanId && (locId === cleanId || locId === 'EP-2027' || locId === 'anon')) ||
+              (cleanName && locName && cleanName === locName);
+
+            if (matchesLoc && !list.some(d => d.id === loc.id || (d.submittedAt && d.submittedAt === loc.submittedAt))) {
+              list.push(loc);
+            }
+          }
+
+          localStorage.setItem('edupeak_local_desserts', JSON.stringify(localList));
+        } catch (_) {}
+
         list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
         callback(list);
       }, (err) => {
         console.warn('[DB] Desserts snapshot listener error:', err);
-        callback([]);
       });
-    } catch (_) {
-      callback([]);
+
+      return unsub;
+    } catch (e) {
+      console.warn('[DB] listenToStudentDesserts setup error:', e);
       return () => {};
     }
   }
 
   // Submit new Dessert homework (from Camera Scanner or file)
-  async submitDessert({ studentId, studentName, studentPhone, subject, caption, mediaUrls }) {
+  async submitDessert({ studentId, studentName, studentPhone, subject, caption, mediaUrls, examYear }) {
+    const dessertsRef = collection(db, 'desserts');
+    const docRef = doc(dessertsRef);
+    const docId = docRef.id;
+
     const newDoc = {
-      id: `dessert_local_${Date.now()}`,
-      studentId: studentId || 'EP-2027',
-      studentName: studentName || 'Scholar',
-      studentPhone: studentPhone || '',
+      id: docId,
+      studentId: String(studentId || 'EP-2027'),
+      studentName: String(studentName || 'Scholar'),
+      studentPhone: String(studentPhone || '').trim(),
+      examYear: String(examYear || '2027 A/L'),
       subject: subject || 'Physics Mechanics',
       caption: caption || 'Daily Dessert Submission',
       mediaUrls: mediaUrls || [],
@@ -125,7 +201,8 @@ export class DbService {
 
     // Always persist to local cache immediately so homework submission is never lost
     try {
-      const localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+      let localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+      localList = localList.filter(d => d.id !== docId);
       localList.unshift(newDoc);
       localStorage.setItem('edupeak_local_desserts', JSON.stringify(localList.slice(0, 50)));
     } catch (storageErr) {
@@ -133,24 +210,20 @@ export class DbService {
     }
 
     try {
-      const dessertsRef = collection(db, 'desserts');
-      const docRef = await addDoc(dessertsRef, newDoc);
-      newDoc.id = docRef.id;
-
-      // Update ID in local list as well
-      try {
-        const localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-        if (localList.length > 0) {
-          localList[0].id = docRef.id;
-          localStorage.setItem('edupeak_local_desserts', JSON.stringify(localList));
-        }
-      } catch (_) {}
-
-      return newDoc;
+      await Promise.race([
+        setDoc(docRef, newDoc),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('submitDessert timeout')), 3500))
+      ]);
     } catch (e) {
-      console.warn('[DB] Firestore dessert save failed, safely saved to local storage:', e);
-      return newDoc;
+      console.warn('[DB] submitDessert Firestore note (saved locally):', e);
     }
+
+    try {
+      window.dispatchEvent(new CustomEvent('edupeak:dessert-submitted', { detail: newDoc }));
+      localStorage.setItem('edupeak_last_sync_event', JSON.stringify({ type: 'dessert-submitted', data: newDoc, timestamp: Date.now() }));
+    } catch (_) {}
+
+    return newDoc;
   }
 
   // Get student accumulated credits from local cache, submissions, and leaderboard
@@ -166,12 +239,17 @@ export class DbService {
     }
 
     try {
+      const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
       const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
       const dessertCredits = localDesserts
-        .filter(d => (d.status === 'approved') && (
-          (studentId && (d.studentId === studentId || d.studentName === studentId)) ||
-          (studentPhone && d.studentPhone === studentPhone)
-        ))
+        .filter(d => {
+          if (d.status !== 'approved') return false;
+          const dPhone = String(d.studentPhone || '').replace(/\D/g, '');
+          const dId = String(d.studentId || '');
+          if (studentId && (dId === studentId || d.studentName === studentId || dId === 'EP-2027')) return true;
+          if (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
+          return false;
+        })
         .reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
       if (dessertCredits > 0) {
         credits = Math.max(credits, 155 + dessertCredits);
@@ -180,11 +258,31 @@ export class DbService {
 
     try {
       const localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
-      const entry = localLb.find(x => (studentId && (x.id === studentId || x.name === studentId)) || (studentPhone && x.studentPhone === studentPhone));
+      const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
+      const entry = localLb.find(x => {
+        const xPhone = String(x.studentPhone || '').replace(/\D/g, '');
+        if (studentId && (x.id === studentId || x.name === studentId)) return true;
+        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(xPhone.slice(-9)))) return true;
+        return false;
+      });
       if (entry && entry.credits) {
         credits = Math.max(credits, Number(entry.credits) || 0);
       }
     } catch (_) {}
+
+    // Read live credits from Firestore users collection if available
+    if (studentId) {
+      try {
+        const uSnap = await Promise.race([
+          getDoc(doc(db, 'users', studentId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+        ]).catch(() => null);
+        if (uSnap && uSnap.exists()) {
+          const uCredits = Number(uSnap.data()?.credits) || 0;
+          if (uCredits > 0) credits = Math.max(credits, uCredits);
+        }
+      } catch (_) {}
+    }
 
     return credits > 0 ? credits : 155;
   }
@@ -277,38 +375,39 @@ export class DbService {
   // Admin: Review & grade homework
   async reviewDessert(dessertId, { status, adminFeedback, creditsAwarded, reviewedBy, studentId, studentName, studentPhone, examYear, dessertObj }) {
     const reviewedAt = new Date().toISOString();
-    const finalCredits = Number(creditsAwarded) || (status === 'approved' ? 50 : 0);
+    const finalCredits = Number(creditsAwarded) || (status === 'approved' ? 100 : 0);
     const feedback = adminFeedback || (status === 'approved' ? 'Great work!' : 'Please revise.');
     const reviewer = reviewedBy || 'Lead Physics Faculty';
 
-    let targetStudentId = studentId;
-    let targetStudentName = studentName;
-    let targetStudentPhone = studentPhone;
-    let targetExamYear = examYear;
+    let targetStudentId = studentId || dessertObj?.studentId;
+    let targetStudentName = studentName || dessertObj?.studentName;
+    let targetStudentPhone = studentPhone || dessertObj?.studentPhone;
+    let targetExamYear = examYear || dessertObj?.examYear;
 
     // 1. Immediately update localStorage (optimistic update ensures UI is never blocked)
     try {
       let localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-      let item = localList.find(x => x.id === dessertId);
-      if (!item && dessertObj) {
-        item = localList.find(x =>
-          (x.submittedAt && x.submittedAt === dessertObj.submittedAt) ||
-          (x.studentName && x.studentName === dessertObj.studentName && x.caption === dessertObj.caption)
-        );
+      let matched = false;
+      for (let i = 0; i < localList.length; i++) {
+        const item = localList[i];
+        if (item.id === dessertId || (dessertObj && (
+          (item.submittedAt && item.submittedAt === dessertObj.submittedAt) ||
+          (item.caption && item.caption === dessertObj.caption && item.studentPhone === targetStudentPhone)
+        ))) {
+          item.status = status;
+          item.adminFeedback = feedback;
+          item.creditsAwarded = finalCredits;
+          item.reviewedBy = reviewer;
+          item.reviewedAt = reviewedAt;
+          if (!targetStudentId) targetStudentId = item.studentId;
+          if (!targetStudentName) targetStudentName = item.studentName;
+          if (!targetStudentPhone) targetStudentPhone = item.studentPhone;
+          matched = true;
+        }
       }
-      if (item) {
-        item.status = status;
-        item.adminFeedback = feedback;
-        item.creditsAwarded = finalCredits;
-        item.reviewedBy = reviewer;
-        item.reviewedAt = reviewedAt;
-        if (!targetStudentId) targetStudentId = item.studentId;
-        if (!targetStudentName) targetStudentName = item.studentName;
-        if (!targetStudentPhone) targetStudentPhone = item.studentPhone;
-        if (!targetExamYear) targetExamYear = item.examYear;
-      } else {
-        const newEntry = {
-          ...(dessertObj || {}),
+      if (!matched && dessertObj) {
+        localList.unshift({
+          ...dessertObj,
           id: dessertId,
           status,
           adminFeedback: feedback,
@@ -316,11 +415,10 @@ export class DbService {
           reviewedBy: reviewer,
           reviewedAt,
           studentId: targetStudentId || 'EP-2027',
-          studentName: targetStudentName || 'Test User',
+          studentName: targetStudentName || 'Student',
           studentPhone: targetStudentPhone || '',
           examYear: targetExamYear || '2027 A/L'
-        };
-        localList.unshift(newEntry);
+        });
       }
       localStorage.setItem('edupeak_local_desserts', JSON.stringify(localList));
     } catch (storageErr) {
@@ -339,15 +437,20 @@ export class DbService {
     }
 
     // 3. Persist review to Firestore with 3.5s timeout
+    const updateData = {
+      status,
+      adminFeedback: feedback,
+      creditsAwarded: finalCredits,
+      reviewedBy: reviewer,
+      reviewedAt,
+      ...(targetStudentId ? { studentId: String(targetStudentId) } : {}),
+      ...(targetStudentPhone ? { studentPhone: String(targetStudentPhone) } : {}),
+      ...(targetStudentName ? { studentName: String(targetStudentName) } : {}),
+      ...(targetExamYear ? { examYear: String(targetExamYear) } : {})
+    };
+
     try {
       const dessertRef = doc(db, 'desserts', dessertId);
-      const updateData = {
-        status,
-        adminFeedback: feedback,
-        creditsAwarded: finalCredits,
-        reviewedBy: reviewer,
-        reviewedAt
-      };
       await Promise.race([
         setDoc(dessertRef, updateData, { merge: true }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500))
@@ -356,9 +459,30 @@ export class DbService {
       console.warn('[DB] Firestore dessert review save note (safely saved locally):', e);
     }
 
+    // Update by submittedAt in case the doc had an auto-generated Firestore ID
+    try {
+      if (dessertObj && dessertObj.submittedAt) {
+        const dessertsRef = collection(db, 'desserts');
+        const q = query(dessertsRef, where('submittedAt', '==', dessertObj.submittedAt), limit(3));
+        const snap = await getDocs(q);
+        snap.forEach(async dSnap => {
+          if (dSnap.id !== dessertId) {
+            try {
+              await setDoc(doc(db, 'desserts', dSnap.id), updateData, { merge: true });
+            } catch (_) {}
+          }
+        });
+      }
+    } catch (_) {}
+
     try {
       window.dispatchEvent(new CustomEvent('edupeak:dessert-reviewed', {
-        detail: { id: dessertId, status, creditsAwarded: finalCredits }
+        detail: { id: dessertId, status, creditsAwarded: finalCredits, studentId: targetStudentId, studentPhone: targetStudentPhone }
+      }));
+      localStorage.setItem('edupeak_last_sync_event', JSON.stringify({
+        type: 'dessert-reviewed',
+        data: { id: dessertId, status, creditsAwarded: finalCredits, studentId: targetStudentId, studentPhone: targetStudentPhone },
+        timestamp: Date.now()
       }));
     } catch (_) {}
 
@@ -381,12 +505,12 @@ export class DbService {
       ]);
       const list = [];
       snap.forEach(docSnap => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        list.push({ ...docSnap.data(), id: docSnap.id });
       });
 
       // Overlay local review modifications so approved state is never overwritten by stale data
       for (let i = 0; i < list.length; i++) {
-        const matchingLocal = localList.find(loc => loc.id === list[i].id);
+        const matchingLocal = localList.find(loc => loc.id === list[i].id || (loc.submittedAt && loc.submittedAt === list[i].submittedAt));
         if (matchingLocal && (matchingLocal.reviewedAt || matchingLocal.status !== 'pending')) {
           list[i] = { ...list[i], ...matchingLocal };
         }
@@ -406,6 +530,38 @@ export class DbService {
       if (localList.length > 0) return localList;
     }
     return this.getMockDesserts ? this.getMockDesserts() : [];
+  }
+
+  // Admin: Real-time listener for incoming homework and reviews
+  listenToAllDessertsForAdmin(callback) {
+    try {
+      const dessertsRef = collection(db, 'desserts');
+      const q = query(dessertsRef, orderBy('submittedAt', 'desc'), limit(100));
+      return onSnapshot(q, (snapshot) => {
+        const list = [];
+        snapshot.forEach(docSnap => {
+          list.push({ ...docSnap.data(), id: docSnap.id });
+        });
+
+        let localList = [];
+        try {
+          localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+        } catch (_) {}
+
+        for (const loc of localList) {
+          if (!list.some(d => d.id === loc.id || (d.submittedAt && d.submittedAt === loc.submittedAt))) {
+            list.push(loc);
+          }
+        }
+        list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+        callback(list);
+      }, (err) => {
+        console.warn('[DB] listenToAllDessertsForAdmin snapshot error:', err);
+      });
+    } catch (e) {
+      console.warn('[DB] listenToAllDessertsForAdmin setup error:', e);
+      return () => {};
+    }
   }
 
   // Admin: Save or update paper session

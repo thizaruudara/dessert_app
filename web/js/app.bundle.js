@@ -65392,81 +65392,131 @@ var DbService = class {
     this.dessertListeners = [];
   }
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
-  async getStudentDesserts(studentId, studentPhone) {
+  async getStudentDesserts(studentId, studentPhone, studentName) {
     let localList = [];
     try {
       localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-      if (studentId || studentPhone) {
-        localList = localList.filter(
-          (d) => studentId && (d.studentId === String(studentId) || d.studentId === "EP-2027" || d.studentId === "anon") || studentPhone && d.studentPhone === String(studentPhone)
-        );
-      }
     } catch (_) {
     }
-    if (!studentId && !studentPhone) return localList.length > 0 ? localList : this.getMockDesserts ? this.getMockDesserts() : [];
+    const cleanId = String(studentId || "").trim();
+    const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
+    const cleanName = String(studentName || "").trim().toLowerCase();
+    const list = [];
     try {
       const dessertsRef = collection(db, "desserts");
-      const q = studentId ? query(dessertsRef, where("studentId", "==", String(studentId)), limit(50)) : query(dessertsRef, where("studentPhone", "==", String(studentPhone)), limit(50));
+      const q = query(dessertsRef, orderBy("submittedAt", "desc"), limit(60));
       const snap = await Promise.race([
         getDocs(q),
         new Promise((_, reject) => setTimeout(() => reject(new Error("getStudentDesserts timeout")), 2800))
       ]);
-      const list = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
-        if (studentId && data.studentId === studentId || studentPhone && data.studentPhone === studentPhone) {
-          list.push({ id: docSnap.id, ...data });
+        const docId = docSnap.id;
+        const dPhone = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
+        const dId = String(data.studentId || data.id || data.userUid || "").trim();
+        const dName = String(data.studentName || "").trim().toLowerCase();
+        const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && (dId === cleanId || dId === "EP-2027" || dId === "anon") || cleanName && dName && cleanName === dName;
+        if (matchesStudent) {
+          list.push({ ...data, id: docId });
         }
       });
-      const seen = new Set(list.map((d) => d.id));
-      for (const loc of localList) {
-        if (!seen.has(loc.id)) {
+    } catch (e2) {
+      console.warn("[DB] Student dessert query note, falling back to local:", e2?.message || e2);
+    }
+    for (const loc of localList) {
+      const locPhone = String(loc.studentPhone || loc.phone || "").replace(/\D/g, "");
+      const locId = String(loc.studentId || loc.id || "").trim();
+      const locName = String(loc.studentName || "").trim().toLowerCase();
+      const matchesLoc = !cleanId && !cleanPhone && !cleanName || cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9))) || cleanId && (locId === cleanId || locId === "EP-2027" || locId === "anon") || cleanName && locName && cleanName === locName;
+      if (matchesLoc) {
+        const fsMatch = list.find(
+          (fs) => fs.id === loc.id || fs.submittedAt && fs.submittedAt === loc.submittedAt || fs.caption && fs.caption === loc.caption && locPhone && fs.studentPhone && locPhone.endsWith(cleanPhone.slice(-9))
+        );
+        if (fsMatch) {
+          if (fsMatch.status) loc.status = fsMatch.status;
+          if (fsMatch.adminFeedback) loc.adminFeedback = fsMatch.adminFeedback;
+          if (fsMatch.creditsAwarded !== void 0) loc.creditsAwarded = fsMatch.creditsAwarded;
+          if (fsMatch.reviewedAt) loc.reviewedAt = fsMatch.reviewedAt;
+        } else {
           list.push(loc);
-          seen.add(loc.id);
         }
       }
-      list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
-      return list;
-    } catch (e2) {
-      console.warn("[DB] Student dessert query failed, falling back:", e2);
-      if (localList.length > 0) return localList;
-      return this.getMockDesserts ? this.getMockDesserts(studentId) : [];
     }
+    try {
+      localStorage.setItem("edupeak_local_desserts", JSON.stringify(list));
+    } catch (_) {
+    }
+    list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
+    return list.length > 0 ? list : this.getMockDesserts ? this.getMockDesserts(studentId) : [];
   }
   // Real-time listener for student's homework status
-  listenToStudentDesserts(studentId, studentPhone, callback) {
-    if (!studentId && !studentPhone) return () => {
-    };
+  listenToStudentDesserts(studentId, studentPhone, callback, studentName) {
+    const cleanId = String(studentId || "").trim();
+    const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
+    const cleanName = String(studentName || "").trim().toLowerCase();
     try {
       const dessertsRef = collection(db, "desserts");
-      const q = studentId ? query(dessertsRef, where("studentId", "==", String(studentId)), limit(40)) : query(dessertsRef, where("studentPhone", "==", String(studentPhone)), limit(40));
-      return onSnapshot(q, (snapshot) => {
+      const q = query(dessertsRef, orderBy("submittedAt", "desc"), limit(60));
+      const unsub = onSnapshot(q, (snapshot) => {
         const list = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          if (data.studentId === studentId || data.studentPhone === studentPhone) {
-            list.push({ id: docSnap.id, ...data });
+          const docId = docSnap.id;
+          const dPhone = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
+          const dId = String(data.studentId || data.id || data.userUid || "").trim();
+          const dName = String(data.studentName || "").trim().toLowerCase();
+          const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && (dId === cleanId || dId === "EP-2027" || dId === "anon") || cleanName && dName && cleanName === dName;
+          if (matchesStudent) {
+            list.push({ ...data, id: docId });
           }
         });
+        try {
+          let localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
+          for (const fsItem of list) {
+            const idx = localList.findIndex(
+              (l2) => l2.id === fsItem.id || l2.submittedAt && l2.submittedAt === fsItem.submittedAt
+            );
+            if (idx >= 0) {
+              localList[idx] = { ...localList[idx], ...fsItem };
+            } else {
+              localList.unshift(fsItem);
+            }
+          }
+          for (const loc of localList) {
+            const locPhone = String(loc.studentPhone || loc.phone || "").replace(/\D/g, "");
+            const locId = String(loc.studentId || loc.id || "").trim();
+            const locName = String(loc.studentName || "").trim().toLowerCase();
+            const matchesLoc = !cleanId && !cleanPhone && !cleanName || cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9))) || cleanId && (locId === cleanId || locId === "EP-2027" || locId === "anon") || cleanName && locName && cleanName === locName;
+            if (matchesLoc && !list.some((d) => d.id === loc.id || d.submittedAt && d.submittedAt === loc.submittedAt)) {
+              list.push(loc);
+            }
+          }
+          localStorage.setItem("edupeak_local_desserts", JSON.stringify(localList));
+        } catch (_) {
+        }
         list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
         callback(list);
       }, (err) => {
         console.warn("[DB] Desserts snapshot listener error:", err);
-        callback([]);
       });
-    } catch (_) {
-      callback([]);
+      return unsub;
+    } catch (e2) {
+      console.warn("[DB] listenToStudentDesserts setup error:", e2);
       return () => {
       };
     }
   }
   // Submit new Dessert homework (from Camera Scanner or file)
-  async submitDessert({ studentId, studentName, studentPhone, subject, caption, mediaUrls }) {
+  async submitDessert({ studentId, studentName, studentPhone, subject, caption, mediaUrls, examYear }) {
+    const dessertsRef = collection(db, "desserts");
+    const docRef = doc(dessertsRef);
+    const docId = docRef.id;
     const newDoc = {
-      id: `dessert_local_${Date.now()}`,
-      studentId: studentId || "EP-2027",
-      studentName: studentName || "Scholar",
-      studentPhone: studentPhone || "",
+      id: docId,
+      studentId: String(studentId || "EP-2027"),
+      studentName: String(studentName || "Scholar"),
+      studentPhone: String(studentPhone || "").trim(),
+      examYear: String(examYear || "2027 A/L"),
       subject: subject || "Physics Mechanics",
       caption: caption || "Daily Dessert Submission",
       mediaUrls: mediaUrls || [],
@@ -65479,29 +65529,27 @@ var DbService = class {
       submittedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     try {
-      const localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
+      let localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
+      localList = localList.filter((d) => d.id !== docId);
       localList.unshift(newDoc);
       localStorage.setItem("edupeak_local_desserts", JSON.stringify(localList.slice(0, 50)));
     } catch (storageErr) {
       console.warn("[DB] LocalStorage save error:", storageErr);
     }
     try {
-      const dessertsRef = collection(db, "desserts");
-      const docRef = await addDoc(dessertsRef, newDoc);
-      newDoc.id = docRef.id;
-      try {
-        const localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-        if (localList.length > 0) {
-          localList[0].id = docRef.id;
-          localStorage.setItem("edupeak_local_desserts", JSON.stringify(localList));
-        }
-      } catch (_) {
-      }
-      return newDoc;
+      await Promise.race([
+        setDoc(docRef, newDoc),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("submitDessert timeout")), 3500))
+      ]);
     } catch (e2) {
-      console.warn("[DB] Firestore dessert save failed, safely saved to local storage:", e2);
-      return newDoc;
+      console.warn("[DB] submitDessert Firestore note (saved locally):", e2);
     }
+    try {
+      window.dispatchEvent(new CustomEvent("edupeak:dessert-submitted", { detail: newDoc }));
+      localStorage.setItem("edupeak_last_sync_event", JSON.stringify({ type: "dessert-submitted", data: newDoc, timestamp: Date.now() }));
+    } catch (_) {
+    }
+    return newDoc;
   }
   // Get student accumulated credits from local cache, submissions, and leaderboard
   async getStudentCredits(studentId, studentPhone) {
@@ -65515,8 +65563,16 @@ var DbService = class {
       if (c2) credits = Math.max(credits, Number(c2) || 0);
     }
     try {
+      const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
       const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-      const dessertCredits = localDesserts.filter((d) => d.status === "approved" && (studentId && (d.studentId === studentId || d.studentName === studentId) || studentPhone && d.studentPhone === studentPhone)).reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
+      const dessertCredits = localDesserts.filter((d) => {
+        if (d.status !== "approved") return false;
+        const dPhone = String(d.studentPhone || "").replace(/\D/g, "");
+        const dId = String(d.studentId || "");
+        if (studentId && (dId === studentId || d.studentName === studentId || dId === "EP-2027")) return true;
+        if (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
+        return false;
+      }).reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
       if (dessertCredits > 0) {
         credits = Math.max(credits, 155 + dessertCredits);
       }
@@ -65524,11 +65580,30 @@ var DbService = class {
     }
     try {
       const localLb = JSON.parse(localStorage.getItem("edupeak_local_leaderboard") || "[]");
-      const entry = localLb.find((x2) => studentId && (x2.id === studentId || x2.name === studentId) || studentPhone && x2.studentPhone === studentPhone);
+      const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
+      const entry = localLb.find((x2) => {
+        const xPhone = String(x2.studentPhone || "").replace(/\D/g, "");
+        if (studentId && (x2.id === studentId || x2.name === studentId)) return true;
+        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(xPhone.slice(-9)))) return true;
+        return false;
+      });
       if (entry && entry.credits) {
         credits = Math.max(credits, Number(entry.credits) || 0);
       }
     } catch (_) {
+    }
+    if (studentId) {
+      try {
+        const uSnap = await Promise.race([
+          getDoc(doc(db, "users", studentId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1500))
+        ]).catch(() => null);
+        if (uSnap && uSnap.exists()) {
+          const uCredits = Number(uSnap.data()?.credits) || 0;
+          if (uCredits > 0) credits = Math.max(credits, uCredits);
+        }
+      } catch (_) {
+      }
     }
     return credits > 0 ? credits : 155;
   }
@@ -65611,34 +65686,33 @@ var DbService = class {
   // Admin: Review & grade homework
   async reviewDessert(dessertId, { status, adminFeedback, creditsAwarded, reviewedBy, studentId, studentName, studentPhone, examYear, dessertObj }) {
     const reviewedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const finalCredits = Number(creditsAwarded) || (status === "approved" ? 50 : 0);
+    const finalCredits = Number(creditsAwarded) || (status === "approved" ? 100 : 0);
     const feedback = adminFeedback || (status === "approved" ? "Great work!" : "Please revise.");
     const reviewer = reviewedBy || "Lead Physics Faculty";
-    let targetStudentId = studentId;
-    let targetStudentName = studentName;
-    let targetStudentPhone = studentPhone;
-    let targetExamYear = examYear;
+    let targetStudentId = studentId || dessertObj?.studentId;
+    let targetStudentName = studentName || dessertObj?.studentName;
+    let targetStudentPhone = studentPhone || dessertObj?.studentPhone;
+    let targetExamYear = examYear || dessertObj?.examYear;
     try {
       let localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-      let item = localList.find((x2) => x2.id === dessertId);
-      if (!item && dessertObj) {
-        item = localList.find(
-          (x2) => x2.submittedAt && x2.submittedAt === dessertObj.submittedAt || x2.studentName && x2.studentName === dessertObj.studentName && x2.caption === dessertObj.caption
-        );
+      let matched = false;
+      for (let i2 = 0; i2 < localList.length; i2++) {
+        const item = localList[i2];
+        if (item.id === dessertId || dessertObj && (item.submittedAt && item.submittedAt === dessertObj.submittedAt || item.caption && item.caption === dessertObj.caption && item.studentPhone === targetStudentPhone)) {
+          item.status = status;
+          item.adminFeedback = feedback;
+          item.creditsAwarded = finalCredits;
+          item.reviewedBy = reviewer;
+          item.reviewedAt = reviewedAt;
+          if (!targetStudentId) targetStudentId = item.studentId;
+          if (!targetStudentName) targetStudentName = item.studentName;
+          if (!targetStudentPhone) targetStudentPhone = item.studentPhone;
+          matched = true;
+        }
       }
-      if (item) {
-        item.status = status;
-        item.adminFeedback = feedback;
-        item.creditsAwarded = finalCredits;
-        item.reviewedBy = reviewer;
-        item.reviewedAt = reviewedAt;
-        if (!targetStudentId) targetStudentId = item.studentId;
-        if (!targetStudentName) targetStudentName = item.studentName;
-        if (!targetStudentPhone) targetStudentPhone = item.studentPhone;
-        if (!targetExamYear) targetExamYear = item.examYear;
-      } else {
-        const newEntry = {
-          ...dessertObj || {},
+      if (!matched && dessertObj) {
+        localList.unshift({
+          ...dessertObj,
           id: dessertId,
           status,
           adminFeedback: feedback,
@@ -65646,11 +65720,10 @@ var DbService = class {
           reviewedBy: reviewer,
           reviewedAt,
           studentId: targetStudentId || "EP-2027",
-          studentName: targetStudentName || "Test User",
+          studentName: targetStudentName || "Student",
           studentPhone: targetStudentPhone || "",
           examYear: targetExamYear || "2027 A/L"
-        };
-        localList.unshift(newEntry);
+        });
       }
       localStorage.setItem("edupeak_local_desserts", JSON.stringify(localList));
     } catch (storageErr) {
@@ -65665,15 +65738,19 @@ var DbService = class {
         credits: finalCredits
       });
     }
+    const updateData = {
+      status,
+      adminFeedback: feedback,
+      creditsAwarded: finalCredits,
+      reviewedBy: reviewer,
+      reviewedAt,
+      ...targetStudentId ? { studentId: String(targetStudentId) } : {},
+      ...targetStudentPhone ? { studentPhone: String(targetStudentPhone) } : {},
+      ...targetStudentName ? { studentName: String(targetStudentName) } : {},
+      ...targetExamYear ? { examYear: String(targetExamYear) } : {}
+    };
     try {
       const dessertRef = doc(db, "desserts", dessertId);
-      const updateData = {
-        status,
-        adminFeedback: feedback,
-        creditsAwarded: finalCredits,
-        reviewedBy: reviewer,
-        reviewedAt
-      };
       await Promise.race([
         setDoc(dessertRef, updateData, { merge: true }),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), 3500))
@@ -65682,8 +65759,29 @@ var DbService = class {
       console.warn("[DB] Firestore dessert review save note (safely saved locally):", e2);
     }
     try {
+      if (dessertObj && dessertObj.submittedAt) {
+        const dessertsRef = collection(db, "desserts");
+        const q = query(dessertsRef, where("submittedAt", "==", dessertObj.submittedAt), limit(3));
+        const snap = await getDocs(q);
+        snap.forEach(async (dSnap) => {
+          if (dSnap.id !== dessertId) {
+            try {
+              await setDoc(doc(db, "desserts", dSnap.id), updateData, { merge: true });
+            } catch (_) {
+            }
+          }
+        });
+      }
+    } catch (_) {
+    }
+    try {
       window.dispatchEvent(new CustomEvent("edupeak:dessert-reviewed", {
-        detail: { id: dessertId, status, creditsAwarded: finalCredits }
+        detail: { id: dessertId, status, creditsAwarded: finalCredits, studentId: targetStudentId, studentPhone: targetStudentPhone }
+      }));
+      localStorage.setItem("edupeak_last_sync_event", JSON.stringify({
+        type: "dessert-reviewed",
+        data: { id: dessertId, status, creditsAwarded: finalCredits, studentId: targetStudentId, studentPhone: targetStudentPhone },
+        timestamp: Date.now()
       }));
     } catch (_) {
     }
@@ -65705,10 +65803,10 @@ var DbService = class {
       ]);
       const list = [];
       snap.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        list.push({ ...docSnap.data(), id: docSnap.id });
       });
       for (let i2 = 0; i2 < list.length; i2++) {
-        const matchingLocal = localList.find((loc) => loc.id === list[i2].id);
+        const matchingLocal = localList.find((loc) => loc.id === list[i2].id || loc.submittedAt && loc.submittedAt === list[i2].submittedAt);
         if (matchingLocal && (matchingLocal.reviewedAt || matchingLocal.status !== "pending")) {
           list[i2] = { ...list[i2], ...matchingLocal };
         }
@@ -65727,6 +65825,37 @@ var DbService = class {
       if (localList.length > 0) return localList;
     }
     return this.getMockDesserts ? this.getMockDesserts() : [];
+  }
+  // Admin: Real-time listener for incoming homework and reviews
+  listenToAllDessertsForAdmin(callback) {
+    try {
+      const dessertsRef = collection(db, "desserts");
+      const q = query(dessertsRef, orderBy("submittedAt", "desc"), limit(100));
+      return onSnapshot(q, (snapshot) => {
+        const list = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id });
+        });
+        let localList = [];
+        try {
+          localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
+        } catch (_) {
+        }
+        for (const loc of localList) {
+          if (!list.some((d) => d.id === loc.id || d.submittedAt && d.submittedAt === loc.submittedAt)) {
+            list.push(loc);
+          }
+        }
+        list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
+        callback(list);
+      }, (err) => {
+        console.warn("[DB] listenToAllDessertsForAdmin snapshot error:", err);
+      });
+    } catch (e2) {
+      console.warn("[DB] listenToAllDessertsForAdmin setup error:", e2);
+      return () => {
+      };
+    }
   }
   // Admin: Save or update paper session
   async savePaperSession(session) {
@@ -68240,14 +68369,50 @@ var AppController = class {
         else this.renderApp();
       }
     });
-    window.addEventListener("edupeak:credits-updated", () => {
+    const refreshStudentViews = () => {
       if (this.currentMode === "student") {
         const vp = document.getElementById("main-viewport");
         if (vp) {
-          if (this.currentTab === "home") this.renderHomeScreen(vp);
+          if (this.currentTab === "desserts") this.renderDessertsScreen(vp);
+          else if (this.currentTab === "home") this.renderHomeScreen(vp);
           else if (this.currentTab === "ranks") this.renderRanksScreen(vp);
           else if (this.currentTab === "profile") this.renderProfileScreen(vp);
         }
+      }
+    };
+    window.addEventListener("edupeak:credits-updated", () => {
+      refreshStudentViews();
+    });
+    window.addEventListener("edupeak:dessert-reviewed", (e2) => {
+      const detail = e2.detail;
+      const user = this.currentUser || {};
+      const userPhone = String(user.phone || "").replace(/\D/g, "");
+      const eventPhone = String(detail?.studentPhone || "").replace(/\D/g, "");
+      const isTargetStudent = !detail?.studentId || detail.studentId === user.uid || detail.studentId === user.id || detail.studentId === user.studentId || userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9)));
+      if (isTargetStudent) {
+        if (detail?.creditsAwarded && this.currentUser) {
+          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+        }
+        refreshStudentViews();
+      }
+    });
+    window.addEventListener("storage", (e2) => {
+      if (e2.key === "edupeak_last_sync_event" || e2.key === "edupeak_local_desserts") {
+        try {
+          const syncData = JSON.parse(e2.newValue || "{}");
+          if (syncData.type === "dessert-reviewed") {
+            const detail = syncData.data;
+            const user = this.currentUser || {};
+            const userPhone = String(user.phone || "").replace(/\D/g, "");
+            const eventPhone = String(detail?.studentPhone || "").replace(/\D/g, "");
+            const isTargetStudent = !detail?.studentId || detail.studentId === user.uid || detail.studentId === user.id || detail.studentId === user.studentId || userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9)));
+            if (isTargetStudent && detail?.creditsAwarded && this.currentUser) {
+              this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+            }
+          }
+        } catch (_) {
+        }
+        refreshStudentViews();
       }
     });
     window.addEventListener("popstate", () => {
@@ -68761,6 +68926,13 @@ var AppController = class {
       }
       this._ranksUnsub = null;
     }
+    if (this._dessertsUnsub) {
+      try {
+        this._dessertsUnsub();
+      } catch (_) {
+      }
+      this._dessertsUnsub = null;
+    }
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
         <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
@@ -68823,8 +68995,8 @@ var AppController = class {
       dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.uid || user.id, user.phone).catch(() => 155),
-      dbService.getStudentDesserts(user.uid || user.id, user.phone).catch(() => [])
+      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 155),
+      dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
     let levelName = "Level 1 Novice";
@@ -70688,7 +70860,11 @@ var AppController = class {
     this.capturedHomeworkPhotos = this.capturedHomeworkPhotos ?? [];
     this.dessertHistoryFilter = this.dessertHistoryFilter ?? "All";
     const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone);
+    const sId = user.studentId || user.uid || user.id || "EP-2027";
+    const sPhone = user.phone || "";
+    const sName = user.name || "";
+    const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
+    this._cachedDesserts = desserts;
     if (renderToken !== this.renderToken || !container.isConnected) return;
     const topics = [
       "Mechanics",
@@ -70958,6 +71134,45 @@ var AppController = class {
         this.openDessertDetailModal(card.dataset.viewDessert);
       });
     });
+    if (typeof this._dessertsUnsub === "function") {
+      try {
+        this._dessertsUnsub();
+      } catch (_) {
+      }
+      this._dessertsUnsub = null;
+    }
+    this._dessertsUnsub = dbService.listenToStudentDesserts(sId, sPhone, (realtimeDesserts) => {
+      if (!container.isConnected || this.currentTab !== "desserts") {
+        if (typeof this._dessertsUnsub === "function") {
+          try {
+            this._dessertsUnsub();
+          } catch (_) {
+          }
+          this._dessertsUnsub = null;
+        }
+        return;
+      }
+      const prevList = this._cachedDesserts || desserts || [];
+      const newlyApproved = realtimeDesserts.filter(
+        (d) => d.status === "approved" && prevList.some((old) => (old.id === d.id || old.submittedAt === d.submittedAt) && old.status === "pending")
+      );
+      this._cachedDesserts = realtimeDesserts;
+      if (newlyApproved.length > 0) {
+        const approvedItem = newlyApproved[0];
+        notificationService.showInAppBanner(
+          "Homework Approved! \u{1F389}",
+          `"${approvedItem.subject || "Dessert"}" has been approved (+${approvedItem.creditsAwarded || 100} XP)!`,
+          "success"
+        );
+        dbService.getStudentCredits(sId, sPhone).then((pts) => {
+          if (this.currentUser) this.currentUser.credits = pts;
+        }).catch(() => {
+        });
+      }
+      if (this.dessertsTab === 1 && !document.querySelector(".app-modal")) {
+        this.renderDessertsScreen(container);
+      }
+    }, sName);
   }
   // ── 5. Profile Tab (Trophy Room, Dark Mode, Exam Batch & Avatar Picker - 1:1 Android) ──
   async renderProfileScreen(container) {
@@ -70969,7 +71184,7 @@ var AppController = class {
     const currentBatch = user.examYear || "2027 A/L";
     let desserts = [];
     try {
-      desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone) || [];
+      desserts = await dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, user.name) || [];
     } catch (_) {
       desserts = [];
     }
@@ -70977,7 +71192,7 @@ var AppController = class {
     const pendingCount = desserts.filter((d) => !d.status || d.status === "pending").length;
     if (renderToken !== this.renderToken || !container.isConnected) return;
     const totalCount = desserts.length;
-    const creditsXP = await dbService.getStudentCredits(user.uid || user.id, user.phone);
+    const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
     let memberSinceStr = "September 2026";
     if (user.createdAt) {
       try {
@@ -71416,7 +71631,7 @@ var AppController = class {
   // ── Dessert Detail Modal ──────────────────────────────────────────────────
   async openDessertDetailModal(dessertId) {
     const user = this.currentUser || {};
-    const desserts = await dbService.getStudentDesserts(user.uid || user.id, user.phone);
+    const desserts = this._cachedDesserts && this._cachedDesserts.length > 0 ? this._cachedDesserts : await dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, user.name);
     const d = desserts.find((x2) => x2.id === dessertId) || desserts[0];
     if (!d) return;
     const modal = document.createElement("div");
@@ -72270,6 +72485,13 @@ var AppController = class {
       }
       this._adminUpcomingUnsub = null;
     }
+    if (this._adminDessertsUnsub) {
+      try {
+        this._adminDessertsUnsub();
+      } catch (_) {
+      }
+      this._adminDessertsUnsub = null;
+    }
     document.querySelectorAll("#admin-bottom-nav .nav-tab-btn").forEach((b2) => {
       b2.classList.toggle("active", b2.dataset.adminTab === tabName);
     });
@@ -72562,6 +72784,28 @@ var AppController = class {
         const sub = allDesserts.find((x2) => x2.id === id);
         this.openAdminReviewModal(sub);
       });
+    });
+    if (typeof this._adminDessertsUnsub === "function") {
+      try {
+        this._adminDessertsUnsub();
+      } catch (_) {
+      }
+      this._adminDessertsUnsub = null;
+    }
+    this._adminDessertsUnsub = dbService.listenToAllDessertsForAdmin((allList) => {
+      if (!container.isConnected || this.adminTab !== "dashboard") {
+        if (typeof this._adminDessertsUnsub === "function") {
+          try {
+            this._adminDessertsUnsub();
+          } catch (_) {
+          }
+          this._adminDessertsUnsub = null;
+        }
+        return;
+      }
+      if (!document.querySelector(".app-modal")) {
+        this.renderAdminDashboardScreen(container);
+      }
     });
   }
   // Review & Grade Drawer Modal (admin_review_screen.dart)
