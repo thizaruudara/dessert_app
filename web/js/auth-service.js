@@ -26,6 +26,17 @@ export class AuthService {
     this.loading = true;
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
+      // Absolute safety timeout: Never let initial auth stall longer than 2.5 seconds
+      setTimeout(() => {
+        if (this.loading) {
+          console.warn('[Auth] Initial auth safety timeout reached, unlocking UI.');
+          this.loading = false;
+          if (this.resolveInitialAuth) {
+            this.resolveInitialAuth();
+            this.resolveInitialAuth = null;
+          }
+        }
+      }, 2500);
     });
     let hasCheckedRestoredAccount = false;
     this.unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -38,13 +49,16 @@ export class AuthService {
           hasCheckedRestoredAccount = true;
           if (firebaseUser.providerData.some((provider) => provider.providerId === 'password')) {
             try {
-              await callBackend('auth/ensure-admin', {
-                phone: `+${normalizedPhone(profile.phone)}`,
-              });
+              await Promise.race([
+                callBackend('auth/ensure-admin', {
+                  phone: `+${normalizedPhone(profile.phone)}`,
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('ensure-admin timeout')), 1500))
+              ]);
               await firebaseUser.getIdToken(true);
               profile = await this.readProfile(firebaseUser.uid);
             } catch (error) {
-              console.error('[Auth] Admin access verification failed:', error);
+              console.warn('[Auth] Admin access verification non-fatal/timed out:', error);
             }
           }
         }
@@ -62,16 +76,29 @@ export class AuthService {
 
   async readProfile(uid) {
     try {
-      const profileSnap = await getDoc(doc(db, 'users', uid));
-      if (!profileSnap.exists()) return null;
-      // The cached token already carries the persisted custom claims. Login
-      // explicitly refreshes the token after ensure-admin before reading here.
-      const claims = await getIdTokenResult(auth.currentUser);
-      return { uid, id: uid, ...profileSnap.data(), role: claims.claims.admin === true ? 'admin' : 'student' };
+      const profileSnap = await Promise.race([
+        getDoc(doc(db, 'users', uid)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 2500))
+      ]);
+      if (profileSnap && profileSnap.exists()) {
+        const claims = await getIdTokenResult(auth.currentUser);
+        return { uid, id: uid, ...profileSnap.data(), role: claims.claims.admin === true ? 'admin' : 'student' };
+      }
     } catch (error) {
-      console.error('[Auth] Profile load failed:', error);
-      return null;
+      console.warn('[Auth] Profile load failed or timed out:', error);
     }
+    // Fallback: build minimal profile from auth.currentUser so user is never locked out
+    const user = auth.currentUser;
+    if (user && user.uid === uid) {
+      return {
+        uid,
+        id: uid,
+        name: user.displayName || 'Scholar',
+        phone: user.email ? user.email.replace(/[^0-9]/g, '') : '',
+        role: 'student'
+      };
+    }
+    return null;
   }
 
   onAuthStateChanged(callback) {
@@ -127,7 +154,10 @@ export class AuthService {
       }
     }
     try {
-      await callBackend('auth/ensure-admin', { phone: `+${normalizedPhone(phone)}` });
+      await Promise.race([
+        callBackend('auth/ensure-admin', { phone: `+${normalizedPhone(phone)}` }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('ensure-admin timeout')), 1500))
+      ]);
       await credential.user.getIdToken(true);
     } catch (adminErr) {
       console.warn('[Auth] ensure-admin non-fatal warning:', adminErr);

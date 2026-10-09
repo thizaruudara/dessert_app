@@ -45,7 +45,10 @@ export class DbService {
         ? query(dessertsRef, where('studentId', '==', String(studentId)), limit(50))
         : query(dessertsRef, where('studentPhone', '==', String(studentPhone)), limit(50));
       
-      const snap = await getDocs(q);
+      const snap = await Promise.race([
+        getDocs(q),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getStudentDesserts timeout')), 2800))
+      ]);
       const list = [];
       snap.forEach(docSnap => {
         const data = docSnap.data();
@@ -814,7 +817,10 @@ export class DbService {
   async getPaperSessions(examYear) {
     try {
       const ref = collection(db, 'paper_sessions');
-      const snap = await getDocs(ref);
+      const snap = await Promise.race([
+        getDocs(ref),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getPaperSessions timeout')), 2800))
+      ]);
       if (!snap.empty) {
         const list = snap.docs.map(d => this.normalizePaperSession(d.data(), d.id)).filter(Boolean);
         let result = list;
@@ -841,7 +847,7 @@ export class DbService {
         return result;
       }
     } catch (e) {
-      console.warn('[DB] getPaperSessions error:', e);
+      console.warn('[DB] getPaperSessions note/timeout:', e?.message || e);
     }
     return [];
   }
@@ -922,7 +928,10 @@ export class DbService {
   async getUpcomingPapers(examYear) {
     try {
       const ref = collection(db, 'upcoming_papers');
-      const snap = await getDocs(ref);
+      const snap = await Promise.race([
+        getDocs(ref),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getUpcomingPapers timeout')), 2800))
+      ]);
       if (!snap.empty) {
         const list = snap.docs.map(d => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
         if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
@@ -931,7 +940,7 @@ export class DbService {
         return list;
       }
     } catch (e) {
-      console.warn('[DB] getUpcomingPapers error:', e);
+      console.warn('[DB] getUpcomingPapers note/timeout:', e?.message || e);
     }
     return [];
   }
@@ -1745,6 +1754,47 @@ export class DbService {
     }
   }
 
+  async getPaperLeaderboards() {
+    try {
+      const ref = collection(db, 'paper_leaderboards');
+      const snapshot = await Promise.race([
+        getDocs(ref),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Paper leaderboards timeout')), 2800))
+      ]);
+      return snapshot.docs.map((paperDoc) => {
+        const data = paperDoc.data();
+        const rawPublishedAt = data.publishedAt;
+        const publishedAt = rawPublishedAt?.toDate
+          ? rawPublishedAt.toDate()
+          : new Date(rawPublishedAt || Date.now());
+        const entries = Array.isArray(data.entries) ? data.entries.map((entry, index) => ({
+          rank: Number(entry?.rank) || index + 1,
+          studentId: String(entry?.studentId || ''),
+          studentName: String(entry?.studentName || 'Student'),
+          studentPhone: String(entry?.studentPhone || ''),
+          indexNumber: String(entry?.indexNumber || ''),
+          marks: Number(entry?.marks) || 0,
+          grade: String(entry?.grade || 'F').toUpperCase(),
+          remarks: String(entry?.remarks || ''),
+        })).sort((a, b) => a.rank - b.rank) : [];
+
+        return {
+          id: paperDoc.id,
+          paperTitle: String(data.paperTitle || 'Paper Evaluation Leaderboard'),
+          subject: String(data.subject || 'Physics'),
+          examYear: String(data.examYear || ''),
+          paperDate: String(data.paperDate || ''),
+          totalMarks: Number(data.totalMarks) || 100,
+          publishedAt: Number.isNaN(publishedAt.getTime()) ? new Date(0) : publishedAt,
+          entries,
+        };
+      }).sort((a, b) => b.publishedAt - a.publishedAt);
+    } catch (e) {
+      console.warn('[DB] getPaperLeaderboards error:', e);
+      return [];
+    }
+  }
+
   async savePaperLeaderboard(leaderboard) {
     try {
       const isNew = !leaderboard.id;
@@ -1909,7 +1959,10 @@ export class DbService {
   async getDailyInsight() {
     try {
       const docRef = doc(db, 'system_config', 'daily_physics_insight');
-      const snap = await getDoc(docRef);
+      const snap = await Promise.race([
+        getDoc(docRef),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getDailyInsight timeout')), 2000))
+      ]);
       if (snap.exists()) {
         const data = snap.data();
         if (data && data.isCustom) {

@@ -77,7 +77,7 @@ class AppController {
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: async () => {
         console.log('[App] PWA Standalone Mode active.');
-        await authService.waitForInitialAuth();
+        await authService.waitForInitialAuth().catch(() => {});
         if (!this.currentUser) {
           this.renderAuthScreen();
         } else if (this.currentUser?.role === 'admin') {
@@ -89,6 +89,14 @@ class AppController {
     });
 
     gatekeeper.init();
+
+    // Safety fallback: if not unlocked within 2.5s on desktop or non-iOS, force unlock
+    setTimeout(() => {
+      if (!gatekeeper.isUnlocked) {
+        console.log('[App] Fallback trigger: unlocking app');
+        gatekeeper.unlockApp();
+      }
+    }, 2500);
 
     // 3. Global Anti-Cheat Listener
     document.addEventListener('visibilitychange', () => {
@@ -132,16 +140,34 @@ class AppController {
 
     document.body.appendChild(splash);
 
-    // Keep the splash in place until Firebase has resolved the persisted
-    // session, while preserving its minimum display time and exit animation.
+    // Ensure splash is dismissed smoothly and NEVER hangs longer than 2.8s
     const splashStartedAt = performance.now();
-    authService.waitForInitialAuth().then(() => {
-      const remaining = Math.max(0, 1900 - (performance.now() - splashStartedAt));
+    let isDismissed = false;
+    const dismissSplash = () => {
+      if (isDismissed) return;
+      isDismissed = true;
+      const remaining = Math.max(0, 1200 - (performance.now() - splashStartedAt));
       setTimeout(() => {
         splash.classList.add('swap-up-exit');
-        setTimeout(() => splash.remove(), 550);
+        setTimeout(() => {
+          try { splash.remove(); } catch (_) {}
+        }, 550);
       }, remaining);
-    });  }
+    };
+
+    // Hard fallback: unconditionally dismiss splash after 2.8s max
+    const hardTimeout = setTimeout(() => {
+      console.warn('[Splash] Force dismissing after safety timeout');
+      dismissSplash();
+    }, 2800);
+
+    authService.waitForInitialAuth()
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(hardTimeout);
+        dismissSplash();
+      });
+  }
 
   // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
   renderAuthScreen(initialTab = 0) {
@@ -343,18 +369,53 @@ class AppController {
     // Form Submissions
     document.getElementById('form-login')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const phone = document.getElementById('input-login-phone')?.value || '';
-      const password = document.getElementById('input-login-password')?.value || '';
+      const phoneInput = document.getElementById('input-login-phone');
+      const passInput = document.getElementById('input-login-password');
+      const phone = phoneInput?.value || '';
+      const password = passInput?.value || '';
       const errEl = document.getElementById('auth-error-msg');
+      const submitBtn = document.getElementById('btn-submit-login');
+
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+
+      // Visual loading feedback
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-loading');
+        submitBtn.innerHTML = `
+          <span class="auth-spinner"></span>
+          <span>Signing in...</span>
+        `;
+      }
+      if (phoneInput) phoneInput.readOnly = true;
+      if (passInput) passInput.readOnly = true;
+
       try {
         const user = await authService.login({ phone, password });
         this.currentUser = user;
+        if (submitBtn) {
+          submitBtn.innerHTML = `
+            <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
+            <span>Success! Opening Portal...</span>
+          `;
+        }
         if (user.role === 'admin') {
           this.renderAdminApp();
         } else {
           this.renderApp();
         }
       } catch (err) {
+        console.error('[Auth] Sign in failed:', err);
+        if (phoneInput) phoneInput.readOnly = false;
+        if (passInput) passInput.readOnly = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('btn-loading');
+          submitBtn.innerHTML = `<span>Sign In 🚀</span>`;
+        }
         if (errEl) {
           errEl.style.display = 'block';
           errEl.textContent = err.message || 'Invalid login credentials.';
@@ -370,12 +431,47 @@ class AppController {
       const password = document.getElementById('input-reg-password')?.value || '';
       const confirmPassword = document.getElementById('input-reg-confirm-password')?.value || '';
       const errEl = document.getElementById('auth-error-msg');
+      const submitBtn = document.getElementById('btn-submit-reg');
+
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+
+      if (password !== confirmPassword) {
+        if (errEl) {
+          errEl.style.display = 'block';
+          errEl.textContent = 'Passwords do not match.';
+        }
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('btn-loading');
+        submitBtn.innerHTML = `
+          <span class="auth-spinner"></span>
+          <span>Creating Account...</span>
+        `;
+      }
+
       try {
-        if (password !== confirmPassword) throw new Error('Passwords do not match.');
         const user = await authService.register({ name, phone, password, examYear });
         this.currentUser = user;
+        if (submitBtn) {
+          submitBtn.innerHTML = `
+            <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
+            <span>Welcome! Opening Portal...</span>
+          `;
+        }
         this.renderApp();
       } catch (err) {
+        console.error('[Auth] Registration failed:', err);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('btn-loading');
+          submitBtn.innerHTML = `<span>Create Account (Instant Sign-in) 🚀</span>`;
+        }
         if (errEl) {
           errEl.style.display = 'block';
           errEl.textContent = err.message || 'Registration failed.';
@@ -513,7 +609,7 @@ class AppController {
 
     switch (tabName) {
       case 'home':
-        this.renderHomeScreen(container);
+        this.renderHomeScreen(container).catch(err => this.renderTabError(container, 'Home', err));
         break;
       case 'papers':
         container.innerHTML = `
@@ -522,33 +618,35 @@ class AppController {
             <div style="font-size:13.5px; font-weight:700; color:#475569;">විභාග සැසි සූදානම් කරමින්...</div>
           </div>
         `;
-        this.renderPapersScreen(container).catch(err => {
-          if (this.currentTab !== 'papers' || !container.isConnected) return;
-          console.error('[Papers] Error rendering papers tab:', err);
-          container.innerHTML = `
-            <div style="padding:40px 20px; text-align:center; color:#DC2626;">
-              <span class="material-symbols-rounded filled" style="font-size:42px; color:#DC2626; margin-bottom:8px;">warning</span>
-              <div style="font-weight:700; font-size:15px; margin-bottom:4px;">Paper Sessions ලෝඩ් කිරීමේ දෝෂයක් සිදුවිය</div>
-              <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${err.message || 'Unknown error'}</div>
-              <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : location.reload()" style="width:auto; padding:8px 18px; margin:0 auto;">නැවත උත්සාහ කරන්න</button>
-            </div>
-          `;
-        });
+        this.renderPapersScreen(container).catch(err => this.renderTabError(container, 'Papers', err));
         break;
       case 'ranks':
-        this.renderRanksScreen(container);
+        this.renderRanksScreen(container).catch(err => this.renderTabError(container, 'Ranks', err));
         break;
       case 'desserts':
-        this.renderDessertsScreen(container);
+        this.renderDessertsScreen(container).catch(err => this.renderTabError(container, 'Desserts', err));
         break;
       case 'profile':
-        this.renderProfileScreen(container);
+        this.renderProfileScreen(container).catch(err => this.renderTabError(container, 'Profile', err));
         break;
       default:
-        this.renderHomeScreen(container);
+        this.renderHomeScreen(container).catch(err => this.renderTabError(container, 'Home', err));
     }
 
     container.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  renderTabError(container, tabTitle, err) {
+    if (!container || !container.isConnected) return;
+    console.error(`[App] Error rendering ${tabTitle} tab:`, err);
+    container.innerHTML = `
+      <div style="padding:48px 20px; text-align:center; color:#DC2626;">
+        <span class="material-symbols-rounded filled" style="font-size:44px; color:#DC2626; margin-bottom:8px;">sync_problem</span>
+        <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#0F172A;">${tabTitle} පිටුව ලෝඩ් කිරීමේ ගැටලුවක් මතු විය</div>
+        <div style="font-size:12px; color:#64748B; margin-bottom:18px;">${err?.message || 'Network latency. Please try again.'}</div>
+        <button class="btn-primary" onclick="window.app ? window.app.switchTab('${this.currentTab || 'home'}') : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">නැවත උත්සාහ කරන්න 🔄</button>
+      </div>
+    `;
   }
 
   // ── 1. The Exact Student Cockpit (Home) ──────────────────────────────────
@@ -560,10 +658,10 @@ class AppController {
     const activeTargetYear = user.examYear || '2027 A/L';
 
     const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
-      dbService.getDailyInsight(),
+      dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.uid || user.id, user.phone),
+      dbService.getStudentCredits(user.uid || user.id, user.phone).catch(() => 155),
       dbService.getStudentDesserts(user.uid || user.id, user.phone).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;

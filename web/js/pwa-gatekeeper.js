@@ -23,8 +23,9 @@ export class PwaGatekeeper {
 
     // 4. Developer / Admin test bypass flag
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('dev') === 'true' || urlParams.get('preview') === 'true') return true;
-    if (sessionStorage.getItem('edupeak_dev_bypass') === 'true') return true;
+    if (urlParams.get('dev') === 'true' || urlParams.get('preview') === 'true' || sessionStorage.getItem('edupeak_dev_bypass') === 'true') return true;
+    // 5. Non-iOS environments (Desktop PC, Mac, Linux, Android) do not require iOS Safari gatekeeper
+    if (!this.isIOS()) return true;
 
     return false;
   }
@@ -151,10 +152,10 @@ export class PwaGatekeeper {
 
         <!-- Developer / Desktop Testing Bypass for Local Preview -->
         <div class="gatekeeper-dev-footer">
-          <button id="btn-dev-preview" class="btn-dev-preview">
-            🖥️ Desktop Testing Mode (Click to Preview App)
+          <button id="btn-browser-bypass" class="btn-dev-preview" style="background:#2563EB; color:#fff; border:none; margin-bottom:8px;">
+            Continue in Browser →
           </button>
-          <div class="dev-hint">Students must launch via iPhone Home Screen for push notifications</div>
+          <div class="dev-hint">Tap "Continue in Browser" or add to Home Screen for the full app experience</div>
         </div>
       </div>
 
@@ -190,10 +191,10 @@ export class PwaGatekeeper {
       });
     }
 
-    // Dev preview bypass button for desktop testing
-    const devBtn = document.getElementById('btn-dev-preview');
-    if (devBtn) {
-      devBtn.addEventListener('click', () => {
+    // Continue in browser bypass button
+    const bypassBtn = document.getElementById('btn-browser-bypass') || document.getElementById('btn-dev-preview');
+    if (bypassBtn) {
+      bypassBtn.addEventListener('click', () => {
         sessionStorage.setItem('edupeak_dev_bypass', 'true');
         this.unlockApp();
       });

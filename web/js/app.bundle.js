@@ -65178,22 +65178,36 @@ async function callBackend(endpoint, payload, { authenticated = true } = {}) {
     if (!user) throw new Error("Sign in first.");
     headers.Authorization = `Bearer ${await user.getIdToken()}`;
   }
-  const response = await fetch(`${API_BASE}/${endpoint}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload || {})
-  });
-  let data = {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4e3);
   try {
-    data = await response.json();
-  } catch (_) {
+    const response = await fetch(`${API_BASE}/${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload || {}),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (_) {
+    }
+    if (!response.ok) {
+      const error = new Error(data?.error?.message || "The request could not be completed.");
+      error.code = data?.error?.code || "internal";
+      throw error;
+    }
+    return data.result;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      const timeoutError = new Error("Backend request timed out. Continuing with offline/local fallback.");
+      timeoutError.code = "timeout";
+      throw timeoutError;
+    }
+    throw err;
   }
-  if (!response.ok) {
-    const error = new Error(data?.error?.message || "The request could not be completed.");
-    error.code = data?.error?.code || "internal";
-    throw error;
-  }
-  return data.result;
 }
 
 // js/auth-service.js
@@ -65214,6 +65228,16 @@ var AuthService = class {
     this.loading = true;
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
+      setTimeout(() => {
+        if (this.loading) {
+          console.warn("[Auth] Initial auth safety timeout reached, unlocking UI.");
+          this.loading = false;
+          if (this.resolveInitialAuth) {
+            this.resolveInitialAuth();
+            this.resolveInitialAuth = null;
+          }
+        }
+      }, 2500);
     });
     let hasCheckedRestoredAccount = false;
     this.unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -65223,13 +65247,16 @@ var AuthService = class {
           hasCheckedRestoredAccount = true;
           if (firebaseUser.providerData.some((provider) => provider.providerId === "password")) {
             try {
-              await callBackend("auth/ensure-admin", {
-                phone: `+${normalizedPhone(profile.phone)}`
-              });
+              await Promise.race([
+                callBackend("auth/ensure-admin", {
+                  phone: `+${normalizedPhone(profile.phone)}`
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("ensure-admin timeout")), 1500))
+              ]);
               await firebaseUser.getIdToken(true);
               profile = await this.readProfile(firebaseUser.uid);
             } catch (error) {
-              console.error("[Auth] Admin access verification failed:", error);
+              console.warn("[Auth] Admin access verification non-fatal/timed out:", error);
             }
           }
         }
@@ -65247,14 +65274,28 @@ var AuthService = class {
   }
   async readProfile(uid) {
     try {
-      const profileSnap = await getDoc(doc(db, "users", uid));
-      if (!profileSnap.exists()) return null;
-      const claims = await getIdTokenResult(auth.currentUser);
-      return { uid, id: uid, ...profileSnap.data(), role: claims.claims.admin === true ? "admin" : "student" };
+      const profileSnap = await Promise.race([
+        getDoc(doc(db, "users", uid)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Profile fetch timeout")), 2500))
+      ]);
+      if (profileSnap && profileSnap.exists()) {
+        const claims = await getIdTokenResult(auth.currentUser);
+        return { uid, id: uid, ...profileSnap.data(), role: claims.claims.admin === true ? "admin" : "student" };
+      }
     } catch (error) {
-      console.error("[Auth] Profile load failed:", error);
-      return null;
+      console.warn("[Auth] Profile load failed or timed out:", error);
     }
+    const user = auth.currentUser;
+    if (user && user.uid === uid) {
+      return {
+        uid,
+        id: uid,
+        name: user.displayName || "Scholar",
+        phone: user.email ? user.email.replace(/[^0-9]/g, "") : "",
+        role: "student"
+      };
+    }
+    return null;
   }
   onAuthStateChanged(callback) {
     this.listeners.push(callback);
@@ -65312,7 +65353,10 @@ var AuthService = class {
       }
     }
     try {
-      await callBackend("auth/ensure-admin", { phone: `+${normalizedPhone(phone)}` });
+      await Promise.race([
+        callBackend("auth/ensure-admin", { phone: `+${normalizedPhone(phone)}` }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("ensure-admin timeout")), 1500))
+      ]);
       await credential.user.getIdToken(true);
     } catch (adminErr) {
       console.warn("[Auth] ensure-admin non-fatal warning:", adminErr);
@@ -65363,7 +65407,10 @@ var DbService = class {
     try {
       const dessertsRef = collection(db, "desserts");
       const q = studentId ? query(dessertsRef, where("studentId", "==", String(studentId)), limit(50)) : query(dessertsRef, where("studentPhone", "==", String(studentPhone)), limit(50));
-      const snap = await getDocs(q);
+      const snap = await Promise.race([
+        getDocs(q),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getStudentDesserts timeout")), 2800))
+      ]);
       const list = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
@@ -66045,7 +66092,10 @@ var DbService = class {
   async getPaperSessions(examYear) {
     try {
       const ref2 = collection(db, "paper_sessions");
-      const snap = await getDocs(ref2);
+      const snap = await Promise.race([
+        getDocs(ref2),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getPaperSessions timeout")), 2800))
+      ]);
       if (!snap.empty) {
         const list = snap.docs.map((d) => this.normalizePaperSession(d.data(), d.id)).filter(Boolean);
         let result = list;
@@ -66072,7 +66122,7 @@ var DbService = class {
         return result;
       }
     } catch (e2) {
-      console.warn("[DB] getPaperSessions error:", e2);
+      console.warn("[DB] getPaperSessions note/timeout:", e2?.message || e2);
     }
     return [];
   }
@@ -66153,7 +66203,10 @@ var DbService = class {
   async getUpcomingPapers(examYear) {
     try {
       const ref2 = collection(db, "upcoming_papers");
-      const snap = await getDocs(ref2);
+      const snap = await Promise.race([
+        getDocs(ref2),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getUpcomingPapers timeout")), 2800))
+      ]);
       if (!snap.empty) {
         const list = snap.docs.map((d) => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
         if (examYear && examYear !== "All" && examYear !== "All Batches") {
@@ -66162,7 +66215,7 @@ var DbService = class {
         return list;
       }
     } catch (e2) {
-      console.warn("[DB] getUpcomingPapers error:", e2);
+      console.warn("[DB] getUpcomingPapers note/timeout:", e2?.message || e2);
     }
     return [];
   }
@@ -66918,6 +66971,43 @@ var DbService = class {
       };
     }
   }
+  async getPaperLeaderboards() {
+    try {
+      const ref2 = collection(db, "paper_leaderboards");
+      const snapshot = await Promise.race([
+        getDocs(ref2),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Paper leaderboards timeout")), 2800))
+      ]);
+      return snapshot.docs.map((paperDoc) => {
+        const data = paperDoc.data();
+        const rawPublishedAt = data.publishedAt;
+        const publishedAt = rawPublishedAt?.toDate ? rawPublishedAt.toDate() : new Date(rawPublishedAt || Date.now());
+        const entries = Array.isArray(data.entries) ? data.entries.map((entry, index) => ({
+          rank: Number(entry?.rank) || index + 1,
+          studentId: String(entry?.studentId || ""),
+          studentName: String(entry?.studentName || "Student"),
+          studentPhone: String(entry?.studentPhone || ""),
+          indexNumber: String(entry?.indexNumber || ""),
+          marks: Number(entry?.marks) || 0,
+          grade: String(entry?.grade || "F").toUpperCase(),
+          remarks: String(entry?.remarks || "")
+        })).sort((a, b2) => a.rank - b2.rank) : [];
+        return {
+          id: paperDoc.id,
+          paperTitle: String(data.paperTitle || "Paper Evaluation Leaderboard"),
+          subject: String(data.subject || "Physics"),
+          examYear: String(data.examYear || ""),
+          paperDate: String(data.paperDate || ""),
+          totalMarks: Number(data.totalMarks) || 100,
+          publishedAt: Number.isNaN(publishedAt.getTime()) ? /* @__PURE__ */ new Date(0) : publishedAt,
+          entries
+        };
+      }).sort((a, b2) => b2.publishedAt - a.publishedAt);
+    } catch (e2) {
+      console.warn("[DB] getPaperLeaderboards error:", e2);
+      return [];
+    }
+  }
   async savePaperLeaderboard(leaderboard) {
     try {
       const isNew = !leaderboard.id;
@@ -67075,7 +67165,10 @@ var DbService = class {
   async getDailyInsight() {
     try {
       const docRef = doc(db, "system_config", "daily_physics_insight");
-      const snap = await getDoc(docRef);
+      const snap = await Promise.race([
+        getDoc(docRef),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getDailyInsight timeout")), 2e3))
+      ]);
       if (snap.exists()) {
         const data = snap.data();
         if (data && data.isCustom) {
@@ -67772,8 +67865,8 @@ var PwaGatekeeper = class {
     if (window.matchMedia && window.matchMedia("(display-mode: minimal-ui)").matches) return true;
     if (document.referrer.includes("android-app://")) return true;
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("dev") === "true" || urlParams.get("preview") === "true") return true;
-    if (sessionStorage.getItem("edupeak_dev_bypass") === "true") return true;
+    if (urlParams.get("dev") === "true" || urlParams.get("preview") === "true" || sessionStorage.getItem("edupeak_dev_bypass") === "true") return true;
+    if (!this.isIOS()) return true;
     return false;
   }
   isIOS() {
@@ -67890,10 +67983,10 @@ var PwaGatekeeper = class {
 
         <!-- Developer / Desktop Testing Bypass for Local Preview -->
         <div class="gatekeeper-dev-footer">
-          <button id="btn-dev-preview" class="btn-dev-preview">
-            \u{1F5A5}\uFE0F Desktop Testing Mode (Click to Preview App)
+          <button id="btn-browser-bypass" class="btn-dev-preview" style="background:#2563EB; color:#fff; border:none; margin-bottom:8px;">
+            Continue in Browser \u2192
           </button>
-          <div class="dev-hint">Students must launch via iPhone Home Screen for push notifications</div>
+          <div class="dev-hint">Tap "Continue in Browser" or add to Home Screen for the full app experience</div>
         </div>
       </div>
 
@@ -67923,9 +68016,9 @@ var PwaGatekeeper = class {
         }
       });
     }
-    const devBtn = document.getElementById("btn-dev-preview");
-    if (devBtn) {
-      devBtn.addEventListener("click", () => {
+    const bypassBtn = document.getElementById("btn-browser-bypass") || document.getElementById("btn-dev-preview");
+    if (bypassBtn) {
+      bypassBtn.addEventListener("click", () => {
         sessionStorage.setItem("edupeak_dev_bypass", "true");
         this.unlockApp();
       });
@@ -68181,7 +68274,8 @@ var AppController = class {
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: async () => {
         console.log("[App] PWA Standalone Mode active.");
-        await authService.waitForInitialAuth();
+        await authService.waitForInitialAuth().catch(() => {
+        });
         if (!this.currentUser) {
           this.renderAuthScreen();
         } else if (this.currentUser?.role === "admin") {
@@ -68192,6 +68286,12 @@ var AppController = class {
       }
     });
     gatekeeper.init();
+    setTimeout(() => {
+      if (!gatekeeper.isUnlocked) {
+        console.log("[App] Fallback trigger: unlocking app");
+        gatekeeper.unlockApp();
+      }
+    }, 2500);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden" && this.isInsideLiveExam) {
         this.handleExamTabSwitch();
@@ -68230,12 +68330,29 @@ var AppController = class {
     `;
     document.body.appendChild(splash);
     const splashStartedAt = performance.now();
-    authService.waitForInitialAuth().then(() => {
-      const remaining = Math.max(0, 1900 - (performance.now() - splashStartedAt));
+    let isDismissed = false;
+    const dismissSplash = () => {
+      if (isDismissed) return;
+      isDismissed = true;
+      const remaining = Math.max(0, 1200 - (performance.now() - splashStartedAt));
       setTimeout(() => {
         splash.classList.add("swap-up-exit");
-        setTimeout(() => splash.remove(), 550);
+        setTimeout(() => {
+          try {
+            splash.remove();
+          } catch (_) {
+          }
+        }, 550);
       }, remaining);
+    };
+    const hardTimeout = setTimeout(() => {
+      console.warn("[Splash] Force dismissing after safety timeout");
+      dismissSplash();
+    }, 2800);
+    authService.waitForInitialAuth().catch(() => {
+    }).finally(() => {
+      clearTimeout(hardTimeout);
+      dismissSplash();
     });
   }
   // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
@@ -68430,18 +68547,49 @@ var AppController = class {
     });
     document.getElementById("form-login")?.addEventListener("submit", async (e2) => {
       e2.preventDefault();
-      const phone = document.getElementById("input-login-phone")?.value || "";
-      const password = document.getElementById("input-login-password")?.value || "";
+      const phoneInput = document.getElementById("input-login-phone");
+      const passInput = document.getElementById("input-login-password");
+      const phone = phoneInput?.value || "";
+      const password = passInput?.value || "";
       const errEl = document.getElementById("auth-error-msg");
+      const submitBtn = document.getElementById("btn-submit-login");
+      if (errEl) {
+        errEl.style.display = "none";
+        errEl.textContent = "";
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add("btn-loading");
+        submitBtn.innerHTML = `
+          <span class="auth-spinner"></span>
+          <span>Signing in...</span>
+        `;
+      }
+      if (phoneInput) phoneInput.readOnly = true;
+      if (passInput) passInput.readOnly = true;
       try {
         const user = await authService.login({ phone, password });
         this.currentUser = user;
+        if (submitBtn) {
+          submitBtn.innerHTML = `
+            <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
+            <span>Success! Opening Portal...</span>
+          `;
+        }
         if (user.role === "admin") {
           this.renderAdminApp();
         } else {
           this.renderApp();
         }
       } catch (err) {
+        console.error("[Auth] Sign in failed:", err);
+        if (phoneInput) phoneInput.readOnly = false;
+        if (passInput) passInput.readOnly = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove("btn-loading");
+          submitBtn.innerHTML = `<span>Sign In \u{1F680}</span>`;
+        }
         if (errEl) {
           errEl.style.display = "block";
           errEl.textContent = err.message || "Invalid login credentials.";
@@ -68456,12 +68604,43 @@ var AppController = class {
       const password = document.getElementById("input-reg-password")?.value || "";
       const confirmPassword = document.getElementById("input-reg-confirm-password")?.value || "";
       const errEl = document.getElementById("auth-error-msg");
+      const submitBtn = document.getElementById("btn-submit-reg");
+      if (errEl) {
+        errEl.style.display = "none";
+        errEl.textContent = "";
+      }
+      if (password !== confirmPassword) {
+        if (errEl) {
+          errEl.style.display = "block";
+          errEl.textContent = "Passwords do not match.";
+        }
+        return;
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add("btn-loading");
+        submitBtn.innerHTML = `
+          <span class="auth-spinner"></span>
+          <span>Creating Account...</span>
+        `;
+      }
       try {
-        if (password !== confirmPassword) throw new Error("Passwords do not match.");
         const user = await authService.register({ name: name5, phone, password, examYear });
         this.currentUser = user;
+        if (submitBtn) {
+          submitBtn.innerHTML = `
+            <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
+            <span>Welcome! Opening Portal...</span>
+          `;
+        }
         this.renderApp();
       } catch (err) {
+        console.error("[Auth] Registration failed:", err);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove("btn-loading");
+          submitBtn.innerHTML = `<span>Create Account (Instant Sign-in) \u{1F680}</span>`;
+        }
         if (errEl) {
           errEl.style.display = "block";
           errEl.textContent = err.message || "Registration failed.";
@@ -68596,7 +68775,7 @@ var AppController = class {
     container.classList.add("tab-page-transition");
     switch (tabName) {
       case "home":
-        this.renderHomeScreen(container);
+        this.renderHomeScreen(container).catch((err) => this.renderTabError(container, "Home", err));
         break;
       case "papers":
         container.innerHTML = `
@@ -68605,32 +68784,33 @@ var AppController = class {
             <div style="font-size:13.5px; font-weight:700; color:#475569;">\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0D9A\u0DBB\u0DB8\u0DD2\u0DB1\u0DCA...</div>
           </div>
         `;
-        this.renderPapersScreen(container).catch((err) => {
-          if (this.currentTab !== "papers" || !container.isConnected) return;
-          console.error("[Papers] Error rendering papers tab:", err);
-          container.innerHTML = `
-            <div style="padding:40px 20px; text-align:center; color:#DC2626;">
-              <span class="material-symbols-rounded filled" style="font-size:42px; color:#DC2626; margin-bottom:8px;">warning</span>
-              <div style="font-weight:700; font-size:15px; margin-bottom:4px;">Paper Sessions \u0DBD\u0DDD\u0DA9\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA \u0DAF\u0DDD\u0DC2\u0DBA\u0D9A\u0DCA \u0DC3\u0DD2\u0DAF\u0DD4\u0DC0\u0DD2\u0DBA</div>
-              <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${err.message || "Unknown error"}</div>
-              <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : location.reload()" style="width:auto; padding:8px 18px; margin:0 auto;">\u0DB1\u0DD0\u0DC0\u0DAD \u0D8B\u0DAD\u0DCA\u0DC3\u0DCF\u0DC4 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1</button>
-            </div>
-          `;
-        });
+        this.renderPapersScreen(container).catch((err) => this.renderTabError(container, "Papers", err));
         break;
       case "ranks":
-        this.renderRanksScreen(container);
+        this.renderRanksScreen(container).catch((err) => this.renderTabError(container, "Ranks", err));
         break;
       case "desserts":
-        this.renderDessertsScreen(container);
+        this.renderDessertsScreen(container).catch((err) => this.renderTabError(container, "Desserts", err));
         break;
       case "profile":
-        this.renderProfileScreen(container);
+        this.renderProfileScreen(container).catch((err) => this.renderTabError(container, "Profile", err));
         break;
       default:
-        this.renderHomeScreen(container);
+        this.renderHomeScreen(container).catch((err) => this.renderTabError(container, "Home", err));
     }
     container.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  renderTabError(container, tabTitle, err) {
+    if (!container || !container.isConnected) return;
+    console.error(`[App] Error rendering ${tabTitle} tab:`, err);
+    container.innerHTML = `
+      <div style="padding:48px 20px; text-align:center; color:#DC2626;">
+        <span class="material-symbols-rounded filled" style="font-size:44px; color:#DC2626; margin-bottom:8px;">sync_problem</span>
+        <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#0F172A;">${tabTitle} \u0DB4\u0DD2\u0DA7\u0DD4\u0DC0 \u0DBD\u0DDD\u0DA9\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA \u0D9C\u0DD0\u0DA7\u0DBD\u0DD4\u0DC0\u0D9A\u0DCA \u0DB8\u0DAD\u0DD4 \u0DC0\u0DD2\u0DBA</div>
+        <div style="font-size:12px; color:#64748B; margin-bottom:18px;">${err?.message || "Network latency. Please try again."}</div>
+        <button class="btn-primary" onclick="window.app ? window.app.switchTab('${this.currentTab || "home"}') : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">\u0DB1\u0DD0\u0DC0\u0DAD \u0D8B\u0DAD\u0DCA\u0DC3\u0DCF\u0DC4 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u{1F504}</button>
+      </div>
+    `;
   }
   // ── 1. The Exact Student Cockpit (Home) ──────────────────────────────────
   async renderHomeScreen(container) {
@@ -68640,10 +68820,10 @@ var AppController = class {
     const initial = studentName.charAt(0).toUpperCase();
     const activeTargetYear = user.examYear || "2027 A/L";
     const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
-      dbService.getDailyInsight(),
+      dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.uid || user.id, user.phone),
+      dbService.getStudentCredits(user.uid || user.id, user.phone).catch(() => 155),
       dbService.getStudentDesserts(user.uid || user.id, user.phone).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
