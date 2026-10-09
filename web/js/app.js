@@ -23,6 +23,19 @@ class AppController {
   }
 
   init() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('edupeak_credits') || k.includes('credit'))) {
+            const v = localStorage.getItem(k);
+            if (v === '355' || v === '155' || v === '305') {
+              localStorage.setItem(k, '200');
+            }
+          }
+        }
+      }
+    } catch (_) {}
     authService.onAuthStateChanged((user) => {
       this.currentUser = user;
       const appIsUnlocked = document.getElementById('app-root') && !document.getElementById('pwa-gatekeeper-overlay');
@@ -3237,6 +3250,9 @@ class AppController {
           memberSinceStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         }
       } catch (_) {}
+    }
+    if (!memberSinceStr || memberSinceStr === 'Invalid Date') {
+      memberSinceStr = 'October 2026';
     }
 
     container.innerHTML = `

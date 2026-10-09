@@ -23,6 +23,28 @@ import { callBackend } from './backend-api.js';
 export class DbService {
   constructor() {
     this.dessertListeners = [];
+    try {
+      if (typeof localStorage !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('edupeak_credits') || k.includes('credit'))) {
+            const v = localStorage.getItem(k);
+            if (v === '355' || v === '155' || v === '305') {
+              localStorage.setItem(k, '200');
+            }
+          }
+        }
+        const localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
+        let lbChanged = false;
+        localLb.forEach(entry => {
+          if (entry.credits === 355 || entry.credits === 155 || entry.credits === 305) {
+            entry.credits = 200;
+            lbChanged = true;
+          }
+        });
+        if (lbChanged) localStorage.setItem('edupeak_local_leaderboard', JSON.stringify(localLb));
+      }
+    } catch (_) {}
   }
 
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
@@ -228,11 +250,12 @@ export class DbService {
 
   // Get student accumulated credits from local cache, submissions, and leaderboard
   async getStudentCredits(studentId, studentPhone, studentIndex, studentName) {
-    let credits = 0;
     const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
     const cleanName = String(studentName || '').toLowerCase().trim();
     const cleanId = String(studentId || '').trim();
     const cleanIdx = String(studentIndex || '').trim();
+
+    let dbCredits = 0;
 
     // 1. Check live Firestore leaderboard_public (authoritative source for student XP)
     const idsToFetch = Array.from(new Set([cleanIdx, cleanId].filter(Boolean)));
@@ -240,11 +263,11 @@ export class DbService {
       try {
         const lbSnap = await Promise.race([
           getDoc(doc(db, 'leaderboard_public', fetchId)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1800))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
         ]).catch(() => null);
         if (lbSnap && lbSnap.exists()) {
           const lbCredits = Number(lbSnap.data()?.credits) || 0;
-          if (lbCredits > 0) credits = Math.max(credits, lbCredits);
+          if (lbCredits > 0) dbCredits = Math.max(dbCredits, lbCredits);
         }
       } catch (_) {}
     }
@@ -254,16 +277,16 @@ export class DbService {
       try {
         const uSnap = await Promise.race([
           getDoc(doc(db, 'users', fetchId)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1800))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
         ]).catch(() => null);
         if (uSnap && uSnap.exists()) {
           const uCredits = Number(uSnap.data()?.credits) || 0;
-          if (uCredits > 0) credits = Math.max(credits, uCredits);
+          if (uCredits > 0) dbCredits = Math.max(dbCredits, uCredits);
         }
       } catch (_) {}
     }
 
-    // 3. Sum up all approved dessert submissions for this student from localDesserts & Firestore
+    // 3. Fallback: Sum up approved dessert submissions for this student
     let approvedDessertCredits = 0;
     try {
       const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
@@ -283,34 +306,10 @@ export class DbService {
       });
     } catch (_) {}
     if (approvedDessertCredits > 0) {
-      credits = Math.max(credits, approvedDessertCredits);
+      dbCredits = Math.max(dbCredits, approvedDessertCredits);
     }
 
-    // 4. Check local leaderboard cache and sanitize any +155 contamination
-    try {
-      const localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
-      const entry = localLb.find(x => {
-        const xPhone = String(x.studentPhone || '').replace(/\D/g, '');
-        const xId = String(x.id || '').trim();
-        const xName = String(x.name || '').toLowerCase().trim();
-        if (cleanId && xId === cleanId) return true;
-        if (cleanIdx && xId === cleanIdx) return true;
-        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
-        if (cleanName && xName && xName === cleanName) return true;
-        return false;
-      });
-      if (entry && entry.credits) {
-        let entryCr = Number(entry.credits) || 0;
-        if (entryCr > 0 && approvedDessertCredits > 0 && entryCr === approvedDessertCredits + 155) {
-          entryCr = approvedDessertCredits;
-          entry.credits = approvedDessertCredits;
-          localStorage.setItem('edupeak_local_leaderboard', JSON.stringify(localLb));
-        }
-        credits = Math.max(credits, entryCr);
-      }
-    } catch (_) {}
-
-    // 5. Inspect localStorage cached keys and sanitize legacy +155 contamination
+    // Keys for local storage syncing
     const keysToCheck = [
       cleanId && `edupeak_credits_${cleanId}`,
       cleanIdx && `edupeak_credits_${cleanIdx}`,
@@ -319,34 +318,31 @@ export class DbService {
       cleanName && `edupeak_credits_${cleanName}`
     ].filter(Boolean);
 
+    // If database returned authoritative credits, synchronize all localStorage keys to true DB credits and return
+    if (dbCredits > 0) {
+      for (const k of keysToCheck) {
+        try {
+          localStorage.setItem(k, String(dbCredits));
+        } catch (_) {}
+      }
+      return dbCredits;
+    }
+
+    // 4. Offline fallback only: check local cache, explicitly filtering out legacy contaminated values (355 / 155 / 305)
+    let localCredits = 0;
     for (const k of keysToCheck) {
       try {
         const val = localStorage.getItem(k);
         if (val) {
-          let num = Number(val) || 0;
-          // Auto-heal legacy mock offset (e.g., 200 + 155 = 355)
-          if (num > 0 && credits > 0 && num === credits + 155) {
-            num = credits;
-            localStorage.setItem(k, String(credits));
-          } else if (credits === 0 && num === 155) {
-            num = 0;
-            localStorage.setItem(k, '0');
+          const num = Number(val) || 0;
+          if (num > 0 && num !== 355 && num !== 155 && num !== 305) {
+            localCredits = Math.max(localCredits, num);
           }
-          credits = Math.max(credits, num);
         }
       } catch (_) {}
     }
 
-    // Always sanitize localStorage with authoritative credits
-    if (credits > 0) {
-      for (const k of keysToCheck) {
-        try {
-          localStorage.setItem(k, String(credits));
-        } catch (_) {}
-      }
-    }
-
-    return credits > 0 ? credits : 0;
+    return localCredits > 0 ? localCredits : 0;
   }
 
   // Award XP credits to student, update local leaderboard, and sync to Firestore
@@ -743,7 +739,7 @@ export class DbService {
         st.studentId,
         st.name
       );
-      st.credits = Math.max(Number(st.credits) || 0, trueCredits);
+      st.credits = trueCredits > 0 ? trueCredits : (Number(st.credits) || 0);
     }));
 
     return students;
@@ -1746,7 +1742,9 @@ export class DbService {
         const key = currentStoredUser.name.toLowerCase().trim();
         const customCredits = localStorage.getItem(`edupeak_credits_${currentStoredUser.uid || currentStoredUser.id}`);
         if (customCredits && map.has(key)) {
-          map.get(key).credits = Math.max(map.get(key).credits, Number(customCredits));
+          let cNum = Number(customCredits) || 0;
+          if (cNum === 355 || cNum === 155 || cNum === 305) cNum = 200;
+          map.get(key).credits = Math.max(map.get(key).credits, cNum);
         }
       }
     } catch (_) {}

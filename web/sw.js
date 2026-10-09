@@ -1,5 +1,5 @@
 // EduPeak Service Worker - PWA & Web Push Notification Handler
-const CACHE_NAME = 'edupeak-pwa-v1.2.0';
+const CACHE_NAME = 'edupeak-pwa-v1.5.0';
 const OFFLINE_URLS = [
   './',
   './index.html',
@@ -21,7 +21,7 @@ const OFFLINE_URLS = [
   './icons/apple-touch-icon.png'
 ];
 
-// Install Event - Pre-cache App Shell
+// Install Event - Pre-cache App Shell & force activation immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -34,7 +34,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate Event - Clean old caches
+// Activate Event - Clean old caches & claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -51,7 +51,7 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim();
 });
 
-// Fetch Event - Stale-while-revalidate for local assets, network-first for external APIs
+// Fetch Event - Network-first for code/HTML to ensure immediate updates; fallback to cache
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -60,21 +60,44 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-First for core application files so updates load immediately without cache staleness
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css')
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            if (event.request.mode === 'navigate') {
+              return caches.match('./index.html');
+            }
+          });
+        })
+    );
+    return;
+  }
+
+  // Cache-first / stale-while-revalidate for static assets (icons, media)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch in background to update cache
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+      if (cachedResponse) return cachedResponse;
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
+        return networkResponse;
       });
     })
   );
