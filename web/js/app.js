@@ -3739,10 +3739,10 @@ class AppController {
             <input type="file" id="input-file-camera" accept="image/*" capture="environment" style="display:none;" multiple />
           </label>
 
-          <div class="shutter-btn-wrap">
-            <div class="shutter-outer-ring"></div>
-            <button class="btn-shutter" id="btn-trigger-shutter"></button>
-          </div>
+          <button class="shutter-btn-wrap" id="btn-trigger-shutter" type="button" aria-label="Take Photo">
+            <span class="shutter-outer-ring"></span>
+            <span class="btn-shutter-inner"></span>
+          </button>
 
           <button class="btn-done-scanning" id="btn-finish-scan" disabled style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
             <span>Done</span>
@@ -3804,7 +3804,11 @@ class AppController {
       }
     };
 
-    document.getElementById('btn-trigger-shutter')?.addEventListener('click', () => {
+    const triggerPhotoCapture = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       try {
         const flash = document.getElementById('scanner-flash');
         if (flash) {
@@ -3817,7 +3821,17 @@ class AppController {
         console.warn('[Camera] Shutter capture notice:', e);
         notificationService.showInAppBanner('Camera Notice', e.message || 'Could not capture photo. Try uploading from Gallery.', 'warning');
       }
-    });
+    };
+
+    const shutterBtn = document.getElementById('btn-trigger-shutter');
+    if (shutterBtn) {
+      shutterBtn.addEventListener('click', triggerPhotoCapture);
+      shutterBtn.addEventListener('touchend', (e) => {
+        // Prevent double trigger on mobile
+        e.preventDefault();
+        triggerPhotoCapture();
+      }, { passive: false });
+    }
 
     document.getElementById('input-file-camera')?.addEventListener('change', async (e) => {
       const files = e.target.files;

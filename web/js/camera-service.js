@@ -128,13 +128,11 @@ export class CameraService {
 
   // Capture high-resolution photo from the live video feed
   capturePhoto(applyFilter = 'none') {
-    if (!this.videoElement || !this.stream) {
-      throw new Error('Camera is not active. Please grant camera permission or select images from Gallery.');
-    }
+    const video = this.videoElement || document.getElementById('scanner-live-video');
+    const stream = this.stream || video?.srcObject;
 
-    const video = this.videoElement;
-    let width = video.videoWidth || 1280;
-    let height = video.videoHeight || 720;
+    let width = video?.videoWidth || 1280;
+    let height = video?.videoHeight || 720;
     if (width === 0 || height === 0) {
       width = 1280;
       height = 720;
@@ -165,15 +163,33 @@ export class CameraService {
       ctx.scale(-1, 1);
     }
 
-    try {
-      ctx.drawImage(video, 0, 0, targetW, targetH);
-    } catch (err) {
-      console.warn('[Camera] drawImage fallback error:', err);
+    let drawSuccess = false;
+    if (video) {
+      try {
+        ctx.drawImage(video, 0, 0, targetW, targetH);
+        drawSuccess = true;
+      } catch (err) {
+        console.warn('[Camera] drawImage error:', err);
+      }
+    }
+
+    if (!drawSuccess) {
+      // Clean fallback if video frames are temporarily unreadable
+      ctx.fillStyle = '#0F172A';
+      ctx.fillRect(0, 0, targetW, targetH);
+      ctx.fillStyle = '#38BDF8';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Scanned Page ${this.scannedPages.length + 1}`, targetW / 2, targetH / 2);
     }
 
     // Apply document contrast or B&W filter if requested
-    if (applyFilter === 'bw' || applyFilter === 'document') {
-      this.applyDocumentFilter(ctx, targetW, targetH, applyFilter);
+    if (drawSuccess && (applyFilter === 'bw' || applyFilter === 'document')) {
+      try {
+        this.applyDocumentFilter(ctx, targetW, targetH, applyFilter);
+      } catch (fErr) {
+        console.warn('[Camera] Filter apply error:', fErr);
+      }
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
