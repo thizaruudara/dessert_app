@@ -55503,18 +55503,6 @@ var __PRIVATE_ArrayUnionFieldValueImpl = class ___PRIVATE_ArrayUnionFieldValueIm
     return e2 instanceof ___PRIVATE_ArrayUnionFieldValueImpl && deepEqual(this.ar, e2.ar);
   }
 };
-var __PRIVATE_NumericIncrementFieldValueImpl = class ___PRIVATE_NumericIncrementFieldValueImpl extends FieldValue {
-  constructor(e2, t2) {
-    super(e2), this.ur = t2;
-  }
-  _toFieldTransform(e2) {
-    const t2 = new __PRIVATE_NumericIncrementTransformOperation(e2.serializer, toNumber(e2.serializer, this.ur));
-    return new FieldTransform(e2.path, t2);
-  }
-  isEqual(e2) {
-    return e2 instanceof ___PRIVATE_NumericIncrementFieldValueImpl && (this.ur === e2.ur || Number.isNaN(this.ur) && Number.isNaN(e2.ur));
-  }
-};
 function __PRIVATE_parseUpdateData(e2, t2, n2, r2) {
   const i2 = e2.createContext(1, t2, n2);
   __PRIVATE_validatePlainObject("Data must be an object, but it was:", i2, r2);
@@ -55804,9 +55792,6 @@ function serverTimestamp() {
 }
 function arrayUnion(...e2) {
   return new __PRIVATE_ArrayUnionFieldValueImpl("arrayUnion", e2);
-}
-function increment(e2) {
-  return new __PRIVATE_NumericIncrementFieldValueImpl("increment", e2);
 }
 function r(e2) {
   return new n(e2);
@@ -65469,10 +65454,10 @@ var DbService = class {
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         const docId = docSnap.id;
-        const dPhone = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
+        const dPhone2 = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
         const dId = String(data.studentId || data.id || data.userUid || "").trim();
         const dName = String(data.studentName || "").trim().toLowerCase();
-        const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && dId === cleanId || cleanName && dName && cleanName === dName;
+        const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone2 && (dPhone2.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone2.slice(-9))) || cleanId && dId === cleanId || cleanName && dName && cleanName === dName;
         if (matchesStudent) {
           list.push({ ...data, id: docId });
         }
@@ -65519,10 +65504,10 @@ var DbService = class {
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
           const docId = docSnap.id;
-          const dPhone = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
+          const dPhone2 = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
           const dId = String(data.studentId || data.id || data.userUid || "").trim();
           const dName = String(data.studentName || "").trim().toLowerCase();
-          const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && dId === cleanId || cleanName && dName && cleanName === dName;
+          const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone2 && (dPhone2.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone2.slice(-9))) || cleanId && dId === cleanId || cleanName && dName && cleanName === dName;
           if (matchesStudent) {
             list.push({ ...data, id: docId });
           }
@@ -65609,25 +65594,37 @@ var DbService = class {
     return newDoc;
   }
   // Get student accumulated credits from local cache, submissions, and leaderboard
-  async getStudentCredits(studentId, studentPhone) {
+  async getStudentCredits(studentId, studentPhone, studentIndex, studentName) {
     let credits = 0;
-    if (studentId) {
-      const c2 = localStorage.getItem(`edupeak_credits_${studentId}`);
-      if (c2) credits = Math.max(credits, Number(c2) || 0);
-    }
-    if (studentPhone) {
-      const c2 = localStorage.getItem(`edupeak_credits_${studentPhone}`);
-      if (c2) credits = Math.max(credits, Number(c2) || 0);
+    const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
+    const cleanName = String(studentName || "").toLowerCase().trim();
+    const cleanId = String(studentId || "").trim();
+    const cleanIdx = String(studentIndex || "").trim();
+    const keysToCheck = [
+      cleanId && `edupeak_credits_${cleanId}`,
+      cleanIdx && `edupeak_credits_${cleanIdx}`,
+      cleanPhone && `edupeak_credits_${cleanPhone}`,
+      studentPhone && `edupeak_credits_${studentPhone}`,
+      cleanName && `edupeak_credits_${cleanName}`
+    ].filter(Boolean);
+    for (const k2 of keysToCheck) {
+      try {
+        const val = localStorage.getItem(k2);
+        if (val) credits = Math.max(credits, Number(val) || 0);
+      } catch (_) {
+      }
     }
     try {
-      const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
       const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
       const dessertCredits = localDesserts.filter((d) => {
         if (d.status !== "approved") return false;
-        const dPhone = String(d.studentPhone || "").replace(/\D/g, "");
-        const dId = String(d.studentId || "");
-        if (studentId && (dId === studentId || d.studentName === studentId)) return true;
-        if (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
+        const dPhone2 = String(d.studentPhone || d.phone || "").replace(/\D/g, "");
+        const dId = String(d.studentId || d.id || "").trim();
+        const dName = String(d.studentName || "").toLowerCase().trim();
+        if (cleanId && dId === cleanId) return true;
+        if (cleanIdx && dId === cleanIdx) return true;
+        if (cleanPhone && dPhone2 && (dPhone2.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone2.slice(-9)))) return true;
+        if (cleanName && dName && dName === cleanName) return true;
         return false;
       }).reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
       if (dessertCredits > 0) {
@@ -65637,11 +65634,14 @@ var DbService = class {
     }
     try {
       const localLb = JSON.parse(localStorage.getItem("edupeak_local_leaderboard") || "[]");
-      const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
       const entry = localLb.find((x2) => {
         const xPhone = String(x2.studentPhone || "").replace(/\D/g, "");
-        if (studentId && (x2.id === studentId || x2.name === studentId)) return true;
-        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(xPhone.slice(-9)))) return true;
+        const xId = String(x2.id || "").trim();
+        const xName = String(x2.name || "").toLowerCase().trim();
+        if (cleanId && xId === cleanId) return true;
+        if (cleanIdx && xId === cleanIdx) return true;
+        if (cleanPhone && xPhone && (xPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
+        if (cleanName && xName && xName === cleanName) return true;
         return false;
       });
       if (entry && entry.credits) {
@@ -65649,15 +65649,29 @@ var DbService = class {
       }
     } catch (_) {
     }
-    if (studentId) {
+    const idsToFetch = Array.from(new Set([cleanId, cleanIdx].filter(Boolean)));
+    for (const fetchId of idsToFetch) {
       try {
         const uSnap = await Promise.race([
-          getDoc(doc(db, "users", studentId)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1500))
+          getDoc(doc(db, "users", fetchId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1800))
         ]).catch(() => null);
         if (uSnap && uSnap.exists()) {
           const uCredits = Number(uSnap.data()?.credits) || 0;
           if (uCredits > 0) credits = Math.max(credits, uCredits);
+        }
+      } catch (_) {
+      }
+    }
+    for (const fetchId of idsToFetch) {
+      try {
+        const lbSnap = await Promise.race([
+          getDoc(doc(db, "leaderboard_public", fetchId)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1800))
+        ]).catch(() => null);
+        if (lbSnap && lbSnap.exists()) {
+          const lbCredits = Number(lbSnap.data()?.credits) || 0;
+          if (lbCredits > 0) credits = Math.max(credits, lbCredits);
         }
       } catch (_) {
       }
@@ -65671,22 +65685,22 @@ var DbService = class {
     const sId = studentId || "st_" + (studentName || "student").toLowerCase().replace(/\s+/g, "_");
     const sName = studentName || "Student";
     const sPhone = studentPhone || "";
+    const cleanPhone = String(sPhone).replace(/\D/g, "");
     const sBatch = examYear || "2027 A/L";
-    const localCreditKey = `edupeak_credits_${sId}`;
-    const prevCredits = Number(localStorage.getItem(localCreditKey) || 0);
-    const newTotalCredits = prevCredits + xp;
-    localStorage.setItem(localCreditKey, String(newTotalCredits));
-    if (sPhone) {
-      localStorage.setItem(`edupeak_credits_${sPhone}`, String(newTotalCredits));
-    }
-    if (sName) {
-      localStorage.setItem(`edupeak_credits_${sName.toLowerCase()}`, String(newTotalCredits));
-    }
+    const currentCredits = await this.getStudentCredits(sId, sPhone, studentId, sName);
+    const newTotalCredits = currentCredits + xp;
+    if (sId) localStorage.setItem(`edupeak_credits_${sId}`, String(newTotalCredits));
+    if (studentId) localStorage.setItem(`edupeak_credits_${studentId}`, String(newTotalCredits));
+    if (sPhone) localStorage.setItem(`edupeak_credits_${sPhone}`, String(newTotalCredits));
+    if (cleanPhone) localStorage.setItem(`edupeak_credits_${cleanPhone}`, String(newTotalCredits));
+    if (sName) localStorage.setItem(`edupeak_credits_${sName.toLowerCase().trim()}`, String(newTotalCredits));
     try {
       let localLb = JSON.parse(localStorage.getItem("edupeak_local_leaderboard") || "[]");
-      let entry = localLb.find((x2) => x2.id === sId || sPhone && x2.studentPhone === sPhone || x2.name && x2.name.toLowerCase() === sName.toLowerCase());
+      let entry = localLb.find(
+        (x2) => x2.id === sId || x2.id === studentId || sPhone && x2.studentPhone === sPhone || cleanPhone && String(x2.studentPhone || "").replace(/\D/g, "").endsWith(cleanPhone.slice(-9)) || x2.name && x2.name.toLowerCase() === sName.toLowerCase()
+      );
       if (entry) {
-        entry.credits = (Number(entry.credits) || prevCredits) + xp;
+        entry.credits = newTotalCredits;
         entry.examYear = sBatch;
         entry.lastActive = (/* @__PURE__ */ new Date()).toISOString();
       } else {
@@ -65705,37 +65719,44 @@ var DbService = class {
     } catch (e2) {
       console.warn("[DB] Local leaderboard save error:", e2);
     }
-    try {
-      const lbRef = doc(db, "leaderboard_public", sId);
-      await Promise.race([
-        setDoc(lbRef, {
-          id: sId,
-          name: sName,
-          studentPhone: sPhone,
-          examYear: sBatch,
-          role: "student",
-          credits: increment(xp),
-          lastActive: (/* @__PURE__ */ new Date()).toISOString()
-        }, { merge: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), 3500))
-      ]);
-    } catch (e2) {
-      console.warn("[DB] Firestore leaderboard update note:", e2);
-    }
-    try {
-      const userRef = doc(db, "users", sId);
-      await Promise.race([
-        setDoc(userRef, {
-          credits: increment(xp),
-          lastActive: (/* @__PURE__ */ new Date()).toISOString()
-        }, { merge: true }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), 3500))
-      ]);
-    } catch (_) {
+    const targetIds = Array.from(new Set([sId, studentId].filter(Boolean)));
+    for (const tid of targetIds) {
+      try {
+        const lbRef = doc(db, "leaderboard_public", tid);
+        await Promise.race([
+          setDoc(lbRef, {
+            id: tid,
+            name: sName,
+            studentPhone: sPhone,
+            examYear: sBatch,
+            role: "student",
+            credits: newTotalCredits,
+            lastActive: (/* @__PURE__ */ new Date()).toISOString()
+          }, { merge: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3e3))
+        ]);
+      } catch (_) {
+      }
+      try {
+        const userRef = doc(db, "users", tid);
+        await Promise.race([
+          setDoc(userRef, {
+            credits: newTotalCredits,
+            lastActive: (/* @__PURE__ */ new Date()).toISOString()
+          }, { merge: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3e3))
+        ]);
+      } catch (_) {
+      }
     }
     try {
       window.dispatchEvent(new CustomEvent("edupeak:credits-updated", {
-        detail: { studentId: sId, studentName: sName, creditsAwarded: xp, totalCredits: newTotalCredits }
+        detail: { studentId: sId, studentName: sName, studentPhone: sPhone, creditsAwarded: xp, totalCredits: newTotalCredits }
+      }));
+      localStorage.setItem("edupeak_last_sync_event", JSON.stringify({
+        type: "credits-updated",
+        data: { studentId: sId, studentName: sName, studentPhone: sPhone, creditsAwarded: xp, totalCredits: newTotalCredits },
+        timestamp: Date.now()
       }));
     } catch (_) {
     }
@@ -65971,7 +65992,7 @@ var DbService = class {
     const map2 = /* @__PURE__ */ new Map();
     for (const u2 of list) {
       if (this.isStaffOrAdmin(u2)) continue;
-      const key = (u2.name || u2.id).toLowerCase().trim();
+      const key = (u2.phone || u2.studentId || u2.id || u2.name).toLowerCase().trim();
       map2.set(key, { ...u2 });
     }
     try {
@@ -65979,7 +66000,7 @@ var DbService = class {
       for (const d of localDesserts) {
         if (!d.studentName) continue;
         if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
-        const key = d.studentName.toLowerCase().trim();
+        const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
         if (!map2.has(key)) {
           map2.set(key, {
             id: d.studentId || "st_" + key.replace(/\s+/g, "_"),
@@ -65987,18 +66008,24 @@ var DbService = class {
             phone: d.studentPhone || "",
             examYear: d.examYear || "2027 A/L",
             credits: Number(d.creditsAwarded) || 0,
+            studentId: d.studentId || "",
             role: "student"
           });
-        } else {
-          const existing = map2.get(key);
-          if (d.creditsAwarded && !existing.credits) {
-            existing.credits = Number(d.creditsAwarded);
-          }
         }
       }
     } catch (_) {
     }
-    return Array.from(map2.values()).filter((u2) => !this.isStaffOrAdmin(u2));
+    const students = Array.from(map2.values()).filter((u2) => !this.isStaffOrAdmin(u2));
+    await Promise.all(students.map(async (st2) => {
+      const trueCredits = await this.getStudentCredits(
+        st2.id,
+        st2.phone,
+        st2.studentId,
+        st2.name
+      );
+      st2.credits = Math.max(Number(st2.credits) || 0, trueCredits);
+    }));
+    return students;
   }
   // Admin: Delete student account and associated data
   async deleteStudent(studentId) {
@@ -68280,7 +68307,9 @@ var AppController = class {
       const eventPhone = String(detail?.studentPhone || "").replace(/\D/g, "");
       const isTargetStudent = !detail?.studentId || detail.studentId === user.uid || detail.studentId === user.id || detail.studentId === user.studentId || userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9)));
       if (isTargetStudent) {
-        if (detail?.creditsAwarded && this.currentUser) {
+        if (detail?.totalCredits !== void 0) {
+          this.currentUser.credits = Number(detail.totalCredits);
+        } else if (detail?.creditsAwarded && this.currentUser) {
           this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
         }
         refreshStudentViews();
@@ -68296,8 +68325,12 @@ var AppController = class {
             const userPhone = String(user.phone || "").replace(/\D/g, "");
             const eventPhone = String(detail?.studentPhone || "").replace(/\D/g, "");
             const isTargetStudent = !detail?.studentId || detail.studentId === user.uid || detail.studentId === user.id || detail.studentId === user.studentId || userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9)));
-            if (isTargetStudent && detail?.creditsAwarded && this.currentUser) {
-              this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
+            if (isTargetStudent) {
+              if (detail?.totalCredits !== void 0) {
+                this.currentUser.credits = Number(detail.totalCredits);
+              } else if (detail?.creditsAwarded && this.currentUser) {
+                this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
+              }
             }
           }
         } catch (_) {

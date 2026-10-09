@@ -67,7 +67,9 @@ class AppController {
         (userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9))));
 
       if (isTargetStudent) {
-        if (detail?.creditsAwarded && this.currentUser) {
+        if (detail?.totalCredits !== undefined) {
+          this.currentUser.credits = Number(detail.totalCredits);
+        } else if (detail?.creditsAwarded && this.currentUser) {
           this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
         }
         refreshStudentViews();
@@ -89,8 +91,12 @@ class AppController {
               detail.studentId === user.studentId ||
               (userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9))));
 
-            if (isTargetStudent && detail?.creditsAwarded && this.currentUser) {
-              this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
+            if (isTargetStudent) {
+              if (detail?.totalCredits !== undefined) {
+                this.currentUser.credits = Number(detail.totalCredits);
+              } else if (detail?.creditsAwarded && this.currentUser) {
+                this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
+              }
             }
           }
         } catch (_) {}
