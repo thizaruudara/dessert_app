@@ -33,6 +33,7 @@ ios/Flutter/Flutter.podspec
 functions/node_modules/
 web/node_modules/
 web/.vercel/
+.vercel/
 
 # OS
 .DS_Store
