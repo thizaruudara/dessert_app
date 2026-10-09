@@ -43618,15 +43618,15 @@ var decodeRanges = (str, isStride1) => {
 };
 var decodeOrbit = (str) => {
   const res = decodeVLQ(str);
-  const map = /* @__PURE__ */ new Map();
+  const map2 = /* @__PURE__ */ new Map();
   let currentKey = 0;
   for (let i2 = 0; i2 < res.length; i2 += 2) {
     currentKey += res[i2];
     const zz = res[i2 + 1];
     const delta = zz >>> 1 ^ -(zz & 1);
-    map.set(currentKey, currentKey + delta);
+    map2.set(currentKey, currentKey + delta);
   }
-  return map;
+  return map2;
 };
 var LazyMap = class {
   constructor(initializer) {
@@ -65229,19 +65229,15 @@ var AuthService = class {
       try {
         const stored = localStorage.getItem("edupeak_cached_user");
         if (stored) {
-          initialUser = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.uid === "EP-2027" || parsed.phone === "0770557769")) {
+            localStorage.removeItem("edupeak_cached_user");
+            initialUser = null;
+          } else {
+            initialUser = parsed;
+          }
         } else {
-          initialUser = {
-            uid: "EP-2027",
-            id: "EP-2027",
-            studentId: "EP-2027",
-            name: "ThiZaru",
-            phone: "0770557769",
-            examYear: "2027 A/L",
-            role: "student",
-            credits: 155
-          };
-          localStorage.setItem("edupeak_cached_user", JSON.stringify(initialUser));
+          initialUser = null;
         }
       } catch (_) {
       }
@@ -65252,6 +65248,9 @@ var AuthService = class {
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
       if (initialUser) {
+        resolve();
+      } else {
+        this.loading = false;
         resolve();
       }
       setTimeout(() => {
@@ -65473,7 +65472,7 @@ var DbService = class {
         const dPhone = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
         const dId = String(data.studentId || data.id || data.userUid || "").trim();
         const dName = String(data.studentName || "").trim().toLowerCase();
-        const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && (dId === cleanId || dId === "EP-2027" || dId === "anon") || cleanName && dName && cleanName === dName;
+        const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && dId === cleanId || cleanName && dName && cleanName === dName;
         if (matchesStudent) {
           list.push({ ...data, id: docId });
         }
@@ -65485,7 +65484,7 @@ var DbService = class {
       const locPhone = String(loc.studentPhone || loc.phone || "").replace(/\D/g, "");
       const locId = String(loc.studentId || loc.id || "").trim();
       const locName = String(loc.studentName || "").trim().toLowerCase();
-      const matchesLoc = !cleanId && !cleanPhone && !cleanName || cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9))) || cleanId && (locId === cleanId || locId === "EP-2027" || locId === "anon") || cleanName && locName && cleanName === locName;
+      const matchesLoc = !cleanId && !cleanPhone && !cleanName || cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9))) || cleanId && locId === cleanId || cleanName && locName && cleanName === locName;
       if (matchesLoc) {
         const fsMatch = list.find(
           (fs) => fs.id === loc.id || fs.submittedAt && fs.submittedAt === loc.submittedAt || fs.caption && fs.caption === loc.caption && locPhone && fs.studentPhone && locPhone.endsWith(cleanPhone.slice(-9))
@@ -65505,7 +65504,7 @@ var DbService = class {
     } catch (_) {
     }
     list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
-    return list.length > 0 ? list : this.getMockDesserts ? this.getMockDesserts(studentId) : [];
+    return list;
   }
   // Real-time listener for student's homework status
   listenToStudentDesserts(studentId, studentPhone, callback, studentName) {
@@ -65523,7 +65522,7 @@ var DbService = class {
           const dPhone = String(data.studentPhone || data.phone || "").replace(/\D/g, "");
           const dId = String(data.studentId || data.id || data.userUid || "").trim();
           const dName = String(data.studentName || "").trim().toLowerCase();
-          const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && (dId === cleanId || dId === "EP-2027" || dId === "anon") || cleanName && dName && cleanName === dName;
+          const matchesStudent = !cleanId && !cleanPhone && !cleanName || cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9))) || cleanId && dId === cleanId || cleanName && dName && cleanName === dName;
           if (matchesStudent) {
             list.push({ ...data, id: docId });
           }
@@ -65544,7 +65543,7 @@ var DbService = class {
             const locPhone = String(loc.studentPhone || loc.phone || "").replace(/\D/g, "");
             const locId = String(loc.studentId || loc.id || "").trim();
             const locName = String(loc.studentName || "").trim().toLowerCase();
-            const matchesLoc = !cleanId && !cleanPhone && !cleanName || cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9))) || cleanId && (locId === cleanId || locId === "EP-2027" || locId === "anon") || cleanName && locName && cleanName === locName;
+            const matchesLoc = !cleanId && !cleanPhone && !cleanName || cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9))) || cleanId && locId === cleanId || cleanName && locName && cleanName === locName;
             if (matchesLoc && !list.some((d) => d.id === loc.id || d.submittedAt && d.submittedAt === loc.submittedAt)) {
               list.push(loc);
             }
@@ -65571,8 +65570,8 @@ var DbService = class {
     const docId = docRef.id;
     const newDoc = {
       id: docId,
-      studentId: String(studentId || "EP-2027"),
-      studentName: String(studentName || "Scholar"),
+      studentId: String(studentId || "student"),
+      studentName: String(studentName || "Student"),
       studentPhone: String(studentPhone || "").trim(),
       examYear: String(examYear || "2027 A/L"),
       subject: subject || "Physics Mechanics",
@@ -65627,12 +65626,12 @@ var DbService = class {
         if (d.status !== "approved") return false;
         const dPhone = String(d.studentPhone || "").replace(/\D/g, "");
         const dId = String(d.studentId || "");
-        if (studentId && (dId === studentId || d.studentName === studentId || dId === "EP-2027")) return true;
+        if (studentId && (dId === studentId || d.studentName === studentId)) return true;
         if (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
         return false;
       }).reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
       if (dessertCredits > 0) {
-        credits = Math.max(credits, 155 + dessertCredits);
+        credits = Math.max(credits, dessertCredits);
       }
     } catch (_) {
     }
@@ -65663,18 +65662,18 @@ var DbService = class {
       } catch (_) {
       }
     }
-    return credits > 0 ? credits : 155;
+    return credits > 0 ? credits : 0;
   }
   // Award XP credits to student, update local leaderboard, and sync to Firestore
   async awardStudentCredits({ studentId, studentName, studentPhone, examYear, credits }) {
     const xp = Number(credits) || 0;
     if (xp <= 0) return;
-    const sId = studentId || "st_" + (studentName || "scholar").toLowerCase().replace(/\s+/g, "_");
-    const sName = studentName || "Scholar";
+    const sId = studentId || "st_" + (studentName || "student").toLowerCase().replace(/\s+/g, "_");
+    const sName = studentName || "Student";
     const sPhone = studentPhone || "";
     const sBatch = examYear || "2027 A/L";
     const localCreditKey = `edupeak_credits_${sId}`;
-    const prevCredits = Number(localStorage.getItem(localCreditKey) || 155);
+    const prevCredits = Number(localStorage.getItem(localCreditKey) || 0);
     const newTotalCredits = prevCredits + xp;
     localStorage.setItem(localCreditKey, String(newTotalCredits));
     if (sPhone) {
@@ -65777,7 +65776,7 @@ var DbService = class {
           creditsAwarded: finalCredits,
           reviewedBy: reviewer,
           reviewedAt,
-          studentId: targetStudentId || "EP-2027",
+          studentId: targetStudentId || "",
           studentName: targetStudentName || "Student",
           studentPhone: targetStudentPhone || "",
           examYear: targetExamYear || "2027 A/L"
@@ -65880,9 +65879,8 @@ var DbService = class {
       if (list.length > 0) return list;
     } catch (e2) {
       console.warn("[DB] Admin desserts fetch fallback:", e2);
-      if (localList.length > 0) return localList;
     }
-    return this.getMockDesserts ? this.getMockDesserts() : [];
+    return localList || [];
   }
   // Admin: Real-time listener for incoming homework and reviews
   listenToAllDessertsForAdmin(callback) {
@@ -65949,27 +65947,27 @@ var DbService = class {
       }
     } catch (_) {
     }
-    const map = /* @__PURE__ */ new Map();
+    const map2 = /* @__PURE__ */ new Map();
     for (const u2 of list) {
       const key = (u2.name || u2.id).toLowerCase().trim();
-      map.set(key, { ...u2 });
+      map2.set(key, { ...u2 });
     }
     try {
       const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
       for (const d of localDesserts) {
         if (!d.studentName) continue;
         const key = d.studentName.toLowerCase().trim();
-        if (!map.has(key)) {
-          map.set(key, {
+        if (!map2.has(key)) {
+          map2.set(key, {
             id: d.studentId || "st_" + key.replace(/\s+/g, "_"),
             name: d.studentName,
-            phone: d.studentPhone || "0770557769",
+            phone: d.studentPhone || "",
             examYear: d.examYear || "2027 A/L",
-            credits: Number(d.creditsAwarded) || 155,
+            credits: Number(d.creditsAwarded) || 0,
             role: "student"
           });
         } else {
-          const existing = map.get(key);
+          const existing = map2.get(key);
           if (d.creditsAwarded && !existing.credits) {
             existing.credits = Number(d.creditsAwarded);
           }
@@ -65977,23 +65975,7 @@ var DbService = class {
       }
     } catch (_) {
     }
-    if (map.size < 4) {
-      const seeds = this.getSeedScholars();
-      for (const s2 of seeds) {
-        const key = s2.name.toLowerCase().trim();
-        if (!map.has(key)) {
-          map.set(key, {
-            id: s2.id,
-            name: s2.name,
-            phone: "0770557769",
-            examYear: s2.examYear,
-            credits: s2.credits,
-            role: "student"
-          });
-        }
-      }
-    }
-    return Array.from(map.values());
+    return Array.from(map2.values());
   }
   // Admin: Delete student account and associated data
   async deleteStudent(studentId) {
@@ -66163,118 +66145,16 @@ var DbService = class {
       scheduledDate: parseTime(raw.scheduledDate, defSched.toISOString()),
       durationMinutes: Number(raw.durationMinutes) || 180,
       paperStructure: raw.paperStructure || "50 MCQs & 4 Structured Essay Questions",
-      syllabusTopics: Array.isArray(raw.syllabusTopics) && raw.syllabusTopics.length > 0 ? raw.syllabusTopics : ["Mechanics & Dynamics", "Newtonian Gravitation", "Circular Motion & Rotational Inertia"],
-      hints: raw.hints || "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA\u0DA7 \u0DB4\u0DD9\u0DBB Mechanics \u0DB4\u0DCF\u0DA9\u0DB8\u0DDA Free Body Diagrams \u0DC3\u0DC4 \u0D9C\u0DB8\u0DCA\u200D\u0DBA\u0DAD\u0DCF \u0DC3\u0D82\u0DC3\u0DCA\u0DAE\u0DD2\u0DAD\u0DD2 \u0DB8\u0DD6\u0DBD\u0DB0\u0DBB\u0DCA\u0DB8 \u0DC4\u0DDC\u0DB3\u0DD2\u0DB1\u0DCA \u0DB4\u0DD4\u0DC4\u0DD4\u0DAB\u0DD4 \u0DC0\u0DB1\u0DCA\u0DB1.",
-      instructions: raw.instructions || "\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0DB1\u0DD2\u0DBA\u0DB8\u0DD2\u0DAD \u0DC0\u0DDA\u0DBD\u0DCF\u0DC0\u0DA7 \u0DB4\u0DD9\u0DBB \u0DB1\u0DD2\u0DBD \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DB4\u0DDC\u0DAD\u0DCA \u0DB4\u0DD2\u0D82\u0DA0 \u0DC3\u0DC4 \u0D9A\u0DD0\u0DBD\u0DCA\u0D9A\u0DD2\u0DBA\u0DD4\u0DBD\u0DDA\u0DA7\u0DBB \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0D9A\u0DBB \u0DAD\u0DB6\u0DCF\u0D9C\u0DB1\u0DCA\u0DB1."
+      syllabusTopics: Array.isArray(raw.syllabusTopics) ? raw.syllabusTopics : [],
+      hints: raw.hints || "",
+      instructions: raw.instructions || ""
     };
   }
   getMockPaperSessions(examYear) {
-    const now = /* @__PURE__ */ new Date();
-    const todayIso = now.toISOString().split("T")[0];
-    const s1Start = new Date(now);
-    s1Start.setHours(8, 30, 0, 0);
-    const s1End = new Date(now);
-    s1End.setHours(10, 30, 0, 0);
-    const s2Start = new Date(now);
-    s2Start.setHours(16, 0, 0, 0);
-    const s2End = new Date(now);
-    s2End.setHours(18, 0, 0, 0);
-    const list = [
-      {
-        id: "mock_paper_01",
-        title: "2027 A/L Physics Evaluation Paper 04 - Mechanics & Dynamics",
-        subject: "A/L Physics",
-        examYear: "2027 A/L",
-        date: todayIso,
-        durationMinutes: 120,
-        totalMarks: 100,
-        status: "upcoming",
-        currentPhase: "waiting",
-        isTimeUp: false,
-        slot1: {
-          id: "slot1",
-          name: "Slot 1 (Morning / \u0D8B\u0DAF\u0DD1\u0DC3\u0DB1 \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA)",
-          startTime: s1Start.toISOString(),
-          endTime: s1End.toISOString(),
-          maxCapacity: 100,
-          registeredCount: 48
-        },
-        slot2: {
-          id: "slot2",
-          name: "Slot 2 (Evening / \u0DC3\u0DC0\u0DC3 \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA)",
-          startTime: s2Start.toISOString(),
-          endTime: s2End.toISOString(),
-          maxCapacity: 100,
-          registeredCount: 35
-        }
-      },
-      {
-        id: "mock_paper_02",
-        title: "2026 A/L Physics Grand Revision Test 02 - Oscillations & Waves",
-        subject: "A/L Physics",
-        examYear: "2026 A/L",
-        date: todayIso,
-        durationMinutes: 180,
-        totalMarks: 100,
-        status: "upcoming",
-        currentPhase: "waiting",
-        isTimeUp: false,
-        slot1: {
-          id: "slot1",
-          name: "Slot 1 (Morning / \u0D8B\u0DAF\u0DD1\u0DC3\u0DB1 \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA)",
-          startTime: s1Start.toISOString(),
-          endTime: s1End.toISOString(),
-          maxCapacity: 150,
-          registeredCount: 84
-        },
-        slot2: {
-          id: "slot2",
-          name: "Slot 2 (Evening / \u0DC3\u0DC0\u0DC3 \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA)",
-          startTime: s2Start.toISOString(),
-          endTime: s2End.toISOString(),
-          maxCapacity: 150,
-          registeredCount: 62
-        }
-      }
-    ];
-    if (!examYear || examYear === "All" || examYear === "All Batches") return list;
-    return list.filter((p2) => this.matchesYear(p2.examYear, examYear));
+    return [];
   }
   getMockUpcomingPapers(examYear) {
-    const now = /* @__PURE__ */ new Date();
-    const d1 = new Date(now.getTime() + 864e5 * 3);
-    d1.setHours(8, 30, 0, 0);
-    const d2 = new Date(now.getTime() + 864e5 * 7);
-    d2.setHours(13, 30, 0, 0);
-    const list = [
-      {
-        id: "upcoming_01",
-        title: "2027 A/L Mechanics Comprehensive Mock 01",
-        subject: "A/L Physics",
-        examYear: "2027 A/L",
-        scheduledDate: d1.toISOString(),
-        durationMinutes: 180,
-        paperStructure: "50 MCQs + 4 Structured Essays",
-        syllabusTopics: ["Newtonian Mechanics", "Rotational Dynamics", "Hydrostatics & Surface Tension", "Viscosity"],
-        hints: "Bernoulli \u0DB8\u0DD6\u0DBD\u0DB0\u0DBB\u0DCA\u0DB8\u0DBA \u0DC3\u0DC4 \u0DAF\u0DD4\u0DC3\u0DCA\u0DC3\u0DCA\u200D\u0DBB\u0DCF\u0DC0\u0DD2\u0DAD\u0DCF \u0DC3\u0DB8\u0DD3\u0D9A\u0DBB\u0DAB \u0D86\u0DC1\u0DCA\u200D\u0DBB\u0DD2\u0DAD \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DC0\u0DD2\u0DC1\u0DDA\u0DC2\u0DBA\u0DD9\u0DB1\u0DCA \u0DB4\u0DD4\u0DC4\u0DD4\u0DAB\u0DD4 \u0DC0\u0DB1\u0DCA\u0DB1. 2018-2024 \u0DB4\u0DC3\u0DD4\u0D9C\u0DD2\u0DBA \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0D85\u0DB0\u0DCA\u200D\u0DBA\u0DBA\u0DB1\u0DBA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.",
-        instructions: "\u0DB1\u0DD2\u0DBD \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DC3\u0DC4 \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA \u0DB8\u0DD2\u0DB1\u0DD4\u0DB8\u0DCA \u0D8B\u0DB4\u0D9A\u0DBB\u0DAB \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0D9A\u0DBB \u0DAD\u0DB6\u0DCF\u0D9C\u0DB1\u0DCA\u0DB1."
-      },
-      {
-        id: "upcoming_02",
-        title: "2026 A/L Island-Wide Physics Trial Examination",
-        subject: "A/L Physics",
-        examYear: "2026 A/L",
-        scheduledDate: d2.toISOString(),
-        durationMinutes: 180,
-        paperStructure: "Full Standard Exam (Part I & Part II)",
-        syllabusTopics: ["Waves & Oscillations", "Thermal Physics", "Electrostatics & Current Electricity"],
-        hints: "\u0DA9\u0DDC\u0DB4\u0DCA\u0DBD\u0DBB\u0DCA \u0D86\u0DA0\u0DBB\u0DAB\u0DBA, \u0DAD\u0DBB\u0D82\u0D9C \u0D86\u0D9A\u0DCA\u200D\u0DBB\u0DB8\u0DAB\u0DBA \u0DC3\u0DC4 Kirchhoff \u0DB1\u0DD3\u0DAD\u0DD2 \u0DB4\u0DBB\u0DD2\u0DB4\u0DAE \u0D9C\u0DD0\u0DA7\u0DC5\u0DD4 \u0DC4\u0DDC\u0DB3\u0DD2\u0DB1\u0DCA \u0DB1\u0DD0\u0DC0\u0DAD \u0DB6\u0DBD\u0DCF\u0D9C\u0DB1\u0DCA\u0DB1.",
-        instructions: "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA\u0DA7 \u0DB8\u0DD2\u0DB1\u0DD2\u0DAD\u0DCA\u0DAD\u0DD4 15 \u0D9A\u0DA7 \u0DB4\u0DD9\u0DBB Waiting Room \u0DC0\u0DD9\u0DAD \u0DC3\u0DB8\u0DCA\u0DB6\u0DB1\u0DCA\u0DB0 \u0DC0\u0DB1\u0DCA\u0DB1."
-      }
-    ];
-    if (!examYear || examYear === "All" || examYear === "All Batches") return list;
-    const filtered = list.filter((p2) => this.matchesYear(p2.examYear, examYear));
-    return filtered.length > 0 ? filtered : list;
+    return [];
   }
   async getPaperSessions(examYear) {
     try {
@@ -66943,35 +66823,7 @@ var DbService = class {
   }
   // ── 4. Leaderboard ───────────────────────────────────────────────────────
   getSeedScholars() {
-    return [
-      // 2027 A/L
-      { id: "scholar_2027_1", name: "Kasun Perera", examYear: "2027 A/L", credits: 780, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_2", name: "ThiZaru", examYear: "2027 A/L", credits: 650, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_3", name: "Dilshan Bandara", examYear: "2027 A/L", credits: 440, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_4", name: "Kavindu Silva", examYear: "2027 A/L", credits: 320, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_5", name: "Anuki Fernando", examYear: "2027 A/L", credits: 210, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_6", name: "Test User", examYear: "2027 A/L", credits: 180, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_7", name: "Janith Weerasinghe", examYear: "2027 A/L", credits: 80, role: "student", avatarUrl: "" },
-      { id: "scholar_2027_8", name: "Vihanga Dissanayake", examYear: "2027 A/L", credits: 25, role: "student", avatarUrl: "" },
-      // 2026 A/L
-      { id: "scholar_2026_1", name: "Sanduni Jayawardena", examYear: "2026 A/L", credits: 690, role: "student", avatarUrl: "" },
-      { id: "scholar_2026_2", name: "Nethmi Wickramasinghe", examYear: "2026 A/L", credits: 420, role: "student", avatarUrl: "" },
-      { id: "scholar_2026_3", name: "Malith Gunasekara", examYear: "2026 A/L", credits: 230, role: "student", avatarUrl: "" },
-      { id: "scholar_2026_4", name: "Pamuditha Rathnayake", examYear: "2026 A/L", credits: 75, role: "student", avatarUrl: "" },
-      // 2025 A/L
-      { id: "scholar_2025_1", name: "Chathura Senanayake", examYear: "2025 A/L", credits: 710, role: "student", avatarUrl: "" },
-      { id: "scholar_2025_2", name: "Sajith Ekanayake", examYear: "2025 A/L", credits: 360, role: "student", avatarUrl: "" },
-      { id: "scholar_2025_3", name: "Isuru Madushan", examYear: "2025 A/L", credits: 190, role: "student", avatarUrl: "" },
-      { id: "scholar_2025_4", name: "Dineth Kaluarachchi", examYear: "2025 A/L", credits: 50, role: "student", avatarUrl: "" },
-      // 2028 A/L
-      { id: "scholar_2028_1", name: "Hiruni Alwis", examYear: "2028 A/L", credits: 540, role: "student", avatarUrl: "" },
-      { id: "scholar_2028_2", name: "Dinuka Ranasinghe", examYear: "2028 A/L", credits: 310, role: "student", avatarUrl: "" },
-      { id: "scholar_2028_3", name: "Tharushi Mendis", examYear: "2028 A/L", credits: 170, role: "student", avatarUrl: "" },
-      { id: "scholar_2028_4", name: "Nuwan Pradeep", examYear: "2028 A/L", credits: 90, role: "student", avatarUrl: "" },
-      // 2024 A/L & 2029 A/L
-      { id: "scholar_2024_1", name: "Amila Jayasuriya", examYear: "2024 A/L", credits: 620, role: "student", avatarUrl: "" },
-      { id: "scholar_2029_1", name: "Rashmika Fonseka", examYear: "2029 A/L", credits: 110, role: "student", avatarUrl: "" }
-    ];
+    return [];
   }
   async getLeaderboard(batch) {
     let firestoreList = [];
@@ -67018,11 +66870,6 @@ var DbService = class {
       });
     } catch (_) {
     }
-    const seedScholars = this.getSeedScholars();
-    const map = /* @__PURE__ */ new Map();
-    for (const s2 of seedScholars) {
-      map.set(s2.name.toLowerCase().trim(), { ...s2 });
-    }
     for (const s2 of localLb) {
       if (!s2.name) continue;
       const key = s2.name.toLowerCase().trim();
@@ -67040,7 +66887,7 @@ var DbService = class {
       let found = false;
       for (const [k2, v2] of map.entries()) {
         if (k2 === normKey || v2.id && v2.id.toLowerCase() === normKey) {
-          v2.credits = Math.max(v2.credits, (v2.credits || 155) + awardedXp);
+          v2.credits = Math.max(v2.credits, (v2.credits || 0) + awardedXp);
           found = true;
           break;
         }
@@ -67051,7 +66898,7 @@ var DbService = class {
           name: studentKey,
           role: "student",
           examYear: dessertBatchMap[studentKey] || "2027 A/L",
-          credits: 155 + awardedXp,
+          credits: awardedXp,
           avatarUrl: ""
         });
       }
@@ -67559,53 +67406,7 @@ var DbService = class {
   }
   // ── Mock Data Fallbacks ───────────────────────────────────────────────────
   getMockDesserts(studentId) {
-    return [
-      {
-        id: "des_001",
-        studentId: studentId || "usr_1",
-        studentName: "Scholar",
-        subject: "Mechanics: Circular Motion & Gravitation",
-        caption: "Solved all 10 past paper structured essay problems with full free-body diagrams.",
-        mediaUrls: ["./icons/exam_3d_countdown.jpg"],
-        type: "image",
-        status: "approved",
-        creditsAwarded: 50,
-        adminFeedback: "Excellent free-body diagram clarity! Centripetal force derivations are perfectly aligned with A/L marking schemes.",
-        reviewedBy: "Prof. Senanayake",
-        submittedAt: new Date(Date.now() - 864e5 * 1.5).toISOString(),
-        reviewedAt: new Date(Date.now() - 864e5 * 0.8).toISOString()
-      },
-      {
-        id: "des_002",
-        studentId: studentId || "usr_1",
-        studentName: "Scholar",
-        subject: "Thermal Physics: Calorimetry & Gas Laws",
-        caption: "Calculation of specific heat capacity and isothermal expansion curves.",
-        mediaUrls: [],
-        type: "text",
-        status: "pending",
-        creditsAwarded: 0,
-        adminFeedback: null,
-        reviewedBy: null,
-        submittedAt: new Date(Date.now() - 36e5 * 4).toISOString(),
-        reviewedAt: null
-      },
-      {
-        id: "des_003",
-        studentId: studentId || "usr_1",
-        studentName: "Scholar",
-        subject: "Wave Optics: Young's Double Slit Interference",
-        caption: "Fringe width derivation and intensity distribution graph.",
-        mediaUrls: [],
-        type: "text",
-        status: "rejected",
-        creditsAwarded: 10,
-        adminFeedback: "Path difference calculation has a sign error on line 4. Please revise and resubmit for full marks.",
-        reviewedBy: "Teacher Assistant",
-        submittedAt: new Date(Date.now() - 864e5 * 4).toISOString(),
-        reviewedAt: new Date(Date.now() - 864e5 * 3).toISOString()
-      }
-    ];
+    return [];
   }
 };
 var dbService = new DbService();
@@ -68457,7 +68258,7 @@ var AppController = class {
       const isTargetStudent = !detail?.studentId || detail.studentId === user.uid || detail.studentId === user.id || detail.studentId === user.studentId || userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9)));
       if (isTargetStudent) {
         if (detail?.creditsAwarded && this.currentUser) {
-          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+          this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
         }
         refreshStudentViews();
       }
@@ -68473,7 +68274,7 @@ var AppController = class {
             const eventPhone = String(detail?.studentPhone || "").replace(/\D/g, "");
             const isTargetStudent = !detail?.studentId || detail.studentId === user.uid || detail.studentId === user.id || detail.studentId === user.studentId || userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9)));
             if (isTargetStudent && detail?.creditsAwarded && this.currentUser) {
-              this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+              this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
             }
           }
         } catch (_) {
@@ -69198,14 +68999,14 @@ var AppController = class {
   async renderHomeScreen(container) {
     const renderToken = ++this.renderToken;
     const user = this.currentUser || {};
-    const studentName = user.name || "ThiZaru";
+    const studentName = user.name || "Student";
     const initial = studentName.charAt(0).toUpperCase();
     const activeTargetYear = user.examYear || "2027 A/L";
     const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
       dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 155),
+      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 0),
       dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
@@ -69254,12 +69055,12 @@ var AppController = class {
               <span class="student-name">${studentName}</span>
               <span class="material-symbols-rounded filled" style="font-size:16px; color:#2563EB;">verified</span>
             </div>
-            <span class="candidate-tag">2027 A/L Candidate</span>
+            <span class="candidate-tag">${activeTargetYear} Candidate</span>
           </div>
         </div>
         <div class="streak-pill" style="display:inline-flex; align-items:center; gap:4px;">
           <span class="material-symbols-rounded filled" style="font-size:16px; color:#EA580C;">local_fire_department</span>
-          <span>3 Days</span>
+          <span>${user.streak || 1} Day${(user.streak || 1) === 1 ? "" : "s"}</span>
         </div>
       </div>
 
@@ -69314,7 +69115,7 @@ var AppController = class {
             <span class="material-symbols-rounded" style="font-size:13px;">timer</span>
             <span>A/L TARGET</span>
           </div>
-          <span class="cd-exam-name">2027 A/L Physics Final Exam</span>
+          <span class="cd-exam-name">${activeTargetYear} Physics Final Exam</span>
           <div class="pulse-dot"></div>
         </div>
         <div class="cd-grid">
@@ -69399,7 +69200,7 @@ var AppController = class {
             <span>Weekly Study Quests</span>
           </div>
           <span class="quests-badge" style="display:inline-flex; align-items:center; gap:4px;">
-            <span>2 / 3 Completed</span>
+            <span>${(hasApprovedHw ? 1 : 0) + ((user.streak || 1) >= 3 ? 1 : 0)} / 3 Completed</span>
             <span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">emoji_events</span>
           </span>
         </div>
@@ -69410,10 +69211,10 @@ var AppController = class {
             <span class="material-symbols-rounded" style="font-size:18px;">bolt</span>
           </div>
           <div class="quest-info">
-            <div class="quest-name">Complete 5 Daily MCQs</div>
-            <div class="quest-sub">3 of 5 sprints solved (60%)</div>
+            <div class="quest-name">Complete Daily MCQs</div>
+            <div class="quest-sub">Solve physics daily sprints</div>
             <div class="quest-bar">
-              <div class="quest-bar-fill" style="width: 60%; background: #EA580C;"></div>
+              <div class="quest-bar-fill" style="width: 20%; background: #EA580C;"></div>
             </div>
           </div>
           <span class="quest-status-badge quest-badge-orange">+50 XP</span>
@@ -69426,14 +69227,14 @@ var AppController = class {
           </div>
           <div class="quest-info">
             <div class="quest-name">Submit Weekly Homework</div>
-            <div class="quest-sub">1 submission in review</div>
+            <div class="quest-sub">${hasApprovedHw ? "Submission approved by teacher" : hasSubmittedHw ? "Submission under review" : "No submission yet"}</div>
             <div class="quest-bar">
-              <div class="quest-bar-fill" style="width: 100%; background: #2563EB;"></div>
+              <div class="quest-bar-fill" style="width: ${hasApprovedHw ? "100%" : hasSubmittedHw ? "60%" : "0%"}; background: #2563EB;"></div>
             </div>
           </div>
-          <span class="quest-status-badge quest-badge-blue" style="display:inline-flex; align-items:center; gap:3px;">
-            <span>In Review</span>
-            <span class="material-symbols-rounded" style="font-size:13px;">schedule</span>
+          <span class="quest-status-badge ${hasApprovedHw ? "quest-badge-green" : hasSubmittedHw ? "quest-badge-blue" : "quest-badge-orange"}" style="display:inline-flex; align-items:center; gap:3px;">
+            <span>${hasApprovedHw ? "+100 XP" : hasSubmittedHw ? "In Review" : "+100 XP"}</span>
+            <span class="material-symbols-rounded" style="font-size:13px;">${hasApprovedHw ? "check_circle" : hasSubmittedHw ? "schedule" : "lock"}</span>
           </span>
         </div>
 
@@ -69444,20 +69245,20 @@ var AppController = class {
           </div>
           <div class="quest-info">
             <div class="quest-name">Keep 3-Day Study Streak</div>
-            <div class="quest-sub">Streak goal achieved!</div>
+            <div class="quest-sub">${(user.streak || 1) >= 3 ? "Goal achieved!" : (user.streak || 1) + " of 3 days active"}</div>
             <div class="quest-bar">
-              <div class="quest-bar-fill" style="width: 100%; background: #059669;"></div>
+              <div class="quest-bar-fill" style="width: ${Math.min(100, Math.round((user.streak || 1) / 3 * 100))}%; background: #059669;"></div>
             </div>
           </div>
-          <span class="quest-status-badge quest-badge-green" style="display:inline-flex; align-items:center; gap:3px;">
-            <span>Claimed!</span>
-            <span class="material-symbols-rounded filled" style="font-size:12px;">star</span>
+          <span class="quest-status-badge ${(user.streak || 1) >= 3 ? "quest-badge-green" : "quest-badge-orange"}" style="display:inline-flex; align-items:center; gap:3px;">
+            <span>${(user.streak || 1) >= 3 ? "Claimed!" : "+50 XP"}</span>
+            <span class="material-symbols-rounded filled" style="font-size:12px;">${(user.streak || 1) >= 3 ? "star" : "local_fire_department"}</span>
           </span>
         </div>
 
         <div class="quests-footer-note" style="display:flex; align-items:center; gap:4px;">
           <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">star</span>
-          <span>Complete all 3 missions to unlock +100 Bonus XP on Sunday!</span>
+          <span>Complete missions to unlock bonus XP towards your island rank!</span>
         </div>
       </div>
 
@@ -69969,8 +69770,8 @@ var AppController = class {
         await dbService.registerStudentSlot({
           paperId: pId,
           studentId: user.uid || user.id || "s_default",
-          studentName: user.name || "Scholar",
-          studentPhone: user.phone || "0770557769",
+          studentName: user.name || "Student",
+          studentPhone: user.phone || "",
           slotId: sId
         });
         notificationService.showLocalToast(`${sId === "slot1" ? "Slot 1 (Morning)" : "Slot 2 (Evening)"} \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 \u0DC0\u0DD9\u0DB1\u0DCA\u0D9A\u0DBB \u0D9C\u0DB1\u0DCA\u0DB1\u0DCF \u0DBD\u0DAF\u0DD3!`);
@@ -70140,7 +69941,7 @@ var AppController = class {
       this._upcomingPapersUnsub = null;
     }
     try {
-      const user = this.currentUser || { name: "Scholar", phone: "", examYear: "2027 A/L" };
+      const user = this.currentUser || { name: "Student", phone: "", examYear: "2027 A/L" };
       const currentYear = user.examYear || "2027 A/L";
       const activeTargetYear = currentYear;
       const [sessions, upcomingList] = await Promise.all([
@@ -71070,7 +70871,7 @@ var AppController = class {
     this.capturedHomeworkPhotos = this.capturedHomeworkPhotos ?? [];
     this.dessertHistoryFilter = this.dessertHistoryFilter ?? "All";
     const user = this.currentUser || {};
-    const sId = user.studentId || user.uid || user.id || "EP-2027";
+    const sId = user.studentId || user.uid || user.id || "student";
     const sPhone = user.phone || "";
     const sName = user.name || "";
     const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
@@ -71314,16 +71115,16 @@ var AppController = class {
         btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">hourglass_top</span> Uploading to Teacher...';
       }
       try {
-        const studentId = user.studentId || user.uid || user.id || "EP-2027";
-        const studentName = user.name || "Scholar";
-        const studentPhone = user.phone || "0770557769";
+        const studentId = user.studentId || user.uid || user.id || "student";
+        const studentName = user.name || "Student";
+        const studentPhone = user.phone || "";
         await dbService.submitDessert({
           studentId,
           studentName,
           studentPhone,
           subject: `Physics: ${this.selectedTopic}`,
           caption: caption || `Homework submission on ${this.selectedTopic}`,
-          mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : ["./icons/exam_3d_countdown.jpg"]
+          mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : []
         });
         this.capturedHomeworkPhotos = [];
         cameraService.clearPages();
@@ -71439,7 +71240,7 @@ var AppController = class {
         </div>
 
         <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
-          <span style="font-size:20px; font-weight:800; color:#0F172A;" id="profile-display-name">${user.name || "Kasun Perera"}</span>
+          <span style="font-size:20px; font-weight:800; color:#0F172A;" id="profile-display-name">${user.name || "Student"}</span>
           <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:15px; display:inline-flex; align-items:center;" title="Edit Name">
             <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
           </button>
@@ -71805,7 +71606,7 @@ var AppController = class {
   }
   // ── Edit Name Dialog (Matching _showEditNameDialog in Flutter) ────────────
   openEditNameDialog(profileContainer) {
-    const currentName = this.currentUser?.name || "Kasun Perera";
+    const currentName = this.currentUser?.name || "Student";
     const modal = document.createElement("div");
     modal.className = "app-modal";
     modal.style.display = "flex";
@@ -72461,9 +72262,9 @@ var AppController = class {
         btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">hourglass_top</span>Uploading...';
       }
       try {
-        const studentId = user.studentId || user.uid || user.id || "EP-2027";
-        const studentName = user.name || "Scholar";
-        const studentPhone = user.phone || "0770557769";
+        const studentId = user.studentId || user.uid || user.id || "student";
+        const studentName = user.name || "Student";
+        const studentPhone = user.phone || "";
         const subject = document.getElementById("submit-topic-input")?.value?.trim() || defaultTopic;
         const caption = document.getElementById("submit-note-input")?.value?.trim() || "Daily Dessert Submission";
         await dbService.submitDessert({
@@ -72763,7 +72564,7 @@ var AppController = class {
         (d) => (d.studentName || "").toLowerCase().includes(q) || (d.subject || "").toLowerCase().includes(q) || (d.studentPhone || "").includes(q) || (d.caption || "").toLowerCase().includes(q)
       );
     }
-    const adminName = this.currentUser?.name || "ThiZaru";
+    const adminName = this.currentUser?.name || "Teacher / Admin";
     const initial = adminName.charAt(0).toUpperCase();
     container.innerHTML = `
       <div class="apk-admin-screen-container">
@@ -77036,7 +76837,7 @@ This will purge all associated submissions and records.`)) {
     if (!session) {
       session = {
         id: paperId,
-        title: "Physics Mock Exam",
+        title: "Physics Examination Session",
         subject: "Physics",
         durationMinutes: 150,
         currentPhase: "waiting",

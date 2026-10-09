@@ -54,7 +54,7 @@ export class DbService {
 
         const matchesStudent = (!cleanId && !cleanPhone && !cleanName) ||
           (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) ||
-          (cleanId && (dId === cleanId || dId === 'EP-2027' || dId === 'anon')) ||
+          (cleanId && dId === cleanId) ||
           (cleanName && dName && cleanName === dName);
 
         if (matchesStudent) {
@@ -72,7 +72,7 @@ export class DbService {
       const locName = String(loc.studentName || '').trim().toLowerCase();
       const matchesLoc = (!cleanId && !cleanPhone && !cleanName) ||
         (cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9)))) ||
-        (cleanId && (locId === cleanId || locId === 'EP-2027' || locId === 'anon')) ||
+        (cleanId && locId === cleanId) ||
         (cleanName && locName && cleanName === locName);
 
       if (matchesLoc) {
@@ -97,7 +97,7 @@ export class DbService {
     } catch (_) {}
 
     list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
-    return list.length > 0 ? list : (this.getMockDesserts ? this.getMockDesserts(studentId) : []);
+    return list;
   }
 
   // Real-time listener for student's homework status
@@ -121,7 +121,7 @@ export class DbService {
 
           const matchesStudent = (!cleanId && !cleanPhone && !cleanName) ||
             (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) ||
-            (cleanId && (dId === cleanId || dId === 'EP-2027' || dId === 'anon')) ||
+            (cleanId && dId === cleanId) ||
             (cleanName && dName && cleanName === dName);
 
           if (matchesStudent) {
@@ -151,7 +151,7 @@ export class DbService {
             const locName = String(loc.studentName || '').trim().toLowerCase();
             const matchesLoc = (!cleanId && !cleanPhone && !cleanName) ||
               (cleanPhone && locPhone && (locPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(locPhone.slice(-9)))) ||
-              (cleanId && (locId === cleanId || locId === 'EP-2027' || locId === 'anon')) ||
+              (cleanId && locId === cleanId) ||
               (cleanName && locName && cleanName === locName);
 
             if (matchesLoc && !list.some(d => d.id === loc.id || (d.submittedAt && d.submittedAt === loc.submittedAt))) {
@@ -183,8 +183,8 @@ export class DbService {
 
     const newDoc = {
       id: docId,
-      studentId: String(studentId || 'EP-2027'),
-      studentName: String(studentName || 'Scholar'),
+      studentId: String(studentId || 'student'),
+      studentName: String(studentName || 'Student'),
       studentPhone: String(studentPhone || '').trim(),
       examYear: String(examYear || '2027 A/L'),
       subject: subject || 'Physics Mechanics',
@@ -246,13 +246,13 @@ export class DbService {
           if (d.status !== 'approved') return false;
           const dPhone = String(d.studentPhone || '').replace(/\D/g, '');
           const dId = String(d.studentId || '');
-          if (studentId && (dId === studentId || d.studentName === studentId || dId === 'EP-2027')) return true;
+          if (studentId && (dId === studentId || d.studentName === studentId)) return true;
           if (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) return true;
           return false;
         })
         .reduce((sum, d) => sum + (Number(d.creditsAwarded) || 0), 0);
       if (dessertCredits > 0) {
-        credits = Math.max(credits, 155 + dessertCredits);
+        credits = Math.max(credits, dessertCredits);
       }
     } catch (_) {}
 
@@ -284,7 +284,7 @@ export class DbService {
       } catch (_) {}
     }
 
-    return credits > 0 ? credits : 155;
+    return credits > 0 ? credits : 0;
   }
 
   // Award XP credits to student, update local leaderboard, and sync to Firestore
@@ -292,14 +292,14 @@ export class DbService {
     const xp = Number(credits) || 0;
     if (xp <= 0) return;
 
-    const sId = studentId || ('st_' + (studentName || 'scholar').toLowerCase().replace(/\s+/g, '_'));
-    const sName = studentName || 'Scholar';
+    const sId = studentId || ('st_' + (studentName || 'student').toLowerCase().replace(/\s+/g, '_'));
+    const sName = studentName || 'Student';
     const sPhone = studentPhone || '';
     const sBatch = examYear || '2027 A/L';
 
     // 1. Update localStorage student credits
     const localCreditKey = `edupeak_credits_${sId}`;
-    const prevCredits = Number(localStorage.getItem(localCreditKey) || 155);
+    const prevCredits = Number(localStorage.getItem(localCreditKey) || 0);
     const newTotalCredits = prevCredits + xp;
     localStorage.setItem(localCreditKey, String(newTotalCredits));
     if (sPhone) {
@@ -414,7 +414,7 @@ export class DbService {
           creditsAwarded: finalCredits,
           reviewedBy: reviewer,
           reviewedAt,
-          studentId: targetStudentId || 'EP-2027',
+          studentId: targetStudentId || '',
           studentName: targetStudentName || 'Student',
           studentPhone: targetStudentPhone || '',
           examYear: targetExamYear || '2027 A/L'
@@ -527,9 +527,8 @@ export class DbService {
       if (list.length > 0) return list;
     } catch (e) {
       console.warn('[DB] Admin desserts fetch fallback:', e);
-      if (localList.length > 0) return localList;
     }
-    return this.getMockDesserts ? this.getMockDesserts() : [];
+    return localList || [];
   }
 
   // Admin: Real-time listener for incoming homework and reviews
@@ -617,9 +616,9 @@ export class DbService {
           map.set(key, {
             id: d.studentId || ('st_' + key.replace(/\s+/g, '_')),
             name: d.studentName,
-            phone: d.studentPhone || '0770557769',
+            phone: d.studentPhone || '',
             examYear: d.examYear || '2027 A/L',
-            credits: Number(d.creditsAwarded) || 155,
+            credits: Number(d.creditsAwarded) || 0,
             role: 'student'
           });
         } else {
@@ -630,24 +629,6 @@ export class DbService {
         }
       }
     } catch (_) {}
-
-    // Incorporate seeds if roster is sparse
-    if (map.size < 4) {
-      const seeds = this.getSeedScholars();
-      for (const s of seeds) {
-        const key = s.name.toLowerCase().trim();
-        if (!map.has(key)) {
-          map.set(key, {
-            id: s.id,
-            name: s.name,
-            phone: '0770557769',
-            examYear: s.examYear,
-            credits: s.credits,
-            role: 'student'
-          });
-        }
-      }
-    }
 
     return Array.from(map.values());
   }
@@ -845,129 +826,18 @@ export class DbService {
       scheduledDate: parseTime(raw.scheduledDate, defSched.toISOString()),
       durationMinutes: Number(raw.durationMinutes) || 180,
       paperStructure: raw.paperStructure || '50 MCQs & 4 Structured Essay Questions',
-      syllabusTopics: Array.isArray(raw.syllabusTopics) && raw.syllabusTopics.length > 0 
-        ? raw.syllabusTopics 
-        : ['Mechanics & Dynamics', 'Newtonian Gravitation', 'Circular Motion & Rotational Inertia'],
-      hints: raw.hints || 'විභාගයට පෙර Mechanics පාඩමේ Free Body Diagrams සහ ගම්‍යතා සංස්ථිති මූලධර්ම හොඳින් පුහුණු වන්න.',
-      instructions: raw.instructions || 'කරුණාකර නියමිත වේලාවට පෙර නිල විභාග පොත් පිංච සහ කැල්කියුලේටර සූදානම් කර තබාගන්න.'
+      syllabusTopics: Array.isArray(raw.syllabusTopics) ? raw.syllabusTopics : [],
+      hints: raw.hints || '',
+      instructions: raw.instructions || ''
     };
   }
 
   getMockPaperSessions(examYear) {
-    const now = new Date();
-    const todayIso = now.toISOString().split('T')[0];
-
-    const s1Start = new Date(now);
-    s1Start.setHours(8, 30, 0, 0);
-    const s1End = new Date(now);
-    s1End.setHours(10, 30, 0, 0);
-
-    const s2Start = new Date(now);
-    s2Start.setHours(16, 0, 0, 0);
-    const s2End = new Date(now);
-    s2End.setHours(18, 0, 0, 0);
-
-    const list = [
-      {
-        id: 'mock_paper_01',
-        title: '2027 A/L Physics Evaluation Paper 04 - Mechanics & Dynamics',
-        subject: 'A/L Physics',
-        examYear: '2027 A/L',
-        date: todayIso,
-        durationMinutes: 120,
-        totalMarks: 100,
-        status: 'upcoming',
-        currentPhase: 'waiting',
-        isTimeUp: false,
-        slot1: {
-          id: 'slot1',
-          name: 'Slot 1 (Morning / උදෑසන සැසිය)',
-          startTime: s1Start.toISOString(),
-          endTime: s1End.toISOString(),
-          maxCapacity: 100,
-          registeredCount: 48
-        },
-        slot2: {
-          id: 'slot2',
-          name: 'Slot 2 (Evening / සවස සැසිය)',
-          startTime: s2Start.toISOString(),
-          endTime: s2End.toISOString(),
-          maxCapacity: 100,
-          registeredCount: 35
-        }
-      },
-      {
-        id: 'mock_paper_02',
-        title: '2026 A/L Physics Grand Revision Test 02 - Oscillations & Waves',
-        subject: 'A/L Physics',
-        examYear: '2026 A/L',
-        date: todayIso,
-        durationMinutes: 180,
-        totalMarks: 100,
-        status: 'upcoming',
-        currentPhase: 'waiting',
-        isTimeUp: false,
-        slot1: {
-          id: 'slot1',
-          name: 'Slot 1 (Morning / උදෑසන සැසිය)',
-          startTime: s1Start.toISOString(),
-          endTime: s1End.toISOString(),
-          maxCapacity: 150,
-          registeredCount: 84
-        },
-        slot2: {
-          id: 'slot2',
-          name: 'Slot 2 (Evening / සවස සැසිය)',
-          startTime: s2Start.toISOString(),
-          endTime: s2End.toISOString(),
-          maxCapacity: 150,
-          registeredCount: 62
-        }
-      }
-    ];
-
-    if (!examYear || examYear === 'All' || examYear === 'All Batches') return list;
-    return list.filter(p => this.matchesYear(p.examYear, examYear));
+    return [];
   }
 
   getMockUpcomingPapers(examYear) {
-    const now = new Date();
-    const d1 = new Date(now.getTime() + 86400000 * 3);
-    d1.setHours(8, 30, 0, 0);
-
-    const d2 = new Date(now.getTime() + 86400000 * 7);
-    d2.setHours(13, 30, 0, 0);
-
-    const list = [
-      {
-        id: 'upcoming_01',
-        title: '2027 A/L Mechanics Comprehensive Mock 01',
-        subject: 'A/L Physics',
-        examYear: '2027 A/L',
-        scheduledDate: d1.toISOString(),
-        durationMinutes: 180,
-        paperStructure: '50 MCQs + 4 Structured Essays',
-        syllabusTopics: ['Newtonian Mechanics', 'Rotational Dynamics', 'Hydrostatics & Surface Tension', 'Viscosity'],
-        hints: 'Bernoulli මූලධර්මය සහ දුස්ස්‍රාවිතා සමීකරණ ආශ්‍රිත ප්‍රශ්න විශේෂයෙන් පුහුණු වන්න. 2018-2024 පසුගිය විභාග ප්‍රශ්න අධ්‍යයනය කරන්න.',
-        instructions: 'නිල පිළිතුරු පත්‍ර සහ අවශ්‍ය මිනුම් උපකරණ සූදානම් කර තබාගන්න.'
-      },
-      {
-        id: 'upcoming_02',
-        title: '2026 A/L Island-Wide Physics Trial Examination',
-        subject: 'A/L Physics',
-        examYear: '2026 A/L',
-        scheduledDate: d2.toISOString(),
-        durationMinutes: 180,
-        paperStructure: 'Full Standard Exam (Part I & Part II)',
-        syllabusTopics: ['Waves & Oscillations', 'Thermal Physics', 'Electrostatics & Current Electricity'],
-        hints: 'ඩොප්ලර් ආචරණය, තරංග ආක්‍රමණය සහ Kirchhoff නීති පරිපථ ගැටළු හොඳින් නැවත බලාගන්න.',
-        instructions: 'විභාගයට මිනිත්තු 15 කට පෙර Waiting Room වෙත සම්බන්ධ වන්න.'
-      }
-    ];
-
-    if (!examYear || examYear === 'All' || examYear === 'All Batches') return list;
-    const filtered = list.filter(p => this.matchesYear(p.examYear, examYear));
-    return filtered.length > 0 ? filtered : list;
+    return [];
   }
 
   async getPaperSessions(examYear) {
@@ -1661,39 +1531,7 @@ export class DbService {
 
   // ── 4. Leaderboard ───────────────────────────────────────────────────────
   getSeedScholars() {
-    return [
-      // 2027 A/L
-      { id: 'scholar_2027_1', name: 'Kasun Perera', examYear: '2027 A/L', credits: 780, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_2', name: 'ThiZaru', examYear: '2027 A/L', credits: 650, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_3', name: 'Dilshan Bandara', examYear: '2027 A/L', credits: 440, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_4', name: 'Kavindu Silva', examYear: '2027 A/L', credits: 320, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_5', name: 'Anuki Fernando', examYear: '2027 A/L', credits: 210, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_6', name: 'Test User', examYear: '2027 A/L', credits: 180, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_7', name: 'Janith Weerasinghe', examYear: '2027 A/L', credits: 80, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2027_8', name: 'Vihanga Dissanayake', examYear: '2027 A/L', credits: 25, role: 'student', avatarUrl: '' },
-
-      // 2026 A/L
-      { id: 'scholar_2026_1', name: 'Sanduni Jayawardena', examYear: '2026 A/L', credits: 690, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2026_2', name: 'Nethmi Wickramasinghe', examYear: '2026 A/L', credits: 420, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2026_3', name: 'Malith Gunasekara', examYear: '2026 A/L', credits: 230, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2026_4', name: 'Pamuditha Rathnayake', examYear: '2026 A/L', credits: 75, role: 'student', avatarUrl: '' },
-
-      // 2025 A/L
-      { id: 'scholar_2025_1', name: 'Chathura Senanayake', examYear: '2025 A/L', credits: 710, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2025_2', name: 'Sajith Ekanayake', examYear: '2025 A/L', credits: 360, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2025_3', name: 'Isuru Madushan', examYear: '2025 A/L', credits: 190, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2025_4', name: 'Dineth Kaluarachchi', examYear: '2025 A/L', credits: 50, role: 'student', avatarUrl: '' },
-
-      // 2028 A/L
-      { id: 'scholar_2028_1', name: 'Hiruni Alwis', examYear: '2028 A/L', credits: 540, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2028_2', name: 'Dinuka Ranasinghe', examYear: '2028 A/L', credits: 310, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2028_3', name: 'Tharushi Mendis', examYear: '2028 A/L', credits: 170, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2028_4', name: 'Nuwan Pradeep', examYear: '2028 A/L', credits: 90, role: 'student', avatarUrl: '' },
-
-      // 2024 A/L & 2029 A/L
-      { id: 'scholar_2024_1', name: 'Amila Jayasuriya', examYear: '2024 A/L', credits: 620, role: 'student', avatarUrl: '' },
-      { id: 'scholar_2029_1', name: 'Rashmika Fonseka', examYear: '2029 A/L', credits: 110, role: 'student', avatarUrl: '' }
-    ];
+    return [];
   }
 
   async getLeaderboard(batch) {
@@ -1744,13 +1582,7 @@ export class DbService {
       });
     } catch (_) {}
 
-    const seedScholars = this.getSeedScholars();
-    const map = new Map();
-
-    // 1. Seed scholars
-    for (const s of seedScholars) {
-      map.set(s.name.toLowerCase().trim(), { ...s });
-    }
+    // No fake seed scholars - use only real verified scholars
 
     // 2. Local leaderboard entries
     for (const s of localLb) {
@@ -1774,7 +1606,7 @@ export class DbService {
       let found = false;
       for (const [k, v] of map.entries()) {
         if (k === normKey || (v.id && v.id.toLowerCase() === normKey)) {
-          v.credits = Math.max(v.credits, (v.credits || 155) + awardedXp);
+          v.credits = Math.max(v.credits, (v.credits || 0) + awardedXp);
           found = true;
           break;
         }
@@ -1785,7 +1617,7 @@ export class DbService {
           name: studentKey,
           role: 'student',
           examYear: dessertBatchMap[studentKey] || '2027 A/L',
-          credits: 155 + awardedXp,
+          credits: awardedXp,
           avatarUrl: ''
         });
       }
@@ -2335,53 +2167,7 @@ export class DbService {
 
   // ── Mock Data Fallbacks ───────────────────────────────────────────────────
   getMockDesserts(studentId) {
-    return [
-      {
-        id: 'des_001',
-        studentId: studentId || 'usr_1',
-        studentName: 'Scholar',
-        subject: 'Mechanics: Circular Motion & Gravitation',
-        caption: 'Solved all 10 past paper structured essay problems with full free-body diagrams.',
-        mediaUrls: ['./icons/exam_3d_countdown.jpg'],
-        type: 'image',
-        status: 'approved',
-        creditsAwarded: 50,
-        adminFeedback: 'Excellent free-body diagram clarity! Centripetal force derivations are perfectly aligned with A/L marking schemes.',
-        reviewedBy: 'Prof. Senanayake',
-        submittedAt: new Date(Date.now() - 86400000 * 1.5).toISOString(),
-        reviewedAt: new Date(Date.now() - 86400000 * 0.8).toISOString()
-      },
-      {
-        id: 'des_002',
-        studentId: studentId || 'usr_1',
-        studentName: 'Scholar',
-        subject: 'Thermal Physics: Calorimetry & Gas Laws',
-        caption: 'Calculation of specific heat capacity and isothermal expansion curves.',
-        mediaUrls: [],
-        type: 'text',
-        status: 'pending',
-        creditsAwarded: 0,
-        adminFeedback: null,
-        reviewedBy: null,
-        submittedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-        reviewedAt: null
-      },
-      {
-        id: 'des_003',
-        studentId: studentId || 'usr_1',
-        studentName: 'Scholar',
-        subject: 'Wave Optics: Young\'s Double Slit Interference',
-        caption: 'Fringe width derivation and intensity distribution graph.',
-        mediaUrls: [],
-        type: 'text',
-        status: 'rejected',
-        creditsAwarded: 10,
-        adminFeedback: 'Path difference calculation has a sign error on line 4. Please revise and resubmit for full marks.',
-        reviewedBy: 'Teacher Assistant',
-        submittedAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-        reviewedAt: new Date(Date.now() - 86400000 * 3).toISOString()
-      }
-    ];
+    return [];
   }
 
 }

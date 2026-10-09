@@ -68,7 +68,7 @@ class AppController {
 
       if (isTargetStudent) {
         if (detail?.creditsAwarded && this.currentUser) {
-          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+          this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
         }
         refreshStudentViews();
       }
@@ -90,7 +90,7 @@ class AppController {
               (userPhone && eventPhone && (userPhone.endsWith(eventPhone.slice(-9)) || eventPhone.endsWith(userPhone.slice(-9))));
 
             if (isTargetStudent && detail?.creditsAwarded && this.currentUser) {
-              this.currentUser.credits = (Number(this.currentUser.credits) || 155) + Number(detail.creditsAwarded);
+              this.currentUser.credits = (Number(this.currentUser.credits) || 0) + Number(detail.creditsAwarded);
             }
           }
         } catch (_) {}
@@ -871,7 +871,7 @@ class AppController {
   async renderHomeScreen(container) {
     const renderToken = ++this.renderToken;
     const user = this.currentUser || {};
-    const studentName = user.name || 'ThiZaru';
+    const studentName = user.name || 'Student';
     const initial = studentName.charAt(0).toUpperCase();
     const activeTargetYear = user.examYear || '2027 A/L';
 
@@ -879,7 +879,7 @@ class AppController {
       dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 155),
+      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 0),
       dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
@@ -935,12 +935,12 @@ class AppController {
               <span class="student-name">${studentName}</span>
               <span class="material-symbols-rounded filled" style="font-size:16px; color:#2563EB;">verified</span>
             </div>
-            <span class="candidate-tag">2027 A/L Candidate</span>
+            <span class="candidate-tag">${activeTargetYear} Candidate</span>
           </div>
         </div>
         <div class="streak-pill" style="display:inline-flex; align-items:center; gap:4px;">
           <span class="material-symbols-rounded filled" style="font-size:16px; color:#EA580C;">local_fire_department</span>
-          <span>3 Days</span>
+          <span>${user.streak || 1} Day${(user.streak || 1) === 1 ? '' : 's'}</span>
         </div>
       </div>
 
@@ -1000,7 +1000,7 @@ class AppController {
             <span class="material-symbols-rounded" style="font-size:13px;">timer</span>
             <span>A/L TARGET</span>
           </div>
-          <span class="cd-exam-name">2027 A/L Physics Final Exam</span>
+          <span class="cd-exam-name">${activeTargetYear} Physics Final Exam</span>
           <div class="pulse-dot"></div>
         </div>
         <div class="cd-grid">
@@ -1085,7 +1085,7 @@ class AppController {
             <span>Weekly Study Quests</span>
           </div>
           <span class="quests-badge" style="display:inline-flex; align-items:center; gap:4px;">
-            <span>2 / 3 Completed</span>
+            <span>${(hasApprovedHw ? 1 : 0) + ((user.streak || 1) >= 3 ? 1 : 0)} / 3 Completed</span>
             <span class="material-symbols-rounded filled" style="font-size:13px; color:#F59E0B;">emoji_events</span>
           </span>
         </div>
@@ -1096,10 +1096,10 @@ class AppController {
             <span class="material-symbols-rounded" style="font-size:18px;">bolt</span>
           </div>
           <div class="quest-info">
-            <div class="quest-name">Complete 5 Daily MCQs</div>
-            <div class="quest-sub">3 of 5 sprints solved (60%)</div>
+            <div class="quest-name">Complete Daily MCQs</div>
+            <div class="quest-sub">Solve physics daily sprints</div>
             <div class="quest-bar">
-              <div class="quest-bar-fill" style="width: 60%; background: #EA580C;"></div>
+              <div class="quest-bar-fill" style="width: 20%; background: #EA580C;"></div>
             </div>
           </div>
           <span class="quest-status-badge quest-badge-orange">+50 XP</span>
@@ -1112,14 +1112,14 @@ class AppController {
           </div>
           <div class="quest-info">
             <div class="quest-name">Submit Weekly Homework</div>
-            <div class="quest-sub">1 submission in review</div>
+            <div class="quest-sub">${hasApprovedHw ? 'Submission approved by teacher' : hasSubmittedHw ? 'Submission under review' : 'No submission yet'}</div>
             <div class="quest-bar">
-              <div class="quest-bar-fill" style="width: 100%; background: #2563EB;"></div>
+              <div class="quest-bar-fill" style="width: ${hasApprovedHw ? '100%' : hasSubmittedHw ? '60%' : '0%'}; background: #2563EB;"></div>
             </div>
           </div>
-          <span class="quest-status-badge quest-badge-blue" style="display:inline-flex; align-items:center; gap:3px;">
-            <span>In Review</span>
-            <span class="material-symbols-rounded" style="font-size:13px;">schedule</span>
+          <span class="quest-status-badge ${hasApprovedHw ? 'quest-badge-green' : hasSubmittedHw ? 'quest-badge-blue' : 'quest-badge-orange'}" style="display:inline-flex; align-items:center; gap:3px;">
+            <span>${hasApprovedHw ? '+100 XP' : hasSubmittedHw ? 'In Review' : '+100 XP'}</span>
+            <span class="material-symbols-rounded" style="font-size:13px;">${hasApprovedHw ? 'check_circle' : hasSubmittedHw ? 'schedule' : 'lock'}</span>
           </span>
         </div>
 
@@ -1130,20 +1130,20 @@ class AppController {
           </div>
           <div class="quest-info">
             <div class="quest-name">Keep 3-Day Study Streak</div>
-            <div class="quest-sub">Streak goal achieved!</div>
+            <div class="quest-sub">${(user.streak || 1) >= 3 ? 'Goal achieved!' : (user.streak || 1) + ' of 3 days active'}</div>
             <div class="quest-bar">
-              <div class="quest-bar-fill" style="width: 100%; background: #059669;"></div>
+              <div class="quest-bar-fill" style="width: ${Math.min(100, Math.round(((user.streak || 1) / 3) * 100))}%; background: #059669;"></div>
             </div>
           </div>
-          <span class="quest-status-badge quest-badge-green" style="display:inline-flex; align-items:center; gap:3px;">
-            <span>Claimed!</span>
-            <span class="material-symbols-rounded filled" style="font-size:12px;">star</span>
+          <span class="quest-status-badge ${(user.streak || 1) >= 3 ? 'quest-badge-green' : 'quest-badge-orange'}" style="display:inline-flex; align-items:center; gap:3px;">
+            <span>${(user.streak || 1) >= 3 ? 'Claimed!' : '+50 XP'}</span>
+            <span class="material-symbols-rounded filled" style="font-size:12px;">${(user.streak || 1) >= 3 ? 'star' : 'local_fire_department'}</span>
           </span>
         </div>
 
         <div class="quests-footer-note" style="display:flex; align-items:center; gap:4px;">
           <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">star</span>
-          <span>Complete all 3 missions to unlock +100 Bonus XP on Sunday!</span>
+          <span>Complete missions to unlock bonus XP towards your island rank!</span>
         </div>
       </div>
 
@@ -1677,8 +1677,8 @@ class AppController {
         await dbService.registerStudentSlot({
           paperId: pId,
           studentId: user.uid || user.id || "s_default",
-          studentName: user.name || "Scholar",
-          studentPhone: user.phone || '0770557769',
+          studentName: user.name || "Student",
+          studentPhone: user.phone || '',
           slotId: sId
         });
         notificationService.showLocalToast(`${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
@@ -1854,7 +1854,7 @@ class AppController {
     }
 
     try {
-      const user = this.currentUser || { name: 'Scholar', phone: '', examYear: '2027 A/L' };
+      const user = this.currentUser || { name: 'Student', phone: '', examYear: '2027 A/L' };
       const currentYear = user.examYear || '2027 A/L';
       const activeTargetYear = currentYear;
 
@@ -2855,7 +2855,7 @@ class AppController {
     this.dessertHistoryFilter = this.dessertHistoryFilter ?? 'All';
 
     const user = this.currentUser || {};
-    const sId = user.studentId || user.uid || user.id || 'EP-2027';
+    const sId = user.studentId || user.uid || user.id || 'student';
     const sPhone = user.phone || '';
     const sName = user.name || '';
     const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
@@ -3116,9 +3116,9 @@ class AppController {
       }
 
       try {
-        const studentId = user.studentId || user.uid || user.id || 'EP-2027';
-        const studentName = user.name || 'Scholar';
-        const studentPhone = user.phone || '0770557769';
+        const studentId = user.studentId || user.uid || user.id || 'student';
+        const studentName = user.name || 'Student';
+        const studentPhone = user.phone || '';
 
         await dbService.submitDessert({
           studentId,
@@ -3126,7 +3126,7 @@ class AppController {
           studentPhone,
           subject: `Physics: ${this.selectedTopic}`,
           caption: caption || `Homework submission on ${this.selectedTopic}`,
-          mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : ['./icons/exam_3d_countdown.jpg']
+          mediaUrls: this.capturedHomeworkPhotos.length > 0 ? this.capturedHomeworkPhotos : []
         });
 
         this.capturedHomeworkPhotos = [];
@@ -3252,7 +3252,7 @@ class AppController {
         </div>
 
         <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
-          <span style="font-size:20px; font-weight:800; color:#0F172A;" id="profile-display-name">${user.name || 'Kasun Perera'}</span>
+          <span style="font-size:20px; font-weight:800; color:#0F172A;" id="profile-display-name">${user.name || 'Student'}</span>
           <button id="btn-edit-student-name" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:15px; display:inline-flex; align-items:center;" title="Edit Name">
             <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
           </button>
@@ -3650,7 +3650,7 @@ class AppController {
 
   // ── Edit Name Dialog (Matching _showEditNameDialog in Flutter) ────────────
   openEditNameDialog(profileContainer) {
-    const currentName = this.currentUser?.name || 'Kasun Perera';
+    const currentName = this.currentUser?.name || 'Student';
 
     const modal = document.createElement('div');
     modal.className = 'app-modal';
@@ -4365,9 +4365,9 @@ class AppController {
       }
 
       try {
-        const studentId = user.studentId || user.uid || user.id || 'EP-2027';
-        const studentName = user.name || 'Scholar';
-        const studentPhone = user.phone || '0770557769';
+        const studentId = user.studentId || user.uid || user.id || 'student';
+        const studentName = user.name || 'Student';
+        const studentPhone = user.phone || '';
         const subject = document.getElementById('submit-topic-input')?.value?.trim() || defaultTopic;
         const caption = document.getElementById('submit-note-input')?.value?.trim() || 'Daily Dessert Submission';
 
@@ -4686,7 +4686,7 @@ class AppController {
       );
     }
 
-    const adminName = this.currentUser?.name || 'ThiZaru';
+    const adminName = this.currentUser?.name || 'Teacher / Admin';
     const initial = adminName.charAt(0).toUpperCase();
 
     container.innerHTML = `
@@ -9281,7 +9281,7 @@ class AppController {
     if (!session) {
       session = {
         id: paperId,
-        title: 'Physics Mock Exam',
+        title: 'Physics Examination Session',
         subject: 'Physics',
         durationMinutes: 150,
         currentPhase: 'waiting',

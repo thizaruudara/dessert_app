@@ -28,20 +28,16 @@ export class AuthService {
       try {
         const stored = localStorage.getItem('edupeak_cached_user');
         if (stored) {
-          initialUser = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          // Purge legacy mock demo student if present in local storage
+          if (parsed && (parsed.uid === 'EP-2027' || parsed.phone === '0770557769')) {
+            localStorage.removeItem('edupeak_cached_user');
+            initialUser = null;
+          } else {
+            initialUser = parsed;
+          }
         } else {
-          // Default student session so students directly open dashboard without login screen flash
-          initialUser = {
-            uid: 'EP-2027',
-            id: 'EP-2027',
-            studentId: 'EP-2027',
-            name: 'ThiZaru',
-            phone: '0770557769',
-            examYear: '2027 A/L',
-            role: 'student',
-            credits: 155
-          };
-          localStorage.setItem('edupeak_cached_user', JSON.stringify(initialUser));
+          initialUser = null;
         }
       } catch (_) {}
     }
@@ -53,6 +49,9 @@ export class AuthService {
       this.resolveInitialAuth = resolve;
       if (initialUser) {
         // Resolve immediately so UI unlocks directly to dashboard
+        resolve();
+      } else {
+        this.loading = false;
         resolve();
       }
       // Absolute safety timeout: Never let initial auth stall longer than 2.5 seconds
