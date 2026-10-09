@@ -6265,13 +6265,34 @@ class AppController {
   }
 
   // ── Examination Countdowns Manager (1:1 with admin_exam_countdowns_screen.dart) ──
+    // ── Examination Countdowns Manager (1:1 with admin_exam_countdowns_screen.dart) ──
   async openExamCountdownsModal() {
+    // Remove any existing countdown modal first
+    document.querySelectorAll('.app-modal.modal-countdowns').forEach(m => m.remove());
+
     const modal = document.createElement('div');
-    modal.className = 'app-modal';
+    modal.className = 'app-modal modal-countdowns';
     modal.style.display = 'flex';
+    document.body.appendChild(modal);
 
     let countdowns = await dbService.getExamCountdowns();
     let timerInterval = null;
+
+    const closeModal = () => {
+      if (timerInterval) clearInterval(timerInterval);
+      window.removeEventListener('keydown', onKeyDown);
+      modal.remove();
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // Dismiss when clicking the backdrop outside the sheet
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
 
     const computeTimeLeft = (targetStr) => {
       const diff = new Date(targetStr).getTime() - Date.now();
@@ -6283,82 +6304,101 @@ class AppController {
       return { days, hours, mins, secs, expired: false };
     };
 
+    const toLocalDatetimeValue = (isoStr) => {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
     const renderCountdownsList = () => {
       modal.innerHTML = `
-        <div class="modal-sheet" style="max-height:88vh; overflow-y:auto; padding:18px;">
-          <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div style="width:38px; height:38px; border-radius:12px; background:rgba(139, 92, 246, 0.12); display:flex; align-items:center; justify-content:center; color:#8B5CF6;">
-                <span class="material-symbols-rounded" style="font-size:20px;">timer</span>
+        <div class="modal-sheet" style="max-height:88vh; overflow-y:auto; padding:20px; box-sizing:border-box;">
+          <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:40px; height:40px; border-radius:12px; background:rgba(139, 92, 246, 0.12); display:flex; align-items:center; justify-content:center; color:#8B5CF6; flex-shrink:0;">
+                <span class="material-symbols-rounded" style="font-size:22px;">timer</span>
               </div>
               <div>
-                <div style="font-size:16px; font-weight:800; color:#0F172A;">G.C.E. A/L Examination Countdowns</div>
-                <div style="font-size:11px; color:#64748B;">Target dates & dashboard countdown timer visibility</div>
+                <div style="font-size:16px; font-weight:800; color:#0F172A; line-height:1.2;">G.C.E. A/L Examination Countdowns</div>
+                <div style="font-size:11.5px; color:#64748B; margin-top:2px;">Target dates & dashboard countdown timer visibility</div>
               </div>
             </div>
-            <button class="modal-close-btn" id="btn-close-countdown">
-              <span class="material-symbols-rounded">close</span>
+            <button class="modal-close-btn" id="btn-close-countdown" type="button" aria-label="Close" style="cursor:pointer; width:34px; height:34px; border-radius:50%; border:none; background:#F1F5F9; color:#475569; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
+              <span class="material-symbols-rounded" style="font-size:20px; pointer-events:none;">close</span>
             </button>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:12px;" id="countdowns-list-container">
-            ${countdowns.map((c) => {
+          <div style="display:flex; flex-direction:column; gap:14px;" id="countdowns-list-container">
+            ${countdowns.length === 0 ? `
+              <div style="padding:40px 16px; text-align:center; color:#94A3B8;">
+                <span class="material-symbols-rounded" style="font-size:36px;">hourglass_empty</span>
+                <div style="font-size:14px; font-weight:700; color:#475569; margin-top:6px;">No countdowns configured</div>
+                <div style="font-size:12px; margin-top:2px;">Add your first batch target date below</div>
+              </div>
+            ` : countdowns.map((c) => {
               const t = computeTimeLeft(c.targetDate);
               const dateFormatted = new Date(c.targetDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
               return `
-                <div class="hero-card" style="padding:14px; border:1px solid ${c.isEnabled ? '#C7D2FE' : '#E2E8F0'}; background:${c.isEnabled ? '#FFFFFF' : '#F8FAFC'}; box-shadow:0 2px 8px rgba(15,23,42,0.04);" id="card-cd-${c.id}">
-                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div>
-                      <div style="display:flex; align-items:center; gap:8px;">
+                <div class="hero-card" style="padding:16px; border-radius:16px; border:1px solid ${c.isEnabled ? '#C7D2FE' : '#E2E8F0'}; background:${c.isEnabled ? '#FFFFFF' : '#F8FAFC'}; box-shadow:0 2px 8px rgba(15,23,42,0.04); transition:all 0.2s ease;" id="card-cd-${c.id}">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                    <div style="flex:1; min-width:0;">
+                      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <span style="font-size:13px; font-weight:800; color:#4338CA; background:#EEF2FF; padding:3px 10px; border-radius:8px; border:1px solid #C7D2FE;">${c.examYear}</span>
-                        <span style="font-size:13px; font-weight:700; color:#1E293B;">${c.customTitle}</span>
+                        <span style="font-size:13.5px; font-weight:700; color:#1E293B;">${c.customTitle}</span>
                       </div>
-                      <div style="font-size:11px; color:#64748B; margin-top:4px; display:flex; align-items:center; gap:4px;">
-                        <span class="material-symbols-rounded" style="font-size:14px; color:#4338CA;">track_changes</span> Target: <strong>${dateFormatted}</strong>
+                      <div style="font-size:11.5px; color:#64748B; margin-top:6px; display:flex; align-items:center; gap:5px;">
+                        <span class="material-symbols-rounded" style="font-size:15px; color:#4338CA;">track_changes</span> Target: <strong id="cd-target-label-${c.id}">${dateFormatted}</strong>
                       </div>
                     </div>
 
-                    <!-- Visibility Toggle (lines 60-70 of Flutter screen) -->
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="Toggle visibility for students">
-                      <span style="font-size:10.5px; font-weight:600; color:${c.isEnabled ? '#10B981' : '#94A3B8'};">${c.isEnabled ? 'Visible' : 'Hidden'}</span>
-                      <input type="checkbox" data-toggle-cd="${c.id}" ${c.isEnabled ? 'checked' : ''} style="width:18px; height:18px; accent-color:#10B981; cursor:pointer;" />
+                    <!-- Visibility Toggle -->
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; background:#F8FAFC; padding:4px 8px; border-radius:8px; border:1px solid #E2E8F0;" title="Toggle visibility for students">
+                      <span class="cd-visibility-label" style="font-size:11px; font-weight:700; color:${c.isEnabled ? '#10B981' : '#94A3B8'};">${c.isEnabled ? 'Visible' : 'Hidden'}</span>
+                      <input type="checkbox" class="cd-visibility-input" data-toggle-cd="${c.id}" ${c.isEnabled ? 'checked' : ''} style="width:18px; height:18px; accent-color:#10B981; cursor:pointer; margin:0;" />
                     </label>
                   </div>
 
                   <!-- Live Counter Box (Days, Hours, Mins, Secs) -->
-                  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:12px 0; background:${c.isEnabled ? '#F5F3FF' : '#F1F5F9'}; padding:10px; border-radius:10px; text-align:center;">
+                  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:14px 0 10px; background:${c.isEnabled ? '#F5F3FF' : '#F1F5F9'}; padding:12px 10px; border-radius:12px; text-align:center;">
                     <div>
-                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-days-${c.id}">${t.days}</div>
-                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Days</div>
+                      <div style="font-size:19px; font-weight:900; color:#4F46E5;" id="cd-days-${c.id}">${t.days}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase; letter-spacing:0.5px;">Days</div>
                     </div>
                     <div>
-                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-hours-${c.id}">${t.hours}</div>
-                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Hours</div>
+                      <div style="font-size:19px; font-weight:900; color:#4F46E5;" id="cd-hours-${c.id}">${t.hours}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase; letter-spacing:0.5px;">Hours</div>
                     </div>
                     <div>
-                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-mins-${c.id}">${t.mins}</div>
-                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Mins</div>
+                      <div style="font-size:19px; font-weight:900; color:#4F46E5;" id="cd-mins-${c.id}">${t.mins}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase; letter-spacing:0.5px;">Mins</div>
                     </div>
                     <div>
-                      <div style="font-size:18px; font-weight:900; color:#4F46E5;" id="cd-secs-${c.id}">${t.secs}</div>
-                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase;">Secs</div>
+                      <div style="font-size:19px; font-weight:900; color:#4F46E5;" id="cd-secs-${c.id}">${t.secs}</div>
+                      <div style="font-size:9.5px; font-weight:700; color:#6366F1; text-transform:uppercase; letter-spacing:0.5px;">Secs</div>
                     </div>
                   </div>
 
                   <!-- Action Bar -->
-                  <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F1F5F9; padding-top:8px;">
-                    <div style="font-size:10.5px; color:#94A3B8;">${c.notes || 'Official countdown active for students'}</div>
-                    <button class="apk-paper-btn-secondary" data-edit-date="${c.id}" style="padding:4px 10px; font-size:11px; height:30px; border-color:#8B5CF6; color:#8B5CF6; display:inline-flex; align-items:center; gap:4px;">
-                      <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span> Edit Date & Time
-                    </button>
+                  <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F1F5F9; padding-top:10px; margin-top:4px;">
+                    <div style="font-size:11px; color:#94A3B8;">${c.notes || 'Official countdown active for students'}</div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <button class="apk-paper-btn-secondary" data-edit-date="${c.id}" type="button" style="padding:4px 12px; font-size:11.5px; height:32px; border-color:#8B5CF6; color:#8B5CF6; display:inline-flex; align-items:center; gap:5px; border-radius:8px; cursor:pointer;">
+                        <span class="material-symbols-rounded" style="font-size:15px;">calendar_today</span> Edit Date & Time
+                      </button>
+                      <button class="apk-icon-action-btn" data-delete-cd="${c.id}" type="button" title="Delete Countdown" style="color:#EF4444; width:32px; height:32px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+                        <span class="material-symbols-rounded" style="font-size:16px;">delete</span>
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Inline Date Picker Box -->
-                  <div id="date-picker-box-${c.id}" style="display:none; margin-top:10px; padding:10px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px;">
-                    <div style="font-size:11px; font-weight:700; color:#334155; margin-bottom:6px;">Select New Examination Date & Time:</div>
-                    <div style="display:flex; gap:8px;">
-                      <input type="datetime-local" id="input-dt-${c.id}" class="form-textarea" style="height:36px; font-size:11.5px; flex:1;" value="${new Date(c.targetDate).toISOString().slice(0, 16)}" />
-                      <button class="primary-btn" data-save-dt="${c.id}" style="height:36px; padding:0 14px; margin-top:0; font-size:11.5px;">Save</button>
+                  <div id="date-picker-box-${c.id}" style="display:none; margin-top:12px; padding:12px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:12px;">
+                    <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:8px;">Select New Examination Date & Time:</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                      <input type="datetime-local" id="input-dt-${c.id}" class="form-textarea" style="height:38px; font-size:12px; flex:1; min-width:180px; padding:6px 10px; border-radius:8px; border:1px solid #CBD5E1;" value="${toLocalDatetimeValue(c.targetDate)}" />
+                      <button class="primary-btn" data-save-dt="${c.id}" type="button" style="height:38px; padding:0 16px; margin-top:0; font-size:12px; font-weight:700; border-radius:8px; cursor:pointer;">Save</button>
                     </div>
                   </div>
                 </div>
@@ -6367,116 +6407,180 @@ class AppController {
           </div>
 
           <!-- Add New Countdown Button / Form -->
-          <div style="margin-top:16px; border-top:1px solid #E2E8F0; padding-top:14px;">
-            <button class="apk-paper-btn-secondary" id="btn-toggle-add-cd" style="width:100%; border-color:#8B5CF6; color:#8B5CF6; height:40px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:16px;">add</span> Add New Batch Examination Countdown
+          <div style="margin-top:18px; border-top:1px solid #E2E8F0; padding-top:16px;">
+            <button class="apk-paper-btn-secondary" id="btn-toggle-add-cd" type="button" style="width:100%; border-color:#8B5CF6; color:#8B5CF6; height:42px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:10px; cursor:pointer; background:#FAF5FF;">
+              <span class="material-symbols-rounded" style="font-size:18px;">add</span> Add New Batch Examination Countdown
             </button>
-            <div id="add-cd-box" style="display:none; margin-top:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
-              <div style="font-size:12px; font-weight:700; color:#1E293B; margin-bottom:8px;">Create New Batch Target:</div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-                <input type="text" id="new-cd-year" class="form-textarea" style="height:38px;" placeholder="e.g. 2030 A/L" />
-                <input type="datetime-local" id="new-cd-date" class="form-textarea" style="height:38px;" />
+            <div id="add-cd-box" style="display:none; margin-top:14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px;">
+              <div style="font-size:12.5px; font-weight:800; color:#1E293B; margin-bottom:10px;">Create New Batch Target:</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                <div>
+                  <label style="display:block; font-size:10.5px; font-weight:700; color:#64748B; margin-bottom:4px;">Batch / Exam Year</label>
+                  <input type="text" id="new-cd-year" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" placeholder="e.g. 2030 A/L" />
+                </div>
+                <div>
+                  <label style="display:block; font-size:10.5px; font-weight:700; color:#64748B; margin-bottom:4px;">Target Date & Time</label>
+                  <input type="datetime-local" id="new-cd-date" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" />
+                </div>
               </div>
-              <input type="text" id="new-cd-title" class="form-textarea" style="height:38px; margin-bottom:8px;" placeholder="e.g. 2030 G.C.E. Advanced Level Examination" />
-              <button class="primary-btn" id="btn-submit-new-cd" style="height:38px; margin-top:0; width:100%;">Create & Sync Countdown</button>
+              <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:10.5px; font-weight:700; color:#64748B; margin-bottom:4px;">Title / Label</label>
+                <input type="text" id="new-cd-title" class="form-textarea" style="height:38px; width:100%; box-sizing:border-box; border-radius:8px; padding:6px 10px; font-size:12px;" placeholder="e.g. 2030 G.C.E. Advanced Level Examination" />
+              </div>
+              <button class="primary-btn" id="btn-submit-new-cd" type="button" style="height:40px; margin-top:0; width:100%; font-weight:700; font-size:13px; border-radius:10px; cursor:pointer;">Create & Sync Countdown</button>
             </div>
           </div>
         </div>
       `;
 
-      // Handlers
-      document.getElementById('btn-close-countdown')?.addEventListener('click', () => {
-        if (timerInterval) clearInterval(timerInterval);
-        modal.remove();
-      });
+      // 1. Close Button Handler
+      const closeBtn = modal.querySelector('#btn-close-countdown');
+      if (closeBtn) {
+        closeBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        };
+      }
 
-      // Toggle edit box
+      // 2. Toggle Edit Date Box
       modal.querySelectorAll('[data-edit-date]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.onclick = (e) => {
+          e.preventDefault();
           const id = btn.dataset.editDate;
-          const box = document.getElementById(`date-picker-box-${id}`);
+          const box = modal.querySelector(`#date-picker-box-${id}`);
           if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
-        });
+        };
       });
 
-      // Save date
+      // 3. Save Edited Date
       modal.querySelectorAll('[data-save-dt]').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.onclick = async (e) => {
+          e.preventDefault();
           const id = btn.dataset.saveDt;
-          const val = document.getElementById(`input-dt-${id}`)?.value;
-          if (!val) return;
+          const input = modal.querySelector(`#input-dt-${id}`);
+          const val = input?.value;
+          if (!val) {
+            notificationService.showInAppToast('Please select a valid date and time', 'warning');
+            return;
+          }
           try {
             btn.innerText = 'Saving...';
-            await dbService.updateExamCountdown(id, { targetDate: new Date(val).toISOString() }, this.currentUser?.name || 'Admin');
+            btn.disabled = true;
+            const targetIso = new Date(val).toISOString();
+            await dbService.updateExamCountdown(id, { targetDate: targetIso }, this.currentUser?.name || 'Admin');
             notificationService.showInAppToast('Examination target date successfully updated!', 'success');
             countdowns = await dbService.getExamCountdowns();
             renderCountdownsList();
-          } catch (e) {
-            notificationService.showInAppToast('Update error: ' + e.message, 'error');
+          } catch (err) {
+            notificationService.showInAppToast('Update error: ' + err.message, 'error');
+            btn.disabled = false;
             btn.innerText = 'Save';
           }
-        });
+        };
       });
 
-      // Toggle visibility
+      // 4. Delete Countdown
+      modal.querySelectorAll('[data-delete-cd]').forEach(btn => {
+        btn.onclick = async (e) => {
+          e.preventDefault();
+          const id = btn.dataset.deleteCd;
+          const target = countdowns.find(x => x.id === id);
+          if (!confirm(`Are you sure you want to permanently delete the countdown for ${target ? target.examYear : 'this exam'}?`)) {
+            return;
+          }
+          try {
+            await dbService.deleteExamCountdown(id);
+            notificationService.showInAppToast('Countdown deleted successfully', 'warning');
+            countdowns = await dbService.getExamCountdowns();
+            renderCountdownsList();
+          } catch (err) {
+            notificationService.showInAppToast('Delete error: ' + err.message, 'error');
+          }
+        };
+      });
+
+      // 5. Toggle Visibility Checkbox
       modal.querySelectorAll('[data-toggle-cd]').forEach(chk => {
-        chk.addEventListener('change', async () => {
+        chk.onchange = async () => {
           const id = chk.dataset.toggleCd;
+          const card = modal.querySelector(`#card-cd-${id}`);
+          const labelSpan = card?.querySelector('.cd-visibility-label');
+          if (labelSpan) {
+            labelSpan.textContent = chk.checked ? 'Visible' : 'Hidden';
+            labelSpan.style.color = chk.checked ? '#10B981' : '#94A3B8';
+          }
+          if (card) {
+            card.style.background = chk.checked ? '#FFFFFF' : '#F8FAFC';
+            card.style.borderColor = chk.checked ? '#C7D2FE' : '#E2E8F0';
+          }
           try {
             await dbService.updateExamCountdown(id, { isEnabled: chk.checked }, this.currentUser?.name || 'Admin');
             notificationService.showInAppToast(`${chk.checked ? 'Enabled' : 'Hidden'} countdown on student dashboard!`, 'info');
             const target = countdowns.find(x => x.id === id);
             if (target) target.isEnabled = chk.checked;
-          } catch (e) {
-            notificationService.showInAppToast('Visibility error: ' + e.message, 'error');
+          } catch (err) {
+            notificationService.showInAppToast('Visibility error: ' + err.message, 'error');
           }
-        });
+        };
       });
 
-      // Toggle Add Form
-      document.getElementById('btn-toggle-add-cd')?.addEventListener('click', () => {
-        const box = document.getElementById('add-cd-box');
-        if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
-      });
+      // 6. Toggle Add Form
+      const addToggleBtn = modal.querySelector('#btn-toggle-add-cd');
+      if (addToggleBtn) {
+        addToggleBtn.onclick = (e) => {
+          e.preventDefault();
+          const box = modal.querySelector('#add-cd-box');
+          if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        };
+      }
 
-      // Submit new
-      document.getElementById('btn-submit-new-cd')?.addEventListener('click', async () => {
-        const year = document.getElementById('new-cd-year')?.value.trim();
-        const dateVal = document.getElementById('new-cd-date')?.value;
-        const title = document.getElementById('new-cd-title')?.value.trim();
+      // 7. Submit New Countdown
+      const submitNewBtn = modal.querySelector('#btn-submit-new-cd');
+      if (submitNewBtn) {
+        submitNewBtn.onclick = async (e) => {
+          e.preventDefault();
+          const year = modal.querySelector('#new-cd-year')?.value.trim();
+          const dateVal = modal.querySelector('#new-cd-date')?.value;
+          const title = modal.querySelector('#new-cd-title')?.value.trim();
 
-        if (!year || !dateVal) {
-          notificationService.showInAppToast('Please provide exam year and target date!', 'warning');
-          return;
-        }
+          if (!year || !dateVal) {
+            notificationService.showInAppToast('Please provide exam year and target date!', 'warning');
+            return;
+          }
 
-        try {
-          await dbService.addExamCountdown({
-            examYear: year,
-            customTitle: title || `${year} Examination`,
-            targetDate: new Date(dateVal).toISOString(),
-            isEnabled: true
-          }, this.currentUser?.name || 'Admin');
-          notificationService.showInAppToast('New examination countdown created!', 'success');
-          countdowns = await dbService.getExamCountdowns();
-          renderCountdownsList();
-        } catch (e) {
-          notificationService.showInAppToast('Add error: ' + e.message, 'error');
-        }
-      });
+          submitNewBtn.disabled = true;
+          submitNewBtn.innerText = 'Creating & Syncing...';
+
+          try {
+            await dbService.addExamCountdown({
+              examYear: year,
+              customTitle: title || `${year} Examination`,
+              targetDate: new Date(dateVal).toISOString(),
+              isEnabled: true
+            }, this.currentUser?.name || 'Admin');
+            notificationService.showInAppToast('New examination countdown created!', 'success');
+            countdowns = await dbService.getExamCountdowns();
+            renderCountdownsList();
+          } catch (err) {
+            notificationService.showInAppToast('Add error: ' + err.message, 'error');
+            submitNewBtn.disabled = false;
+            submitNewBtn.innerText = 'Create & Sync Countdown';
+          }
+        };
+      }
     };
 
     renderCountdownsList();
-    document.body.appendChild(modal);
 
     // Live 1-second interval to tick countdown numbers
     timerInterval = setInterval(() => {
       countdowns.forEach(c => {
         const t = computeTimeLeft(c.targetDate);
-        const daysEl = document.getElementById(`cd-days-${c.id}`);
-        const hoursEl = document.getElementById(`cd-hours-${c.id}`);
-        const minsEl = document.getElementById(`cd-mins-${c.id}`);
-        const secsEl = document.getElementById(`cd-secs-${c.id}`);
+        const daysEl = modal.querySelector(`#cd-days-${c.id}`);
+        const hoursEl = modal.querySelector(`#cd-hours-${c.id}`);
+        const minsEl = modal.querySelector(`#cd-mins-${c.id}`);
+        const secsEl = modal.querySelector(`#cd-secs-${c.id}`);
         if (daysEl) daysEl.innerText = t.days;
         if (hoursEl) hoursEl.innerText = t.hours;
         if (minsEl) minsEl.innerText = t.mins;
@@ -6484,6 +6588,8 @@ class AppController {
       });
     }, 1000);
   }
+
+  
 
   // ── Student Homework Submission Guidelines Modal (1:1 with student_submit_guide_screen.dart) ──
   openSubmitGuideModal() {
