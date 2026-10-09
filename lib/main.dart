@@ -29,6 +29,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = SafeHttpOverrides();
 
+  // If launched on Android, immediately disconnect database access and display deprecation notice
+  if (Platform.isAndroid) {
+    runApp(const EduPeakDeprecatedApp());
+    return;
+  }
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -129,3 +135,83 @@ class DessertApp extends StatelessWidget {
     );
   }
 }
+
+class EduPeakDeprecatedApp extends StatelessWidget {
+  const EduPeakDeprecatedApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'EduPeak App Deprecated',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFF0B1220),
+        fontFamily: 'sans-serif',
+      ),
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: const Icon(
+                    Icons.web_rounded,
+                    color: Color(0xFF3B82F6),
+                    size: 38,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Android App Discontinued',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'The native Android APK has been decommissioned and disconnected from the database. Please use the official EduPeak Web App on your browser.',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2563EB)),
+                  ),
+                  child: const SelectableText(
+                    'https://app.edupeak.lk',
+                    style: TextStyle(
+                      color: Color(0xFF60A5FA),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

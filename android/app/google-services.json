@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:400647872169:android:fae72682b4da8841ec93b8",
+        "mobilesdk_app_id": "DECOMMISSIONED_APP_ID",
         "android_client_info": {
           "package_name": "com.institute.dessert.dessert_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDVaNNyALnsrqrqTj371nGn8gbeBWL7fGc"
+          "current_key": "DECOMMISSIONED_API_KEY"
         }
       ],
       "services": {

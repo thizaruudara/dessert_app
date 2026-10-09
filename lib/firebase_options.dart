@@ -8,7 +8,9 @@ class DefaultFirebaseOptions {
     if (kIsWeb) throw UnsupportedError('Web not supported');
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return android;
+        throw UnsupportedError(
+          'Android APK has been decommissioned. Please use the official Web App at https://app.edupeak.lk',
+        );
       case TargetPlatform.iOS:
         return ios;
       default:
@@ -19,11 +21,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDVaNNyALnsrqrqTj371nGn8gbeBWL7fGc',
-    appId: '1:400647872169:android:fae72682b4da8841ec93b8',
-    messagingSenderId: '400647872169',
-    projectId: 'dessert-institute',
-    storageBucket: 'dessert-institute.firebasestorage.app',
+    apiKey: 'DISCONNECTED',
+    appId: 'DISCONNECTED',
+    messagingSenderId: '0',
+    projectId: 'decommissioned',
+    storageBucket: 'decommissioned',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
