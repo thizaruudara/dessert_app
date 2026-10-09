@@ -33,6 +33,18 @@ class AppController {
         else this.renderApp();
       }
     });
+
+    window.addEventListener('edupeak:credits-updated', () => {
+      if (this.currentMode === 'student') {
+        const vp = document.getElementById('main-viewport');
+        if (vp) {
+          if (this.currentTab === 'home') this.renderHomeScreen(vp);
+          else if (this.currentTab === 'ranks') this.renderRanksScreen(vp);
+          else if (this.currentTab === 'profile') this.renderProfileScreen(vp);
+        }
+      }
+    });
+
     window.addEventListener('popstate', () => {
       if (this.currentUser?.role === 'admin') {
         if (this.currentMode !== 'student') return;
@@ -547,12 +559,36 @@ class AppController {
     const initial = studentName.charAt(0).toUpperCase();
     const activeTargetYear = user.examYear || '2027 A/L';
 
-    const [insight, sessions, upcomingList] = await Promise.all([
+    const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
       dbService.getDailyInsight(),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
-      dbService.getUpcomingPapers(activeTargetYear).catch(() => [])
+      dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
+      dbService.getStudentCredits(user.uid || user.id, user.phone),
+      dbService.getStudentDesserts(user.uid || user.id, user.phone).catch(() => [])
     ]);
     if (renderToken !== this.renderToken || !container.isConnected) return;
+
+    // Dynamic level calculation based on student's earned XP
+    let levelName = 'Level 1 Novice';
+    let targetXp = 100;
+    let baseLevelXp = 0;
+    if (studentCredits >= 500) {
+      levelName = 'Level 4 Master';
+      targetXp = 1000;
+      baseLevelXp = 500;
+    } else if (studentCredits >= 250) {
+      levelName = 'Level 3 Scholar';
+      targetXp = 500;
+      baseLevelXp = 250;
+    } else if (studentCredits >= 100) {
+      levelName = 'Level 2 Cadet';
+      targetXp = 250;
+      baseLevelXp = 100;
+    }
+    const progressPercent = Math.min(100, Math.max(8, Math.round(((studentCredits - baseLevelXp) / Math.max(1, targetXp - baseLevelXp)) * 100)));
+
+    const hasApprovedHw = myDesserts.some(d => d.status === 'approved');
+    const hasSubmittedHw = myDesserts.length > 0;
 
     // Determine the most relevant real paper for the student
     const liveSession = sessions.find(s => {
@@ -592,17 +628,17 @@ class AppController {
         </div>
       </div>
 
-      <!-- 2. Hero Level Card (Level 2 Cadet, 155 / 200 XP, 3 Mission Checkboxes) -->
+      <!-- 2. Hero Level Card (Dynamic Level, Real Points System, Mission Checkboxes) -->
       <div class="hero-card">
         <div class="hero-top">
           <div class="hero-title" style="display:inline-flex; align-items:center; gap:4px;">
             <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">bolt</span>
-            <span>Level 2 Cadet</span>
+            <span>${levelName}</span>
           </div>
-          <span class="hero-pts">155 / 200 XP</span>
+          <span class="hero-pts">${studentCredits} / ${targetXp} XP</span>
         </div>
         <div class="progress-bar-bg">
-          <div class="progress-bar-fill"></div>
+          <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
         </div>
         <div class="mission-checkboxes-row">
           <div class="mission-check-pill completed" style="display:inline-flex; align-items:center; gap:4px;">
@@ -615,10 +651,13 @@ class AppController {
             <span class="mission-check-title">Review Tip</span>
             <span class="mission-check-xp">+20 XP</span>
           </div>
-          <div class="mission-check-pill" style="display:inline-flex; align-items:center; gap:4px;">
-            <span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span>
-            <span class="mission-check-title">Homework</span>
-            <span class="mission-check-xp">+100 XP</span>
+          <div class="mission-check-pill ${hasApprovedHw ? 'completed' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
+            ${hasApprovedHw
+              ? '<span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#10B981;">Approved</span>'
+              : hasSubmittedHw
+                ? '<span class="material-symbols-rounded" style="font-size:14px; color:#3B82F6;">hourglass_top</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#3B82F6;">Pending</span>'
+                : '<span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp">+100 XP</span>'
+            }
           </div>
         </div>
       </div>
@@ -2156,7 +2195,10 @@ class AppController {
     const top3 = filtered.slice(0, 3);
     const visibleRankRows = filtered;
     const currentUserId = currentUser.uid || currentUser.id;
-    const currentUserRank = filtered.findIndex((student) => student.id === currentUserId) + 1;
+    const isMe = (student) => (student.id && student.id === currentUserId) ||
+      (currentUser.phone && student.studentPhone && String(student.studentPhone).replace(/\D/g, '') === String(currentUser.phone).replace(/\D/g, '')) ||
+      (currentUser.name && student.name && student.name.trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
+    const currentUserRank = filtered.findIndex((student) => isMe(student)) + 1;
     const currentUserEntry = currentUserRank > 0 ? filtered[currentUserRank - 1] : null;
     const nextRankEntry = currentUserRank > 1 ? filtered[currentUserRank - 2] : null;
     const emptyBatchLabel = isAdmin
@@ -2181,14 +2223,14 @@ class AppController {
           </div>`
         : `<div class="ranks-list">
             ${visibleRankRows.map((student) => `
-              <div class="rank-list-item ${student.id === (currentUser.uid || currentUser.id) ? 'is-current-user' : ''}">
+              <div class="rank-list-item ${isMe(student) ? 'is-current-user' : ''}">
                 <div class="rank-item-left">
                   <span class="rank-index ${student.rank <= 3 ? `top-rank-${student.rank}` : ''}">#${student.rank}</span>
                   <div class="rank-avatar">${escapeHTML(String(student.name || 'S').charAt(0).toUpperCase())}</div>
                   <div class="rank-name-box">
                     <div class="rank-student-name">
                       <span>${escapeHTML(student.name)}</span>
-                      ${student.id === (currentUser.uid || currentUser.id) ? '<span class="rank-you-tag">You</span>' : ''}
+                      ${isMe(student) ? '<span class="rank-you-tag">You</span>' : ''}
                     </div>
                     <div class="rank-batch-tag">${escapeHTML(student.examYear || 'General Batch')}</div>
                   </div>
@@ -2809,7 +2851,7 @@ class AppController {
     const pendingCount = desserts.filter(d => !d.status || d.status === 'pending').length;
     if (renderToken !== this.renderToken || !container.isConnected) return;
     const totalCount = desserts.length;
-    const creditsXP = user.credits ?? 155;
+    const creditsXP = await dbService.getStudentCredits(user.uid || user.id, user.phone);
 
     // Format member since date
     let memberSinceStr = 'September 2026';
@@ -4623,34 +4665,83 @@ class AppController {
       });
     });
 
-    document.getElementById('btn-close-review')?.addEventListener('click', () => modal.remove());
-
-    document.getElementById('btn-admin-approve-sub')?.addEventListener('click', async () => {
-      const fb = document.getElementById('admin-feedback-text')?.value || 'Great work!';
-      await dbService.reviewDessert(sub.id, {
-        status: 'approved',
-        adminFeedback: fb,
-        creditsAwarded: credits,
-        reviewedBy: 'Lead Physics Faculty'
-      });
-      notificationService.showInAppBanner('Submission Approved!', `Awarded +${credits} XP to ${sub.studentName}.`, 'success');
-      modal.remove();
-      const vp = document.getElementById('admin-main-viewport');
-      if (vp) this.renderAdminDashboardScreen(vp);
+    modal.querySelector('#btn-close-review')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
     });
 
-    document.getElementById('btn-admin-reject-sub')?.addEventListener('click', async () => {
-      const fb = document.getElementById('admin-feedback-text')?.value || 'Needs improvement. Please try again.';
-      await dbService.reviewDessert(sub.id, {
-        status: 'rejected',
-        adminFeedback: fb,
-        creditsAwarded: 10,
-        reviewedBy: 'Lead Physics Faculty'
-      });
-      notificationService.showInAppBanner('Revision Requested', `Sent correction notes to ${sub.studentName}.`, 'warning');
-      modal.remove();
-      const vp = document.getElementById('admin-main-viewport');
-      if (vp) this.renderAdminDashboardScreen(vp);
+    const approveBtn = modal.querySelector('#btn-admin-approve-sub');
+    approveBtn?.addEventListener('click', async () => {
+      if (approveBtn.disabled) return;
+      approveBtn.disabled = true;
+      approveBtn.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px; animation:spin 1s linear infinite;">sync</span> <span>Approving (+${credits} XP)...</span>`;
+
+      const fb = modal.querySelector('#admin-feedback-text')?.value || 'Great work!';
+      try {
+        await dbService.reviewDessert(sub.id, {
+          status: 'approved',
+          adminFeedback: fb,
+          creditsAwarded: credits,
+          reviewedBy: 'Lead Physics Faculty',
+          studentId: sub.studentId,
+          studentName: sub.studentName,
+          studentPhone: sub.studentPhone,
+          examYear: sub.examYear,
+          dessertObj: sub
+        });
+
+        // Update current user credits if viewing student
+        if (this.currentUser && (
+          this.currentUser.uid === sub.studentId ||
+          this.currentUser.id === sub.studentId ||
+          this.currentUser.phone === sub.studentPhone ||
+          this.currentUser.name === sub.studentName
+        )) {
+          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + credits;
+        }
+
+        notificationService.showInAppBanner('Submission Approved! 🎉', `Awarded +${credits} XP to ${sub.studentName || 'Student'}.`, 'success');
+        modal.remove();
+        const vp = document.getElementById('admin-main-viewport');
+        if (vp) await this.renderAdminDashboardScreen(vp);
+      } catch (err) {
+        console.error('[Admin] Review approval error:', err);
+        approveBtn.disabled = false;
+        approveBtn.innerHTML = `<span class="material-symbols-rounded filled" style="font-size:16px;">check_circle</span> <span>Approve (+${credits} XP)</span>`;
+        notificationService.showInAppBanner('Review Notice', 'Failed to approve: ' + (err.message || err), 'error');
+      }
+    });
+
+    const rejectBtn = modal.querySelector('#btn-admin-reject-sub');
+    rejectBtn?.addEventListener('click', async () => {
+      if (rejectBtn.disabled) return;
+      rejectBtn.disabled = true;
+      rejectBtn.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px; animation:spin 1s linear infinite;">sync</span> <span>Updating...</span>`;
+
+      const fb = modal.querySelector('#admin-feedback-text')?.value || 'Needs improvement. Please revise.';
+      try {
+        await dbService.reviewDessert(sub.id, {
+          status: 'rejected',
+          adminFeedback: fb,
+          creditsAwarded: 10,
+          reviewedBy: 'Lead Physics Faculty',
+          studentId: sub.studentId,
+          studentName: sub.studentName,
+          studentPhone: sub.studentPhone,
+          examYear: sub.examYear,
+          dessertObj: sub
+        });
+
+        notificationService.showInAppBanner('Revision Requested', `Sent correction notes to ${sub.studentName || 'Student'}.`, 'warning');
+        modal.remove();
+        const vp = document.getElementById('admin-main-viewport');
+        if (vp) await this.renderAdminDashboardScreen(vp);
+      } catch (err) {
+        console.error('[Admin] Review rejection error:', err);
+        rejectBtn.disabled = false;
+        rejectBtn.innerHTML = `<span class="material-symbols-rounded filled" style="font-size:16px;">cancel</span> <span>Request Redo</span>`;
+        notificationService.showInAppBanner('Review Notice', 'Failed to submit correction: ' + (err.message || err), 'error');
+      }
     });
   }
 
@@ -5983,6 +6074,7 @@ class AppController {
                     </div>
                     <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
                       ${st.phone || 'No phone'} • <span style="color:#2563EB; font-weight:700;">${st.examYear || '2026 A/L'}</span>
+                      <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">⚡ ${st.credits || 155} XP</span>
                       ${st.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${st.studentId}</span>` : ''}
                     </div>
                   </div>

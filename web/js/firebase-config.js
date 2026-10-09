@@ -17,7 +17,8 @@ import {
   limit, 
   onSnapshot, 
   serverTimestamp, 
-  arrayUnion 
+  arrayUnion,
+  increment
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 
@@ -53,6 +54,7 @@ export {
   onSnapshot, 
   serverTimestamp, 
   arrayUnion,
+  increment,
   ref,
   uploadString,
   getDownloadURL,
