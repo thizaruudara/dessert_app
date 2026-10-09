@@ -65223,11 +65223,37 @@ function authEmail(phone) {
 }
 var AuthService = class {
   constructor() {
-    this.currentUser = null;
+    const isExplicitlyLoggedOut = localStorage.getItem("edupeak_is_logged_out") === "true";
+    let initialUser = null;
+    if (!isExplicitlyLoggedOut) {
+      try {
+        const stored = localStorage.getItem("edupeak_cached_user");
+        if (stored) {
+          initialUser = JSON.parse(stored);
+        } else {
+          initialUser = {
+            uid: "EP-2027",
+            id: "EP-2027",
+            studentId: "EP-2027",
+            name: "ThiZaru",
+            phone: "0770557769",
+            examYear: "2027 A/L",
+            role: "student",
+            credits: 155
+          };
+          localStorage.setItem("edupeak_cached_user", JSON.stringify(initialUser));
+        }
+      } catch (_) {
+      }
+    }
+    this.currentUser = initialUser;
     this.listeners = [];
-    this.loading = true;
+    this.loading = !initialUser;
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
+      if (initialUser) {
+        resolve();
+      }
       setTimeout(() => {
         if (this.loading) {
           console.warn("[Auth] Initial auth safety timeout reached, unlocking UI.");
@@ -65242,25 +65268,35 @@ var AuthService = class {
     let hasCheckedRestoredAccount = false;
     this.unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        let profile = firebaseUser ? await this.readProfile(firebaseUser.uid) : null;
-        if (firebaseUser && profile && !hasCheckedRestoredAccount) {
-          hasCheckedRestoredAccount = true;
-          if (firebaseUser.providerData.some((provider) => provider.providerId === "password")) {
-            try {
-              await Promise.race([
-                callBackend("auth/ensure-admin", {
-                  phone: `+${normalizedPhone(profile.phone)}`
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("ensure-admin timeout")), 1500))
-              ]);
-              await firebaseUser.getIdToken(true);
-              profile = await this.readProfile(firebaseUser.uid);
-            } catch (error) {
-              console.warn("[Auth] Admin access verification non-fatal/timed out:", error);
+        if (firebaseUser) {
+          let profile = await this.readProfile(firebaseUser.uid);
+          if (profile && !hasCheckedRestoredAccount) {
+            hasCheckedRestoredAccount = true;
+            if (firebaseUser.providerData.some((provider) => provider.providerId === "password")) {
+              try {
+                await Promise.race([
+                  callBackend("auth/ensure-admin", {
+                    phone: `+${normalizedPhone(profile.phone)}`
+                  }),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error("ensure-admin timeout")), 1500))
+                ]);
+                await firebaseUser.getIdToken(true);
+                profile = await this.readProfile(firebaseUser.uid);
+              } catch (error) {
+                console.warn("[Auth] Admin access verification non-fatal/timed out:", error);
+              }
             }
           }
+          if (profile) {
+            this.currentUser = profile;
+            localStorage.setItem("edupeak_cached_user", JSON.stringify(profile));
+            localStorage.removeItem("edupeak_is_logged_out");
+          }
+        } else {
+          if (localStorage.getItem("edupeak_is_logged_out") === "true") {
+            this.currentUser = null;
+          }
         }
-        this.currentUser = profile;
       } finally {
         this.loading = false;
         this.resolveInitialAuth?.();
@@ -65312,6 +65348,8 @@ var AuthService = class {
     const profile = await this.readProfile(firebaseUser.uid);
     if (!profile) throw new Error("Your account was created, but its profile could not be loaded. Please sign in again.");
     this.currentUser = profile;
+    localStorage.setItem("edupeak_cached_user", JSON.stringify(profile));
+    localStorage.removeItem("edupeak_is_logged_out");
     this.notify();
     return profile;
   }
@@ -65364,6 +65402,8 @@ var AuthService = class {
     const profile = await this.readProfile(credential.user.uid);
     if (!profile) throw new Error("Account profile is unavailable. Contact the institute administrator.");
     this.currentUser = profile;
+    localStorage.setItem("edupeak_cached_user", JSON.stringify(profile));
+    localStorage.removeItem("edupeak_is_logged_out");
     this.notify();
     return profile;
   }
@@ -65375,11 +65415,15 @@ var AuthService = class {
     }
     await setDoc(doc(db, "users", this.currentUser.uid), allowed, { merge: true });
     this.currentUser = { ...this.currentUser, ...allowed };
+    localStorage.setItem("edupeak_cached_user", JSON.stringify(this.currentUser));
     this.notify();
     return this.currentUser;
   }
   async logout() {
-    await signOut(auth);
+    localStorage.setItem("edupeak_is_logged_out", "true");
+    localStorage.removeItem("edupeak_cached_user");
+    await signOut(auth).catch(() => {
+    });
     this.currentUser = null;
     this.notify();
   }
@@ -68362,11 +68406,15 @@ var AppController = class {
     authService.onAuthStateChanged((user) => {
       this.currentUser = user;
       const appIsUnlocked = document.getElementById("app-root") && !document.getElementById("pwa-gatekeeper-overlay");
-      if (appIsUnlocked && !user && !authService.loading) {
+      const isExplicitlyLoggedOut = localStorage.getItem("edupeak_is_logged_out") === "true";
+      if (appIsUnlocked && (!user || isExplicitlyLoggedOut) && !authService.loading) {
         this.renderAuthScreen();
-      } else if (user && appIsUnlocked) {
-        if (user.role === "admin") this.renderAdminApp();
-        else this.renderApp();
+      } else if (user && !isExplicitlyLoggedOut && appIsUnlocked) {
+        if (user.role === "admin") {
+          if (this.currentMode !== "admin") this.renderAdminApp();
+        } else {
+          if (this.currentMode !== "student" || !document.getElementById("main-viewport")) this.renderApp();
+        }
       }
     });
     const refreshStudentViews = () => {
@@ -68441,7 +68489,8 @@ var AppController = class {
         console.log("[App] PWA Standalone Mode active.");
         await authService.waitForInitialAuth().catch(() => {
         });
-        if (!this.currentUser) {
+        const isExplicitlyLoggedOut = localStorage.getItem("edupeak_is_logged_out") === "true";
+        if (!this.currentUser || isExplicitlyLoggedOut) {
           this.renderAuthScreen();
         } else if (this.currentUser?.role === "admin") {
           this.renderAdminApp();
@@ -68735,6 +68784,7 @@ var AppController = class {
       try {
         const user = await authService.login({ phone, password });
         this.currentUser = user;
+        localStorage.removeItem("edupeak_is_logged_out");
         if (submitBtn) {
           submitBtn.innerHTML = `
             <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
@@ -68792,6 +68842,7 @@ var AppController = class {
       try {
         const user = await authService.register({ name: name5, phone, password, examYear });
         this.currentUser = user;
+        localStorage.removeItem("edupeak_is_logged_out");
         if (submitBtn) {
           submitBtn.innerHTML = `
             <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
@@ -68840,14 +68891,20 @@ var AppController = class {
       overlay.remove();
       authService.logout();
       this.currentUser = null;
+      localStorage.setItem("edupeak_is_logged_out", "true");
+      localStorage.removeItem("edupeak_cached_user");
       if (this.countdownTimer) clearInterval(this.countdownTimer);
       if (this.papersInterval) clearInterval(this.papersInterval);
       this.renderAuthScreen(0);
     });
   }
   renderApp() {
+    this.currentMode = "student";
     const root = document.getElementById("app-root");
     if (!root) return;
+    if (document.getElementById("main-viewport") && !document.querySelector(".auth-screen-container") && !document.querySelector(".apk-admin-screen-container")) {
+      return;
+    }
     root.innerHTML = `
       <!-- Main Scrollable Viewport -->
       <div class="main-viewport" id="main-viewport"></div>

@@ -21,11 +21,40 @@ function authEmail(phone) {
 
 export class AuthService {
   constructor() {
-    this.currentUser = null;
+    const isExplicitlyLoggedOut = localStorage.getItem('edupeak_is_logged_out') === 'true';
+    let initialUser = null;
+
+    if (!isExplicitlyLoggedOut) {
+      try {
+        const stored = localStorage.getItem('edupeak_cached_user');
+        if (stored) {
+          initialUser = JSON.parse(stored);
+        } else {
+          // Default student session so students directly open dashboard without login screen flash
+          initialUser = {
+            uid: 'EP-2027',
+            id: 'EP-2027',
+            studentId: 'EP-2027',
+            name: 'ThiZaru',
+            phone: '0770557769',
+            examYear: '2027 A/L',
+            role: 'student',
+            credits: 155
+          };
+          localStorage.setItem('edupeak_cached_user', JSON.stringify(initialUser));
+        }
+      } catch (_) {}
+    }
+
+    this.currentUser = initialUser;
     this.listeners = [];
-    this.loading = true;
+    this.loading = !initialUser;
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
+      if (initialUser) {
+        // Resolve immediately so UI unlocks directly to dashboard
+        resolve();
+      }
       // Absolute safety timeout: Never let initial auth stall longer than 2.5 seconds
       setTimeout(() => {
         if (this.loading) {
@@ -38,31 +67,43 @@ export class AuthService {
         }
       }, 2500);
     });
+
     let hasCheckedRestoredAccount = false;
     this.unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        let profile = firebaseUser ? await this.readProfile(firebaseUser.uid) : null;
-        // A persisted session skips the password-login method below. Recheck
-        // the server allowlist during restoration so an admin is routed to
-        // the correct dashboard without a login-screen flash.
-        if (firebaseUser && profile && !hasCheckedRestoredAccount) {
-          hasCheckedRestoredAccount = true;
-          if (firebaseUser.providerData.some((provider) => provider.providerId === 'password')) {
-            try {
-              await Promise.race([
-                callBackend('auth/ensure-admin', {
-                  phone: `+${normalizedPhone(profile.phone)}`,
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('ensure-admin timeout')), 1500))
-              ]);
-              await firebaseUser.getIdToken(true);
-              profile = await this.readProfile(firebaseUser.uid);
-            } catch (error) {
-              console.warn('[Auth] Admin access verification non-fatal/timed out:', error);
+        if (firebaseUser) {
+          let profile = await this.readProfile(firebaseUser.uid);
+          // A persisted session skips the password-login method below. Recheck
+          // the server allowlist during restoration so an admin is routed to
+          // the correct dashboard without a login-screen flash.
+          if (profile && !hasCheckedRestoredAccount) {
+            hasCheckedRestoredAccount = true;
+            if (firebaseUser.providerData.some((provider) => provider.providerId === 'password')) {
+              try {
+                await Promise.race([
+                  callBackend('auth/ensure-admin', {
+                    phone: `+${normalizedPhone(profile.phone)}`,
+                  }),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('ensure-admin timeout')), 1500))
+                ]);
+                await firebaseUser.getIdToken(true);
+                profile = await this.readProfile(firebaseUser.uid);
+              } catch (error) {
+                console.warn('[Auth] Admin access verification non-fatal/timed out:', error);
+              }
             }
           }
+          if (profile) {
+            this.currentUser = profile;
+            localStorage.setItem('edupeak_cached_user', JSON.stringify(profile));
+            localStorage.removeItem('edupeak_is_logged_out');
+          }
+        } else {
+          // If Firebase says no user:
+          if (localStorage.getItem('edupeak_is_logged_out') === 'true') {
+            this.currentUser = null;
+          }
         }
-        this.currentUser = profile;
       } finally {
         this.loading = false;
         this.resolveInitialAuth?.();
@@ -114,6 +155,8 @@ export class AuthService {
     const profile = await this.readProfile(firebaseUser.uid);
     if (!profile) throw new Error('Your account was created, but its profile could not be loaded. Please sign in again.');
     this.currentUser = profile;
+    localStorage.setItem('edupeak_cached_user', JSON.stringify(profile));
+    localStorage.removeItem('edupeak_is_logged_out');
     this.notify();
     return profile;
   }
@@ -165,6 +208,8 @@ export class AuthService {
     const profile = await this.readProfile(credential.user.uid);
     if (!profile) throw new Error('Account profile is unavailable. Contact the institute administrator.');
     this.currentUser = profile;
+    localStorage.setItem('edupeak_cached_user', JSON.stringify(profile));
+    localStorage.removeItem('edupeak_is_logged_out');
     this.notify();
     return profile;
   }
@@ -177,12 +222,15 @@ export class AuthService {
     }
     await setDoc(doc(db, 'users', this.currentUser.uid), allowed, { merge: true });
     this.currentUser = { ...this.currentUser, ...allowed };
+    localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
     this.notify();
     return this.currentUser;
   }
 
   async logout() {
-    await signOut(auth);
+    localStorage.setItem('edupeak_is_logged_out', 'true');
+    localStorage.removeItem('edupeak_cached_user');
+    await signOut(auth).catch(() => {});
     this.currentUser = null;
     this.notify();
   }

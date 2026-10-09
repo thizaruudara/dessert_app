@@ -26,11 +26,16 @@ class AppController {
     authService.onAuthStateChanged((user) => {
       this.currentUser = user;
       const appIsUnlocked = document.getElementById('app-root') && !document.getElementById('pwa-gatekeeper-overlay');
-      if (appIsUnlocked && !user && !authService.loading) {
+      const isExplicitlyLoggedOut = localStorage.getItem('edupeak_is_logged_out') === 'true';
+
+      if (appIsUnlocked && (!user || isExplicitlyLoggedOut) && !authService.loading) {
         this.renderAuthScreen();
-      } else if (user && appIsUnlocked) {
-        if (user.role === 'admin') this.renderAdminApp();
-        else this.renderApp();
+      } else if (user && !isExplicitlyLoggedOut && appIsUnlocked) {
+        if (user.role === 'admin') {
+          if (this.currentMode !== 'admin') this.renderAdminApp();
+        } else {
+          if (this.currentMode !== 'student' || !document.getElementById('main-viewport')) this.renderApp();
+        }
       }
     });
 
@@ -126,7 +131,8 @@ class AppController {
       onUnlocked: async () => {
         console.log('[App] PWA Standalone Mode active.');
         await authService.waitForInitialAuth().catch(() => {});
-        if (!this.currentUser) {
+        const isExplicitlyLoggedOut = localStorage.getItem('edupeak_is_logged_out') === 'true';
+        if (!this.currentUser || isExplicitlyLoggedOut) {
           this.renderAuthScreen();
         } else if (this.currentUser?.role === 'admin') {
           this.renderAdminApp();
@@ -444,6 +450,7 @@ class AppController {
       try {
         const user = await authService.login({ phone, password });
         this.currentUser = user;
+        localStorage.removeItem('edupeak_is_logged_out');
         if (submitBtn) {
           submitBtn.innerHTML = `
             <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
@@ -506,6 +513,7 @@ class AppController {
       try {
         const user = await authService.register({ name, phone, password, examYear });
         this.currentUser = user;
+        localStorage.removeItem('edupeak_is_logged_out');
         if (submitBtn) {
           submitBtn.innerHTML = `
             <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
@@ -560,6 +568,8 @@ class AppController {
       overlay.remove();
       authService.logout();
       this.currentUser = null;
+      localStorage.setItem('edupeak_is_logged_out', 'true');
+      localStorage.removeItem('edupeak_cached_user');
       if (this.countdownTimer) clearInterval(this.countdownTimer);
       if (this.papersInterval) clearInterval(this.papersInterval);
       this.renderAuthScreen(0);
@@ -567,8 +577,13 @@ class AppController {
   }
 
   renderApp() {
+    this.currentMode = 'student';
     const root = document.getElementById('app-root');
     if (!root) return;
+
+    if (document.getElementById('main-viewport') && !document.querySelector('.auth-screen-container') && !document.querySelector('.apk-admin-screen-container')) {
+      return;
+    }
 
     root.innerHTML = `
       <!-- Main Scrollable Viewport -->
