@@ -65927,7 +65927,34 @@ var DbService = class {
       throw e2;
     }
   }
-  // Admin: Get student roster (excludes admin/teacher accounts)
+  isStaffOrAdmin(u2) {
+    if (!u2) return false;
+    const role = String(u2.role || "").toLowerCase().trim();
+    const name5 = String(u2.name || "").toLowerCase().trim();
+    const phone = String(u2.phone || u2.studentPhone || "").replace(/\D/g, "");
+    const id = String(u2.id || u2.uid || u2.studentId || "").toLowerCase().trim();
+    if (u2.isAdmin === true || u2.isTeacher === true || u2.isStaff === true) return true;
+    if (role === "admin" || role === "teacher" || role === "staff" || role === "instructor") return true;
+    if (name5.includes("admin") || name5.includes("teacher") || name5.includes("prof.") || name5.includes("professor") || name5.includes("senanayake") || name5.includes("staff") || name5.includes("instructor")) {
+      return true;
+    }
+    if (id.includes("admin") || id.includes("teacher") || id.includes("staff")) return true;
+    if (phone.endsWith("770557769") || phone.endsWith("0770557769")) return true;
+    try {
+      const cachedAuth = JSON.parse(localStorage.getItem("edupeak_cached_user") || "null");
+      if (cachedAuth && (cachedAuth.role === "admin" || cachedAuth.isAdmin)) {
+        const cId = String(cachedAuth.uid || cachedAuth.id || "").toLowerCase().trim();
+        const cPhone = String(cachedAuth.phone || "").replace(/\D/g, "");
+        const cName = String(cachedAuth.name || "").toLowerCase().trim();
+        if (cId && (id === cId || u2.uid && String(u2.uid).toLowerCase().trim() === cId)) return true;
+        if (cPhone && phone && (phone.endsWith(cPhone.slice(-9)) || cPhone.endsWith(phone.slice(-9)))) return true;
+        if (cName && name5 === cName) return true;
+      }
+    } catch (_) {
+    }
+    return false;
+  }
+  // Admin: Get student roster (strictly excludes admin/teacher/staff accounts)
   async getAllStudents() {
     let list = [];
     try {
@@ -65937,18 +65964,13 @@ var DbService = class {
         new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3500))
       ]);
       if (!snap.empty) {
-        list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((u2) => {
-          const role = String(u2.role || "").toLowerCase().trim();
-          const name5 = String(u2.name || "").toLowerCase().trim();
-          const isAdmin = u2.isAdmin === true || role === "admin" || role === "teacher" || u2.isTeacher === true;
-          const isStaffName = name5 === "teacher / admin" || name5 === "teacher" || name5 === "admin";
-          return !isAdmin && !isStaffName;
-        });
+        list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((u2) => !this.isStaffOrAdmin(u2));
       }
     } catch (_) {
     }
     const map2 = /* @__PURE__ */ new Map();
     for (const u2 of list) {
+      if (this.isStaffOrAdmin(u2)) continue;
       const key = (u2.name || u2.id).toLowerCase().trim();
       map2.set(key, { ...u2 });
     }
@@ -65956,6 +65978,7 @@ var DbService = class {
       const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
       for (const d of localDesserts) {
         if (!d.studentName) continue;
+        if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
         const key = d.studentName.toLowerCase().trim();
         if (!map2.has(key)) {
           map2.set(key, {
@@ -65975,7 +65998,7 @@ var DbService = class {
       }
     } catch (_) {
     }
-    return Array.from(map2.values());
+    return Array.from(map2.values()).filter((u2) => !this.isStaffOrAdmin(u2));
   }
   // Admin: Delete student account and associated data
   async deleteStudent(studentId) {
@@ -66918,7 +66941,7 @@ var DbService = class {
     const normalizeBatch = (b2) => String(b2 || "").replace(/\s+/g, "").toUpperCase();
     const targetBatchNorm = normalizeBatch(batch);
     const filtered = allStudents.filter((student) => {
-      if (student.role !== "student") return false;
+      if (student.role !== "student" || this.isStaffOrAdmin(student)) return false;
       if (!batch || batch === "All Batches" || targetBatchNorm === "ALL" || targetBatchNorm === "ALLBATCHES") return true;
       const sBatchNorm = normalizeBatch(student.examYear);
       return sBatchNorm === targetBatchNorm || sBatchNorm === "ALL" || sBatchNorm === "ALLBATCHES";
@@ -72954,7 +72977,7 @@ var AppController = class {
           dessertObj: sub
         });
         if (this.currentUser && (this.currentUser.uid === sub.studentId || this.currentUser.id === sub.studentId || this.currentUser.phone === sub.studentPhone || this.currentUser.name === sub.studentName)) {
-          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + credits;
+          this.currentUser.credits = (Number(this.currentUser.credits) || 0) + credits;
         }
         notificationService.showInAppBanner("Submission Approved! \u{1F389}", `Awarded +${credits} XP to ${sub.studentName || "Student"}.`, "success");
         modal.remove();
@@ -74142,7 +74165,8 @@ var AppController = class {
   async renderAdminStudentsScreen(container) {
     this.adminStudentBatchFilter = this.adminStudentBatchFilter || "All";
     this.adminStudentSearchQuery = this.adminStudentSearchQuery || "";
-    const allStudents = await dbService.getAllStudents();
+    const rawStudents = await dbService.getAllStudents();
+    const allStudents = rawStudents.filter((s2) => !dbService.isStaffOrAdmin(s2));
     let filtered = allStudents;
     if (this.adminStudentBatchFilter !== "All") {
       filtered = filtered.filter((s2) => (s2.examYear || "").trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
@@ -74253,7 +74277,7 @@ var AppController = class {
                     </div>
                     <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
                       ${st2.phone || "No phone"} \u2022 <span style="color:#2563EB; font-weight:700;">${st2.examYear || "2026 A/L"}</span>
-                      <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">\u26A1 ${st2.credits || 155} XP</span>
+                      <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">\u26A1 ${st2.credits || 0} XP</span>
                       ${st2.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${st2.studentId}</span>` : ""}
                     </div>
                   </div>

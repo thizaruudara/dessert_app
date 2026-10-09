@@ -5102,7 +5102,7 @@ class AppController {
           this.currentUser.phone === sub.studentPhone ||
           this.currentUser.name === sub.studentName
         )) {
-          this.currentUser.credits = (Number(this.currentUser.credits) || 155) + credits;
+          this.currentUser.credits = (Number(this.currentUser.credits) || 0) + credits;
         }
 
         notificationService.showInAppBanner('Submission Approved! 🎉', `Awarded +${credits} XP to ${sub.studentName || 'Student'}.`, 'success');
@@ -6361,7 +6361,8 @@ class AppController {
     this.adminStudentBatchFilter = this.adminStudentBatchFilter || 'All';
     this.adminStudentSearchQuery = this.adminStudentSearchQuery || '';
 
-    const allStudents = await dbService.getAllStudents();
+    const rawStudents = await dbService.getAllStudents();
+    const allStudents = rawStudents.filter(s => !dbService.isStaffOrAdmin(s));
 
     let filtered = allStudents;
     if (this.adminStudentBatchFilter !== 'All') {
@@ -6479,7 +6480,7 @@ class AppController {
                     </div>
                     <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
                       ${st.phone || 'No phone'} • <span style="color:#2563EB; font-weight:700;">${st.examYear || '2026 A/L'}</span>
-                      <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">⚡ ${st.credits || 155} XP</span>
+                      <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">⚡ ${st.credits || 0} XP</span>
                       ${st.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${st.studentId}</span>` : ''}
                     </div>
                   </div>

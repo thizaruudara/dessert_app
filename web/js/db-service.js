@@ -578,7 +578,45 @@ export class DbService {
     }
   }
 
-    // Admin: Get student roster (excludes admin/teacher accounts)
+    isStaffOrAdmin(u) {
+    if (!u) return false;
+    const role = String(u.role || '').toLowerCase().trim();
+    const name = String(u.name || '').toLowerCase().trim();
+    const phone = String(u.phone || u.studentPhone || '').replace(/\D/g, '');
+    const id = String(u.id || u.uid || u.studentId || '').toLowerCase().trim();
+
+    if (u.isAdmin === true || u.isTeacher === true || u.isStaff === true) return true;
+    if (role === 'admin' || role === 'teacher' || role === 'staff' || role === 'instructor') return true;
+    if (
+      name.includes('admin') ||
+      name.includes('teacher') ||
+      name.includes('prof.') ||
+      name.includes('professor') ||
+      name.includes('senanayake') ||
+      name.includes('staff') ||
+      name.includes('instructor')
+    ) {
+      return true;
+    }
+    if (id.includes('admin') || id.includes('teacher') || id.includes('staff')) return true;
+    if (phone.endsWith('770557769') || phone.endsWith('0770557769')) return true;
+
+    try {
+      const cachedAuth = JSON.parse(localStorage.getItem('edupeak_cached_user') || 'null');
+      if (cachedAuth && (cachedAuth.role === 'admin' || cachedAuth.isAdmin)) {
+        const cId = String(cachedAuth.uid || cachedAuth.id || '').toLowerCase().trim();
+        const cPhone = String(cachedAuth.phone || '').replace(/\D/g, '');
+        const cName = String(cachedAuth.name || '').toLowerCase().trim();
+        if (cId && (id === cId || (u.uid && String(u.uid).toLowerCase().trim() === cId))) return true;
+        if (cPhone && phone && (phone.endsWith(cPhone.slice(-9)) || cPhone.endsWith(phone.slice(-9)))) return true;
+        if (cName && name === cName) return true;
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  // Admin: Get student roster (strictly excludes admin/teacher/staff accounts)
   async getAllStudents() {
     let list = [];
     try {
@@ -590,18 +628,13 @@ export class DbService {
       if (!snap.empty) {
         list = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(u => {
-            const role = String(u.role || '').toLowerCase().trim();
-            const name = String(u.name || '').toLowerCase().trim();
-            const isAdmin = u.isAdmin === true || role === 'admin' || role === 'teacher' || u.isTeacher === true;
-            const isStaffName = name === 'teacher / admin' || name === 'teacher' || name === 'admin';
-            return !isAdmin && !isStaffName;
-          });
+          .filter(u => !this.isStaffOrAdmin(u));
       }
     } catch (_) {}
 
     const map = new Map();
     for (const u of list) {
+      if (this.isStaffOrAdmin(u)) continue;
       const key = (u.name || u.id).toLowerCase().trim();
       map.set(key, { ...u });
     }
@@ -611,6 +644,7 @@ export class DbService {
       const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
       for (const d of localDesserts) {
         if (!d.studentName) continue;
+        if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
         const key = d.studentName.toLowerCase().trim();
         if (!map.has(key)) {
           map.set(key, {
@@ -630,7 +664,7 @@ export class DbService {
       }
     } catch (_) {}
 
-    return Array.from(map.values());
+    return Array.from(map.values()).filter(u => !this.isStaffOrAdmin(u));
   }
 
   // Admin: Delete student account and associated data
@@ -1642,7 +1676,7 @@ export class DbService {
     const targetBatchNorm = normalizeBatch(batch);
 
     const filtered = allStudents.filter(student => {
-      if (student.role !== 'student') return false;
+      if (student.role !== 'student' || this.isStaffOrAdmin(student)) return false;
       if (!batch || batch === 'All Batches' || targetBatchNorm === 'ALL' || targetBatchNorm === 'ALLBATCHES') return true;
       const sBatchNorm = normalizeBatch(student.examYear);
       return sBatchNorm === targetBatchNorm || sBatchNorm === 'ALL' || sBatchNorm === 'ALLBATCHES';
