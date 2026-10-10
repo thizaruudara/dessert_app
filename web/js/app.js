@@ -243,317 +243,66 @@ class AppController {
   }
 
   // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
-  renderAuthScreen(initialTab = 0) {
+  // ── 0. Dedicated Login Screen: Single Sign-On via EduPeak (edupeak.lk) ──
+  renderAuthScreen() {
     const root = document.getElementById('app-root');
     if (!root) return;
 
-    this.authTab = initialTab; // 0 = Login, 1 = Register
-
     root.innerHTML = `
-      <div class="auth-screen-container ${this.authTab === 1 ? 'is-registering' : ''}">
-        <div class="auth-scroll-content">
-        <div class="auth-header">
-          <div class="auth-brand-logo-wrap">
-            <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" onerror="this.src='./icons/icon-192.png'" />
+      <div class="auth-screen-container">
+        <div class="auth-scroll-content" style="max-width:440px; margin:0 auto; padding:32px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh;">
+          <div class="auth-header" style="text-align:center; margin-bottom:28px;">
+            <div class="auth-brand-logo-wrap" style="width:76px; height:76px; margin:0 auto 14px; border-radius:22px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 25px rgba(37,99,235,0.12); border:1px solid rgba(191,219,254,0.6);">
+              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="width:52px; height:52px; object-fit:contain;" onerror="this.src='./icons/icon-192.png'" />
+            </div>
+            <div class="auth-title" style="font-size:26px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
+            <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
+              <span>A/L Pastry &amp; Dessert Institute 🍰</span>
+            </div>
           </div>
-          <div class="auth-title">EduPeak</div>
-          <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
-            <span>A/L Pastry &amp; Dessert Institute 🍰</span>
-          </div>
-        </div>
 
-        <!-- Auth Tabs (Login vs Register) -->
-        <div class="auth-tabs-bar">
-          <button class="auth-tab-btn ${this.authTab === 0 ? 'active' : ''}" id="tab-auth-login" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            <span>Sign In</span>
-          </button>
-          <button class="auth-tab-btn ${this.authTab === 1 ? 'active' : ''}" id="tab-auth-register" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            <span>Register</span>
-          </button>
-        </div>
+          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:20px; padding:28px 24px; box-shadow:0 12px 36px rgba(15,23,42,0.06); text-align:center;">
+            <div style="font-size:20px; font-weight:800; color:#1E293B; margin-bottom:8px;">
+              Student &amp; Exam Portal
+            </div>
+            <p style="font-size:13.5px; color:#64748B; line-height:1.55; margin:0 0 24px;">
+              Access your proctored paper sessions, homework dessert submissions, and batch rankings through your central EduPeak account.
+            </p>
 
-        <!-- Form Card -->
-        <div class="auth-form-card" id="auth-form-card">
-          ${this.authTab === 0 ? `
-            <!-- Login Form -->
-            <form id="form-login" style="display:flex; flex-direction:column; gap:14px;">
-              <div class="auth-form-heading">
-                <h2>Sign In</h2>
-                <p>Enter your phone number and password to access your portal</p>
-              </div>
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-login-phone">Phone Number</label>
-                <div class="auth-phone-row">
-                  <span class="auth-phone-country">
-                    <svg class="auth-country-flag" viewBox="0 0 28 18" role="img" aria-label="Sri Lanka">
-                      <rect x=".5" y=".5" width="27" height="17" rx="2.5" fill="#FFBE29" />
-                      <rect x="2" y="3" width="4" height="12" fill="#00534E" />
-                      <rect x="6.5" y="3" width="4" height="12" fill="#EB7400" />
-                      <rect x="11" y="3" width="15" height="12" rx="1" fill="#8D153A" />
-                      <path d="M17 6.2c1.4-.9 3.3-.4 3.5 1.1.1 1.2-1 1.4-1.7 2.1-.4.4-.3 1.1.1 1.5m-2.7-4.7-.7-.8m4.9.4.7-.7M18.7 11v1.1m-2.3-.2-.8.8m4.7-.8.8.8" fill="none" stroke="#FFBE29" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    <strong>+94</strong>
-                  </span>
-                  <div class="auth-input-wrapper auth-phone-input-wrap">
-                    <span class="material-symbols-rounded auth-input-prefix">call</span>
-                    <input type="tel" class="auth-input has-prefix" id="input-login-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
-                  </div>
-                </div>
-              </div>
-
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-login-password">Password</label>
-                <div class="auth-input-wrapper">
-                  <span class="material-symbols-rounded auth-input-prefix">lock_outline</span>
-                  <input type="password" class="auth-input has-prefix has-suffix" id="input-login-password" placeholder="Enter your password" autocomplete="current-password" required />
-                  <button type="button" class="auth-pw-toggle" id="btn-toggle-login-pw">
-                    <span class="material-symbols-rounded" style="font-size:18px;">visibility_off</span>
-                  </button>
-                </div>
-              </div>
-
-              <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
-
-              <button type="submit" class="auth-btn-submit" id="btn-submit-login" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span>Sign In 🚀</span>
-              </button>
-            </form>
-          ` : `
-            <!-- Register Form -->
-            <form id="form-register" style="display:flex; flex-direction:column; gap:14px;">
-              <div class="auth-form-heading">
-                <h2>New Student Registration</h2>
-                <p>Create your password to instantly access your portal</p>
-              </div>
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-reg-name">Full Name</label>
-                <div class="auth-input-wrapper">
-                  <span class="material-symbols-rounded auth-input-prefix">person_outline</span>
-                  <input type="text" class="auth-input has-prefix" id="input-reg-name" placeholder="e.g. Thisaru Udara" autocomplete="name" required />
-                </div>
-              </div>
-
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-reg-phone">Phone Number</label>
-                <div class="auth-phone-row">
-                  <span class="auth-phone-country">
-                    <svg class="auth-country-flag" viewBox="0 0 28 18" role="img" aria-label="Sri Lanka">
-                      <rect x=".5" y=".5" width="27" height="17" rx="2.5" fill="#FFBE29" />
-                      <rect x="2" y="3" width="4" height="12" fill="#00534E" />
-                      <rect x="6.5" y="3" width="4" height="12" fill="#EB7400" />
-                      <rect x="11" y="3" width="15" height="12" rx="1" fill="#8D153A" />
-                      <path d="M17 6.2c1.4-.9 3.3-.4 3.5 1.1.1 1.2-1 1.4-1.7 2.1-.4.4-.3 1.1.1 1.5m-2.7-4.7-.7-.8m4.9.4.7-.7M18.7 11v1.1m-2.3-.2-.8.8m4.7-.8.8.8" fill="none" stroke="#FFBE29" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    <strong>+94</strong>
-                  </span>
-                  <div class="auth-input-wrapper auth-phone-input-wrap">
-                    <span class="material-symbols-rounded auth-input-prefix">call</span>
-                    <input type="tel" class="auth-input has-prefix" id="input-reg-phone" placeholder="7XXXXXXXX" autocomplete="tel-national" inputmode="numeric" maxlength="10" required />
-                  </div>
-                </div>
-              </div>
-
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-reg-batch">A/L Examination Year</label>
-                <div class="auth-input-wrapper">
-                  <span class="material-symbols-rounded auth-input-prefix">school</span>
-                  <select class="auth-input has-prefix" id="input-reg-batch">
-                  <option value="2027 A/L" selected>2027 A/L</option>
-                  <option value="2028 A/L">2028 A/L</option>
-                  <option value="2029 A/L">2029 A/L</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-reg-password">Create Password (8+ Digits)</label>
-                <div class="auth-input-wrapper">
-                  <span class="material-symbols-rounded auth-input-prefix">lock_outline</span>
-                  <input type="password" class="auth-input has-prefix has-suffix" id="input-reg-password" placeholder="Minimum 8 characters" minlength="8" autocomplete="new-password" required />
-                  <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-pw">
-                    <span class="material-symbols-rounded" style="font-size:18px;">visibility_off</span>
-                  </button>
-                </div>
-                <small class="auth-helper-text">Must be at least 8 characters long</small>
-              </div>
-
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="input-reg-confirm-password">Confirm 8-Digit Password</label>
-                <div class="auth-input-wrapper">
-                  <span class="material-symbols-rounded auth-input-prefix">lock_outline</span>
-                  <input type="password" class="auth-input has-prefix has-suffix" id="input-reg-confirm-password" placeholder="Re-enter your 8-digit password" autocomplete="new-password" required />
-                  <button type="button" class="auth-pw-toggle" id="btn-toggle-reg-confirm-pw">
-                    <span class="material-symbols-rounded" style="font-size:18px;">visibility_off</span>
-                  </button>
-                </div>
-              </div>
-
-              <div id="auth-error-msg" style="display:none; background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600;"></div>
-
-            </form>
-          `}
-        </div>
-        <div class="auth-secure-note">
-          <span class="material-symbols-rounded">lock_outline</span>
-          <span>Secure authentication for EduPeak Students</span>
-        </div>
-        </div>
-        ${this.authTab === 1 ? `
-          <div class="auth-sticky-action">
-            <button type="submit" form="form-register" class="auth-btn-submit" id="btn-submit-reg">
-              <span>Create Account (Instant Sign-in) 🚀</span>
+            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:52px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 20px rgba(37,99,235,0.3); transition:all 0.2s ease;">
+              <span class="material-symbols-rounded" style="font-size:22px;">login</span>
+              <span>Login With EduPeak</span>
             </button>
-          </div>
-        ` : ''}
 
+            <div style="margin-top:20px; padding-top:18px; border-top:1px solid #F1F5F9; font-size:12.5px; color:#64748B;">
+              Don't have an account on edupeak.lk yet?
+              <br>
+              <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:3px; margin-top:6px;">
+                <span>Create an Account at edupeak.lk</span>
+                <span class="material-symbols-rounded" style="font-size:14px;">open_in_new</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="auth-secure-note" style="margin-top:20px; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#94A3B8;">
+            <span class="material-symbols-rounded" style="font-size:16px;">verified_user</span>
+            <span>Single Sign-On verified with edupeak.lk &amp; Supabase Cloud</span>
+          </div>
+        </div>
       </div>
     `;
 
-    // Tab Listeners
-    document.getElementById('tab-auth-login')?.addEventListener('click', () => this.renderAuthScreen(0));
-    document.getElementById('tab-auth-register')?.addEventListener('click', () => this.renderAuthScreen(1));
-
-    // Show/Hide Password toggles
-    document.getElementById('btn-toggle-login-pw')?.addEventListener('click', () => {
-      const inp = document.getElementById('input-login-password');
-      if (inp) {
-        inp.type = inp.type === 'password' ? 'text' : 'password';
-        const icon = document.querySelector('#btn-toggle-login-pw .material-symbols-rounded');
-        if (icon) icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
-      }
-    });
-    document.getElementById('btn-toggle-reg-pw')?.addEventListener('click', () => {
-      const inp = document.getElementById('input-reg-password');
-      if (inp) {
-        inp.type = inp.type === 'password' ? 'text' : 'password';
-        const icon = document.querySelector('#btn-toggle-reg-pw .material-symbols-rounded');
-        if (icon) icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
-      }
-    });
-    document.getElementById('btn-toggle-reg-confirm-pw')?.addEventListener('click', () => {
-      const inp = document.getElementById('input-reg-confirm-password');
-      if (inp) {
-        inp.type = inp.type === 'password' ? 'text' : 'password';
-        const icon = document.querySelector('#btn-toggle-reg-confirm-pw .material-symbols-rounded');
-        if (icon) icon.textContent = inp.type === 'password' ? 'visibility_off' : 'visibility';
-      }
-    });
-
-    // Form Submissions
-    document.getElementById('form-login')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const phoneInput = document.getElementById('input-login-phone');
-      const passInput = document.getElementById('input-login-password');
-      const phone = phoneInput?.value || '';
-      const password = passInput?.value || '';
-      const errEl = document.getElementById('auth-error-msg');
-      const submitBtn = document.getElementById('btn-submit-login');
-
-      if (errEl) {
-        errEl.style.display = 'none';
-        errEl.textContent = '';
-      }
-
-      // Visual loading feedback
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.classList.add('btn-loading');
-        submitBtn.innerHTML = `
-          <span class="auth-spinner"></span>
-          <span>Signing in...</span>
+    document.getElementById('btn-login-edupeak')?.addEventListener('click', () => {
+      const btn = document.getElementById('btn-login-edupeak');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `
+          <div style="width:18px; height:18px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
+          <span>Connecting to EduPeak...</span>
         `;
       }
-      if (phoneInput) phoneInput.readOnly = true;
-      if (passInput) passInput.readOnly = true;
-
-      try {
-        const user = await authService.login({ phone, password });
-        this.currentUser = user;
-        localStorage.removeItem('edupeak_is_logged_out');
-        if (submitBtn) {
-          submitBtn.innerHTML = `
-            <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
-            <span>Success! Opening Portal...</span>
-          `;
-        }
-        if (user.role === 'admin') {
-          this.renderAdminApp();
-        } else {
-          this.renderApp();
-        }
-      } catch (err) {
-        console.error('[Auth] Sign in failed:', err);
-        if (phoneInput) phoneInput.readOnly = false;
-        if (passInput) passInput.readOnly = false;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.classList.remove('btn-loading');
-          submitBtn.innerHTML = `<span>Sign In 🚀</span>`;
-        }
-        if (errEl) {
-          errEl.style.display = 'block';
-          errEl.textContent = err.message || 'Invalid login credentials.';
-        }
-      }
+      authService.redirectToEduPeakLogin();
     });
-
-    document.getElementById('form-register')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = document.getElementById('input-reg-name')?.value || '';
-      const phone = document.getElementById('input-reg-phone')?.value || '';
-      const examYear = document.getElementById('input-reg-batch')?.value || '2027 A/L';
-      const password = document.getElementById('input-reg-password')?.value || '';
-      const confirmPassword = document.getElementById('input-reg-confirm-password')?.value || '';
-      const errEl = document.getElementById('auth-error-msg');
-      const submitBtn = document.getElementById('btn-submit-reg');
-
-      if (errEl) {
-        errEl.style.display = 'none';
-        errEl.textContent = '';
-      }
-
-      if (password !== confirmPassword) {
-        if (errEl) {
-          errEl.style.display = 'block';
-          errEl.textContent = 'Passwords do not match.';
-        }
-        return;
-      }
-
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.classList.add('btn-loading');
-        submitBtn.innerHTML = `
-          <span class="auth-spinner"></span>
-          <span>Creating Account...</span>
-        `;
-      }
-
-      try {
-        const user = await authService.register({ name, phone, password, examYear });
-        this.currentUser = user;
-        localStorage.removeItem('edupeak_is_logged_out');
-        if (submitBtn) {
-          submitBtn.innerHTML = `
-            <span class="material-symbols-rounded" style="font-size:19px;">check_circle</span>
-            <span>Welcome! Opening Portal...</span>
-          `;
-        }
-        this.renderApp();
-      } catch (err) {
-        console.error('[Auth] Registration failed:', err);
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.classList.remove('btn-loading');
-          submitBtn.innerHTML = `<span>Create Account (Instant Sign-in) 🚀</span>`;
-        }
-        if (errEl) {
-          errEl.style.display = 'block';
-          errEl.textContent = err.message || 'Registration failed.';
-        }
-      }
-    });
-
   }
 
   // ── Logout In-App Confirmation Dialog (1:1 student_profile_screen.dart replica) ─
@@ -591,7 +340,66 @@ class AppController {
       localStorage.removeItem('edupeak_cached_user');
       if (this.countdownTimer) clearInterval(this.countdownTimer);
       if (this.papersInterval) clearInterval(this.papersInterval);
-      this.renderAuthScreen(0);
+      this.renderAuthScreen();
+    });
+  }
+
+  // ── Subscription Gatekeeper: Super Paper Class Monthly Access ──
+  checkSubscriptionAccess(featureName = 'this feature') {
+    if (!this.currentUser || this.currentUser.role === 'admin' || this.currentUser.role === 'teacher') return true;
+    if (this.currentUser.isSubscribed !== false) return true;
+
+    const subDetails = this.currentUser.subscriptionDetails || {};
+    const month = subDetails.monthName || 'this month';
+    this.showSubscriptionModal(featureName, month);
+    return false;
+  }
+
+  showSubscriptionModal(featureName = 'This feature', month = 'this month') {
+    const existing = document.getElementById('edupeak-sub-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'edupeak-sub-modal';
+    overlay.className = 'app-dialog-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(11,18,32,0.85); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px;';
+    overlay.innerHTML = `
+      <div style="width:100%; max-width:400px; background:#FFFFFF; border-radius:24px; padding:28px 24px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.3); border:1px solid #E2E8F0;">
+        <div style="width:64px; height:64px; border-radius:20px; background:#FEF3C7; border:1px solid #FDE68A; margin:0 auto 16px; display:flex; align-items:center; justify-content:center;">
+          <span class="material-symbols-rounded" style="font-size:36px; color:#D97706;">lock</span>
+        </div>
+        <h3 style="font-size:18px; font-weight:800; color:#0F172A; margin-bottom:8px;">Super Paper Class Subscription Required</h3>
+        <p style="font-size:13px; color:#64748B; line-height:1.55; margin-bottom:20px;">
+          Access to <strong>${featureName}</strong> is restricted to students enrolled in the active <strong>${month}</strong> Super Paper Class course on edupeak.lk.
+        </p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="background:#2563EB; color:white; height:46px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span>Enroll / Pay on EduPeak.lk</span>
+            <span class="material-symbols-rounded" style="font-size:17px;">open_in_new</span>
+          </a>
+          <button type="button" id="btn-sub-modal-check" style="background:#F1F5F9; color:#334155; height:42px; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
+            Re-check My Enrollment 🔄
+          </button>
+          <button type="button" id="btn-sub-modal-close" style="background:transparent; color:#94A3B8; height:36px; border:none; font-size:12.5px; font-weight:600; cursor:pointer;">
+            Dismiss
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('btn-sub-modal-close')?.addEventListener('click', () => overlay.remove());
+    document.getElementById('btn-sub-modal-check')?.addEventListener('click', async () => {
+      const b = document.getElementById('btn-sub-modal-check');
+      if (b) b.textContent = 'Verifying with EduPeak...';
+      const res = await authService.refreshSubscription();
+      overlay.remove();
+      if (res && res.isSubscribed) {
+        notificationService.showLocalToast('✅ Subscription verified! Full access unlocked.');
+        location.reload();
+      } else {
+        notificationService.showLocalToast('⚠️ Course payment not found yet. Please check edupeak.lk');
+      }
     });
   }
 
@@ -939,6 +747,33 @@ class AppController {
     const featuredUpcoming = !featuredSession ? upcomingPaper : null;
 
     container.innerHTML = `
+      ${user.isSubscribed === false ? `
+        <!-- Subscription Warning Banner -->
+        <div class="subscription-warning-card" style="margin:12px 16px 18px; background:linear-gradient(135deg, #FFFBEB, #FEF3C7); border:1.5px solid #F59E0B; border-radius:18px; padding:16px 18px; box-shadow:0 8px 20px rgba(245,158,11,0.14); display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:12px; background:rgba(217,119,6,0.15); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <span class="material-symbols-rounded" style="color:#D97706; font-size:24px;">lock_clock</span>
+            </div>
+            <div>
+              <div style="font-weight:800; color:#92400E; font-size:14.5px;">Super Paper Class Subscription Required</div>
+              <div style="font-size:12.5px; color:#B45309; line-height:1.45; margin-top:3px;">
+                You haven't enrolled for the active <strong>${user.subscriptionDetails?.monthName || 'current month'}</strong> Super Paper Class course on edupeak.lk. Paper exam sessions and dessert submissions are locked.
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding-top:4px;">
+            <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="background:#D97706; color:white; padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(217,119,6,0.25);">
+              <span>Enroll / Pay on EduPeak.lk</span>
+              <span class="material-symbols-rounded" style="font-size:15px;">open_in_new</span>
+            </a>
+            <button type="button" id="btn-recheck-subscription" style="background:white; border:1px solid #FCD34D; color:#92400E; padding:7px 12px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:15px;">sync</span>
+              <span>Re-check Access</span>
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- 1. Header (Avatar, Name, Verified Badge, 2027 Tag, 3 Days Streak) -->
       <div class="header-row">
         <div class="header-left">
@@ -1387,13 +1222,30 @@ class AppController {
     });
 
     // Event Listeners
+    document.getElementById('btn-recheck-subscription')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-recheck-subscription');
+      if (btn) btn.innerHTML = '<span>Checking...</span>';
+      const res = await authService.refreshSubscription();
+      if (res && res.isSubscribed) {
+        notificationService.showLocalToast('✅ Subscription verified! Full access unlocked.');
+      } else {
+        notificationService.showLocalToast('⚠️ Course payment not found on edupeak.lk yet.');
+      }
+      this.switchTab('home', { historyMode: 'none' });
+    });
     document.getElementById('act-daily-mcq')?.addEventListener('click', () => this.switchTab('home'));
     document.getElementById('btn-start-sprint-action')?.addEventListener('click', () => this.openSprintDialog());
     document.getElementById('act-ai-tutor')?.addEventListener('click', () => this.openAiTutorDialog());
     document.getElementById('btn-ask-tutor-insight')?.addEventListener('click', () => this.openAiTutorDialog(insight.titleEnglish || 'Work-Energy Theorem'));
-    document.getElementById('act-submit-hw')?.addEventListener('click', () => this.openSubmitGuideModal());
+    document.getElementById('act-submit-hw')?.addEventListener('click', () => {
+      if (!this.checkSubscriptionAccess('Homework Dessert Submissions')) return;
+      this.openSubmitGuideModal();
+    });
     document.getElementById('act-ranks')?.addEventListener('click', () => this.switchTab('ranks'));
-    document.getElementById('btn-enter-eval-room')?.addEventListener('click', () => this.switchTab('papers'));
+    document.getElementById('btn-enter-eval-room')?.addEventListener('click', () => {
+      if (!this.checkSubscriptionAccess('Paper Evaluation & Exam Sessions')) return;
+      this.switchTab('papers');
+    });
     document.getElementById('btn-header-avatar')?.addEventListener('click', () => this.switchTab('profile'));
 
     container.querySelectorAll('.inquiry-item-btn').forEach(btn => {
@@ -1691,6 +1543,7 @@ class AppController {
     // Slot Selection
     container.querySelectorAll('.slot-selection-box').forEach(box => {
       box.addEventListener('click', async () => {
+        if (!this.checkSubscriptionAccess('Paper Slot Registration')) return;
         const pId = box.dataset.paperId;
         const sId = box.dataset.slotId;
         await dbService.registerStudentSlot({
@@ -1727,6 +1580,7 @@ class AppController {
     // Enter Exam / Waiting Room
     container.querySelectorAll('[data-enter-exam]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!this.checkSubscriptionAccess('Live Paper Writing Sessions')) return;
         const paperId = btn.dataset.enterExam;
         const reg = registrations.get(paperId);
         const selectedSlot = reg?.selectedSlot || 'slot1';
@@ -1737,6 +1591,7 @@ class AppController {
     // Scan Answers
     container.querySelectorAll('[data-scan-answers]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!this.checkSubscriptionAccess('Exam Answer Submission')) return;
         this.openDocumentScanner();
       });
     });
@@ -1910,6 +1765,25 @@ class AppController {
             </button>
           </div>
         </div>
+
+        ${user.isSubscribed === false ? `
+          <!-- Subscription Warning Banner -->
+          <div class="subscription-warning-card" style="margin: 6px 16px 14px; background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1.5px solid #F59E0B; border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 16px rgba(245,158,11,0.12); display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <span class="material-symbols-rounded" style="color: #D97706; font-size: 24px; flex-shrink: 0; margin-top: 1px;">lock_clock</span>
+              <div>
+                <div style="font-weight: 800; color: #92400E; font-size: 14px;">Super Paper Class Subscription Required</div>
+                <div style="font-size: 12px; color: #B45309; line-height: 1.45; margin-top: 2px;">
+                  You must be enrolled in the active <strong>${user.subscriptionDetails?.monthName || 'current month'}</strong> Super Paper Class course on edupeak.lk to participate in live exams or reserve paper slots.
+                </div>
+              </div>
+            </div>
+            <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+              <span>Enroll / Pay on EduPeak.lk</span>
+              <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
+            </a>
+          </div>
+        ` : ''}
 
         <!-- View Switcher Tabs (1:1 with lines 156-185 of paper_sessions_screen.dart) -->
         <div class="sub-tabs-container" style="margin: 6px 16px 14px;">
@@ -2904,6 +2778,25 @@ class AppController {
         </div>
       </div>
 
+      ${user.isSubscribed === false ? `
+        <!-- Subscription Warning Banner -->
+        <div class="subscription-warning-card" style="margin: 6px 16px 14px; background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1.5px solid #F59E0B; border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 16px rgba(245,158,11,0.12); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <span class="material-symbols-rounded" style="color: #D97706; font-size: 24px; flex-shrink: 0; margin-top: 1px;">lock_clock</span>
+            <div>
+              <div style="font-weight: 800; color: #92400E; font-size: 14px;">Super Paper Class Subscription Required</div>
+              <div style="font-size: 12px; color: #B45309; line-height: 1.45; margin-top: 2px;">
+                Dessert homework problem set submissions are reserved for students enrolled in the active <strong>${user.subscriptionDetails?.monthName || 'current month'}</strong> Super Paper Class course on edupeak.lk.
+              </div>
+            </div>
+          </div>
+          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+            <span>Enroll / Pay on EduPeak.lk</span>
+            <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
+          </a>
+        </div>
+      ` : ''}
+
       <!-- Sub-Tabs: Submit Homework vs Submissions History -->
       <div class="sub-tabs-container">
         <button class="sub-tab-btn ${this.dessertsTab === 0 ? 'active' : ''}" id="tab-dessert-submit">
@@ -3091,11 +2984,16 @@ class AppController {
     });
 
     document.getElementById('btn-dessert-open-cam')?.addEventListener('click', () => {
+      if (!this.checkSubscriptionAccess('Homework Dessert Submissions')) return;
       this.openDocumentScanner();
     });
 
     const fileInput = document.getElementById('input-hw-gallery');
     fileInput?.addEventListener('change', async (e) => {
+      if (!this.checkSubscriptionAccess('Homework Dessert Submissions')) {
+        e.target.value = '';
+        return;
+      }
       const files = Array.from(e.target.files);
       if (!files.length) return;
       for (const file of files) {
@@ -3127,6 +3025,7 @@ class AppController {
     });
 
     document.getElementById('btn-submit-dessert-final')?.addEventListener('click', async () => {
+      if (!this.checkSubscriptionAccess('Homework Dessert Submissions')) return;
       const caption = document.getElementById('input-dessert-caption')?.value.trim();
       const btn = document.getElementById('btn-submit-dessert-final');
       if (btn) {

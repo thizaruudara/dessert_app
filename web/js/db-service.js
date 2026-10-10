@@ -19,6 +19,7 @@ import {
   increment
 } from './firebase-config.js';
 import { callBackend } from './backend-api.js';
+import { supabase } from './supabase-client.js';
 
 export class DbService {
   constructor() {
@@ -86,6 +87,39 @@ export class DbService {
     } catch (e) {
       console.warn('[DB] Student dessert query note, falling back to local:', e?.message || e);
     }
+    // Supabase fallback query
+    if (list.length === 0 && supabase) {
+      try {
+        let sbQuery = supabase.from('dessert_submissions').select('*').order('submitted_at', { ascending: false }).limit(60);
+        if (cleanId) sbQuery = sbQuery.eq('student_id', cleanId);
+        else if (cleanPhone) sbQuery = sbQuery.eq('student_phone', cleanPhone);
+        const { data: sbData, error: sbErr } = await sbQuery;
+        if (!sbErr && sbData && sbData.length > 0) {
+          sbData.forEach(item => {
+            list.push({
+              id: item.id,
+              studentId: item.student_id,
+              studentName: item.student_name,
+              studentPhone: item.student_phone,
+              examYear: item.exam_year,
+              subject: item.subject,
+              caption: item.caption,
+              mediaUrls: item.media_urls || [],
+              type: item.submission_type || 'image',
+              status: item.status || 'pending',
+              creditsAwarded: item.credits_awarded || 0,
+              adminFeedback: item.admin_feedback,
+              reviewedBy: item.reviewed_by,
+              reviewedAt: item.reviewed_at,
+              submittedAt: item.submitted_at
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('[DB] Supabase dessert query note:', err);
+      }
+    }
+
 
     // Merge with localList: Firestore status is authoritative!
     for (const loc of localList) {
@@ -239,6 +273,28 @@ export class DbService {
     } catch (e) {
       console.warn('[DB] submitDessert Firestore note (saved locally):', e);
     }
+    // Mirror submission to Supabase dessert_submissions table
+    if (supabase) {
+      try {
+        await supabase.from('dessert_submissions').insert([{
+          id: docId,
+          student_id: String(studentId || 'student'),
+          student_name: String(studentName || 'Student'),
+          student_phone: String(studentPhone || '').trim(),
+          exam_year: String(examYear || '2027 A/L'),
+          subject: subject || 'Physics Mechanics',
+          caption: caption || 'Daily Dessert Submission',
+          media_urls: mediaUrls || [],
+          submission_type: mediaUrls && mediaUrls.length > 0 ? 'image' : 'text',
+          status: 'pending',
+          credits_awarded: 0,
+          submitted_at: newDoc.submittedAt
+        }]);
+      } catch (sbErr) {
+        console.warn('[DB] Supabase dessert_submissions insert note:', sbErr?.message || sbErr);
+      }
+    }
+
 
     try {
       window.dispatchEvent(new CustomEvent('edupeak:dessert-submitted', { detail: newDoc }));
