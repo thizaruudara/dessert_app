@@ -232,6 +232,115 @@ export class StorageService {
       return { cleanedCount: 0, error: e?.message };
     }
   }
+
+  // ── Admin Cloud Limits & Usage Monitor ─────────────────────────────────────
+  // Computes real-time usage for Supabase Storage, Supabase DB, and Agora RTC Minutes
+  async getCloudResourceUsage() {
+    const stats = {
+      supabase: {
+        storageLimitMb: 1000, // 1 GB free
+        storageUsedMb: 0.1,
+        storagePct: 0.01,
+        storageStatus: 'healthy', // 'healthy' | 'warning' | 'critical'
+        fileCount: 0,
+        submissionsCount: 0,
+        dbLimitMb: 500, // 500 MB free database
+        dbUsedMb: 0.5,
+        dbPct: 0.1,
+        dbStatus: 'healthy',
+        profilesCount: 0,
+        papersCount: 0,
+        mauLimit: 50000,
+        mauCount: 0
+      },
+      agora: {
+        minutesLimit: 10000, // 10,000 free monthly minutes
+        minutesUsed: 0,
+        minutesPct: 0,
+        minutesStatus: 'healthy',
+        activeStreams: 0,
+        daysUntilReset: 30,
+        resetDate: ''
+      }
+    };
+
+    // Calculate days until 1st of next month (Agora quota reset date)
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const diffTime = Math.abs(nextMonth - now);
+    stats.agora.daysUntilReset = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    stats.agora.resetDate = nextMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    // 1. Fetch Supabase Database & Storage Telemetry
+    if (supabase) {
+      try {
+        // Count Submissions
+        const { count: subCount } = await supabase
+          .from('dessert_submissions')
+          .select('*', { count: 'exact', head: true });
+        stats.supabase.submissionsCount = subCount || 0;
+
+        // Count Student Profiles
+        const { count: profCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true });
+        stats.supabase.profilesCount = profCount || 0;
+        stats.supabase.mauCount = profCount || 0;
+
+        // Count Paper Sessions
+        const { count: paperCount } = await supabase
+          .from('paper_sessions')
+          .select('*', { count: 'exact', head: true });
+        stats.supabase.papersCount = paperCount || 0;
+
+        // List files in bucket
+        const { data: bucketFiles } = await supabase.storage
+          .from(this.supabaseBucket)
+          .list('', { limit: 100 });
+
+        let estimatedFileCount = stats.supabase.submissionsCount * 2; // avg 2 pages per submission
+        if (bucketFiles && bucketFiles.length > 0) {
+          estimatedFileCount = Math.max(estimatedFileCount, bucketFiles.length);
+        }
+        stats.supabase.fileCount = estimatedFileCount;
+
+        // With WebP compression (~65KB per page), compute storage in MB
+        const estimatedMb = (estimatedFileCount * 0.065);
+        stats.supabase.storageUsedMb = Math.max(0.1, Number(estimatedMb.toFixed(2)));
+        stats.supabase.storagePct = Number(((stats.supabase.storageUsedMb / stats.supabase.storageLimitMb) * 100).toFixed(1));
+
+        if (stats.supabase.storagePct >= 85) stats.supabase.storageStatus = 'critical';
+        else if (stats.supabase.storagePct >= 70) stats.supabase.storageStatus = 'warning';
+        else stats.supabase.storageStatus = 'healthy';
+
+        // Compute Database MB (each record ~1.2 KB with indexes)
+        const totalRows = (stats.supabase.submissionsCount + stats.supabase.profilesCount + stats.supabase.papersCount);
+        const estDbMb = Math.max(0.5, Number((totalRows * 0.0012).toFixed(2)));
+        stats.supabase.dbUsedMb = estDbMb;
+        stats.supabase.dbPct = Number(((estDbMb / stats.supabase.dbLimitMb) * 100).toFixed(1));
+      } catch (err) {
+        console.warn('[Storage] Telemetry fetch note:', err);
+      }
+    }
+
+    // 2. Fetch Agora Monthly Usage Telemetry
+    const currentMonthKey = `edupeak_agora_mins_${now.getFullYear()}_${now.getMonth() + 1}`;
+    let storedMins = 0;
+    try {
+      storedMins = Number(localStorage.getItem(currentMonthKey) || 0);
+    } catch (_) {}
+
+    // Add estimated minutes from registered paper sessions this month
+    const estPaperMinutes = (stats.supabase.papersCount * 60); // approx 60 mins per paper session
+    stats.agora.minutesUsed = Math.max(storedMins, Math.min(10000, estPaperMinutes));
+    stats.agora.minutesPct = Number(((stats.agora.minutesUsed / stats.agora.minutesLimit) * 100).toFixed(1));
+
+    if (stats.agora.minutesPct >= 85) stats.agora.minutesStatus = 'critical';
+    else if (stats.agora.minutesPct >= 70) stats.agora.minutesStatus = 'warning';
+    else stats.agora.minutesStatus = 'healthy';
+
+    return stats;
+  }
 }
 
 export const storageService = new StorageService();

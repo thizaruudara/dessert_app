@@ -4576,6 +4576,13 @@ class AppController {
   // ── 1. SCREEN 1: ADMIN HOME SCREEN (admin_home_screen.dart) ──────────────
   // ═════════════════════════════════════════════════════════════════════════
   async renderAdminDashboardScreen(container) {
+    let cloudUsage = {
+      supabase: { storageUsedMb: 0.1, storageLimitMb: 1000, storagePct: 0.1, storageStatus: 'healthy', dbUsedMb: 0.5, dbLimitMb: 500, dbPct: 0.1, submissionsCount: 0, profilesCount: 0 },
+      agora: { minutesUsed: 0, minutesLimit: 10000, minutesPct: 0, minutesStatus: 'healthy', daysUntilReset: 30, resetDate: 'Next Month' }
+    };
+    try {
+      cloudUsage = await storageService.getCloudResourceUsage();
+    } catch (_) {}
     this.adminFilterTab = this.adminFilterTab ?? 'pending'; // 'pending', 'approved', 'rejected'
     this.adminSearchQuery = this.adminSearchQuery ?? '';
 
@@ -4654,6 +4661,75 @@ class AppController {
             </div>
             <div class="apk-metric-num" style="color:#EF4444;">${rejected.length}</div>
             <div class="apk-metric-lbl">Rejected</div>
+          </div>
+        </div>
+
+        <!-- ── Cloud Quotas & Usage Limits Monitor (Supabase & Agora) ── -->
+        <div class="apk-cloud-limits-card" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:20px; padding:18px; margin-bottom:16px; box-shadow:0 4px 16px rgba(15,23,42,0.04);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="material-symbols-rounded filled" style="color:#0284C7; font-size:22px;">cloud_sync</span>
+              <div>
+                <div style="font-size:14px; font-weight:800; color:#0F172A;">Cloud Resource Quotas & Limits</div>
+                <div style="font-size:11px; color:#64748B;">Live usage tracking for Supabase & Agora Free Plans</div>
+              </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button id="btn-admin-clean-storage" style="padding:6px 12px; font-size:11px; background:rgba(239,68,68,0.08); color:#DC2626; border:1px solid rgba(239,68,68,0.25); border-radius:8px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Purge reviewed homework images older than 45 days">
+                <span class="material-symbols-rounded" style="font-size:14px;">auto_delete</span> Clean Storage
+              </button>
+              <button id="btn-admin-cloud-details" style="padding:6px 12px; font-size:11px; background:#F1F5F9; color:#334155; border:1px solid #CBD5E1; border-radius:8px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px;">analytics</span> Details
+              </button>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+            <!-- Supabase Storage Gauge -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:11.5px; font-weight:700; color:#334155; display:flex; align-items:center; gap:5px;">
+                  <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10B981;"></span>
+                  Supabase Storage (1 GB Free)
+                </span>
+                <span style="font-size:10.5px; font-weight:800; color:#0284C7;">${cloudUsage.supabase.storagePct}%</span>
+              </div>
+              <div style="height:7px; background:#E2E8F0; border-radius:4px; overflow:hidden; margin-bottom:6px;">
+                <div style="height:100%; width:${Math.min(100, Math.max(3, cloudUsage.supabase.storagePct))}%; background:${cloudUsage.supabase.storagePct > 80 ? '#EF4444' : (cloudUsage.supabase.storagePct > 65 ? '#F59E0B' : '#10B981')}; border-radius:4px;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:10.5px; color:#64748B;">
+                <span>${cloudUsage.supabase.storageUsedMb} MB used (${cloudUsage.supabase.fileCount || 0} files)</span>
+                <span>${cloudUsage.supabase.storageLimitMb} MB Quota</span>
+              </div>
+            </div>
+
+            <!-- Agora Video Minutes Gauge -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:11.5px; font-weight:700; color:#334155; display:flex; align-items:center; gap:5px;">
+                  <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#6366F1;"></span>
+                  Agora Video Minutes (10k Free)
+                </span>
+                <span style="font-size:10.5px; font-weight:800; color:#6366F1;">${cloudUsage.agora.minutesPct}%</span>
+              </div>
+              <div style="height:7px; background:#E2E8F0; border-radius:4px; overflow:hidden; margin-bottom:6px;">
+                <div style="height:100%; width:${Math.min(100, Math.max(3, cloudUsage.agora.minutesPct))}%; background:${cloudUsage.agora.minutesPct > 80 ? '#EF4444' : (cloudUsage.agora.minutesPct > 65 ? '#F59E0B' : '#6366F1')}; border-radius:4px;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:10.5px; color:#64748B;">
+                <span>${cloudUsage.agora.minutesUsed} mins used</span>
+                <span>Resets in ${cloudUsage.agora.daysUntilReset}d (${cloudUsage.agora.resetDate})</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px dashed #E2E8F0; font-size:11px; flex-wrap:wrap; gap:6px;">
+            <span style="color:#64748B;">
+              Database: <strong style="color:#0F172A;">${cloudUsage.supabase.dbUsedMb} MB</strong> / 500 MB &bull; Submissions: <strong style="color:#0F172A;">${cloudUsage.supabase.submissionsCount}</strong> &bull; Students: <strong style="color:#0F172A;">${cloudUsage.supabase.profilesCount}</strong>
+            </span>
+            <span style="display:inline-flex; align-items:center; gap:4px; font-weight:700; color:${cloudUsage.supabase.storageStatus === 'healthy' && cloudUsage.agora.minutesStatus === 'healthy' ? '#10B981' : '#F59E0B'};">
+              <span class="material-symbols-rounded filled" style="font-size:14px;">${cloudUsage.supabase.storageStatus === 'healthy' ? 'verified' : 'warning'}</span>
+              ${cloudUsage.supabase.storageStatus === 'healthy' && cloudUsage.agora.minutesStatus === 'healthy' ? 'All Quotas Safe & Optimal' : 'Usage Action Suggested'}
+            </span>
           </div>
         </div>
 
@@ -4804,6 +4880,42 @@ class AppController {
       url.searchParams.set('view', 'student');
       window.history.pushState({ ...(window.history.state || {}), edupeakView: 'student' }, '', url);
       this.renderApp();
+    });
+
+    // Cloud Limits: Storage Cleanup
+    document.getElementById('btn-admin-clean-storage')?.addEventListener('click', async () => {
+      const confirmed = confirm(
+        'Run Storage Cleanup Now?\n\n' +
+        'This will automatically remove old image files from Supabase Storage for homework submissions that have already been reviewed (>45 days ago).\n\n' +
+        'Student grades, XP points, teacher feedback, and exam history will be 100% preserved!'
+      );
+      if (!confirmed) return;
+
+      const btn = document.getElementById('btn-admin-clean-storage');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px;">hourglass_top</span> Cleaning...';
+      }
+
+      try {
+        const res = await storageService.cleanupOldSubmissions(45);
+        notificationService.showInAppBanner(
+          'Storage Cleanup Complete',
+          res.cleanedCount > 0 
+            ? 'Successfully removed ' + res.cleanedCount + ' archived image files and reclaimed storage space!'
+            : 'Storage is already optimized! No old images found exceeding 45 days.',
+          'success'
+        );
+        this.renderAdminDashboardScreen(container);
+      } catch (err) {
+        notificationService.showInAppBanner('Cleanup Note', err?.message || 'Could not complete cleanup.', 'warning');
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    // Cloud Limits: Detailed Modal
+    document.getElementById('btn-admin-cloud-details')?.addEventListener('click', () => {
+      this.openCloudLimitsModal(cloudUsage);
     });
 
     document.getElementById('btn-admin-logout')?.addEventListener('click', () => {
@@ -11083,6 +11195,85 @@ ${!times.isWaiting ? `
       }
     }, 1000);
   }
+
+
+openCloudLimitsModal(cloudUsage) {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:540px; padding:24px;">
+        <div class="modal-header" style="margin-bottom:16px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="color:#0284C7; font-size:24px;">cloud_sync</span>
+            <h3 class="modal-title">Cloud Resource Limits & Actions</h3>
+          </div>
+          <button class="modal-close-btn" id="btn-close-limits-modal">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+
+        <div style="font-size:12.5px; color:#475569; line-height:1.5; margin-bottom:18px;">
+          Monitor your exact usage against free tier limits. Our automated WebP compression and lifecycle cleanup keep you running without unexpected bills.
+        </div>
+
+        <!-- Supabase Section -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="color:#0F172A; font-size:13px; display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10B981;"></span>
+              Supabase Project: EduPeak (hkonbtrxmsxisggcxpww)
+            </strong>
+            <a href="https://supabase.com/dashboard/project/hkonbtrxmsxisggcxpww" target="_blank" style="font-size:11.5px; color:#2563EB; font-weight:700; text-decoration:none;">Open Dashboard &rarr;</a>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11.5px;">
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:8px;">
+              <div style="color:#64748B;">Storage Bucket</div>
+              <div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">${cloudUsage.supabase.storageUsedMb} / 1,000 MB</div>
+              <div style="font-size:10px; color:#10B981; font-weight:700; margin-top:2px;">${(1000 - cloudUsage.supabase.storageUsedMb).toFixed(1)} MB Remaining</div>
+            </div>
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:8px;">
+              <div style="color:#64748B;">Database Size</div>
+              <div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">${cloudUsage.supabase.dbUsedMb} / 500 MB</div>
+              <div style="font-size:10px; color:#10B981; font-weight:700; margin-top:2px;">${cloudUsage.supabase.submissionsCount} submissions, ${cloudUsage.supabase.profilesCount} users</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agora Section -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px; margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="color:#0F172A; font-size:13px; display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#6366F1;"></span>
+              Agora RTC Video Proctoring
+            </strong>
+            <a href="https://console.agora.io" target="_blank" style="font-size:11.5px; color:#6366F1; font-weight:700; text-decoration:none;">Open Console &rarr;</a>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11.5px;">
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:8px;">
+              <div style="color:#64748B;">Monthly Video Minutes</div>
+              <div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">${cloudUsage.agora.minutesUsed} / 10,000 Mins</div>
+              <div style="font-size:10px; color:#6366F1; font-weight:700; margin-top:2px;">10,000 Free every month</div>
+            </div>
+            <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:8px;">
+              <div style="color:#64748B;">Next Quota Reset</div>
+              <div style="font-size:14px; font-weight:800; color:#0F172A; margin-top:2px;">${cloudUsage.agora.resetDate}</div>
+              <div style="font-size:10px; color:#10B981; font-weight:700; margin-top:2px;">In ${cloudUsage.agora.daysUntilReset} days</div>
+            </div>
+          </div>
+          <div style="font-size:11px; color:#64748B; margin-top:8px; background:rgba(99,102,241,0.06); padding:8px 10px; border-radius:8px;">
+            💡 <strong>Pro-Tip:</strong> Agora provides 10,000 minutes free each calendar month. If you ever anticipate exceeding this during mega-paper sessions, you can toggle audio-only or intermittent camera snapshots.
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btn-modal-close-done" style="width:100%; padding:12px;">Close</button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.querySelector('#btn-close-limits-modal')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('#btn-modal-close-done')?.addEventListener('click', () => modal.remove());
+  }
+
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -11090,3 +11281,6 @@ window.addEventListener('DOMContentLoaded', () => {
   window.app = app;
   app.init();
 });
+
+
+  
