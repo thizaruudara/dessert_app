@@ -98,7 +98,7 @@ export class CameraService {
   }
 
   // Compress and resize image dataUrl to keep payload size lightweight (<100KB)
-  compressImage(dataUrl, maxDim = 1200, quality = 0.72) {
+  compressImage(dataUrl, maxDim = 1100, quality = 0.70) {
     return new Promise((resolve) => {
       if (!dataUrl || typeof dataUrl !== 'string') return resolve(dataUrl);
       const img = new Image();
@@ -118,7 +118,13 @@ export class CameraService {
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, w, h);
+        try {
+          const webp = canvas.toDataURL('image/webp', quality);
+          if (webp.startsWith('data:image/webp')) return resolve(webp);
+        } catch (_) {}
         resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = () => resolve(dataUrl);
@@ -192,7 +198,13 @@ export class CameraService {
       }
     }
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+    let dataUrl;
+    try {
+      const webp = canvas.toDataURL('image/webp', 0.70);
+      dataUrl = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.70);
+    } catch (_) {
+      dataUrl = canvas.toDataURL('image/jpeg', 0.70);
+    }
     this.scannedPages.push(dataUrl);
 
     // Trigger haptic vibration if supported

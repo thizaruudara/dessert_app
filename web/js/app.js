@@ -4,6 +4,7 @@ import { authService } from './auth-service.js';
 import { dbService } from './db-service.js';
 import { notificationService } from './notification-service.js';
 import { cameraService } from './camera-service.js';
+import { storageService } from './storage-service.js';
 import { PwaGatekeeper } from './pwa-gatekeeper.js';
 import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid } from './agora-service.js';
 
@@ -12,6 +13,8 @@ class AppController {
     this.currentTab = 'home';
     this.renderToken = 0;
     this.currentUser = authService.currentUser || null;
+    // Solution 4: Storage auto-cleanup for archived homework (>45 days)
+    setTimeout(() => { storageService.cleanupOldSubmissions(45).catch(() => {}); }, 4000);
     this.countdownTimer = null;
     this.papersInterval = null;
     this.isInsideLiveExam = false;
@@ -4264,13 +4267,28 @@ class AppController {
         const subject = document.getElementById('submit-topic-input')?.value?.trim() || defaultTopic;
         const caption = document.getElementById('submit-note-input')?.value?.trim() || 'Daily Dessert Submission';
 
+        if (btn) {
+          btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">cloud_upload</span>Optimizing & Uploading Pages...';
+        }
+
+        // Solutions 2 & 3: Ultra-compress and upload to R2 / Supabase Storage
+        let uploadedUrls = [];
+        try {
+          uploadedUrls = await storageService.uploadAllPages(pages, {
+            studentId,
+            filePrefix: 'dessert'
+          });
+        } catch (uploadErr) {
+          console.warn('[Dessert] Storage upload fallback:', uploadErr);
+        }
+
         await dbService.submitDessert({
           studentId,
           studentName,
           studentPhone,
           subject,
           caption,
-          mediaUrls: pages
+          mediaUrls: (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : pages
         });
 
         this.capturedHomeworkPhotos = [];
@@ -10519,7 +10537,16 @@ ${!times.isWaiting ? `
             const totalMarks = Number(session.totalMarks) || 100;
             const marks = totalQs > 0 ? Math.round((correctCount / totalQs) * totalMarks) : 0;
 
-            const photoUrls = scannedPages.map(p => p.dataUrl);
+            let photoUrls = [];
+            try {
+              const rawImgs = scannedPages.map(p => p.dataUrl);
+              photoUrls = await storageService.uploadAllPages(rawImgs, {
+                studentId,
+                filePrefix: 'exam_paper'
+              });
+            } catch (_) {
+              photoUrls = scannedPages.map(p => p.dataUrl);
+            }
             if (driveLink) photoUrls.push(driveLink);
 
             await dbService.updateCameraHeartbeat({
