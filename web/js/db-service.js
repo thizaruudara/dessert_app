@@ -742,14 +742,14 @@ export class DbService {
     return false;
   }
 
-  // Admin: Get student roster from combined EduPeak Supabase profiles
+  // Admin: Get student roster - ONLY students who have logged into Dessert App
   async getAllStudents() {
     const map = new Map();
 
-    // 1. Fetch live registered students from central Supabase database
+    // 1. Fetch registered students who have logged into Dessert App via Supabase RPC
     try {
       const { data: supaStudents, error: supaErr } = await supabase.rpc('get_all_students_for_admin');
-      if (!supaErr && Array.isArray(supaStudents) && supaStudents.length > 0) {
+      if (!supaErr && Array.isArray(supaStudents)) {
         for (const u of supaStudents) {
           if (this.isStaffOrAdmin(u)) continue;
           const key = (u.studentId || u.id || u.phone || u.email || u.name).toLowerCase().trim();
@@ -765,32 +765,37 @@ export class DbService {
             attendanceMode: u.attendanceMode || 'online',
             school: u.school || '',
             district: u.district || '',
+            loginCount: u.loginCount || 1,
+            lastLoginAt: u.lastLoginAt || null,
+            firstLoginAt: u.firstLoginAt || null,
             credits: 0
           });
         }
-      } else {
-        // Fallback direct query on profiles
-        const { data: profRows } = await supabase
-          .from('profiles')
-          .select('*')
-          .or('role.eq.student,role.is.null');
+      } else if (supaErr) {
+        console.warn('[DB] get_all_students_for_admin RPC error, querying dessert_app_logins table:', supaErr);
+        // Fallback: Query dessert_app_logins directly to ensure ONLY logged-in students are listed
+        const { data: loginRows } = await supabase
+          .from('dessert_app_logins')
+          .select('*');
 
-        if (profRows && profRows.length > 0) {
-          for (const p of profRows) {
-            if (this.isStaffOrAdmin(p)) continue;
-            const key = (p.id || p.phone || p.email || p.name).toLowerCase().trim();
+        if (loginRows && loginRows.length > 0) {
+          for (const l of loginRows) {
+            const key = (l.student_id || l.phone || l.email || l.name).toLowerCase().trim();
             map.set(key, {
-              id: p.id,
-              studentId: p.id,
-              name: p.name,
-              phone: p.phone || '',
-              email: p.email || '',
-              examYear: p.exam_year || '2027 A/L',
+              id: l.student_id,
+              studentId: l.student_id,
+              name: l.name,
+              phone: l.phone || '',
+              email: l.email || '',
+              examYear: l.exam_year || '2027 A/L',
               role: 'student',
-              enrolledCourses: p.enrolled_courses || [],
-              attendanceMode: p.attendance_mode || 'online',
-              school: p.school || '',
-              district: p.district || '',
+              enrolledCourses: [],
+              attendanceMode: 'online',
+              school: '',
+              district: '',
+              loginCount: l.login_count || 1,
+              lastLoginAt: l.last_login_at || null,
+              firstLoginAt: l.first_login_at || null,
               credits: 0
             });
           }
@@ -800,7 +805,7 @@ export class DbService {
       console.warn('[DB] Supabase getAllStudents error:', e);
     }
 
-    // 2. Merge with Firestore users if present
+    // 2. Merge with Firestore users ONLY for verified Dessert App students in map
     try {
       const usersRef = collection(db, 'users');
       const snap = await Promise.race([
@@ -815,45 +820,10 @@ export class DbService {
           if (map.has(key)) {
             const existing = map.get(key);
             map.set(key, { ...existing, ...u });
-          } else {
-            map.set(key, {
-              id: u.id,
-              studentId: u.studentId || u.id,
-              name: u.name,
-              phone: u.phone || '',
-              email: u.email || '',
-              examYear: u.examYear || '2027 A/L',
-              role: 'student',
-              enrolledCourses: u.enrolledCourses || [],
-              credits: Number(u.credits) || 0
-            });
           }
         }
       }
     } catch (_) {}
-
-    // 3. Fallback to local storage only if no students found from database
-    if (map.size === 0) {
-      try {
-        const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-        for (const d of localDesserts) {
-          if (!d.studentName) continue;
-          if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
-          const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
-          if (!map.has(key)) {
-            map.set(key, {
-              id: d.studentId || ('st_' + key.replace(/\s+/g, '_')),
-              name: d.studentName,
-              phone: d.studentPhone || '',
-              examYear: d.examYear || '2027 A/L',
-              credits: Number(d.creditsAwarded) || 0,
-              studentId: d.studentId || '',
-              role: 'student'
-            });
-          }
-        }
-      } catch (_) {}
-    }
 
     // 4. Calculate accurate credits for each student
     const students = Array.from(map.values()).filter(u => !this.isStaffOrAdmin(u));

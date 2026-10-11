@@ -53900,6 +53900,11 @@ var AuthService = class {
       }
       localStorage.setItem("edupeak_cached_user", JSON.stringify(this.currentUser));
       localStorage.removeItem("edupeak_is_logged_out");
+      if (this.currentUser && (!this.currentUser.role || this.currentUser.role === "student")) {
+        this.recordDessertAppLogin(this.currentUser).catch((e2) => {
+          console.warn("[Auth] Background recordDessertAppLogin error:", e2);
+        });
+      }
       this.notify();
       return this.currentUser;
     } catch (err) {
@@ -53981,11 +53986,41 @@ var AuthService = class {
         subscriptionDetails: sub
       };
       localStorage.setItem("edupeak_cached_user", JSON.stringify(this.currentUser));
+      if (!this.currentUser.role || this.currentUser.role === "student") {
+        this.recordDessertAppLogin(this.currentUser).catch(() => {
+        });
+      }
       this.notify();
       return sub;
     } catch (err) {
       console.error("[Auth] refreshSubscription error:", err);
       return { isSubscribed: false, error: err };
+    }
+  }
+  /**
+   * Record this student's login / presence in Dessert App in Supabase
+   */
+  async recordDessertAppLogin(user) {
+    if (!user) return;
+    const role = (user.role || "").toLowerCase();
+    if (role && role !== "student") return;
+    const studentId = user.studentId || user.id || user.uid;
+    if (!studentId) return;
+    try {
+      const { error } = await supabase.rpc("record_dessert_app_login", {
+        p_student_id: String(studentId),
+        p_name: String(user.name || ""),
+        p_phone: String(user.phone || ""),
+        p_email: String(user.email || ""),
+        p_exam_year: String(user.exam_year || user.examYear || "")
+      });
+      if (error) {
+        console.warn("[Auth] record_dessert_app_login RPC warning:", error);
+      } else {
+        console.log("[Auth] Logged student dessert app presence:", studentId);
+      }
+    } catch (e2) {
+      console.warn("[Auth] recordDessertAppLogin invocation error:", e2);
     }
   }
 };
@@ -86894,12 +86929,12 @@ var DbService = class {
     }
     return false;
   }
-  // Admin: Get student roster from combined EduPeak Supabase profiles
+  // Admin: Get student roster - ONLY students who have logged into Dessert App
   async getAllStudents() {
     const map2 = /* @__PURE__ */ new Map();
     try {
       const { data: supaStudents, error: supaErr } = await supabase.rpc("get_all_students_for_admin");
-      if (!supaErr && Array.isArray(supaStudents) && supaStudents.length > 0) {
+      if (!supaErr && Array.isArray(supaStudents)) {
         for (const u2 of supaStudents) {
           if (this.isStaffOrAdmin(u2)) continue;
           const key = (u2.studentId || u2.id || u2.phone || u2.email || u2.name).toLowerCase().trim();
@@ -86915,27 +86950,33 @@ var DbService = class {
             attendanceMode: u2.attendanceMode || "online",
             school: u2.school || "",
             district: u2.district || "",
+            loginCount: u2.loginCount || 1,
+            lastLoginAt: u2.lastLoginAt || null,
+            firstLoginAt: u2.firstLoginAt || null,
             credits: 0
           });
         }
-      } else {
-        const { data: profRows } = await supabase.from("profiles").select("*").or("role.eq.student,role.is.null");
-        if (profRows && profRows.length > 0) {
-          for (const p2 of profRows) {
-            if (this.isStaffOrAdmin(p2)) continue;
-            const key = (p2.id || p2.phone || p2.email || p2.name).toLowerCase().trim();
+      } else if (supaErr) {
+        console.warn("[DB] get_all_students_for_admin RPC error, querying dessert_app_logins table:", supaErr);
+        const { data: loginRows } = await supabase.from("dessert_app_logins").select("*");
+        if (loginRows && loginRows.length > 0) {
+          for (const l2 of loginRows) {
+            const key = (l2.student_id || l2.phone || l2.email || l2.name).toLowerCase().trim();
             map2.set(key, {
-              id: p2.id,
-              studentId: p2.id,
-              name: p2.name,
-              phone: p2.phone || "",
-              email: p2.email || "",
-              examYear: p2.exam_year || "2027 A/L",
+              id: l2.student_id,
+              studentId: l2.student_id,
+              name: l2.name,
+              phone: l2.phone || "",
+              email: l2.email || "",
+              examYear: l2.exam_year || "2027 A/L",
               role: "student",
-              enrolledCourses: p2.enrolled_courses || [],
-              attendanceMode: p2.attendance_mode || "online",
-              school: p2.school || "",
-              district: p2.district || "",
+              enrolledCourses: [],
+              attendanceMode: "online",
+              school: "",
+              district: "",
+              loginCount: l2.login_count || 1,
+              lastLoginAt: l2.last_login_at || null,
+              firstLoginAt: l2.first_login_at || null,
               credits: 0
             });
           }
@@ -86958,44 +86999,10 @@ var DbService = class {
           if (map2.has(key)) {
             const existing = map2.get(key);
             map2.set(key, { ...existing, ...u2 });
-          } else {
-            map2.set(key, {
-              id: u2.id,
-              studentId: u2.studentId || u2.id,
-              name: u2.name,
-              phone: u2.phone || "",
-              email: u2.email || "",
-              examYear: u2.examYear || "2027 A/L",
-              role: "student",
-              enrolledCourses: u2.enrolledCourses || [],
-              credits: Number(u2.credits) || 0
-            });
           }
         }
       }
     } catch (_) {
-    }
-    if (map2.size === 0) {
-      try {
-        const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-        for (const d of localDesserts) {
-          if (!d.studentName) continue;
-          if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
-          const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
-          if (!map2.has(key)) {
-            map2.set(key, {
-              id: d.studentId || "st_" + key.replace(/\s+/g, "_"),
-              name: d.studentName,
-              phone: d.studentPhone || "",
-              examYear: d.examYear || "2027 A/L",
-              credits: Number(d.creditsAwarded) || 0,
-              studentId: d.studentId || "",
-              role: "student"
-            });
-          }
-        }
-      } catch (_) {
-      }
     }
     const students = Array.from(map2.values()).filter((u2) => !this.isStaffOrAdmin(u2));
     await Promise.all(students.map(async (st2) => {

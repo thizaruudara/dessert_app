@@ -157,6 +157,13 @@ export class AuthService {
 
       localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
       localStorage.removeItem('edupeak_is_logged_out');
+
+      if (this.currentUser && (!this.currentUser.role || this.currentUser.role === 'student')) {
+        this.recordDessertAppLogin(this.currentUser).catch((e) => {
+          console.warn('[Auth] Background recordDessertAppLogin error:', e);
+        });
+      }
+
       this.notify();
       return this.currentUser;
     } catch (err) {
@@ -259,11 +266,43 @@ export class AuthService {
       };
 
       localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
+      if (!this.currentUser.role || this.currentUser.role === 'student') {
+        this.recordDessertAppLogin(this.currentUser).catch(() => {});
+      }
       this.notify();
       return sub;
     } catch (err) {
       console.error('[Auth] refreshSubscription error:', err);
       return { isSubscribed: false, error: err };
+    }
+  }
+
+  /**
+   * Record this student's login / presence in Dessert App in Supabase
+   */
+  async recordDessertAppLogin(user) {
+    if (!user) return;
+    const role = (user.role || '').toLowerCase();
+    if (role && role !== 'student') return;
+
+    const studentId = user.studentId || user.id || user.uid;
+    if (!studentId) return;
+
+    try {
+      const { error } = await supabase.rpc('record_dessert_app_login', {
+        p_student_id: String(studentId),
+        p_name: String(user.name || ''),
+        p_phone: String(user.phone || ''),
+        p_email: String(user.email || ''),
+        p_exam_year: String(user.exam_year || user.examYear || '')
+      });
+      if (error) {
+        console.warn('[Auth] record_dessert_app_login RPC warning:', error);
+      } else {
+        console.log('[Auth] Logged student dessert app presence:', studentId);
+      }
+    } catch (e) {
+      console.warn('[Auth] recordDessertAppLogin invocation error:', e);
     }
   }
 }
