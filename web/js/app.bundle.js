@@ -89616,23 +89616,34 @@ var AppController = class {
               Access your proctored paper sessions, homework dessert submissions, and batch rankings through your central EduPeak account.
             </p>
 
-            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:50px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 20px rgba(37,99,235,0.3); transition:all 0.2s ease;">
-              <span class="material-symbols-rounded" style="font-size:22px;">login</span>
+            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:50px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 20px rgba(37,99,235,0.3); transition:all 0.2s ease; touch-action:manipulation;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
+              </svg>
               <span>Login With EduPeak</span>
             </button>
 
             <div style="margin-top:16px; padding-top:16px; border-top:1px solid #F1F5F9; font-size:12px; color:#64748B;">
               Don't have an account on edupeak.lk yet?
               <br>
-              <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:3px; margin-top:6px;">
+              <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; margin-top:6px;">
                 <span>Create an Account at edupeak.lk</span>
-                <span class="material-symbols-rounded" style="font-size:14px;">open_in_new</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
               </a>
             </div>
           </div>
 
-          <div class="auth-secure-note" style="margin-top:16px; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:#94A3B8;">
-            <span class="material-symbols-rounded" style="font-size:16px;">verified_user</span>
+          <div class="auth-secure-note" style="margin-top:16px; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:#64748B;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              <polyline points="9 12 11 14 15 10"></polyline>
+            </svg>
             <span>Single Sign-On verified with edupeak.lk &amp; Supabase Cloud</span>
           </div>
         </div>
