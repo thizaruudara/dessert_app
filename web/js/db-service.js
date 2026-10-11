@@ -742,51 +742,120 @@ export class DbService {
     return false;
   }
 
-  // Admin: Get student roster (strictly excludes admin/teacher/staff accounts)
+  // Admin: Get student roster from combined EduPeak Supabase profiles
   async getAllStudents() {
-    let list = [];
+    const map = new Map();
+
+    // 1. Fetch live registered students from central Supabase database
+    try {
+      const { data: supaStudents, error: supaErr } = await supabase.rpc('get_all_students_for_admin');
+      if (!supaErr && Array.isArray(supaStudents) && supaStudents.length > 0) {
+        for (const u of supaStudents) {
+          if (this.isStaffOrAdmin(u)) continue;
+          const key = (u.studentId || u.id || u.phone || u.email || u.name).toLowerCase().trim();
+          map.set(key, {
+            id: u.id || u.studentId,
+            studentId: u.studentId || u.id,
+            name: u.name,
+            phone: u.phone || '',
+            email: u.email || '',
+            examYear: u.examYear || '2027 A/L',
+            role: 'student',
+            enrolledCourses: u.enrolledCourses || [],
+            attendanceMode: u.attendanceMode || 'online',
+            school: u.school || '',
+            district: u.district || '',
+            credits: 0
+          });
+        }
+      } else {
+        // Fallback direct query on profiles
+        const { data: profRows } = await supabase
+          .from('profiles')
+          .select('*')
+          .or('role.eq.student,role.is.null');
+
+        if (profRows && profRows.length > 0) {
+          for (const p of profRows) {
+            if (this.isStaffOrAdmin(p)) continue;
+            const key = (p.id || p.phone || p.email || p.name).toLowerCase().trim();
+            map.set(key, {
+              id: p.id,
+              studentId: p.id,
+              name: p.name,
+              phone: p.phone || '',
+              email: p.email || '',
+              examYear: p.exam_year || '2027 A/L',
+              role: 'student',
+              enrolledCourses: p.enrolled_courses || [],
+              attendanceMode: p.attendance_mode || 'online',
+              school: p.school || '',
+              district: p.district || '',
+              credits: 0
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[DB] Supabase getAllStudents error:', e);
+    }
+
+    // 2. Merge with Firestore users if present
     try {
       const usersRef = collection(db, 'users');
       const snap = await Promise.race([
         getDocs(usersRef),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
       ]);
-      if (!snap.empty) {
-        list = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(u => !this.isStaffOrAdmin(u));
-      }
-    } catch (_) {}
-
-    const map = new Map();
-    for (const u of list) {
-      if (this.isStaffOrAdmin(u)) continue;
-      const key = (u.phone || u.studentId || u.id || u.name).toLowerCase().trim();
-      map.set(key, { ...u });
-    }
-
-    // Incorporate students from local submissions (such as Test User)
-    try {
-      const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-      for (const d of localDesserts) {
-        if (!d.studentName) continue;
-        if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
-        const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
-        if (!map.has(key)) {
-          map.set(key, {
-            id: d.studentId || ('st_' + key.replace(/\s+/g, '_')),
-            name: d.studentName,
-            phone: d.studentPhone || '',
-            examYear: d.examYear || '2027 A/L',
-            credits: Number(d.creditsAwarded) || 0,
-            studentId: d.studentId || '',
-            role: 'student'
-          });
+      if (snap && !snap.empty) {
+        for (const d of snap.docs) {
+          const u = { id: d.id, ...d.data() };
+          if (this.isStaffOrAdmin(u)) continue;
+          const key = (u.studentId || u.id || u.phone || u.name).toLowerCase().trim();
+          if (map.has(key)) {
+            const existing = map.get(key);
+            map.set(key, { ...existing, ...u });
+          } else {
+            map.set(key, {
+              id: u.id,
+              studentId: u.studentId || u.id,
+              name: u.name,
+              phone: u.phone || '',
+              email: u.email || '',
+              examYear: u.examYear || '2027 A/L',
+              role: 'student',
+              enrolledCourses: u.enrolledCourses || [],
+              credits: Number(u.credits) || 0
+            });
+          }
         }
       }
     } catch (_) {}
 
-    // Calculate exact, accurate credits for all students in parallel
+    // 3. Fallback to local storage only if no students found from database
+    if (map.size === 0) {
+      try {
+        const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+        for (const d of localDesserts) {
+          if (!d.studentName) continue;
+          if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
+          const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
+          if (!map.has(key)) {
+            map.set(key, {
+              id: d.studentId || ('st_' + key.replace(/\s+/g, '_')),
+              name: d.studentName,
+              phone: d.studentPhone || '',
+              examYear: d.examYear || '2027 A/L',
+              credits: Number(d.creditsAwarded) || 0,
+              studentId: d.studentId || '',
+              role: 'student'
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4. Calculate accurate credits for each student
     const students = Array.from(map.values()).filter(u => !this.isStaffOrAdmin(u));
     await Promise.all(students.map(async (st) => {
       const trueCredits = await this.getStudentCredits(

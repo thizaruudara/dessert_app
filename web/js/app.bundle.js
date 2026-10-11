@@ -86894,45 +86894,108 @@ var DbService = class {
     }
     return false;
   }
-  // Admin: Get student roster (strictly excludes admin/teacher/staff accounts)
+  // Admin: Get student roster from combined EduPeak Supabase profiles
   async getAllStudents() {
-    let list = [];
+    const map2 = /* @__PURE__ */ new Map();
+    try {
+      const { data: supaStudents, error: supaErr } = await supabase.rpc("get_all_students_for_admin");
+      if (!supaErr && Array.isArray(supaStudents) && supaStudents.length > 0) {
+        for (const u2 of supaStudents) {
+          if (this.isStaffOrAdmin(u2)) continue;
+          const key = (u2.studentId || u2.id || u2.phone || u2.email || u2.name).toLowerCase().trim();
+          map2.set(key, {
+            id: u2.id || u2.studentId,
+            studentId: u2.studentId || u2.id,
+            name: u2.name,
+            phone: u2.phone || "",
+            email: u2.email || "",
+            examYear: u2.examYear || "2027 A/L",
+            role: "student",
+            enrolledCourses: u2.enrolledCourses || [],
+            attendanceMode: u2.attendanceMode || "online",
+            school: u2.school || "",
+            district: u2.district || "",
+            credits: 0
+          });
+        }
+      } else {
+        const { data: profRows } = await supabase.from("profiles").select("*").or("role.eq.student,role.is.null");
+        if (profRows && profRows.length > 0) {
+          for (const p2 of profRows) {
+            if (this.isStaffOrAdmin(p2)) continue;
+            const key = (p2.id || p2.phone || p2.email || p2.name).toLowerCase().trim();
+            map2.set(key, {
+              id: p2.id,
+              studentId: p2.id,
+              name: p2.name,
+              phone: p2.phone || "",
+              email: p2.email || "",
+              examYear: p2.exam_year || "2027 A/L",
+              role: "student",
+              enrolledCourses: p2.enrolled_courses || [],
+              attendanceMode: p2.attendance_mode || "online",
+              school: p2.school || "",
+              district: p2.district || "",
+              credits: 0
+            });
+          }
+        }
+      }
+    } catch (e2) {
+      console.warn("[DB] Supabase getAllStudents error:", e2);
+    }
     try {
       const usersRef = collection(db, "users");
       const snap = await Promise.race([
         getDocs(usersRef),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3500))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3e3))
       ]);
-      if (!snap.empty) {
-        list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((u2) => !this.isStaffOrAdmin(u2));
-      }
-    } catch (_) {
-    }
-    const map2 = /* @__PURE__ */ new Map();
-    for (const u2 of list) {
-      if (this.isStaffOrAdmin(u2)) continue;
-      const key = (u2.phone || u2.studentId || u2.id || u2.name).toLowerCase().trim();
-      map2.set(key, { ...u2 });
-    }
-    try {
-      const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-      for (const d of localDesserts) {
-        if (!d.studentName) continue;
-        if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
-        const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
-        if (!map2.has(key)) {
-          map2.set(key, {
-            id: d.studentId || "st_" + key.replace(/\s+/g, "_"),
-            name: d.studentName,
-            phone: d.studentPhone || "",
-            examYear: d.examYear || "2027 A/L",
-            credits: Number(d.creditsAwarded) || 0,
-            studentId: d.studentId || "",
-            role: "student"
-          });
+      if (snap && !snap.empty) {
+        for (const d of snap.docs) {
+          const u2 = { id: d.id, ...d.data() };
+          if (this.isStaffOrAdmin(u2)) continue;
+          const key = (u2.studentId || u2.id || u2.phone || u2.name).toLowerCase().trim();
+          if (map2.has(key)) {
+            const existing = map2.get(key);
+            map2.set(key, { ...existing, ...u2 });
+          } else {
+            map2.set(key, {
+              id: u2.id,
+              studentId: u2.studentId || u2.id,
+              name: u2.name,
+              phone: u2.phone || "",
+              email: u2.email || "",
+              examYear: u2.examYear || "2027 A/L",
+              role: "student",
+              enrolledCourses: u2.enrolledCourses || [],
+              credits: Number(u2.credits) || 0
+            });
+          }
         }
       }
     } catch (_) {
+    }
+    if (map2.size === 0) {
+      try {
+        const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
+        for (const d of localDesserts) {
+          if (!d.studentName) continue;
+          if (this.isStaffOrAdmin({ name: d.studentName, phone: d.studentPhone, id: d.studentId, role: d.role })) continue;
+          const key = (d.studentPhone || d.studentId || d.studentName).toLowerCase().trim();
+          if (!map2.has(key)) {
+            map2.set(key, {
+              id: d.studentId || "st_" + key.replace(/\s+/g, "_"),
+              name: d.studentName,
+              phone: d.studentPhone || "",
+              examYear: d.examYear || "2027 A/L",
+              credits: Number(d.creditsAwarded) || 0,
+              studentId: d.studentId || "",
+              role: "student"
+            });
+          }
+        }
+      } catch (_) {
+      }
     }
     const students = Array.from(map2.values()).filter((u2) => !this.isStaffOrAdmin(u2));
     await Promise.all(students.map(async (st2) => {
