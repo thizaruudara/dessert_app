@@ -90652,8 +90652,17 @@ var PwaGatekeeper = class {
       window.__edupeakInstallPrompt = e2;
       this.updateInstallButtonVisibility();
     });
+    window.pwaGatekeeper = this;
+    window.showPwaInstallModal = (customPlatform) => {
+      this.renderGatekeeper(customPlatform);
+      this.attachEventListeners();
+    };
   }
   isStandaloneMode() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("install") === "true" || urlParams.get("pwa") === "true" || urlParams.get("gatekeeper") === "true" || urlParams.get("a2hs") === "true" || window.location.hash === "#install" || window.location.hash === "#pwa") {
+      return false;
+    }
     if (window.navigator.standalone === true) return true;
     if (window.matchMedia) {
       if (window.matchMedia("(display-mode: standalone)").matches) return true;
@@ -90661,13 +90670,62 @@ var PwaGatekeeper = class {
       if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
     }
     if (document.referrer && document.referrer.includes("android-app://")) return true;
-    const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("dev") === "true" || urlParams.get("preview") === "true" || urlParams.get("bypass") === "true" || sessionStorage.getItem("edupeak_dev_bypass") === "true") {
       return true;
     }
     return false;
   }
-  detectPlatform() {
+  detectPlatform(forced) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const platformParam = forced || urlParams.get("platform") || "";
+    if (platformParam === "ios" || platformParam === "safari") {
+      return {
+        os: "ios",
+        osName: "Apple iOS (iPhone / iPad)",
+        browser: "safari",
+        browserName: "Apple Safari",
+        isIOS: true,
+        isAndroid: false,
+        isMobile: true,
+        isInApp: false
+      };
+    }
+    if (platformParam === "ios-chrome") {
+      return {
+        os: "ios",
+        osName: "Apple iOS (iPhone)",
+        browser: "chrome",
+        browserName: "Google Chrome",
+        isIOS: true,
+        isAndroid: false,
+        isMobile: true,
+        isInApp: false
+      };
+    }
+    if (platformParam === "android") {
+      return {
+        os: "android",
+        osName: "Android Mobile",
+        browser: "chrome",
+        browserName: "Google Chrome",
+        isIOS: false,
+        isAndroid: true,
+        isMobile: true,
+        isInApp: false
+      };
+    }
+    if (platformParam === "inapp" || platformParam === "whatsapp") {
+      return {
+        os: "ios",
+        osName: "Social Media App",
+        browser: "inapp",
+        browserName: "In-App Webview (WhatsApp / FB)",
+        isIOS: true,
+        isAndroid: false,
+        isMobile: true,
+        isInApp: true
+      };
+    }
     const ua2 = navigator.userAgent || "";
     const platform = navigator.platform || "";
     const isIOS = /iPad|iPhone|iPod/.test(ua2) || platform === "MacIntel" && navigator.maxTouchPoints > 1;
@@ -90925,14 +90983,14 @@ var PwaGatekeeper = class {
     }
     this.onUnlocked();
   }
-  renderGatekeeper() {
+  renderGatekeeper(customPlatform) {
     const existing = document.getElementById("pwa-gatekeeper-overlay");
     if (existing) existing.remove();
     document.documentElement.classList.add("gatekeeper-active");
     document.body.classList.add("gatekeeper-active");
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) themeMeta.setAttribute("content", "#F1F5F9");
-    const platform = this.detectPlatform();
+    const platform = this.detectPlatform(customPlatform);
     const info = this.getInstructions(platform);
     const overlay = document.createElement("div");
     overlay.id = "pwa-gatekeeper-overlay";
@@ -90941,13 +90999,16 @@ var PwaGatekeeper = class {
       <div class="gatekeeper-card">
         <div class="card-ambient-glow"></div>
 
-        <!-- Top bar with detected device chip -->
-        <div class="gatekeeper-top-bar">
+        <!-- Top bar with detected device chip & optional close button -->
+        <div class="gatekeeper-top-bar" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
           <div class="gatekeeper-device-chip" title="${info.deviceLabel}">
             <span>${platform.isIOS ? "\u{1F34F} iOS" : platform.isAndroid ? "\u{1F916} Android" : "\u{1F4BB} PC"}</span>
             <span>\u2022</span>
             <span>${platform.browserName}</span>
           </div>
+          ${this.isUnlocked ? `
+            <button id="btn-close-gatekeeper" style="border:none; background:#F1F5F9; color:#64748B; width:32px; height:32px; border-radius:50%; font-size:18px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">\u2715</button>
+          ` : ""}
         </div>
 
         <div class="gatekeeper-header">
@@ -91029,6 +91090,18 @@ var PwaGatekeeper = class {
     }
   }
   attachEventListeners() {
+    const closeBtn = document.getElementById("btn-close-gatekeeper");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        const overlay = document.getElementById("pwa-gatekeeper-overlay");
+        if (overlay) {
+          overlay.classList.add("fade-out");
+          setTimeout(() => overlay.remove(), 250);
+        }
+        document.documentElement.classList.remove("gatekeeper-active");
+        document.body.classList.remove("gatekeeper-active");
+      });
+    }
     const btnNative = document.getElementById("btn-native-install");
     if (btnNative && this.deferredPrompt) {
       btnNative.addEventListener("click", async () => {
@@ -91378,6 +91451,20 @@ var AppController = class {
     });
     window.addEventListener("popstate", () => {
       if (this.currentUser?.role === "admin") {
+        if (this.currentMode === "admin") {
+          const params2 = new URLSearchParams(window.location.search);
+          if (params2.get("view") === "student") {
+            this.currentMode = "student";
+            this.renderApp();
+            return;
+          }
+          const requestedAdminTab = params2.get("admin_tab") || "dashboard";
+          const allowedAdminTabs = ["dashboard", "papers", "sprints", "students", "broadcasts"];
+          if (allowedAdminTabs.includes(requestedAdminTab) && this.adminTab !== requestedAdminTab) {
+            this.switchAdminTab(requestedAdminTab, { historyMode: "none" });
+          }
+          return;
+        }
         if (this.currentMode !== "student") return;
         const params = new URLSearchParams(window.location.search);
         if (params.get("view") !== "student") {
@@ -91508,8 +91595,8 @@ var AppController = class {
       <div class="auth-screen-container">
         <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:12px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
           <div class="auth-header" style="text-align:center; margin-bottom:20px;">
-            <div class="auth-brand-logo-wrap" style="width:72px; height:72px; margin:0 auto 12px; border-radius:20px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(37,99,235,0.12); border:1px solid rgba(191,219,254,0.6);">
-              <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="auth-brand-logo-img" style="width:48px; height:48px; object-fit:contain;" onerror="this.src='./icons/edupeak_logo.webp'" />
+            <div class="auth-brand-logo-wrap" style="margin:0 auto 10px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; box-shadow:none;">
+              <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="auth-brand-logo-img" style="height:52px; width:auto; max-width:160px; object-fit:contain; background:transparent;" onerror="this.src='./icons/edupeak_logo.webp'" />
             </div>
             <div class="auth-title" style="font-size:24px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
             <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
@@ -91996,7 +92083,9 @@ var AppController = class {
       if (panel) {
         if (t2 === tabName) {
           panel.style.display = "flex";
+          requestAnimationFrame(() => panel.classList.add("active-tab"));
         } else {
+          panel.classList.remove("active-tab");
           panel.style.display = "none";
         }
       }
@@ -95690,7 +95779,10 @@ var AppController = class {
     const root = document.getElementById("app-root");
     if (!root) return;
     this.currentMode = "admin";
-    this.adminTab = this.adminTab || "dashboard";
+    const params = new URLSearchParams(window.location.search);
+    const requestedAdminTab = params.get("admin_tab");
+    const allowedAdminTabs = ["dashboard", "papers", "sprints", "students", "broadcasts"];
+    this.adminTab = allowedAdminTabs.includes(requestedAdminTab) ? requestedAdminTab : this.adminTab || "dashboard";
     root.innerHTML = `
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
       <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;">
@@ -95734,19 +95826,29 @@ var AppController = class {
       });
     });
     this._renderedAdminTabs = /* @__PURE__ */ new Set();
-    this.switchAdminTab(this.adminTab);
+    this.switchAdminTab(this.adminTab, { historyMode: "none" });
   }
   returnToAdminDashboard() {
     this.currentMode = "admin";
     const url = new URL(window.location.href);
     url.searchParams.delete("view");
     url.searchParams.delete("tab");
-    window.history.replaceState({ ...window.history.state || {}, edupeakView: "admin" }, "", url);
+    if (this.adminTab && this.adminTab !== "dashboard") {
+      url.searchParams.set("admin_tab", this.adminTab);
+    } else {
+      url.searchParams.delete("admin_tab");
+    }
+    window.history.replaceState({ ...window.history.state || {}, edupeakView: "admin", edupeakAdminTab: this.adminTab || "dashboard" }, "", url);
     this.renderAdminApp();
   }
   getAdminTabViewport(tabName) {
     const mainVp = document.getElementById("admin-main-viewport");
     if (!mainVp) return null;
+    const strayNodes = Array.from(mainVp.children).filter((child2) => !child2.classList.contains("tab-viewport"));
+    if (strayNodes.length > 0) {
+      console.warn("[Admin Navigation] Cleaning up stray uncontained nodes in admin-main-viewport:", strayNodes.length);
+      strayNodes.forEach((n2) => n2.remove());
+    }
     let panel = document.getElementById(`admin-tab-viewport-${tabName}`);
     if (!panel) {
       panel = document.createElement("div");
@@ -95757,13 +95859,38 @@ var AppController = class {
     }
     return panel;
   }
-  switchAdminTab(tabName, { forceRefresh = false } = {}) {
+  refreshAdminTab(tabName = this.adminTab) {
+    if (this.currentMode !== "admin") return;
+    this.switchAdminTab(tabName, { forceRefresh: true });
+  }
+  switchAdminTab(tabName, { historyMode = "push", forceRefresh = false } = {}) {
+    const allowedAdminTabs = ["dashboard", "papers", "sprints", "students", "broadcasts"];
+    if (!allowedAdminTabs.includes(tabName)) tabName = "dashboard";
+    const previousTab = this.adminTab;
     this.adminTab = tabName;
     const viewport = document.getElementById("admin-main-viewport");
     if (!viewport) return;
+    if (historyMode !== "none" && (historyMode === "replace" || previousTab !== tabName)) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      url.searchParams.delete("tab");
+      if (tabName === "dashboard") {
+        url.searchParams.delete("admin_tab");
+      } else {
+        url.searchParams.set("admin_tab", tabName);
+      }
+      window.history[historyMode === "replace" ? "replaceState" : "pushState"](
+        { ...window.history.state || {}, edupeakView: "admin", edupeakAdminTab: tabName },
+        "",
+        url
+      );
+    }
     const fabSlot = document.getElementById("admin-fab-slot");
-    if (fabSlot) fabSlot.innerHTML = "";
-    const allowedAdminTabs = ["dashboard", "papers", "sprints", "students", "broadcasts"];
+    if (tabName === "papers") {
+      this._updateAdminPaperFab();
+    } else {
+      if (fabSlot) fabSlot.innerHTML = "";
+    }
     document.querySelectorAll("#admin-bottom-nav .nav-tab-btn").forEach((b2) => {
       b2.classList.toggle("active", b2.dataset.adminTab === tabName);
     });
@@ -95772,7 +95899,9 @@ var AppController = class {
       if (panel) {
         if (t2 === tabName) {
           panel.style.display = "flex";
+          requestAnimationFrame(() => panel.classList.add("active-tab"));
         } else {
+          panel.classList.remove("active-tab");
           panel.style.display = "none";
         }
       }
@@ -95781,7 +95910,7 @@ var AppController = class {
     if (!targetViewport) return;
     viewport.scrollTo({ top: 0, behavior: "instant" });
     this._renderedAdminTabs = this._renderedAdminTabs || /* @__PURE__ */ new Set();
-    if (this._renderedAdminTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0) {
+    if (this._renderedAdminTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0 && !targetViewport.innerHTML.includes("Loading admin console")) {
       return;
     }
     targetViewport.innerHTML = `
@@ -95791,7 +95920,10 @@ var AppController = class {
       </div>
     `;
     const markRendered = () => {
-      this._renderedAdminTabs.add(tabName);
+      if (targetViewport.isConnected && !targetViewport.innerHTML.includes("Loading admin console")) {
+        this._renderedAdminTabs.add(tabName);
+        requestAnimationFrame(() => targetViewport.classList.add("active-tab"));
+      }
     };
     switch (tabName) {
       case "dashboard":
@@ -95811,8 +95943,8 @@ var AppController = class {
         });
         break;
       case "broadcasts":
-        this.renderAdminBroadcastsScreen(targetViewport).then(markRendered).catch(() => {
-        });
+        this.renderAdminBroadcastsScreen(targetViewport);
+        markRendered();
         break;
       default:
         this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {
@@ -96334,8 +96466,7 @@ var AppController = class {
         }
         notificationService.showInAppBanner("Submission Approved! \u{1F389}", `Awarded +${credits} XP to ${sub.studentName || "Student"}.`, "success");
         modal.remove();
-        const vp = document.getElementById("admin-main-viewport");
-        if (vp) await this.renderAdminDashboardScreen(vp);
+        this.refreshAdminTab("dashboard");
       } catch (err) {
         console.error("[Admin] Review approval error:", err);
         approveBtn.disabled = false;
@@ -96363,8 +96494,7 @@ var AppController = class {
         });
         notificationService.showInAppBanner("Revision Requested", `Sent correction notes to ${sub.studentName || "Student"}.`, "warning");
         modal.remove();
-        const vp = document.getElementById("admin-main-viewport");
-        if (vp) await this.renderAdminDashboardScreen(vp);
+        this.refreshAdminTab("dashboard");
       } catch (err) {
         console.error("[Admin] Review rejection error:", err);
         rejectBtn.disabled = false;
@@ -97508,11 +97638,8 @@ var AppController = class {
           notificationService.notifyPaperHintPublished(title, examYear);
         }
         modal.remove();
-        const mainVp = document.getElementById("main-viewport") || document.querySelector(".main-viewport");
-        if (mainVp) {
-          this.adminPaperTab = 1;
-          this.renderAdminPapersScreen(mainVp);
-        }
+        this.adminPaperTab = 1;
+        this.refreshAdminTab("papers");
       } catch (err) {
         console.error("Error saving hint:", err);
         alert("Failed to save paper hint: " + (err.message || err));
@@ -97829,19 +97956,27 @@ var AppController = class {
   async renderAdminStudentsScreen(container) {
     this.adminStudentBatchFilter = this.adminStudentBatchFilter || "All";
     this.adminStudentSearchQuery = this.adminStudentSearchQuery || "";
-    const rawStudents = await dbService.getAllStudents();
-    const allStudents = rawStudents.filter((s2) => !dbService.isStaffOrAdmin(s2));
-    let filtered = allStudents;
-    if (this.adminStudentBatchFilter !== "All") {
-      filtered = filtered.filter((s2) => (s2.examYear || "").trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
-    }
-    if (this.adminStudentSearchQuery.trim()) {
-      const q = this.adminStudentSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (s2) => (s2.name || "").toLowerCase().includes(q) || (s2.phone || "").includes(q) || (s2.studentId || "").toLowerCase().includes(q)
-      );
+    let allStudents = this._adminStudentsListCache;
+    if (!allStudents) {
+      const rawStudents = await dbService.getAllStudents();
+      allStudents = rawStudents.filter((s2) => !dbService.isStaffOrAdmin(s2));
+      this._adminStudentsListCache = allStudents;
     }
     const batches = ["All", "2024 A/L", "2025 A/L", "2026 A/L", "2027 A/L", "2028 A/L", "2029 A/L"];
+    const getFilteredStudents = () => {
+      let filtered = allStudents;
+      if (this.adminStudentBatchFilter !== "All") {
+        filtered = filtered.filter((s2) => (s2.examYear || "").trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
+      }
+      if (this.adminStudentSearchQuery.trim()) {
+        const q = this.adminStudentSearchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (s2) => (s2.name || "").toLowerCase().includes(q) || (s2.phone || "").includes(q) || (s2.studentId || "").toLowerCase().includes(q)
+        );
+      }
+      return filtered;
+    };
+    const initialFiltered = getFilteredStudents();
     container.innerHTML = `
       <!-- Screen AppBar -->
       <div class="apk-screen-appbar">
@@ -97849,17 +97984,17 @@ var AppController = class {
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
             <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span> Registered Students
           </div>
+          <div style="font-size:11px; color:#64748B;">Live Student Directory</div>
         </div>
       </div>
 
-      <!-- Summary Stats & Search Header matching Screenshot 5 -->
-      <div style="background:#FFFFFF; padding:12px 16px 14px; border-bottom:1px solid #E2E8F0;">
-        <!-- Stats Row -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+      <!-- Header Controls: Summary Cards, Search Bar, Batch Filter Chips -->
+      <div style="padding:16px 16px 8px 16px; background:#FFFFFF; border-bottom:1px solid #E2E8F0; display:flex; flex-direction:column; gap:12px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
-            <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span>
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB;">people</span>
             <div>
-              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Students</div>
+              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Active</div>
               <div style="font-size:16px; font-weight:800; color:#0F172A;">${allStudents.length}</div>
             </div>
           </div>
@@ -97867,7 +98002,7 @@ var AppController = class {
             <span class="material-symbols-rounded filled" style="font-size:20px; color:#6366F1;">flash_on</span>
             <div>
               <div style="font-size:10.5px; color:#64748B; font-weight:600;">Showing</div>
-              <div style="font-size:16px; font-weight:800; color:#0F172A;">${filtered.length}</div>
+              <div id="admin-students-showing-count" style="font-size:16px; font-weight:800; color:#0F172A;">${initialFiltered.length}</div>
             </div>
           </div>
         </div>
@@ -97879,7 +98014,7 @@ var AppController = class {
         </div>
 
         <!-- Batch Filter Chips -->
-        <div class="apk-chips-scroll-row">
+        <div class="apk-chips-scroll-row" id="admin-students-batch-chips">
           ${batches.map((b2) => {
       const isSel = this.adminStudentBatchFilter === b2;
       return `
@@ -97892,9 +98027,16 @@ var AppController = class {
       </div>
 
       <!-- Students List View -->
-      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;">
-        ${filtered.length === 0 ? `
-          <!-- Empty State matching Screenshot 5 -->
+      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;"></div>
+    `;
+    const renderRows = () => {
+      const filtered = getFilteredStudents();
+      const countEl = document.getElementById("admin-students-showing-count");
+      if (countEl) countEl.textContent = filtered.length;
+      const listEl = document.getElementById("admin-students-list");
+      if (!listEl) return;
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
           <div style="padding:70px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
             <span class="material-symbols-rounded" style="font-size:44px; color:#94A3B8;">search</span>
             <div style="font-size:16px; font-weight:800; color:#0F172A;">
@@ -97904,9 +98046,9 @@ var AppController = class {
               When students register with phone number, they appear here.
             </div>
           </div>
-        ` : `
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            ${(() => {
+        `;
+        return;
+      }
       const phoneCounts = {};
       allStudents.forEach((s2) => {
         const ph = String(s2.phone || "").trim();
@@ -97926,7 +98068,9 @@ var AppController = class {
         for (let i2 = 0; i2 < (str || "").length; i2++) hash = str.charCodeAt(i2) + ((hash << 5) - hash);
         return grads[Math.abs(hash) % grads.length];
       };
-      return filtered.map((st2) => {
+      listEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${filtered.map((st2) => {
         const isDup = phoneCounts[st2.phone] > 1;
         return `
               <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
@@ -97957,32 +98101,36 @@ var AppController = class {
                 </div>
               </div>
             `;
-      }).join("");
-    })()}
-          </div>
-        `}
-      </div>
-    `;
+      }).join("")}
+        </div>
+      `;
+      listEl.querySelectorAll("[data-msg-student]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const st2 = allStudents.find((x2) => x2.id === btn.dataset.msgStudent);
+          if (st2) this.openSendCustomMessageModal(st2);
+        });
+      });
+      listEl.querySelectorAll("[data-delete-student]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const st2 = allStudents.find((x2) => x2.id === btn.dataset.deleteStudent);
+          if (st2) this.confirmDeleteStudent(st2);
+        });
+      });
+    };
+    renderRows();
     document.getElementById("input-admin-student-search")?.addEventListener("input", (e2) => {
       this.adminStudentSearchQuery = e2.target.value;
-      this.renderAdminStudentsScreen(container);
+      renderRows();
     });
     container.querySelectorAll("[data-batch]").forEach((chip) => {
       chip.addEventListener("click", () => {
         this.adminStudentBatchFilter = chip.dataset.batch;
-        this.renderAdminStudentsScreen(container);
-      });
-    });
-    container.querySelectorAll("[data-msg-student]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const st2 = allStudents.find((x2) => x2.id === btn.dataset.msgStudent);
-        if (st2) this.openSendCustomMessageModal(st2);
-      });
-    });
-    container.querySelectorAll("[data-delete-student]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const st2 = allStudents.find((x2) => x2.id === btn.dataset.deleteStudent);
-        if (st2) this.confirmDeleteStudent(st2);
+        container.querySelectorAll("[data-batch]").forEach((c2) => {
+          const isSel = c2.dataset.batch === this.adminStudentBatchFilter;
+          c2.classList.toggle("active", isSel);
+          c2.innerHTML = `${isSel ? '<span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">check</span> ' : ""}${c2.dataset.batch}`;
+        });
+        renderRows();
       });
     });
   }
@@ -99252,8 +99400,7 @@ var AppController = class {
         });
         notificationService.showInAppBanner("Paper Created!", "Paper Session \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 \u0DB1\u0DD2\u0DBB\u0DCA\u0DB8\u0DCF\u0DAB\u0DBA \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3 (Upcoming Session).", "success");
         modal.remove();
-        const vp = document.getElementById("admin-main-viewport");
-        if (vp) this.renderAdminPapersScreen(vp);
+        this.refreshAdminTab("papers");
       } catch (err) {
         console.error("Failed to create paper session:", err);
         alert("Error creating paper session: " + err.message);
@@ -99449,8 +99596,7 @@ var AppController = class {
       });
       notificationService.showInAppBanner("Leaderboard Published!", "Paper Leaderboard \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 Real-Time Publish \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3.", "success");
       modal.remove();
-      const vp = document.getElementById("admin-main-viewport");
-      if (vp) this.renderAdminPapersScreen(vp);
+      this.refreshAdminTab("papers");
     });
   }
   openCreateSprintSheet() {
@@ -99517,8 +99663,7 @@ var AppController = class {
         });
         modal.remove();
         notificationService.showInAppBanner("Sprint Published", "The five-question sprint is available to the selected batch.", "success");
-        const viewport = document.getElementById("admin-main-viewport");
-        if (viewport) this.renderAdminSprintsScreen(viewport);
+        this.refreshAdminTab("sprints");
       } catch (error) {
         errorBox.hidden = false;
         errorBox.textContent = error?.message || "The sprint could not be published. Try again.";
@@ -99582,8 +99727,8 @@ This will purge all associated submissions and records.`)) {
     try {
       await dbService.deleteStudent(student.id);
       notificationService.showInAppBanner("Account Purged", `Record for ${student.name} removed.`, "warning");
-      const vp = document.getElementById("admin-main-viewport");
-      if (vp) await this.renderAdminStudentsScreen(vp);
+      this._adminStudentsListCache = null;
+      this.refreshAdminTab("students");
     } catch (e2) {
       alert("Failed to delete student: " + (e2.message || e2));
     }

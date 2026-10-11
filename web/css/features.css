@@ -2289,32 +2289,29 @@ html[data-theme="dark"],
 }
 
 .auth-brand-logo-wrap {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  background: #FFFFFF;
-  border: 3px solid rgba(37, 99, 235, 0.35);
-  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  margin-bottom: 12px;
-  box-sizing: border-box;
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  margin-bottom: 10px;
+  transition: transform 0.2s ease;
 }
 
 .auth-brand-logo-wrap:hover {
   transform: scale(1.04);
-  box-shadow: 0 14px 32px rgba(37, 99, 235, 0.35);
 }
 
 .auth-brand-logo-img {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: 52px;
+  max-width: 160px;
   object-fit: contain;
-  border-radius: 50%;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
 }
 
 .auth-brand-tag {
@@ -2696,9 +2693,10 @@ html[data-theme="dark"] .splash-loading-text {
 .auth-sticky-action .auth-btn-submit { width: 100%; margin: 0; }
 .auth-header { margin: 16px 0 28px; }
 .auth-brand-logo-wrap {
-  width: 90px; height: 90px; margin-bottom: 14px;
-  border: 3px solid rgba(34, 122, 255, .3);
-  box-shadow: 0 8px 20px rgba(34, 122, 255, .18);
+  width: auto; height: auto; margin-bottom: 10px;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 .auth-title {
   margin-bottom: 4px; color: #0F172A; font-size: 26px;

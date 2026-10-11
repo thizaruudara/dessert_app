@@ -122,6 +122,20 @@ class AppController {
 
     window.addEventListener('popstate', () => {
       if (this.currentUser?.role === 'admin') {
+        if (this.currentMode === 'admin') {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('view') === 'student') {
+            this.currentMode = 'student';
+            this.renderApp();
+            return;
+          }
+          const requestedAdminTab = params.get('admin_tab') || 'dashboard';
+          const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
+          if (allowedAdminTabs.includes(requestedAdminTab) && this.adminTab !== requestedAdminTab) {
+            this.switchAdminTab(requestedAdminTab, { historyMode: 'none' });
+          }
+          return;
+        }
         if (this.currentMode !== 'student') return;
         const params = new URLSearchParams(window.location.search);
         if (params.get('view') !== 'student') {
@@ -272,8 +286,8 @@ class AppController {
       <div class="auth-screen-container">
         <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:12px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
           <div class="auth-header" style="text-align:center; margin-bottom:20px;">
-            <div class="auth-brand-logo-wrap" style="width:72px; height:72px; margin:0 auto 12px; border-radius:20px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(37,99,235,0.12); border:1px solid rgba(191,219,254,0.6);">
-              <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="auth-brand-logo-img" style="width:48px; height:48px; object-fit:contain;" onerror="this.src='./icons/edupeak_logo.webp'" />
+            <div class="auth-brand-logo-wrap" style="margin:0 auto 10px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; box-shadow:none;">
+              <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="auth-brand-logo-img" style="height:52px; width:auto; max-width:160px; object-fit:contain; background:transparent;" onerror="this.src='./icons/edupeak_logo.webp'" />
             </div>
             <div class="auth-title" style="font-size:24px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
             <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
@@ -803,7 +817,9 @@ class AppController {
       if (panel) {
         if (t === tabName) {
           panel.style.display = 'flex';
+          requestAnimationFrame(() => panel.classList.add('active-tab'));
         } else {
+          panel.classList.remove('active-tab');
           panel.style.display = 'none';
         }
       }
@@ -4778,7 +4794,10 @@ class AppController {
     if (!root) return;
 
     this.currentMode = 'admin';
-    this.adminTab = this.adminTab || 'dashboard';
+    const params = new URLSearchParams(window.location.search);
+    const requestedAdminTab = params.get('admin_tab');
+    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
+    this.adminTab = allowedAdminTabs.includes(requestedAdminTab) ? requestedAdminTab : (this.adminTab || 'dashboard');
 
     root.innerHTML = `
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
@@ -4825,7 +4844,7 @@ class AppController {
     });
 
     this._renderedAdminTabs = new Set();
-    this.switchAdminTab(this.adminTab);
+    this.switchAdminTab(this.adminTab, { historyMode: 'none' });
   }
 
   returnToAdminDashboard() {
@@ -4833,13 +4852,26 @@ class AppController {
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
     url.searchParams.delete('tab');
-    window.history.replaceState({ ...(window.history.state || {}), edupeakView: 'admin' }, '', url);
+    if (this.adminTab && this.adminTab !== 'dashboard') {
+      url.searchParams.set('admin_tab', this.adminTab);
+    } else {
+      url.searchParams.delete('admin_tab');
+    }
+    window.history.replaceState({ ...(window.history.state || {}), edupeakView: 'admin', edupeakAdminTab: this.adminTab || 'dashboard' }, '', url);
     this.renderAdminApp();
   }
 
   getAdminTabViewport(tabName) {
     const mainVp = document.getElementById('admin-main-viewport');
     if (!mainVp) return null;
+
+    // Safety: Purge any rogue children that are not tab viewports (prevents uncontained modals from polluting the scroll root)
+    const strayNodes = Array.from(mainVp.children).filter(child => !child.classList.contains('tab-viewport'));
+    if (strayNodes.length > 0) {
+      console.warn('[Admin Navigation] Cleaning up stray uncontained nodes in admin-main-viewport:', strayNodes.length);
+      strayNodes.forEach(n => n.remove());
+    }
+
     let panel = document.getElementById(`admin-tab-viewport-${tabName}`);
     if (!panel) {
       panel = document.createElement('div');
@@ -4851,29 +4883,57 @@ class AppController {
     return panel;
   }
 
-  switchAdminTab(tabName, { forceRefresh = false } = {}) {
+  refreshAdminTab(tabName = this.adminTab) {
+    if (this.currentMode !== 'admin') return;
+    this.switchAdminTab(tabName, { forceRefresh: true });
+  }
+
+  switchAdminTab(tabName, { historyMode = 'push', forceRefresh = false } = {}) {
+    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
+    if (!allowedAdminTabs.includes(tabName)) tabName = 'dashboard';
+    const previousTab = this.adminTab;
     this.adminTab = tabName;
+
     const viewport = document.getElementById('admin-main-viewport');
     if (!viewport) return;
 
-    // Reset FAB slot on every tab switch so buttons never bleed across tabs
+    // 1. URL & Browser History Sync
+    if (historyMode !== 'none' && (historyMode === 'replace' || previousTab !== tabName)) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      url.searchParams.delete('tab');
+      if (tabName === 'dashboard') {
+        url.searchParams.delete('admin_tab');
+      } else {
+        url.searchParams.set('admin_tab', tabName);
+      }
+      window.history[historyMode === 'replace' ? 'replaceState' : 'pushState'](
+        { ...(window.history.state || {}), edupeakView: 'admin', edupeakAdminTab: tabName }, '', url
+      );
+    }
+
+    // 2. Synchronize Floating Action Button (FAB)
     const fabSlot = document.getElementById('admin-fab-slot');
-    if (fabSlot) fabSlot.innerHTML = '';
+    if (tabName === 'papers') {
+      this._updateAdminPaperFab();
+    } else {
+      if (fabSlot) fabSlot.innerHTML = '';
+    }
 
-    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
-
-    // 1. Highlight bottom nav tab immediately (0ms feedback)
+    // 3. Highlight bottom nav tab immediately (0ms visual response)
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.adminTab === tabName);
     });
 
-    // 2. Instant tab switching: toggle visibility of persistent tab viewports
+    // 4. Instant tab switching with hardware-accelerated crossfade
     allowedAdminTabs.forEach(t => {
       const panel = this.getAdminTabViewport(t);
       if (panel) {
         if (t === tabName) {
           panel.style.display = 'flex';
+          requestAnimationFrame(() => panel.classList.add('active-tab'));
         } else {
+          panel.classList.remove('active-tab');
           panel.style.display = 'none';
         }
       }
@@ -4886,8 +4946,8 @@ class AppController {
 
     this._renderedAdminTabs = this._renderedAdminTabs || new Set();
 
-    // 3. ZERO-LAG: If tab is already rendered once, it is visible immediately in 0ms!
-    if (this._renderedAdminTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0) {
+    // 5. ZERO-LAG: If tab is already rendered once and not force-refreshing, it is ALREADY visible!
+    if (this._renderedAdminTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0 && !targetViewport.innerHTML.includes('Loading admin console')) {
       return;
     }
 
@@ -4899,7 +4959,10 @@ class AppController {
     `;
 
     const markRendered = () => {
-      this._renderedAdminTabs.add(tabName);
+      if (targetViewport.isConnected && !targetViewport.innerHTML.includes('Loading admin console')) {
+        this._renderedAdminTabs.add(tabName);
+        requestAnimationFrame(() => targetViewport.classList.add('active-tab'));
+      }
     };
 
     switch (tabName) {
@@ -4916,7 +4979,8 @@ class AppController {
         this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch(() => {});
         break;
       case 'broadcasts':
-        this.renderAdminBroadcastsScreen(targetViewport).then(markRendered).catch(() => {});
+        this.renderAdminBroadcastsScreen(targetViewport);
+        markRendered();
         break;
       default:
         this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {});
@@ -5483,8 +5547,7 @@ class AppController {
 
         notificationService.showInAppBanner('Submission Approved! 🎉', `Awarded +${credits} XP to ${sub.studentName || 'Student'}.`, 'success');
         modal.remove();
-        const vp = document.getElementById('admin-main-viewport');
-        if (vp) await this.renderAdminDashboardScreen(vp);
+        this.refreshAdminTab('dashboard');
       } catch (err) {
         console.error('[Admin] Review approval error:', err);
         approveBtn.disabled = false;
@@ -5515,8 +5578,7 @@ class AppController {
 
         notificationService.showInAppBanner('Revision Requested', `Sent correction notes to ${sub.studentName || 'Student'}.`, 'warning');
         modal.remove();
-        const vp = document.getElementById('admin-main-viewport');
-        if (vp) await this.renderAdminDashboardScreen(vp);
+        this.refreshAdminTab('dashboard');
       } catch (err) {
         console.error('[Admin] Review rejection error:', err);
         rejectBtn.disabled = false;
@@ -6734,11 +6796,8 @@ class AppController {
         }
 
         modal.remove();
-        const mainVp = document.getElementById('main-viewport') || document.querySelector('.main-viewport');
-        if (mainVp) {
-          this.adminPaperTab = 1;
-          this.renderAdminPapersScreen(mainVp);
-        }
+        this.adminPaperTab = 1;
+        this.refreshAdminTab('papers');
       } catch (err) {
         console.error('Error saving hint:', err);
         alert('Failed to save paper hint: ' + (err.message || err));
@@ -7074,23 +7133,31 @@ class AppController {
     this.adminStudentBatchFilter = this.adminStudentBatchFilter || 'All';
     this.adminStudentSearchQuery = this.adminStudentSearchQuery || '';
 
-    const rawStudents = await dbService.getAllStudents();
-    const allStudents = rawStudents.filter(s => !dbService.isStaffOrAdmin(s));
-
-    let filtered = allStudents;
-    if (this.adminStudentBatchFilter !== 'All') {
-      filtered = filtered.filter(s => (s.examYear || '').trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
-    }
-    if (this.adminStudentSearchQuery.trim()) {
-      const q = this.adminStudentSearchQuery.toLowerCase();
-      filtered = filtered.filter(s =>
-        (s.name || '').toLowerCase().includes(q) ||
-        (s.phone || '').includes(q) ||
-        (s.studentId || '').toLowerCase().includes(q)
-      );
+    let allStudents = this._adminStudentsListCache;
+    if (!allStudents) {
+      const rawStudents = await dbService.getAllStudents();
+      allStudents = rawStudents.filter(s => !dbService.isStaffOrAdmin(s));
+      this._adminStudentsListCache = allStudents;
     }
 
     const batches = ['All', '2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
+
+    const getFilteredStudents = () => {
+      let filtered = allStudents;
+      if (this.adminStudentBatchFilter !== 'All') {
+        filtered = filtered.filter(s => (s.examYear || '').trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
+      }
+      if (this.adminStudentSearchQuery.trim()) {
+        const q = this.adminStudentSearchQuery.toLowerCase();
+        filtered = filtered.filter(s =>
+          (s.name || '').toLowerCase().includes(q) ||
+          (s.phone || '').includes(q) ||
+          (s.studentId || '').toLowerCase().includes(q)
+        );
+      }
+      return filtered;
+    };
+    const initialFiltered = getFilteredStudents();
 
     container.innerHTML = `
       <!-- Screen AppBar -->
@@ -7099,17 +7166,17 @@ class AppController {
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
             <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span> Registered Students
           </div>
+          <div style="font-size:11px; color:#64748B;">Live Student Directory</div>
         </div>
       </div>
 
-      <!-- Summary Stats & Search Header matching Screenshot 5 -->
-      <div style="background:#FFFFFF; padding:12px 16px 14px; border-bottom:1px solid #E2E8F0;">
-        <!-- Stats Row -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+      <!-- Header Controls: Summary Cards, Search Bar, Batch Filter Chips -->
+      <div style="padding:16px 16px 8px 16px; background:#FFFFFF; border-bottom:1px solid #E2E8F0; display:flex; flex-direction:column; gap:12px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
-            <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span>
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB;">people</span>
             <div>
-              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Students</div>
+              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Active</div>
               <div style="font-size:16px; font-weight:800; color:#0F172A;">${allStudents.length}</div>
             </div>
           </div>
@@ -7117,7 +7184,7 @@ class AppController {
             <span class="material-symbols-rounded filled" style="font-size:20px; color:#6366F1;">flash_on</span>
             <div>
               <div style="font-size:10.5px; color:#64748B; font-weight:600;">Showing</div>
-              <div style="font-size:16px; font-weight:800; color:#0F172A;">${filtered.length}</div>
+              <div id="admin-students-showing-count" style="font-size:16px; font-weight:800; color:#0F172A;">${initialFiltered.length}</div>
             </div>
           </div>
         </div>
@@ -7129,7 +7196,7 @@ class AppController {
         </div>
 
         <!-- Batch Filter Chips -->
-        <div class="apk-chips-scroll-row">
+        <div class="apk-chips-scroll-row" id="admin-students-batch-chips">
           ${batches.map(b => {
             const isSel = this.adminStudentBatchFilter === b;
             return `
@@ -7142,9 +7209,19 @@ class AppController {
       </div>
 
       <!-- Students List View -->
-      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;">
-        ${filtered.length === 0 ? `
-          <!-- Empty State matching Screenshot 5 -->
+      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;"></div>
+    `;
+
+    const renderRows = () => {
+      const filtered = getFilteredStudents();
+      const countEl = document.getElementById('admin-students-showing-count');
+      if (countEl) countEl.textContent = filtered.length;
+
+      const listEl = document.getElementById('admin-students-list');
+      if (!listEl) return;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
           <div style="padding:70px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
             <span class="material-symbols-rounded" style="font-size:44px; color:#94A3B8;">search</span>
             <div style="font-size:16px; font-weight:800; color:#0F172A;">
@@ -7154,33 +7231,36 @@ class AppController {
               When students register with phone number, they appear here.
             </div>
           </div>
-        ` : `
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            ${(() => {
-              const phoneCounts = {};
-              allStudents.forEach(s => {
-                const ph = String(s.phone || '').trim();
-                if (ph) phoneCounts[ph] = (phoneCounts[ph] || 0) + 1;
-              });
+        `;
+        return;
+      }
 
-              const getAvatarGrad = (str) => {
-                const grads = [
-                  'linear-gradient(135deg, #2563EB, #1D4ED8)',
-                  'linear-gradient(135deg, #7C3AED, #5B21B6)',
-                  'linear-gradient(135deg, #059669, #047857)',
-                  'linear-gradient(135deg, #D97706, #B45309)',
-                  'linear-gradient(135deg, #DB2777, #9D174D)',
-                  'linear-gradient(135deg, #0891B2, #0E7490)',
-                  'linear-gradient(135deg, #4F46E5, #3730A3)'
-                ];
-                let hash = 0;
-                for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                return grads[Math.abs(hash) % grads.length];
-              };
+      const phoneCounts = {};
+      allStudents.forEach(s => {
+        const ph = String(s.phone || '').trim();
+        if (ph) phoneCounts[ph] = (phoneCounts[ph] || 0) + 1;
+      });
 
-              return filtered.map(st => {
-                const isDup = phoneCounts[st.phone] > 1;
-                return `
+      const getAvatarGrad = (str) => {
+        const grads = [
+          'linear-gradient(135deg, #2563EB, #1D4ED8)',
+          'linear-gradient(135deg, #7C3AED, #5B21B6)',
+          'linear-gradient(135deg, #059669, #047857)',
+          'linear-gradient(135deg, #D97706, #B45309)',
+          'linear-gradient(135deg, #DB2777, #9D174D)',
+          'linear-gradient(135deg, #0891B2, #0E7490)',
+          'linear-gradient(135deg, #4F46E5, #3730A3)'
+        ];
+        let hash = 0;
+        for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        return grads[Math.abs(hash) % grads.length];
+      };
+
+      listEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${filtered.map(st => {
+            const isDup = phoneCounts[st.phone] > 1;
+            return `
               <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
                 <div style="display:flex; align-items:center; gap:12px;">
                   <div style="width:42px; height:42px; border-radius:50%; background:${getAvatarGrad(st.name || st.id)}; color:#FFFFFF; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.12); flex-shrink:0;">
@@ -7209,40 +7289,45 @@ class AppController {
                 </div>
               </div>
             `;
-              }).join('');
-            })()}
-          </div>
-        `}
-      </div>
-    `;
+          }).join('')}
+        </div>
+      `;
 
-    // Search Input event
+      // Custom Message
+      listEl.querySelectorAll('[data-msg-student]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const st = allStudents.find(x => x.id === btn.dataset.msgStudent);
+          if (st) this.openSendCustomMessageModal(st);
+        });
+      });
+
+      // Delete Student
+      listEl.querySelectorAll('[data-delete-student]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const st = allStudents.find(x => x.id === btn.dataset.deleteStudent);
+          if (st) this.confirmDeleteStudent(st);
+        });
+      });
+    };
+
+    renderRows();
+
+    // Search Input event (Zero lag, never drops input focus)
     document.getElementById('input-admin-student-search')?.addEventListener('input', (e) => {
       this.adminStudentSearchQuery = e.target.value;
-      this.renderAdminStudentsScreen(container);
+      renderRows();
     });
 
     // Batch Chips events
     container.querySelectorAll('[data-batch]').forEach(chip => {
       chip.addEventListener('click', () => {
         this.adminStudentBatchFilter = chip.dataset.batch;
-        this.renderAdminStudentsScreen(container);
-      });
-    });
-
-    // Custom Message
-    container.querySelectorAll('[data-msg-student]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const st = allStudents.find(x => x.id === btn.dataset.msgStudent);
-        if (st) this.openSendCustomMessageModal(st);
-      });
-    });
-
-    // Delete Student
-    container.querySelectorAll('[data-delete-student]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const st = allStudents.find(x => x.id === btn.dataset.deleteStudent);
-        if (st) this.confirmDeleteStudent(st);
+        container.querySelectorAll('[data-batch]').forEach(c => {
+          const isSel = c.dataset.batch === this.adminStudentBatchFilter;
+          c.classList.toggle('active', isSel);
+          c.innerHTML = `${isSel ? '<span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">check</span> ' : ''}${c.dataset.batch}`;
+        });
+        renderRows();
       });
     });
   }
@@ -8623,8 +8708,7 @@ class AppController {
 
         notificationService.showInAppBanner('Paper Created!', 'Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
         modal.remove();
-        const vp = document.getElementById('admin-main-viewport');
-        if (vp) this.renderAdminPapersScreen(vp);
+        this.refreshAdminTab('papers');
       } catch (err) {
         console.error('Failed to create paper session:', err);
         alert('Error creating paper session: ' + err.message);
@@ -8834,8 +8918,7 @@ class AppController {
 
       notificationService.showInAppBanner('Leaderboard Published!', 'Paper Leaderboard එක සාර්ථකව Real-Time Publish කරන ලදී.', 'success');
       modal.remove();
-      const vp = document.getElementById('admin-main-viewport');
-      if (vp) this.renderAdminPapersScreen(vp);
+      this.refreshAdminTab('papers');
     });
   }
 
@@ -8901,8 +8984,7 @@ class AppController {
         });
         modal.remove();
         notificationService.showInAppBanner('Sprint Published', 'The five-question sprint is available to the selected batch.', 'success');
-        const viewport = document.getElementById('admin-main-viewport');
-        if (viewport) this.renderAdminSprintsScreen(viewport);
+        this.refreshAdminTab('sprints');
       } catch (error) {
         errorBox.hidden = false;
         errorBox.textContent = error?.message || 'The sprint could not be published. Try again.';
@@ -8972,8 +9054,8 @@ class AppController {
     try {
       await dbService.deleteStudent(student.id);
       notificationService.showInAppBanner('Account Purged', `Record for ${student.name} removed.`, 'warning');
-      const vp = document.getElementById('admin-main-viewport');
-      if (vp) await this.renderAdminStudentsScreen(vp);
+      this._adminStudentsListCache = null;
+      this.refreshAdminTab('students');
     } catch (e) {
       alert('Failed to delete student: ' + (e.message || e));
     }

@@ -17,9 +17,30 @@ export class PwaGatekeeper {
       window.__edupeakInstallPrompt = e;
       this.updateInstallButtonVisibility();
     });
+
+    // Expose instance globally for in-app trigger
+    window.pwaGatekeeper = this;
+    window.showPwaInstallModal = (customPlatform) => {
+      this.renderGatekeeper(customPlatform);
+      this.attachEventListeners();
+    };
   }
 
   isStandaloneMode() {
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // 0. Force-show PWA installation modal for testing / inspection
+    if (
+      urlParams.get('install') === 'true' ||
+      urlParams.get('pwa') === 'true' ||
+      urlParams.get('gatekeeper') === 'true' ||
+      urlParams.get('a2hs') === 'true' ||
+      window.location.hash === '#install' ||
+      window.location.hash === '#pwa'
+    ) {
+      return false;
+    }
+
     // 1. iOS Safari standalone property
     if (window.navigator.standalone === true) return true;
 
@@ -34,7 +55,6 @@ export class PwaGatekeeper {
     if (document.referrer && document.referrer.includes('android-app://')) return true;
 
     // 4. Developer / Admin test bypass flag
-    const urlParams = new URLSearchParams(window.location.search);
     if (
       urlParams.get('dev') === 'true' ||
       urlParams.get('preview') === 'true' ||
@@ -47,7 +67,59 @@ export class PwaGatekeeper {
     return false;
   }
 
-  detectPlatform() {
+  detectPlatform(forced) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const platformParam = forced || urlParams.get('platform') || '';
+
+    if (platformParam === 'ios' || platformParam === 'safari') {
+      return {
+        os: 'ios',
+        osName: 'Apple iOS (iPhone / iPad)',
+        browser: 'safari',
+        browserName: 'Apple Safari',
+        isIOS: true,
+        isAndroid: false,
+        isMobile: true,
+        isInApp: false
+      };
+    }
+    if (platformParam === 'ios-chrome') {
+      return {
+        os: 'ios',
+        osName: 'Apple iOS (iPhone)',
+        browser: 'chrome',
+        browserName: 'Google Chrome',
+        isIOS: true,
+        isAndroid: false,
+        isMobile: true,
+        isInApp: false
+      };
+    }
+    if (platformParam === 'android') {
+      return {
+        os: 'android',
+        osName: 'Android Mobile',
+        browser: 'chrome',
+        browserName: 'Google Chrome',
+        isIOS: false,
+        isAndroid: true,
+        isMobile: true,
+        isInApp: false
+      };
+    }
+    if (platformParam === 'inapp' || platformParam === 'whatsapp') {
+      return {
+        os: 'ios',
+        osName: 'Social Media App',
+        browser: 'inapp',
+        browserName: 'In-App Webview (WhatsApp / FB)',
+        isIOS: true,
+        isAndroid: false,
+        isMobile: true,
+        isInApp: true
+      };
+    }
+
     const ua = navigator.userAgent || '';
     const platform = navigator.platform || '';
 
@@ -339,7 +411,7 @@ export class PwaGatekeeper {
     this.onUnlocked();
   }
 
-  renderGatekeeper() {
+  renderGatekeeper(customPlatform) {
     const existing = document.getElementById('pwa-gatekeeper-overlay');
     if (existing) existing.remove();
 
@@ -349,7 +421,7 @@ export class PwaGatekeeper {
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) themeMeta.setAttribute('content', '#F1F5F9');
 
-    const platform = this.detectPlatform();
+    const platform = this.detectPlatform(customPlatform);
     const info = this.getInstructions(platform);
 
     const overlay = document.createElement('div');
@@ -359,13 +431,16 @@ export class PwaGatekeeper {
       <div class="gatekeeper-card">
         <div class="card-ambient-glow"></div>
 
-        <!-- Top bar with detected device chip -->
-        <div class="gatekeeper-top-bar">
+        <!-- Top bar with detected device chip & optional close button -->
+        <div class="gatekeeper-top-bar" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
           <div class="gatekeeper-device-chip" title="${info.deviceLabel}">
             <span>${platform.isIOS ? '🍏 iOS' : platform.isAndroid ? '🤖 Android' : '💻 PC'}</span>
             <span>•</span>
             <span>${platform.browserName}</span>
           </div>
+          ${this.isUnlocked ? `
+            <button id="btn-close-gatekeeper" style="border:none; background:#F1F5F9; color:#64748B; width:32px; height:32px; border-radius:50%; font-size:18px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">✕</button>
+          ` : ''}
         </div>
 
         <div class="gatekeeper-header">
@@ -452,6 +527,20 @@ export class PwaGatekeeper {
   }
 
   attachEventListeners() {
+    // In-app close button
+    const closeBtn = document.getElementById('btn-close-gatekeeper');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        const overlay = document.getElementById('pwa-gatekeeper-overlay');
+        if (overlay) {
+          overlay.classList.add('fade-out');
+          setTimeout(() => overlay.remove(), 250);
+        }
+        document.documentElement.classList.remove('gatekeeper-active');
+        document.body.classList.remove('gatekeeper-active');
+      });
+    }
+
     // Native Install Button
     const btnNative = document.getElementById('btn-native-install');
     if (btnNative && this.deferredPrompt) {
