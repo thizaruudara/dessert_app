@@ -173,7 +173,7 @@ class AppController {
     // 1. Mount 1:1 Opening Loading Screen (splash_screen.dart replica)
     this.renderSplashScreen();
 
-    // 2. Initialize PWA Gatekeeper for iOS Add to Home Screen enforcement
+    // 2. Initialize PWA Gatekeeper for Home Screen installation enforcement
     const gatekeeper = new PwaGatekeeper({
       onUnlocked: async () => {
         console.log('[App] PWA Standalone Mode active.');
@@ -190,14 +190,6 @@ class AppController {
     });
 
     gatekeeper.init();
-
-    // Safety fallback: if not unlocked within 2.5s on desktop or non-iOS, force unlock
-    setTimeout(() => {
-      if (!gatekeeper.isUnlocked) {
-        console.log('[App] Fallback trigger: unlocking app');
-        gatekeeper.unlockApp();
-      }
-    }, 2500);
 
     // 3. Global Anti-Cheat Listener
     document.addEventListener('visibilitychange', () => {
