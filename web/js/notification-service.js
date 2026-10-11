@@ -144,6 +144,7 @@ export class NotificationService {
       container.style.cssText = `
         position: fixed;
         top: 20px;
+        top: max(16px, calc(env(safe-area-inset-top, 0px) + 14px));
         left: 50%;
         transform: translateX(-50%);
         z-index: 9999999;

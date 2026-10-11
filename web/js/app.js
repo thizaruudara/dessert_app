@@ -253,31 +253,31 @@ class AppController {
 
     root.innerHTML = `
       <div class="auth-screen-container">
-        <div class="auth-scroll-content" style="max-width:440px; margin:0 auto; padding:32px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh;">
-          <div class="auth-header" style="text-align:center; margin-bottom:28px;">
-            <div class="auth-brand-logo-wrap" style="width:76px; height:76px; margin:0 auto 14px; border-radius:22px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 25px rgba(37,99,235,0.12); border:1px solid rgba(191,219,254,0.6);">
-              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="width:52px; height:52px; object-fit:contain;" onerror="this.src='./icons/icon-192.png'" />
+        <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:12px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
+          <div class="auth-header" style="text-align:center; margin-bottom:20px;">
+            <div class="auth-brand-logo-wrap" style="width:72px; height:72px; margin:0 auto 12px; border-radius:20px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(37,99,235,0.12); border:1px solid rgba(191,219,254,0.6);">
+              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="width:48px; height:48px; object-fit:contain;" onerror="this.src='./icons/icon-192.png'" />
             </div>
-            <div class="auth-title" style="font-size:26px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
+            <div class="auth-title" style="font-size:24px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
             <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
               <span>A/L Pastry &amp; Dessert Institute 🍰</span>
             </div>
           </div>
 
-          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:20px; padding:28px 24px; box-shadow:0 12px 36px rgba(15,23,42,0.06); text-align:center;">
-            <div style="font-size:20px; font-weight:800; color:#1E293B; margin-bottom:8px;">
+          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:20px; padding:24px 20px; box-shadow:0 12px 36px rgba(15,23,42,0.06); text-align:center; box-sizing:border-box;">
+            <div style="font-size:19px; font-weight:800; color:#1E293B; margin-bottom:8px;">
               Student &amp; Exam Portal
             </div>
-            <p style="font-size:13.5px; color:#64748B; line-height:1.55; margin:0 0 24px;">
+            <p style="font-size:13px; color:#64748B; line-height:1.5; margin:0 0 20px;">
               Access your proctored paper sessions, homework dessert submissions, and batch rankings through your central EduPeak account.
             </p>
 
-            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:52px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 20px rgba(37,99,235,0.3); transition:all 0.2s ease;">
+            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:50px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 20px rgba(37,99,235,0.3); transition:all 0.2s ease;">
               <span class="material-symbols-rounded" style="font-size:22px;">login</span>
               <span>Login With EduPeak</span>
             </button>
 
-            <div style="margin-top:20px; padding-top:18px; border-top:1px solid #F1F5F9; font-size:12.5px; color:#64748B;">
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid #F1F5F9; font-size:12px; color:#64748B;">
               Don't have an account on edupeak.lk yet?
               <br>
               <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:3px; margin-top:6px;">
@@ -287,7 +287,7 @@ class AppController {
             </div>
           </div>
 
-          <div class="auth-secure-note" style="margin-top:20px; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#94A3B8;">
+          <div class="auth-secure-note" style="margin-top:16px; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:#94A3B8;">
             <span class="material-symbols-rounded" style="font-size:16px;">verified_user</span>
             <span>Single Sign-On verified with edupeak.lk &amp; Supabase Cloud</span>
           </div>
