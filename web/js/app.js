@@ -362,6 +362,11 @@ class AppController {
     const existing = document.getElementById('edupeak-sub-modal');
     if (existing) existing.remove();
 
+    const user = authService.getCurrentUser();
+    const sub = user?.subscriptionDetails;
+    const activeMonth = sub?.monthName || month;
+    const enrollUrl = sub?.enrollUrl || (sub?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(sub.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4');
+
     const overlay = document.createElement('div');
     overlay.id = 'edupeak-sub-modal';
     overlay.className = 'app-dialog-overlay';
@@ -373,15 +378,15 @@ class AppController {
         </div>
         <h3 style="font-size:18px; font-weight:800; color:#0F172A; margin-bottom:8px;">Super Paper Class Subscription Required</h3>
         <p style="font-size:13px; color:#64748B; line-height:1.55; margin-bottom:20px;">
-          Access to <strong>${featureName}</strong> is restricted to students enrolled in the active <strong>${month}</strong> Super Paper Class course on edupeak.lk.
+          Access to <strong>${featureName}</strong> requires an active, paid monthly subscription for <strong>${activeMonth}</strong> Super Paper Class on edupeak.lk. (1st lesson free trials do not unlock paper exams or dessert submissions).
         </p>
         <div style="display:flex; flex-direction:column; gap:10px;">
-          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="background:#2563EB; color:white; height:46px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <a href="${enrollUrl}" target="_blank" rel="noopener noreferrer" style="background:#2563EB; color:white; height:46px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px;">
             <span>Enroll / Pay on EduPeak.lk</span>
             <span class="material-symbols-rounded" style="font-size:17px;">open_in_new</span>
           </a>
           <button type="button" id="btn-sub-modal-check" style="background:#F1F5F9; color:#334155; height:42px; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
-            Re-check My Enrollment 🔄
+            Re-check My Payment 🔄
           </button>
           <button type="button" id="btn-sub-modal-close" style="background:transparent; color:#94A3B8; height:36px; border:none; font-size:12.5px; font-weight:600; cursor:pointer;">
             Dismiss
@@ -760,12 +765,12 @@ class AppController {
             <div>
               <div style="font-weight:800; color:#92400E; font-size:14.5px;">Super Paper Class Subscription Required</div>
               <div style="font-size:12.5px; color:#B45309; line-height:1.45; margin-top:3px;">
-                You haven't enrolled for the active <strong>${user.subscriptionDetails?.monthName || 'current month'}</strong> Super Paper Class course on edupeak.lk. Paper exam sessions and dessert submissions are locked.
+                You haven't completed tuition payment for the active <strong>${user.subscriptionDetails?.monthName || 'October 2027'}</strong> Super Paper Class course on edupeak.lk. Paper exam sessions and dessert submissions are locked. (1st lesson free trials do not unlock exams).
               </div>
             </div>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding-top:4px;">
-            <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="background:#D97706; color:white; padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(217,119,6,0.25);">
+            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="background:#D97706; color:white; padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(217,119,6,0.25);">
               <span>Enroll / Pay on EduPeak.lk</span>
               <span class="material-symbols-rounded" style="font-size:15px;">open_in_new</span>
             </a>
@@ -1777,11 +1782,11 @@ class AppController {
               <div>
                 <div style="font-weight: 800; color: #92400E; font-size: 14px;">Super Paper Class Subscription Required</div>
                 <div style="font-size: 12px; color: #B45309; line-height: 1.45; margin-top: 2px;">
-                  You must be enrolled in the active <strong>${user.subscriptionDetails?.monthName || 'current month'}</strong> Super Paper Class course on edupeak.lk to participate in live exams or reserve paper slots.
+                  Tuition payment is required for the active <strong>${user.subscriptionDetails?.monthName || 'October 2027'}</strong> Super Paper Class course on edupeak.lk to participate in live exams or reserve paper slots. (1st lesson free trials do not unlock exams).
                 </div>
               </div>
             </div>
-            <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
               <span>Enroll / Pay on EduPeak.lk</span>
               <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
             </a>
@@ -2789,11 +2794,11 @@ class AppController {
             <div>
               <div style="font-weight: 800; color: #92400E; font-size: 14px;">Super Paper Class Subscription Required</div>
               <div style="font-size: 12px; color: #B45309; line-height: 1.45; margin-top: 2px;">
-                Dessert homework problem set submissions are reserved for students enrolled in the active <strong>${user.subscriptionDetails?.monthName || 'current month'}</strong> Super Paper Class course on edupeak.lk.
+                Dessert homework problem set submissions are reserved for students who have completed payment for the active <strong>${user.subscriptionDetails?.monthName || 'October 2027'}</strong> Super Paper Class course on edupeak.lk. (1st lesson free trials do not unlock submissions).
               </div>
             </div>
           </div>
-          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+          <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
             <span>Enroll / Pay on EduPeak.lk</span>
             <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
           </a>

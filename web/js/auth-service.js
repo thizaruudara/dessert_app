@@ -133,7 +133,7 @@ export class AuthService {
         let subscription = { isSubscribed: true };
         if (role === 'student') {
           // Check monthly course subscription for Super Paper Class
-          subscription = await checkSuperPaperSubscription(profile.id, profile.exam_year);
+          subscription = await checkSuperPaperSubscription(profile.id, profile.exam_year, profile.email, profile.phone);
         }
 
         this.currentUser = {
@@ -223,7 +223,7 @@ export class AuthService {
   // Refresh subscription status on demand
   async refreshSubscription() {
     if (!this.currentUser || this.currentUser.role !== 'student') return;
-    const sub = await checkSuperPaperSubscription(this.currentUser.id, this.currentUser.exam_year);
+    const sub = await checkSuperPaperSubscription(this.currentUser.id, this.currentUser.exam_year, this.currentUser.email, this.currentUser.phone);
     this.currentUser.isSubscribed = sub.isSubscribed;
     this.currentUser.subscriptionDetails = sub;
     localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));

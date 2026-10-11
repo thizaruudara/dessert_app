@@ -53607,12 +53607,13 @@ async function getStudentProfile(identifier) {
     return null;
   }
 }
-async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L") {
-  if (!studentId) {
+async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L", studentEmail = null, studentPhone = null) {
+  if (!studentId && !studentEmail) {
     return {
       isSubscribed: false,
       reason: "NO_STUDENT_ID",
-      message: "Student ID missing."
+      enrollUrl: "https://edupeak.lk/courses.html",
+      message: "Student identification missing."
     };
   }
   try {
@@ -53620,43 +53621,95 @@ async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L") {
     if (coursesError || !courses || courses.length === 0) {
       console.warn("[Supabase] Could not fetch Super Paper Class courses:", coursesError);
       return {
-        isSubscribed: true,
+        isSubscribed: false,
+        reason: "COURSES_UNAVAILABLE",
         currentCourse: null,
-        message: "Courses status unavailable, granting access."
+        enrollUrl: "https://edupeak.lk/courses.html",
+        monthName: "Current Month",
+        message: "Could not connect to EduPeak course directory. Please verify your connection."
       };
     }
-    const monthlyCourses = courses.filter((c2) => c2.month_name || c2.parent_course_id && c2.parent_course_id !== "");
-    const batchMatches = monthlyCourses.filter((c2) => !examYear || c2.examyear === examYear);
-    const activeMonthlyCourse = batchMatches.length > 0 ? batchMatches[0] : monthlyCourses[0] || courses[0];
+    const paidMonthlyCourses = courses.filter((c2) => {
+      const isBase = c2.is_base_course === true || String(c2.id).startsWith("crs-base-");
+      const feeStr = String(c2.fee || c2.price || "").toLowerCase();
+      const isFree = feeStr.includes("free") || c2.fee === 0 || c2.fee === "0";
+      return !isBase && !isFree && (c2.parent_course_id || c2.month_name);
+    });
+    const batchMatches = paidMonthlyCourses.filter((c2) => !examYear || c2.examyear === examYear || c2.level === examYear);
+    const activeMonthlyCourse = batchMatches.length > 0 ? batchMatches[0] : paidMonthlyCourses[0] || courses.find((c2) => !c2.is_base_course) || courses[0];
     if (!activeMonthlyCourse) {
-      return { isSubscribed: true, currentCourse: null };
+      return {
+        isSubscribed: false,
+        reason: "NO_ACTIVE_COURSE",
+        currentCourse: null,
+        enrollUrl: "https://edupeak.lk/courses.html",
+        monthName: "Current Month",
+        message: "No active Super Paper Class monthly course currently open."
+      };
     }
-    const { data: enrollment, error: enrollError } = await supabase.from("enrollments").select("*").eq("student_id", studentId).eq("course_id", activeMonthlyCourse.id).limit(1).maybeSingle();
-    if (enrollError) {
-      console.warn("[Supabase] Error checking enrollment:", enrollError);
+    const enrollUrl = `https://edupeak.lk/checkout.html?course=${encodeURIComponent(activeMonthlyCourse.id)}`;
+    const monthName = activeMonthlyCourse.month_name || activeMonthlyCourse.title;
+    const studentKeys = [studentId, studentEmail, studentPhone].filter(Boolean);
+    let isPaid = false;
+    let paidEnrollment = null;
+    for (const key of studentKeys) {
+      const { data: enr, error: enrollError } = await supabase.from("enrollments").select("*").eq("student_id", key).eq("course_id", activeMonthlyCourse.id).limit(1).maybeSingle();
+      if (enr) {
+        const pStatus = String(enr.payment_status || "").toLowerCase().trim();
+        if (pStatus === "paid" || pStatus === "approved") {
+          isPaid = true;
+          paidEnrollment = enr;
+          break;
+        }
+      }
     }
-    const isPaid = enrollment && String(enrollment.payment_status).toLowerCase() === "paid";
+    if (!isPaid && (studentEmail || studentId)) {
+      try {
+        const { data: orders } = await supabase.from("broadcast_schedules").select("id, status, coursetitle").like("id", "order-%").in("status", ["order_approved", "approved", "Approved"]).limit(25);
+        if (orders && orders.length > 0) {
+          for (const ord of orders) {
+            try {
+              const p2 = typeof ord.coursetitle === "string" ? JSON.parse(ord.coursetitle) : ord.coursetitle;
+              if (p2 && (p2.courseId === activeMonthlyCourse.id || p2.course_id === activeMonthlyCourse.id)) {
+                const mailMatch = studentEmail && String(p2.studentEmail || "").toLowerCase() === String(studentEmail).toLowerCase();
+                const idMatch = studentId && String(p2.studentId || "") === String(studentId);
+                if (mailMatch || idMatch) {
+                  isPaid = true;
+                  break;
+                }
+              }
+            } catch (_) {
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Supabase] broadcast_schedules orders check:", err);
+      }
+    }
     if (isPaid) {
       return {
         isSubscribed: true,
         currentCourse: activeMonthlyCourse,
-        enrollment,
-        monthName: activeMonthlyCourse.month_name || activeMonthlyCourse.title
+        enrollUrl,
+        enrollment: paidEnrollment,
+        monthName
       };
     }
     return {
       isSubscribed: false,
-      reason: "UNPAID_OR_NOT_ENROLLED",
+      reason: "PAYMENT_REQUIRED",
       currentCourse: activeMonthlyCourse,
-      monthName: activeMonthlyCourse.month_name || activeMonthlyCourse.title,
-      message: `You are not enrolled in ${activeMonthlyCourse.title || "the current Super Paper Class"}. Please purchase this month's course on edupeak.lk.`
+      enrollUrl,
+      monthName,
+      message: `Full tuition payment required for ${monthName}. 1st lesson free trials do not unlock paper sessions or homework submissions.`
     };
   } catch (err) {
     console.error("[Supabase] checkSuperPaperSubscription error:", err);
     return {
       isSubscribed: false,
       reason: "ERROR",
-      message: "Failed to verify subscription status."
+      enrollUrl: "https://edupeak.lk/courses.html",
+      message: "Failed to verify payment status."
     };
   }
 }
@@ -53769,7 +53822,7 @@ var AuthService = class {
         const role = profile.role || authUser.app_metadata?.role || "student";
         let subscription = { isSubscribed: true };
         if (role === "student") {
-          subscription = await checkSuperPaperSubscription(profile.id, profile.exam_year);
+          subscription = await checkSuperPaperSubscription(profile.id, profile.exam_year, profile.email, profile.phone);
         }
         this.currentUser = {
           ...profile,
@@ -53841,7 +53894,7 @@ var AuthService = class {
   // Refresh subscription status on demand
   async refreshSubscription() {
     if (!this.currentUser || this.currentUser.role !== "student") return;
-    const sub = await checkSuperPaperSubscription(this.currentUser.id, this.currentUser.exam_year);
+    const sub = await checkSuperPaperSubscription(this.currentUser.id, this.currentUser.exam_year, this.currentUser.email, this.currentUser.phone);
     this.currentUser.isSubscribed = sub.isSubscribed;
     this.currentUser.subscriptionDetails = sub;
     localStorage.setItem("edupeak_cached_user", JSON.stringify(this.currentUser));
@@ -89643,6 +89696,10 @@ var AppController = class {
   showSubscriptionModal(featureName = "This feature", month = "this month") {
     const existing = document.getElementById("edupeak-sub-modal");
     if (existing) existing.remove();
+    const user = authService.getCurrentUser();
+    const sub = user?.subscriptionDetails;
+    const activeMonth = sub?.monthName || month;
+    const enrollUrl = sub?.enrollUrl || (sub?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(sub.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4");
     const overlay = document.createElement("div");
     overlay.id = "edupeak-sub-modal";
     overlay.className = "app-dialog-overlay";
@@ -89654,15 +89711,15 @@ var AppController = class {
         </div>
         <h3 style="font-size:18px; font-weight:800; color:#0F172A; margin-bottom:8px;">Super Paper Class Subscription Required</h3>
         <p style="font-size:13px; color:#64748B; line-height:1.55; margin-bottom:20px;">
-          Access to <strong>${featureName}</strong> is restricted to students enrolled in the active <strong>${month}</strong> Super Paper Class course on edupeak.lk.
+          Access to <strong>${featureName}</strong> requires an active, paid monthly subscription for <strong>${activeMonth}</strong> Super Paper Class on edupeak.lk. (1st lesson free trials do not unlock paper exams or dessert submissions).
         </p>
         <div style="display:flex; flex-direction:column; gap:10px;">
-          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="background:#2563EB; color:white; height:46px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <a href="${enrollUrl}" target="_blank" rel="noopener noreferrer" style="background:#2563EB; color:white; height:46px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:8px;">
             <span>Enroll / Pay on EduPeak.lk</span>
             <span class="material-symbols-rounded" style="font-size:17px;">open_in_new</span>
           </a>
           <button type="button" id="btn-sub-modal-check" style="background:#F1F5F9; color:#334155; height:42px; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">
-            Re-check My Enrollment \u{1F504}
+            Re-check My Payment \u{1F504}
           </button>
           <button type="button" id="btn-sub-modal-close" style="background:transparent; color:#94A3B8; height:36px; border:none; font-size:12.5px; font-weight:600; cursor:pointer;">
             Dismiss
@@ -90018,12 +90075,12 @@ var AppController = class {
             <div>
               <div style="font-weight:800; color:#92400E; font-size:14.5px;">Super Paper Class Subscription Required</div>
               <div style="font-size:12.5px; color:#B45309; line-height:1.45; margin-top:3px;">
-                You haven't enrolled for the active <strong>${user.subscriptionDetails?.monthName || "current month"}</strong> Super Paper Class course on edupeak.lk. Paper exam sessions and dessert submissions are locked.
+                You haven't completed tuition payment for the active <strong>${user.subscriptionDetails?.monthName || "October 2027"}</strong> Super Paper Class course on edupeak.lk. Paper exam sessions and dessert submissions are locked. (1st lesson free trials do not unlock exams).
               </div>
             </div>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding-top:4px;">
-            <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="background:#D97706; color:white; padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(217,119,6,0.25);">
+            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="background:#D97706; color:white; padding:8px 16px; border-radius:10px; font-size:12.5px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:5px; box-shadow:0 3px 8px rgba(217,119,6,0.25);">
               <span>Enroll / Pay on EduPeak.lk</span>
               <span class="material-symbols-rounded" style="font-size:15px;">open_in_new</span>
             </a>
@@ -91000,11 +91057,11 @@ var AppController = class {
               <div>
                 <div style="font-weight: 800; color: #92400E; font-size: 14px;">Super Paper Class Subscription Required</div>
                 <div style="font-size: 12px; color: #B45309; line-height: 1.45; margin-top: 2px;">
-                  You must be enrolled in the active <strong>${user.subscriptionDetails?.monthName || "current month"}</strong> Super Paper Class course on edupeak.lk to participate in live exams or reserve paper slots.
+                  Tuition payment is required for the active <strong>${user.subscriptionDetails?.monthName || "October 2027"}</strong> Super Paper Class course on edupeak.lk to participate in live exams or reserve paper slots. (1st lesson free trials do not unlock exams).
                 </div>
               </div>
             </div>
-            <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
               <span>Enroll / Pay on EduPeak.lk</span>
               <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
             </a>
@@ -91941,11 +91998,11 @@ var AppController = class {
             <div>
               <div style="font-weight: 800; color: #92400E; font-size: 14px;">Super Paper Class Subscription Required</div>
               <div style="font-size: 12px; color: #B45309; line-height: 1.45; margin-top: 2px;">
-                Dessert homework problem set submissions are reserved for students enrolled in the active <strong>${user.subscriptionDetails?.monthName || "current month"}</strong> Super Paper Class course on edupeak.lk.
+                Dessert homework problem set submissions are reserved for students who have completed payment for the active <strong>${user.subscriptionDetails?.monthName || "October 2027"}</strong> Super Paper Class course on edupeak.lk. (1st lesson free trials do not unlock submissions).
               </div>
             </div>
           </div>
-          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+          <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
             <span>Enroll / Pay on EduPeak.lk</span>
             <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
           </a>
