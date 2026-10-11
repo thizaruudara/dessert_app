@@ -1145,6 +1145,32 @@ export class DbService {
     };
   }
 
+  normalizePaperHint(raw, id) {
+    if (!raw) return null;
+    const parseTime = (val) => {
+      if (!val) return new Date();
+      if (typeof val?.toDate === 'function') {
+        try { return val.toDate(); } catch (_) {}
+      }
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    return {
+      id: id || raw.id || 'hint_' + Date.now(),
+      title: raw.title || raw.paperTitle || 'Special Paper Hints & Guidance',
+      subject: raw.subject || 'A/L Physics',
+      examYear: raw.examYear || 'All Batches',
+      paperName: raw.paperName || raw.paperTitle || '',
+      hints: raw.hints || raw.instructions || '',
+      formulas: raw.formulas || '',
+      scope: Array.isArray(raw.scope) ? raw.scope : (typeof raw.scope === 'string' ? raw.scope.split(',').map(s => s.trim()).filter(Boolean) : (Array.isArray(raw.syllabusTopics) ? raw.syllabusTopics : [])),
+      isPublished: raw.isPublished !== false,
+      publishedAt: parseTime(raw.publishedAt || raw.createdAt),
+      createdAt: raw.createdAt || new Date().toISOString()
+    };
+  }
+
   getMockPaperSessions(examYear) {
     return [];
   }
@@ -1338,6 +1364,115 @@ export class DbService {
       console.warn('[DB] streamUpcomingPapers setup error:', e);
       return () => {};
     }
+  }
+
+  async getPaperHints(examYear, { forceRefresh = false } = {}) {
+    const cacheKey = `paper_hints_${examYear || 'all'}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.setCache(cacheKey, parsed);
+            return parsed;
+          }
+        }
+      } catch (_) {}
+    }
+    try {
+      const hintsRef = collection(db, 'paper_hints');
+      const snap = await Promise.race([
+        getDocs(hintsRef),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getPaperHints timeout')), 3000))
+      ]);
+      let list = [];
+      if (!snap.empty) {
+        list = snap.docs.map(d => this.normalizePaperHint(d.data(), d.id)).filter(Boolean);
+      }
+      
+      // Also include any hints from upcoming_papers so existing hints are preserved
+      try {
+        const upRef = collection(db, 'upcoming_papers');
+        const upSnap = await getDocs(upRef);
+        if (!upSnap.empty) {
+          upSnap.docs.forEach(d => {
+            const data = d.data();
+            if (data && (data.hints || data.instructions)) {
+              if (!list.some(h => h.id === d.id || h.title === data.title)) {
+                list.push(this.normalizePaperHint(data, d.id));
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      list.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+      if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+        const res = list.filter(h => this.matchesYear(h.examYear, examYear) || h.examYear === 'All Batches' || h.examYear === 'All');
+        this.setCache(cacheKey, res);
+        try { localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(res)); } catch (_) {}
+        return res;
+      }
+      this.setCache(cacheKey, list);
+      try { localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(list)); } catch (_) {}
+      return list;
+    } catch (e) {
+      console.warn('[DB] getPaperHints note/timeout:', e?.message || e);
+    }
+    return [];
+  }
+
+  streamPaperHints(examYear, callback) {
+    try {
+      const ref = collection(db, 'paper_hints');
+      return onSnapshot(ref, (snap) => {
+        let list = snap.docs.map(d => this.normalizePaperHint(d.data(), d.id)).filter(Boolean);
+        list.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+        if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+          list = list.filter(h => this.matchesYear(h.examYear, examYear) || h.examYear === 'All Batches' || h.examYear === 'All');
+        }
+        callback(list);
+      }, (e) => {
+        console.warn('[DB] streamPaperHints error:', e);
+      });
+    } catch (e) {
+      console.warn('[DB] streamPaperHints setup error:', e);
+      return () => {};
+    }
+  }
+
+  async createPaperHint(hintData) {
+    const id = hintData.id || `hint_${Date.now()}`;
+    const payload = {
+      ...hintData,
+      id,
+      publishedAt: serverTimestamp(),
+      createdAt: new Date().toISOString(),
+      isPublished: true
+    };
+    await setDoc(doc(db, 'paper_hints', id), payload, { merge: true });
+    this.clearCache('paper_hints');
+    return payload;
+  }
+
+  async updatePaperHint(hintId, hintData) {
+    if (!hintId) return;
+    const ref = doc(db, 'paper_hints', hintId);
+    await updateDoc(ref, {
+      ...hintData,
+      updatedAt: serverTimestamp()
+    });
+    this.clearCache('paper_hints');
+  }
+
+  async deletePaperHint(hintId) {
+    if (!hintId) return;
+    await deleteDoc(doc(db, 'paper_hints', hintId));
+    this.clearCache('paper_hints');
   }
 
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {

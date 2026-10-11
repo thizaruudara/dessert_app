@@ -268,6 +268,19 @@ export class NotificationService {
     } catch (_) {}
   }
 
+  notifyPaperHintPublished(hintTitle, batch = 'All Batches') {
+    this.playChime();
+    this.showInAppBanner(
+      '💡 New Paper Hint Published!',
+      `"${hintTitle}" (${batch}) hints are now live. Review formulas & guidance!`,
+      'info'
+    );
+    this.showLocalNotification('💡 New Paper Hint Published!', {
+      body: `"${hintTitle}" (${batch}) hints and guidance are now available for your exam preparation.`,
+      tag: 'paper-hint-alert'
+    });
+  }
+
   urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');

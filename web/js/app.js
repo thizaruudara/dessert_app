@@ -1793,119 +1793,179 @@ class AppController {
     });
   }
 
-  _buildStudentUpcomingPapersHTML(upcomingList, activeTargetYear, currentYear) {
-    if (!upcomingList || upcomingList.length === 0) {
+  _buildStudentPaperHintsHTML(hints, activeTargetYear, currentYear) {
+    const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    const formatDate = (value) => {
+      try {
+        const d = new Date(value);
+        return isNaN(d.getTime()) ? 'Recently' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch (_) { return 'Recently'; }
+    };
+
+    if (!hints || hints.length === 0) {
       return `
-        <div style="padding:40px 24px; text-align:center; color:#64748B;">
+        <div style="padding:44px 20px; text-align:center; color:#64748B; background:#FFFFFF; border-radius:18px; border:1px solid #E2E8F0; margin:6px 0;">
           <div style="margin-bottom:12px; display:flex; justify-content:center;">
-            <span class="material-symbols-rounded" style="font-size:48px; color:#94A3B8;">lightbulb</span>
+            <span class="material-symbols-rounded filled" style="font-size:46px; color:#F59E0B;">lightbulb</span>
           </div>
-          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">No Upcoming Papers Scheduled Yet</div>
-          <div style="font-size:13px; line-height:1.5;">Upcoming papers and hints for ${currentYear} will be announced here.</div>
+          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">තවම Paper Hints පළ කර නොමැත</div>
+          <div style="font-size:13px; line-height:1.5; color:#64748B;">විභාගය ආරම්භ වීමට පෙර ඔබේ කණ්ඩායම (${escapeHTML(currentYear)}) සඳහා විශේෂ Hints, Formulas සහ උපදෙස් මෙහි දිස්වනු ඇත.</div>
         </div>
       `;
     }
 
-    return upcomingList.map(paper => {
-      const rawDate = paper.scheduledDate ? new Date(paper.scheduledDate) : new Date(Date.now() + 86400000 * 3);
-      const schedDate = isNaN(rawDate.getTime()) ? new Date(Date.now() + 86400000 * 3) : rawDate;
-      const durationMins = Number(paper.durationMinutes) || 180;
-      const durationHours = (durationMins / 60).toFixed(1);
-      const diffMs = schedDate.getTime() - Date.now();
-      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
-      const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
-      const countdownText = days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
-
-      return `
-        <div class="upcoming-paper-card">
-          <!-- Banner Header -->
-          <div class="upcoming-paper-header-banner">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">
-                ${paper.subject || 'A/L Physics'}
-              </span>
-              <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:600;">
-                ${paper.examYear || '2027 A/L'}
-              </span>
+    return `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        ${hints.map(hint => `
+          <div class="upcoming-paper-card" style="box-shadow:0 6px 18px rgba(15,23,42,0.06); border-radius:18px; overflow:hidden;">
+            <!-- Header Banner -->
+            <div class="upcoming-paper-header-banner" style="background:linear-gradient(135deg, #EFF6FF, #DBEAFE); padding:12px 16px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:rgba(245,158,11,0.15); color:#D97706; border:1px solid rgba(245,158,11,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded filled" style="font-size:13px;">lightbulb</span>
+                  <span>${escapeHTML(hint.subject || 'A/L Physics')}</span>
+                </span>
+                <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
+                  ${escapeHTML(hint.examYear || currentYear)}
+                </span>
+                ${hint.paperName ? `<span style="background:#EFF6FF; color:#1D4ED8; padding:3px 8px; border-radius:8px; font-size:10.5px; font-weight:700;">${escapeHTML(hint.paperName)}</span>` : ''}
+              </div>
+              <div style="font-size:11.5px; color:#64748B; display:flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+                <span>${escapeHTML(formatDate(hint.publishedAt))}</span>
+              </div>
             </div>
-            <div class="upcoming-countdown-badge">
-              <span class="material-symbols-rounded" style="font-size:14px; margin-right:3px;">schedule</span>
-              <span>${diffMs > 0 ? countdownText : 'Paper Active'}</span>
+
+            <!-- Card Body -->
+            <div style="padding:16px; display:flex; flex-direction:column; gap:12px; background:#FFFFFF;">
+              <div class="paper-title" style="font-size:17px; font-weight:800; color:#0F172A;">${escapeHTML(hint.title)}</div>
+
+              <!-- Special Hints Box -->
+              <div class="upcoming-hints-highlight-box" style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border:1.5px solid #FDE68A; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(245,158,11,0.06);">
+                <div class="upcoming-hints-title" style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309; margin-bottom:8px;">
+                  <span class="material-symbols-rounded filled" style="font-size:17px; color:#D97706;">tips_and_updates</span>
+                  <span>Exclusive Paper Hints & Guidance (විශේෂ උපදෙස්)</span>
+                </div>
+                <div class="upcoming-hints-text" style="font-size:13px; color:#78350F; line-height:1.65; white-space:pre-wrap;">${escapeHTML(hint.hints)}</div>
+              </div>
+
+              <!-- Formulas Box -->
+              ${hint.formulas ? `
+                <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+                  <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                    <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">functions</span>
+                    <span>Key Formulas & Equations (මූලික සමීකරණ)</span>
+                  </div>
+                  <div style="font-size:12.5px; font-family:monospace; color:#1E293B; background:#FFFFFF; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; white-space:pre-wrap;">${escapeHTML(hint.formulas)}</div>
+                </div>
+              ` : ''}
+
+              <!-- Scope Chips -->
+              ${hint.scope && hint.scope.length > 0 ? `
+                <div>
+                  <div style="font-size:11px; font-weight:700; color:#64748B; margin-bottom:4px;">Target Tested Concepts:</div>
+                  <div class="upcoming-topics-wrap" style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${hint.scope.map(topic => `
+                      <div class="upcoming-topic-chip" style="background:#F0FDF4; border:1px solid #BBF7D0; color:#15803D; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                        <span class="material-symbols-rounded filled" style="font-size:13px; color:#16A34A;">check_circle</span>
+                        <span>${escapeHTML(topic)}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              <!-- Quick action: Copy hint button -->
+              <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:4px;">
+                <button class="btn-copy-paper-hint" data-copy-hint="${escapeHTML(hint.hints)}" style="background:#F1F5F9; border:1px solid #CBD5E1; color:#334155; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                  <span class="material-symbols-rounded" style="font-size:16px;">content_copy</span>
+                  <span>Copy Guidance</span>
+                </button>
+              </div>
             </div>
           </div>
-
-          <!-- Card Body -->
-          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
-            <div class="paper-title" style="font-size:16.5px;">${paper.title || 'Upcoming Model Paper'}</div>
-
-            <!-- Date & Duration -->
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
-                <span class="material-symbols-rounded" style="font-size:15px; color:#64748B;">calendar_today</span>
-                <span>${schedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })} at ${this._safeFormatTime(schedDate.toISOString(), '08:30 AM')}</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569;">
-                <span class="material-symbols-rounded" style="font-size:15px; color:#64748B;">timer</span>
-                <span>${durationMins} Minutes (${durationHours} Hours) • ${paper.paperStructure || 'Comprehensive Evaluation'}</span>
-              </div>
-            </div>
-
-            <!-- Syllabus Topics Chips -->
-            ${paper.syllabusTopics && paper.syllabusTopics.length > 0 ? `
-              <div style="margin-top:2px;">
-                <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">Syllabus & Tested Topics:</div>
-                <div class="upcoming-topics-wrap">
-                  ${paper.syllabusTopics.map(topic => `
-                    <div class="upcoming-topic-chip">
-                      <span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span>
-                      <span>${topic}</span>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- EXCLUSIVE HINTS & TIPS -->
-            ${paper.hints ? `
-              <div class="upcoming-hints-highlight-box">
-                <div class="upcoming-hints-title">
-                  <span class="material-symbols-rounded" style="font-size:18px; color:#D97706;">lightbulb</span>
-                  <span>Special Paper Hints & Guidance</span>
-                </div>
-                <div class="upcoming-hints-text">
-                  ${paper.hints}
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- Instructions -->
-            ${paper.instructions ? `
-              <div style="display:flex; align-items:flex-start; gap:6px; font-size:11.5px; color:#64748B;">
-                <span class="material-symbols-rounded" style="font-size:16px; color:#64748B; flex-shrink:0;">info</span>
-                <span>${paper.instructions}</span>
-              </div>
-            ` : ''}
-
-            <!-- Action Button -->
-            <button class="btn-primary" style="background:#6366F1; padding:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 4px 14px rgba(99,102,241,0.3);" data-paper-scope="${paper.id}">
-              <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
-              <span>View Full Scope & Hints</span>
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
+        `).join('')}
+      </div>
+    `;
   }
 
-  _bindStudentUpcomingActions(container, upcomingList) {
-    container.querySelectorAll('[data-paper-scope]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const pId = btn.dataset.paperScope;
-        const paper = upcomingList.find(p => p.id === pId);
-        if (paper) this.showUpcomingPaperDetailsModal(paper);
+  _bindStudentPaperHintActions(container, hints) {
+    container.querySelectorAll('.btn-copy-paper-hint').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const text = btn.dataset.copyHint;
+        if (text) {
+          navigator.clipboard?.writeText(text).then(() => {
+            btn.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px; color:#10B981;">check</span><span>Copied!</span>`;
+            setTimeout(() => {
+              btn.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px;">content_copy</span><span>Copy Guidance</span>`;
+            }, 2000);
+          }).catch(() => {});
+        }
       });
     });
+  }
+
+  _buildStudentPaperLeaderboardHTML(allBoards, activeTargetYear) {
+    const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    const selectedBatch = (activeTargetYear || '2027 A/L').replace(/\s+/g, '').toUpperCase();
+    const boards = (allBoards || []).filter(b => !b.examYear || ['ALL', 'ALLBATCHES'].includes(b.examYear.replace(/\s+/g, '').toUpperCase()) || b.examYear.replace(/\s+/g, '').toUpperCase() === selectedBatch);
+
+    if (!boards.length) {
+      return `
+        <div style="padding:44px 20px; text-align:center; color:#64748B; background:#FFFFFF; border-radius:18px; border:1px solid #E2E8F0; margin:6px 0;">
+          <span class="material-symbols-rounded" style="font-size:46px; color:#94A3B8; margin-bottom:10px;">military_tech</span>
+          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:4px;">තවම ප්‍රතිඵල පළ කර නොමැත</div>
+          <div style="font-size:12.5px; color:#64748B;">Published evaluations & rankings for ${escapeHTML(activeTargetYear)} will appear here.</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        ${boards.map((board, idx) => {
+          const entries = board.entries || [];
+          const published = board.publishedAt ? (board.publishedAt.toLocaleDateString ? board.publishedAt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : new Date(board.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })) : '';
+          return `
+            <article class="hero-card" style="padding:18px; border-radius:18px; border:1px solid #E2E8F0; background:#FFFFFF; box-shadow:0 4px 14px rgba(15,23,42,0.04); display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">
+                    ${escapeHTML(board.subject || 'A/L Physics')}
+                  </span>
+                  <span style="background:#F1F5F9; color:#475569; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
+                    ${escapeHTML(board.examYear || activeTargetYear)}
+                  </span>
+                  ${idx === 0 ? '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:800;">LATEST</span>' : ''}
+                </div>
+                <div style="font-size:11.5px; color:#94A3B8;">${escapeHTML(published)}</div>
+              </div>
+
+              <div style="font-size:16px; font-weight:800; color:#0F172A;">${escapeHTML(board.paperTitle)}</div>
+
+              <div style="display:flex; align-items:center; gap:12px; font-size:12px; color:#64748B;">
+                <span>Total Marks: <strong>${board.totalMarks}</strong></span>
+                <span>•</span>
+                <span>Ranked Candidates: <strong>${entries.length}</strong></span>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+                ${entries.slice(0, 10).map(e => `
+                  <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:${e.rank === 1 ? '#FEF9C3' : (e.rank === 2 ? '#F1F5F9' : (e.rank === 3 ? '#FFEDD5' : '#FAFAFA'))}; border-radius:10px; border:1px solid #E2E8F0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="font-weight:800; font-size:12px; width:22px; text-align:center; color:${e.rank === 1 ? '#CA8A04' : (e.rank === 2 ? '#64748B' : (e.rank === 3 ? '#EA580C' : '#94A3B8'))};">#${e.rank}</span>
+                      <span style="font-weight:700; font-size:13px; color:#0F172A;">${escapeHTML(e.studentName)}</span>
+                      <span style="padding:1px 6px; border-radius:6px; font-size:10px; font-weight:800; background:#E0F2FE; color:#0369A1;">${escapeHTML(e.grade || 'A')}</span>
+                    </div>
+                    <div style="font-weight:800; font-size:13px; color:#0F172A;">${e.marks} <span style="font-size:10px; color:#64748B;">/ ${board.totalMarks}</span></div>
+                  </div>
+                `).join('')}
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 
   async renderPapersScreen(container) {
@@ -1929,9 +1989,10 @@ class AppController {
       const currentYear = user.examYear || '2027 A/L';
       const activeTargetYear = currentYear;
 
-      const [sessions, upcomingList] = await Promise.all([
-        dbService.getPaperSessions(activeTargetYear),
-        dbService.getUpcomingPapers(activeTargetYear)
+      const [sessions, paperHints, paperBoards] = await Promise.all([
+        dbService.getPaperSessions(activeTargetYear).catch(() => []),
+        dbService.getPaperHints(activeTargetYear).catch(() => []),
+        dbService.getPaperLeaderboards().catch(() => [])
       ]);
       const studentId = user.uid || user.id || 's_default';
       const registrations = new Map(await Promise.all(sessions.map(async session => [
@@ -1948,8 +2009,8 @@ class AppController {
               <span class="material-symbols-rounded">assignment</span>
             </div>
             <div>
-              <div class="appbar-title">Paper Writing Sessions</div>
-              <div class="appbar-subtitle" id="papers-batch-subtitle">${currentYear} • සජීවී විභාග සහ අධීක්ෂණ සැසි</div>
+              <div class="appbar-title">Paper Examination Hub</div>
+              <div class="appbar-subtitle" id="papers-batch-subtitle">${currentYear} • සජීවී විභාග, Hints සහ ප්‍රතිඵල</div>
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
@@ -1988,21 +2049,28 @@ class AppController {
           </div>
         ` : ''}
 
-        <!-- View Switcher Tabs (1:1 with lines 156-185 of paper_sessions_screen.dart) -->
-        <div class="sub-tabs-container" style="margin: 6px 16px 14px;">
-          <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live">
-            <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
-              <span>Live Exam Sessions</span>
+        <!-- 3-Segment Switcher Tabs (Live Sessions, Paper Hints, Leaderboard) -->
+        <div class="sub-tabs-container" style="margin: 6px 16px 14px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+          <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live" style="padding:10px 4px;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">sensors</span>
+              <span style="font-size:12px;">Live Sessions</span>
             </span>
-            <span class="tab-sub" id="tab-papers-live-sub">${this._computeLiveTabSubtitle(sessions)}</span>
+            <span class="tab-sub" id="tab-papers-live-sub" style="font-size:10px;">${this._computeLiveTabSubtitle(sessions)}</span>
           </button>
-          <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-upcoming">
-            <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:16px;">lightbulb</span>
-              <span>Upcoming Papers & Hints</span>
+          <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-hints" style="padding:10px 4px;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+              <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">lightbulb</span>
+              <span style="font-size:12px;">Paper Hints</span>
             </span>
-            <span class="tab-sub">Scope, Tips & Hints</span>
+            <span class="tab-sub" style="font-size:10px;">Scope & Clues</span>
+          </button>
+          <button class="sub-tab-btn ${this.papersTab === 2 ? 'active' : ''}" id="tab-papers-leaderboard" style="padding:10px 4px;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:16px; color:#10B981;">emoji_events</span>
+              <span style="font-size:12px;">Leaderboard</span>
+            </span>
+            <span class="tab-sub" style="font-size:10px;">Rankings</span>
           </button>
         </div>
 
@@ -2011,9 +2079,14 @@ class AppController {
           ${this._buildStudentLiveSessionsHTML(sessions, registrations, user, activeTargetYear, currentYear)}
         </div>
 
-        <!-- Tab 1: Upcoming Papers & Hints View -->
-        <div id="papers-tab-upcoming-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
-          ${this._buildStudentUpcomingPapersHTML(upcomingList, activeTargetYear, currentYear)}
+        <!-- Tab 1: Paper Hints View -->
+        <div id="papers-tab-hints-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
+          ${this._buildStudentPaperHintsHTML(paperHints, activeTargetYear, currentYear)}
+        </div>
+
+        <!-- Tab 2: Paper Leaderboard View -->
+        <div id="papers-tab-leaderboard-content" style="${this.papersTab === 2 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
+          ${this._buildStudentPaperLeaderboardHTML(paperBoards, activeTargetYear)}
         </div>
       `;
 
@@ -2026,15 +2099,20 @@ class AppController {
         this.renderPapersScreen(container);
       });
 
-      document.getElementById('tab-papers-upcoming')?.addEventListener('click', () => {
+      document.getElementById('tab-papers-hints')?.addEventListener('click', () => {
         this.papersTab = 1;
+        this.renderPapersScreen(container);
+      });
+
+      document.getElementById('tab-papers-leaderboard')?.addEventListener('click', () => {
+        this.papersTab = 2;
         this.renderPapersScreen(container);
       });
 
       document.getElementById('btn-refresh-papers')?.addEventListener('click', () => this.renderPapersScreen(container));
 
       this._bindStudentLiveSessionActions(container, sessions, registrations, user);
-      this._bindStudentUpcomingActions(container, upcomingList);
+      this._bindStudentPaperHintActions(container, paperHints);
 
       // Real-time listener: immediately update in-place without reloading whole page
       this._papersUnsub = dbService.streamPaperSessions(activeTargetYear, async (liveSessions) => {
@@ -2054,12 +2132,12 @@ class AppController {
         this.startPapersTimer(container, liveSessions);
       });
 
-      this._upcomingPapersUnsub = dbService.streamUpcomingPapers(activeTargetYear, (liveUpcoming) => {
+      this._paperHintsUnsub = dbService.streamPaperHints(activeTargetYear, (liveHints) => {
         if (!container.isConnected || renderToken !== this._tabTokens['papers']) return;
-        const upcomingTab = container.querySelector('#papers-tab-upcoming-content');
-        if (!upcomingTab) return;
-        upcomingTab.innerHTML = this._buildStudentUpcomingPapersHTML(liveUpcoming, activeTargetYear, currentYear);
-        this._bindStudentUpcomingActions(container, liveUpcoming);
+        const hintsTab = container.querySelector('#papers-tab-hints-content');
+        if (!hintsTab) return;
+        hintsTab.innerHTML = this._buildStudentPaperHintsHTML(liveHints, activeTargetYear, currentYear);
+        this._bindStudentPaperHintActions(container, liveHints);
       });
     } catch (renderError) {
       console.error('[PapersScreen] Critical render error caught:', renderError);
@@ -5481,20 +5559,20 @@ class AppController {
 
   // 2. Admin Papers Screen (admin_paper_sessions_screen.dart)
   async renderAdminPapersScreen(container) {
-    this.adminPaperTab = this.adminPaperTab ?? 0; // 0: Live Sessions, 1: Upcoming Papers, 2: Leaderboard
+    this.adminPaperTab = this.adminPaperTab ?? 0; // 0: Live Sessions, 1: Paper Hints, 2: Leaderboard
     this.adminSelectedPaperBatch = this.adminSelectedPaperBatch || 'All Batches';
     if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
     if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
-    if (this._adminUpcomingUnsub) { try { this._adminUpcomingUnsub(); } catch (_) {} this._adminUpcomingUnsub = null; }
+    if (this._adminHintsUnsub) { try { this._adminHintsUnsub(); } catch (_) {} this._adminHintsUnsub = null; }
     const papers = await dbService.getPaperSessions();
-    let adminUpcomingPapers = [];
-    let adminUpcomingPapersError = false;
+    let adminPaperHints = [];
+    let adminPaperHintsError = false;
     if (this.adminPaperTab === 1) {
       try {
-        adminUpcomingPapers = await dbService.getUpcomingPapers('All Batches');
+        adminPaperHints = await dbService.getPaperHints(this.adminSelectedPaperBatch);
       } catch (error) {
-        console.warn('[Admin papers] Upcoming papers could not be loaded:', error?.code || 'unknown');
-        adminUpcomingPapersError = true;
+        console.warn('[Admin papers] Paper hints could not be loaded:', error?.code || 'unknown');
+        adminPaperHintsError = true;
       }
     }
     let adminPaperBoards = [];
@@ -5514,7 +5592,7 @@ class AppController {
 
     const subtitle = this.adminPaperTab === 0
       ? 'සජීවී විභාග සැසි සහ කැමරා අධීක්ෂණය'
-      : (this.adminPaperTab === 1 ? 'ඉදිරි විභාග සහ Hints කළමනාකරණය' : 'Paper ප්‍රතිඵල සහ Leaderboard නිර්මාණය');
+      : (this.adminPaperTab === 1 ? 'Paper Hints සහ විභාග උපදෙස් කළමනාකරණය' : 'Paper ප්‍රතිඵල සහ Leaderboard නිර්මාණය');
 
     container.innerHTML = `
       <!-- Screen AppBar -->
@@ -5545,7 +5623,7 @@ class AppController {
             <span class="material-symbols-rounded filled" style="font-size:16px; margin-right:4px;">sensors</span> Live Sessions
           </button>
           <button class="apk-segmented-tab-btn ${this.adminPaperTab === 1 ? 'active' : ''}" data-paper-tab="1" style="${this.adminPaperTab === 1 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
-            <span class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">lightbulb</span> Upcoming Papers
+            <span class="material-symbols-rounded filled" style="font-size:16px; margin-right:4px;">lightbulb</span> Paper Hints
           </button>
           <button class="apk-segmented-tab-btn ${this.adminPaperTab === 2 ? 'active' : ''}" data-paper-tab="2" style="${this.adminPaperTab === 2 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
             <span class="material-symbols-rounded" style="font-size:16px; margin-right:4px;">emoji_events</span> Leaderboard
@@ -5556,7 +5634,7 @@ class AppController {
       <!-- Tab Viewport -->
       <div id="admin-papers-content" class="apk-admin-paper-tab-content" style="padding:0 16px 90px;">
         ${this.adminPaperTab === 0 ? this._buildAdminLiveSessionsHTML(papers) : ''}
-        ${this.adminPaperTab === 1 ? this._buildAdminUpcomingPapersHTML(adminUpcomingPapers, adminUpcomingPapersError) : ''}
+        ${this.adminPaperTab === 1 ? this._buildAdminPaperHintsHTML(adminPaperHints, adminPaperHintsError, this.adminSelectedPaperBatch) : ''}
         ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML(adminPaperBoards, adminPaperBoardsError, this.adminSelectedPaperBatch) : ''}
       </div>
     `;
@@ -5582,9 +5660,6 @@ class AppController {
     document.getElementById('btn-admin-paper-results-retry')?.addEventListener('click', () => {
       this.renderAdminPapersScreen(container);
     });
-    document.getElementById('btn-admin-upcoming-retry')?.addEventListener('click', () => {
-      this.renderAdminPapersScreen(container);
-    });
     container.querySelectorAll('[data-admin-paper-board]').forEach((button) => {
       button.addEventListener('click', () => {
         const boardId = button.dataset.adminPaperBoard;
@@ -5607,6 +5682,8 @@ class AppController {
         e.stopPropagation();
         if (Number(this.adminPaperTab) === 2) {
           this.openAdminCreateLeaderboardModal();
+        } else if (Number(this.adminPaperTab) === 1) {
+          this.openAdminCreatePaperHintModal();
         } else {
           this.openAdminCreatePaperModal();
         }
@@ -5625,6 +5702,9 @@ class AppController {
 
     // Interactive paper action handlers matching Flutter 1:1
     this._bindAdminLiveSessionActions(container, papers);
+    if (this.adminPaperTab === 1) {
+      this._bindAdminPaperHintActions(container, adminPaperHints);
+    }
     if (this.adminPaperTab === 2) {
       this._bindAdminLeaderboardActions(container, adminPaperBoards);
     }
@@ -5641,11 +5721,12 @@ class AppController {
     });
 
     if (this.adminPaperTab === 1) {
-      this._adminUpcomingUnsub = dbService.streamUpcomingPapers('All Batches', (liveUpcoming) => {
+      this._adminHintsUnsub = dbService.streamPaperHints(this.adminSelectedPaperBatch, (liveHints) => {
         if (!container.isConnected || this.adminPaperTab !== 1) return;
         const tabContent = container.querySelector('.apk-admin-paper-tab-content');
         if (tabContent) {
-          tabContent.innerHTML = this._buildAdminUpcomingPapersHTML(liveUpcoming, false);
+          tabContent.innerHTML = this._buildAdminPaperHintsHTML(liveHints, false, this.adminSelectedPaperBatch);
+          this._bindAdminPaperHintActions(container, liveHints);
         }
       });
     }
@@ -5689,7 +5770,7 @@ class AppController {
       fabSlot.innerHTML = `
         <button class="apk-fab-button" id="btn-fab-admin-paper" data-tab="1" style="display:inline-flex; align-items:center; gap:6px;">
           <span class="material-symbols-rounded" style="font-size:20px;">add</span>
-          <span>Add Upcoming Paper</span>
+          <span>Add Paper Hint</span>
         </button>
       `;
       const btn = fabSlot.querySelector('#btn-fab-admin-paper');
@@ -5697,7 +5778,7 @@ class AppController {
         btn.onclick = (e) => {
           e.preventDefault();
           e.stopPropagation();
-          this.openAdminCreatePaperModal();
+          this.openAdminCreatePaperHintModal();
         };
       }
     } else {
@@ -6400,24 +6481,337 @@ class AppController {
     this.renderAdminPapersScreen(container);
   }
 
-  _buildAdminUpcomingPapersHTML(papers, loadError = false) {
-    if (loadError) return `<div class="leaderboard-state" role="status"><span class="material-symbols-rounded">cloud_off</span><strong>Upcoming papers unavailable</strong><span>Check the connection and try again.</span><button class="leaderboard-retry-btn" id="btn-admin-upcoming-retry" type="button">Retry</button></div>`;
-    if (!papers.length) return `<div class="leaderboard-state" role="status"><span class="material-symbols-rounded">event_busy</span><strong>No upcoming papers published</strong><span>When an administrator publishes a paper, it will appear here.</span></div>`;
+  _buildAdminPaperHintsHTML(hints, loadError = false, selectedBatch = 'All Batches') {
     const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-    const formatDate = (value) => new Date(value).toLocaleString(undefined, { year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    return `<div class="admin-upcoming-papers-list">
-      ${papers.map((paper) => `
-        <article class="hero-card admin-upcoming-paper-card">
-          <div class="admin-upcoming-paper-tags"><span>${escapeHTML(paper.subject)} · ${escapeHTML(paper.examYear)}</span><span>${escapeHTML(paper.status)}</span></div>
-          <h3>${escapeHTML(paper.title)}</h3>
-          <div class="admin-upcoming-paper-meta"><span class="material-symbols-rounded">calendar_today</span>${escapeHTML(formatDate(paper.scheduledDate))}<span>·</span><span>${Number(paper.durationMinutes) || 180} mins</span></div>
-          ${paper.paperStructure ? `<p>${escapeHTML(paper.paperStructure)}</p>` : ''}
-          ${paper.syllabusTopics?.length ? `<div class="admin-upcoming-topics">${paper.syllabusTopics.map((topic) => `<span>${escapeHTML(topic)}</span>`).join('')}</div>` : ''}
-          ${paper.hints ? `<div class="admin-paper-hints"><strong><span class="material-symbols-rounded">lightbulb</span> Special Paper Hints &amp; Guidance</strong><p>${escapeHTML(paper.hints)}</p></div>` : ''}
-          ${paper.instructions ? `<p class="admin-upcoming-instructions">${escapeHTML(paper.instructions)}</p>` : ''}
-        </article>
-      `).join('')}
-    </div>`;
+    const formatDate = (value) => {
+      try {
+        const d = new Date(value);
+        return isNaN(d.getTime()) ? 'Recently' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch (_) { return 'Recently'; }
+    };
+
+    if (loadError) {
+      return `
+        <div class="leaderboard-state" role="status">
+          <span class="material-symbols-rounded">cloud_off</span>
+          <strong>Paper Hints unavailable</strong>
+          <span>Check your connection and try again.</span>
+          <button class="leaderboard-retry-btn" id="btn-admin-hints-retry" type="button">Retry</button>
+        </div>
+      `;
+    }
+
+    const batches = ['All Batches', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
+
+    return `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Top Batch Filter -->
+        <div style="display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; border:1px solid #E2E8F0; padding:8px 12px; border-radius:12px; box-shadow:0 2px 6px rgba(15,23,42,0.03);">
+          <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#475569;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">filter_list</span>
+            <span>Batch Filter:</span>
+          </div>
+          <select id="select-admin-paper-hints-batch" style="border:1px solid #CBD5E1; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:700; color:#0F172A; background:#F8FAFC; outline:none; cursor:pointer;">
+            ${batches.map(b => `<option value="${escapeHTML(b)}" ${b === selectedBatch ? 'selected' : ''}>${escapeHTML(b)}</option>`).join('')}
+          </select>
+        </div>
+
+        ${!hints || hints.length === 0 ? `
+          <div class="leaderboard-state" role="status" style="padding:48px 24px; text-align:center; background:#FFFFFF; border-radius:18px; border:1px solid #E2E8F0;">
+            <div style="display:flex; justify-content:center; margin-bottom:12px;">
+              <div style="width:64px; height:64px; border-radius:50%; background:#FEF3C7; display:flex; align-items:center; justify-content:center;">
+                <span class="material-symbols-rounded filled" style="font-size:32px; color:#D97706;">lightbulb</span>
+              </div>
+            </div>
+            <strong style="font-size:16px; color:#0F172A; display:block; margin-bottom:6px;">තවම Paper Hints පළ කර නොමැත</strong>
+            <span style="font-size:13px; color:#64748B; display:block; max-width:320px; margin:0 auto 16px auto; line-height:1.5;">${escapeHTML(selectedBatch)} සඳහා සිසුන්ට විභාගයට පෙර අවශ්‍ය විශේෂ Hints, Formulas සහ උපදෙස් පළ කරන්න.</span>
+            <button class="apk-btn-primary" id="btn-empty-create-hint" type="button" style="padding:10px 20px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; margin:0 auto;">
+              <span class="material-symbols-rounded" style="font-size:18px;">add</span>
+              <span>Create First Paper Hint</span>
+            </button>
+          </div>
+        ` : `
+          <div class="admin-paper-hints-list" style="display:flex; flex-direction:column; gap:14px;">
+            ${hints.map(hint => `
+              <article class="hero-card admin-paper-hint-card" style="padding:18px; border-radius:18px; border:1px solid #E2E8F0; background:#FFFFFF; box-shadow:0 4px 14px rgba(15,23,42,0.04); display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="background:rgba(245,158,11,0.12); color:#D97706; border:1px solid rgba(245,158,11,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                      <span class="material-symbols-rounded filled" style="font-size:13px;">lightbulb</span>
+                      <span>${escapeHTML(hint.subject || 'A/L Physics')}</span>
+                    </span>
+                    <span style="background:#F1F5F9; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
+                      ${escapeHTML(hint.examYear || 'All Batches')}
+                    </span>
+                    ${hint.paperName ? `<span style="background:#EFF6FF; color:#1D4ED8; padding:3px 8px; border-radius:8px; font-size:10.5px; font-weight:700;">${escapeHTML(hint.paperName)}</span>` : ''}
+                  </div>
+                  <div style="font-size:11.5px; color:#94A3B8; display:flex; align-items:center; gap:4px;">
+                    <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+                    <span>${escapeHTML(formatDate(hint.publishedAt))}</span>
+                  </div>
+                </div>
+
+                <h3 style="font-size:16px; font-weight:800; color:#0F172A; margin:0;">${escapeHTML(hint.title)}</h3>
+
+                <!-- Highlighted Hints Box -->
+                <div style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border:1.5px solid #FDE68A; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(245,158,11,0.06);">
+                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309; margin-bottom:8px;">
+                    <span class="material-symbols-rounded filled" style="font-size:16px; color:#D97706;">tips_and_updates</span>
+                    <span>Special Paper Hints & Guidance (විශේෂ උපදෙස්)</span>
+                  </div>
+                  <div style="font-size:13px; color:#78350F; line-height:1.6; white-space:pre-wrap;">${escapeHTML(hint.hints)}</div>
+                </div>
+
+                <!-- Formulas Box if available -->
+                ${hint.formulas ? `
+                  <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+                    <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">
+                      <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">functions</span>
+                      <span>Key Formulas & Equations (මූලික සමීකරණ)</span>
+                    </div>
+                    <div style="font-size:12.5px; font-family:monospace; color:#1E293B; background:#FFFFFF; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; white-space:pre-wrap;">${escapeHTML(hint.formulas)}</div>
+                  </div>
+                ` : ''}
+
+                <!-- Scope chips if available -->
+                ${hint.scope && hint.scope.length ? `
+                  <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+                    <span style="font-size:11px; font-weight:700; color:#64748B;">Target Concepts:</span>
+                    ${hint.scope.map(t => `<span style="background:#F1F5F9; color:#334155; padding:2px 8px; border-radius:6px; font-size:10.5px; font-weight:600;">${escapeHTML(t)}</span>`).join('')}
+                  </div>
+                ` : ''}
+
+                <!-- Card Footer Actions -->
+                <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:8px; border-top:1px solid #F1F5F9;">
+                  <button class="apk-icon-action-btn" type="button" data-broadcast-hint="${escapeHTML(hint.id)}" data-hint-title="${escapeHTML(hint.title)}" data-hint-batch="${escapeHTML(hint.examYear)}" title="Broadcast Push Alert to Students" style="color:#D97706; background:#FEF3C7; border:1px solid #FDE68A; width:auto; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:15px;">notifications_active</span>
+                    <span>Send Push Alert</span>
+                  </button>
+                  <button class="apk-icon-action-btn" type="button" data-edit-hint="${escapeHTML(hint.id)}" title="Edit Hint" style="color:#2563EB; background:#EFF6FF; border:1px solid #DBEAFE; width:auto; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:15px;">edit</span>
+                    <span>Edit</span>
+                  </button>
+                  <button class="apk-icon-action-btn" type="button" data-delete-hint="${escapeHTML(hint.id)}" title="Delete Hint" style="color:#DC2626; background:#FEF2F2; border:1px solid #FECACA; width:34px; height:34px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:17px;">delete</span>
+                  </button>
+                </div>
+              </article>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  _bindAdminPaperHintActions(container, hints) {
+    if (!container) return;
+
+    // Batch filter dropdown
+    document.getElementById('select-admin-paper-hints-batch')?.addEventListener('change', (e) => {
+      this.adminSelectedPaperBatch = e.target.value;
+      this.renderAdminPapersScreen(container);
+    });
+
+    // Retry button
+    document.getElementById('btn-admin-hints-retry')?.addEventListener('click', () => {
+      this.renderAdminPapersScreen(container);
+    });
+
+    // Empty state create button
+    document.getElementById('btn-empty-create-hint')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.openAdminCreatePaperHintModal();
+    });
+
+    // Edit hint
+    container.querySelectorAll('[data-edit-hint]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const hintId = btn.dataset.editHint;
+        const hint = (hints || []).find(h => h.id === hintId);
+        if (hint) this.openAdminCreatePaperHintModal(hint);
+      });
+    });
+
+    // Delete hint
+    container.querySelectorAll('[data-delete-hint]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const hintId = btn.dataset.deleteHint;
+        if (!hintId) return;
+        if (!confirm('මෙම Paper Hint එක මකා දැමීමට අවශ්‍ය බව තහවුරු කරන්න (Are you sure you want to delete this hint)?')) return;
+        try {
+          await dbService.deletePaperHint(hintId);
+          notificationService.showInAppBanner('Hint Deleted', 'Paper Hint එක සාර්ථකව මකා දමන ලදී.', 'info');
+          this.renderAdminPapersScreen(container);
+        } catch (err) {
+          alert('Failed to delete hint: ' + (err.message || err));
+        }
+      });
+    });
+
+    // Broadcast push alert
+    container.querySelectorAll('[data-broadcast-hint]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const title = btn.dataset.hintTitle || 'Paper Hints';
+        const batch = btn.dataset.hintBatch || 'All Batches';
+        notificationService.notifyPaperHintPublished(title, batch);
+        notificationService.showInAppBanner('Alert Broadcasted! 🔔', `"${title}" hints alert sent to ${batch} students.`, 'success');
+      });
+    });
+  }
+
+  openAdminCreatePaperHintModal(existingHint = null) {
+    const isEdit = !!existingHint;
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+
+    const batches = ['2027 A/L', '2026 A/L', '2025 A/L', '2028 A/L', '2029 A/L', 'All Batches'];
+    const currentBatch = existingHint?.examYear || this.adminSelectedPaperBatch || '2027 A/L';
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:90vh; overflow-y:auto;">
+        <div class="modal-header">
+          <div style="font-size:16px; font-weight:800; color:#0F172A;">
+            ${isEdit ? 'Edit Paper Hint & Tips' : 'Add Paper Hint & Guidance'}
+          </div>
+          <button class="modal-close-btn" id="btn-close-hint-modal">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+          <div>
+            <div class="form-label">Hint Title (මාතෘකාව):</div>
+            <input type="text" id="hint-input-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 - Mechanics Hints & Clues" value="${existingHint?.title ? existingHint.title.replace(/"/g, '&quot;') : ''}" />
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <div class="form-label">Subject:</div>
+              <select id="hint-input-subject" class="form-textarea" style="height:40px; padding:8px;">
+                <option value="Physics" selected>Physics</option>
+              </select>
+            </div>
+            <div>
+              <div class="form-label">Target Batch (කණ්ඩායම):</div>
+              <select id="hint-input-batch" class="form-textarea" style="height:40px; padding:8px;">
+                ${batches.map(b => `<option value="${b}" ${b === currentBatch ? 'selected' : ''}>${b}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div class="form-label">Associated Paper Session (අදාළ විභාගය - Optional):</div>
+            <input type="text" id="hint-input-paper-name" class="form-textarea" style="height:40px;" placeholder="e.g. Paper 01 (Mechanics)" value="${existingHint?.paperName ? existingHint.paperName.replace(/"/g, '&quot;') : ''}" />
+          </div>
+
+          <div>
+            <div class="form-label" style="display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:15px; color:#D97706;">lightbulb</span>
+              <span>Special Hints & Guidance (විශේෂ උපදෙස්):</span>
+            </div>
+            <textarea id="hint-input-content" class="form-textarea" style="min-height:110px; resize:vertical; line-height:1.5;" placeholder="Share tricky questions advice, step-by-step pointers, time management guidance for the paper...">${existingHint?.hints || ''}</textarea>
+          </div>
+
+          <div>
+            <div class="form-label" style="display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">functions</span>
+              <span>Key Formulas & Equations (මූලික සමීකරණ - Optional):</span>
+            </div>
+            <textarea id="hint-input-formulas" class="form-textarea" style="min-height:70px; resize:vertical; font-family:monospace;" placeholder="e.g. v = u + at, s = ut + 1/2at^2, v^2 = u^2 + 2as">${existingHint?.formulas || ''}</textarea>
+          </div>
+
+          <div>
+            <div class="form-label">Target Concepts / Scope (පරීක්ෂා කරන විෂය කොටස් - Comma separated):</div>
+            <input type="text" id="hint-input-scope" class="form-textarea" style="height:40px;" placeholder="e.g. Linear Motion, Vectors, Relative Velocity" value="${Array.isArray(existingHint?.scope) ? existingHint.scope.join(', ') : (existingHint?.scope || '')}" />
+          </div>
+
+          <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1E293B; cursor:pointer; background:#EFF6FF; padding:10px 12px; border-radius:10px; border:1px solid #DBEAFE;">
+            <input type="checkbox" id="hint-input-notify" checked style="width:16px; height:16px; accent-color:#2563EB;" />
+            <span>Send Push Alert to Students immediately 🔔</span>
+          </label>
+
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button class="apk-btn-primary" id="btn-cancel-hint" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+              Cancel
+            </button>
+            <button class="apk-btn-primary" id="btn-save-hint" style="flex:2;">
+              ${isEdit ? 'Update Paper Hint' : 'Publish Paper Hint'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.getElementById('btn-close-hint-modal')?.addEventListener('click', () => modal.remove());
+    document.getElementById('btn-cancel-hint')?.addEventListener('click', () => modal.remove());
+
+    const saveBtn = document.getElementById('btn-save-hint');
+    saveBtn?.addEventListener('click', async () => {
+      const title = document.getElementById('hint-input-title')?.value.trim();
+      const subject = document.getElementById('hint-input-subject')?.value || 'Physics';
+      const examYear = document.getElementById('hint-input-batch')?.value || 'All Batches';
+      const paperName = document.getElementById('hint-input-paper-name')?.value.trim();
+      const hints = document.getElementById('hint-input-content')?.value.trim();
+      const formulas = document.getElementById('hint-input-formulas')?.value.trim();
+      const scopeRaw = document.getElementById('hint-input-scope')?.value.trim();
+      const scope = scopeRaw ? scopeRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const notify = document.getElementById('hint-input-notify')?.checked;
+
+      if (!title) {
+        alert('කරුණාකර මාතෘකාවක් (Hint Title) ඇතුළත් කරන්න.');
+        return;
+      }
+      if (!hints) {
+        alert('කරුණාකර Hints සහ උපදෙස් (Hints & Guidance) ඇතුළත් කරන්න.');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      try {
+        const payload = {
+          title,
+          subject,
+          examYear,
+          paperName,
+          hints,
+          formulas,
+          scope
+        };
+
+        if (isEdit) {
+          await dbService.updatePaperHint(existingHint.id, payload);
+          notificationService.showInAppBanner('Hint Updated! ✅', `"${title}" has been updated.`, 'success');
+        } else {
+          await dbService.createPaperHint(payload);
+          notificationService.showInAppBanner('Hint Published! 💡', `"${title}" has been published.`, 'success');
+        }
+
+        if (notify) {
+          notificationService.notifyPaperHintPublished(title, examYear);
+        }
+
+        modal.remove();
+        const mainVp = document.getElementById('main-viewport') || document.querySelector('.main-viewport');
+        if (mainVp) {
+          this.adminPaperTab = 1;
+          this.renderAdminPapersScreen(mainVp);
+        }
+      } catch (err) {
+        console.error('Error saving hint:', err);
+        alert('Failed to save paper hint: ' + (err.message || err));
+        saveBtn.disabled = false;
+        saveBtn.textContent = isEdit ? 'Update Paper Hint' : 'Publish Paper Hint';
+      }
+    });
   }
 
   _buildAdminPaperLeaderboardHTML(boards, loadError, selectedBatch) {

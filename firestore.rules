@@ -71,6 +71,10 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if isAdmin();
     }
+    match /paper_hints/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
     match /paper_leaderboards/{id} {
       allow read: if signedIn();
       allow write: if isAdmin();
