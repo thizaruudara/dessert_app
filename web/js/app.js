@@ -1798,10 +1798,10 @@ class AppController {
       return `
         <div style="padding:44px 20px; text-align:center; color:#64748B; background:#FFFFFF; border-radius:18px; border:1px solid #E2E8F0; margin:6px 0;">
           <div style="margin-bottom:12px; display:flex; justify-content:center;">
-            <span class="material-symbols-rounded filled" style="font-size:46px; color:#F59E0B;">lightbulb</span>
+            <span class="material-symbols-rounded filled" style="font-size:46px; color:#10B981;">checklist</span>
           </div>
-          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">තවම Paper Hints පළ කර නොමැත</div>
-          <div style="font-size:13px; line-height:1.5; color:#64748B;">විභාගය ආරම්භ වීමට පෙර ඔබේ කණ්ඩායම (${escapeHTML(currentYear)}) සඳහා විශේෂ Hints, Formulas සහ උපදෙස් මෙහි දිස්වනු ඇත.</div>
+          <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">තවම Paper Scope පළ කර නොමැත</div>
+          <div style="font-size:13px; line-height:1.5; color:#64748B;">විභාගය ආරම්භ වීමට පෙර ඔබේ කණ්ඩායම (${escapeHTML(currentYear)}) සඳහා පරීක්ෂා කරන විෂය කොටස් (Target Concepts / Scope) මෙහි දිස්වනු ඇත.</div>
         </div>
       `;
     }
@@ -1813,8 +1813,8 @@ class AppController {
             <!-- Header Banner -->
             <div class="upcoming-paper-header-banner" style="background:linear-gradient(135deg, #EFF6FF, #DBEAFE); padding:12px 16px;">
               <div style="display:flex; align-items:center; gap:8px;">
-                <span style="background:rgba(245,158,11,0.15); color:#D97706; border:1px solid rgba(245,158,11,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                  <span class="material-symbols-rounded filled" style="font-size:13px;">lightbulb</span>
+                <span style="background:rgba(16,185,129,0.15); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded filled" style="font-size:13px;">checklist</span>
                   <span>${escapeHTML(hint.subject || 'A/L Physics')}</span>
                 </span>
                 <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
@@ -1832,47 +1832,24 @@ class AppController {
             <div style="padding:16px; display:flex; flex-direction:column; gap:12px; background:#FFFFFF;">
               <div class="paper-title" style="font-size:17px; font-weight:800; color:#0F172A;">${escapeHTML(hint.title)}</div>
 
-              <!-- Special Hints Box -->
-              <div class="upcoming-hints-highlight-box" style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border:1.5px solid #FDE68A; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(245,158,11,0.06);">
-                <div class="upcoming-hints-title" style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309; margin-bottom:8px;">
-                  <span class="material-symbols-rounded filled" style="font-size:17px; color:#D97706;">tips_and_updates</span>
-                  <span>Exclusive Paper Hints & Guidance (විශේෂ උපදෙස්)</span>
+              <!-- Target Concepts / Scope Only -->
+              <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px;">
+                <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#0F172A; margin-bottom:10px;">
+                  <span class="material-symbols-rounded filled" style="font-size:18px; color:#10B981;">checklist</span>
+                  <span>Target Concepts / Scope (පරීක්ෂා කරන විෂය කොටස්):</span>
                 </div>
-                <div class="upcoming-hints-text" style="font-size:13px; color:#78350F; line-height:1.65; white-space:pre-wrap;">${escapeHTML(hint.hints)}</div>
-              </div>
-
-              <!-- Formulas Box -->
-              ${hint.formulas ? `
-                <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
-                  <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">
-                    <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">functions</span>
-                    <span>Key Formulas & Equations (මූලික සමීකරණ)</span>
-                  </div>
-                  <div style="font-size:12.5px; font-family:monospace; color:#1E293B; background:#FFFFFF; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; white-space:pre-wrap;">${escapeHTML(hint.formulas)}</div>
-                </div>
-              ` : ''}
-
-              <!-- Scope Chips -->
-              ${hint.scope && hint.scope.length > 0 ? `
-                <div>
-                  <div style="font-size:11px; font-weight:700; color:#64748B; margin-bottom:4px;">Target Tested Concepts:</div>
-                  <div class="upcoming-topics-wrap" style="display:flex; flex-wrap:wrap; gap:6px;">
+                ${hint.scope && hint.scope.length > 0 ? `
+                  <div class="upcoming-topics-wrap" style="display:flex; flex-wrap:wrap; gap:8px;">
                     ${hint.scope.map(topic => `
-                      <div class="upcoming-topic-chip" style="background:#F0FDF4; border:1px solid #BBF7D0; color:#15803D; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
-                        <span class="material-symbols-rounded filled" style="font-size:13px; color:#16A34A;">check_circle</span>
+                      <div class="upcoming-topic-chip" style="background:#F0FDF4; border:1px solid #BBF7D0; color:#15803D; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+                        <span class="material-symbols-rounded filled" style="font-size:14px; color:#16A34A;">check_circle</span>
                         <span>${escapeHTML(topic)}</span>
                       </div>
                     `).join('')}
                   </div>
-                </div>
-              ` : ''}
-
-              <!-- Quick action: Copy hint button -->
-              <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:4px;">
-                <button class="btn-copy-paper-hint" data-copy-hint="${escapeHTML(hint.hints)}" style="background:#F1F5F9; border:1px solid #CBD5E1; color:#334155; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-                  <span class="material-symbols-rounded" style="font-size:16px;">content_copy</span>
-                  <span>Copy Guidance</span>
-                </button>
+                ` : `
+                  <div style="font-size:12.5px; color:#94A3B8; font-style:italic;">විෂය කොටස් සඳහන් කර නොමැත (No concepts specified)</div>
+                `}
               </div>
             </div>
           </div>
@@ -6515,11 +6492,11 @@ class AppController {
                 <span class="material-symbols-rounded filled" style="font-size:32px; color:#D97706;">lightbulb</span>
               </div>
             </div>
-            <strong style="font-size:16px; color:#0F172A; display:block; margin-bottom:6px;">තවම Paper Hints පළ කර නොමැත</strong>
-            <span style="font-size:13px; color:#64748B; display:block; max-width:320px; margin:0 auto 16px auto; line-height:1.5;">${escapeHTML(selectedBatch)} සඳහා සිසුන්ට විභාගයට පෙර අවශ්‍ය විශේෂ Hints, Formulas සහ උපදෙස් පළ කරන්න.</span>
+            <strong style="font-size:16px; color:#0F172A; display:block; margin-bottom:6px;">තවම Paper Scope පළ කර නොමැත</strong>
+            <span style="font-size:13px; color:#64748B; display:block; max-width:320px; margin:0 auto 16px auto; line-height:1.5;">${escapeHTML(selectedBatch)} සඳහා සිසුන්ට විභාගයට පෙර පරීක්ෂා කරන විෂය කොටස් (Target Concepts / Scope) පළ කරන්න.</span>
             <button class="apk-btn-primary" id="btn-empty-create-hint" type="button" style="padding:10px 20px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; margin:0 auto;">
               <span class="material-symbols-rounded" style="font-size:18px;">add</span>
-              <span>Create First Paper Hint</span>
+              <span>Create Paper Scope</span>
             </button>
           </div>
         ` : `
@@ -6528,8 +6505,8 @@ class AppController {
               <article class="hero-card admin-paper-hint-card" style="padding:18px; border-radius:18px; border:1px solid #E2E8F0; background:#FFFFFF; box-shadow:0 4px 14px rgba(15,23,42,0.04); display:flex; flex-direction:column; gap:12px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                   <div style="display:flex; align-items:center; gap:6px;">
-                    <span style="background:rgba(245,158,11,0.12); color:#D97706; border:1px solid rgba(245,158,11,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                      <span class="material-symbols-rounded filled" style="font-size:13px;">lightbulb</span>
+                    <span style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                      <span class="material-symbols-rounded filled" style="font-size:13px;">checklist</span>
                       <span>${escapeHTML(hint.subject || 'A/L Physics')}</span>
                     </span>
                     <span style="background:#F1F5F9; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
@@ -6545,33 +6522,20 @@ class AppController {
 
                 <h3 style="font-size:16px; font-weight:800; color:#0F172A; margin:0;">${escapeHTML(hint.title)}</h3>
 
-                <!-- Highlighted Hints Box -->
-                <div style="background:linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border:1.5px solid #FDE68A; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(245,158,11,0.06);">
-                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#B45309; margin-bottom:8px;">
-                    <span class="material-symbols-rounded filled" style="font-size:16px; color:#D97706;">tips_and_updates</span>
-                    <span>Special Paper Hints & Guidance (විශේෂ උපදෙස්)</span>
+                <!-- Target Concepts / Scope -->
+                <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px;">
+                  <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#0F172A; margin-bottom:10px;">
+                    <span class="material-symbols-rounded filled" style="font-size:18px; color:#10B981;">checklist</span>
+                    <span>Target Concepts / Scope (පරීක්ෂා කරන විෂය කොටස්)</span>
                   </div>
-                  <div style="font-size:13px; color:#78350F; line-height:1.6; white-space:pre-wrap;">${escapeHTML(hint.hints)}</div>
-                </div>
-
-                <!-- Formulas Box if available -->
-                ${hint.formulas ? `
-                  <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
-                    <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">
-                      <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">functions</span>
-                      <span>Key Formulas & Equations (මූලික සමීකරණ)</span>
+                  ${hint.scope && hint.scope.length ? `
+                    <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+                      ${hint.scope.map(t => `<span style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded filled" style="font-size:14px; color:#16A34A;">check_circle</span><span>${escapeHTML(t)}</span></span>`).join('')}
                     </div>
-                    <div style="font-size:12.5px; font-family:monospace; color:#1E293B; background:#FFFFFF; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; white-space:pre-wrap;">${escapeHTML(hint.formulas)}</div>
-                  </div>
-                ` : ''}
-
-                <!-- Scope chips if available -->
-                ${hint.scope && hint.scope.length ? `
-                  <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
-                    <span style="font-size:11px; font-weight:700; color:#64748B;">Target Concepts:</span>
-                    ${hint.scope.map(t => `<span style="background:#F1F5F9; color:#334155; padding:2px 8px; border-radius:6px; font-size:10.5px; font-weight:600;">${escapeHTML(t)}</span>`).join('')}
-                  </div>
-                ` : ''}
+                  ` : `
+                    <div style="font-size:12.5px; color:#94A3B8; font-style:italic;">විෂය කොටස් සඳහන් කර නොමැත (No concepts specified)</div>
+                  `}
+                </div>
 
                 <!-- Card Footer Actions -->
                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:8px; border-top:1px solid #F1F5F9;">
@@ -6668,7 +6632,7 @@ class AppController {
       <div class="modal-sheet" style="max-height:90vh; overflow-y:auto;">
         <div class="modal-header">
           <div style="font-size:16px; font-weight:800; color:#0F172A;">
-            ${isEdit ? 'Edit Paper Hint & Tips' : 'Add Paper Hint & Guidance'}
+            ${isEdit ? 'Edit Paper Scope & Concepts' : 'Add Paper Scope & Concepts'}
           </div>
           <button class="modal-close-btn" id="btn-close-hint-modal">
             <span class="material-symbols-rounded">close</span>
@@ -6677,8 +6641,8 @@ class AppController {
 
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
           <div>
-            <div class="form-label">Hint Title (මාතෘකාව):</div>
-            <input type="text" id="hint-input-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 - Mechanics Hints & Clues" value="${existingHint?.title ? existingHint.title.replace(/"/g, '&quot;') : ''}" />
+            <div class="form-label">Scope / Hint Title (මාතෘකාව):</div>
+            <input type="text" id="hint-input-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 - Scope" value="${existingHint?.title ? existingHint.title.replace(/"/g, '&quot;') : ''}" />
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -6702,24 +6666,8 @@ class AppController {
           </div>
 
           <div>
-            <div class="form-label" style="display:flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:15px; color:#D97706;">lightbulb</span>
-              <span>Special Hints & Guidance (විශේෂ උපදෙස්):</span>
-            </div>
-            <textarea id="hint-input-content" class="form-textarea" style="min-height:110px; resize:vertical; line-height:1.5;" placeholder="Share tricky questions advice, step-by-step pointers, time management guidance for the paper...">${existingHint?.hints || ''}</textarea>
-          </div>
-
-          <div>
-            <div class="form-label" style="display:flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:15px; color:#2563EB;">functions</span>
-              <span>Key Formulas & Equations (මූලික සමීකරණ - Optional):</span>
-            </div>
-            <textarea id="hint-input-formulas" class="form-textarea" style="min-height:70px; resize:vertical; font-family:monospace;" placeholder="e.g. v = u + at, s = ut + 1/2at^2, v^2 = u^2 + 2as">${existingHint?.formulas || ''}</textarea>
-          </div>
-
-          <div>
             <div class="form-label">Target Concepts / Scope (පරීක්ෂා කරන විෂය කොටස් - Comma separated):</div>
-            <input type="text" id="hint-input-scope" class="form-textarea" style="height:40px;" placeholder="e.g. Linear Motion, Vectors, Relative Velocity" value="${Array.isArray(existingHint?.scope) ? existingHint.scope.join(', ') : (existingHint?.scope || '')}" />
+            <input type="text" id="hint-input-scope" class="form-textarea" style="height:42px;" placeholder="e.g. Linear Motion, Vectors, Relative Velocity" value="${Array.isArray(existingHint?.scope) ? existingHint.scope.join(', ') : (existingHint?.scope || '')}" />
           </div>
 
           <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1E293B; cursor:pointer; background:#EFF6FF; padding:10px 12px; border-radius:10px; border:1px solid #DBEAFE;">
@@ -6732,7 +6680,7 @@ class AppController {
               Cancel
             </button>
             <button class="apk-btn-primary" id="btn-save-hint" style="flex:2;">
-              ${isEdit ? 'Update Paper Hint' : 'Publish Paper Hint'}
+              ${isEdit ? 'Update Paper Scope' : 'Publish Paper Scope'}
             </button>
           </div>
         </div>
@@ -6750,18 +6698,12 @@ class AppController {
       const subject = document.getElementById('hint-input-subject')?.value || 'Physics';
       const examYear = document.getElementById('hint-input-batch')?.value || 'All Batches';
       const paperName = document.getElementById('hint-input-paper-name')?.value.trim();
-      const hints = document.getElementById('hint-input-content')?.value.trim();
-      const formulas = document.getElementById('hint-input-formulas')?.value.trim();
       const scopeRaw = document.getElementById('hint-input-scope')?.value.trim();
       const scope = scopeRaw ? scopeRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
       const notify = document.getElementById('hint-input-notify')?.checked;
 
       if (!title) {
-        alert('කරුණාකර මාතෘකාවක් (Hint Title) ඇතුළත් කරන්න.');
-        return;
-      }
-      if (!hints) {
-        alert('කරුණාකර Hints සහ උපදෙස් (Hints & Guidance) ඇතුළත් කරන්න.');
+        alert('කරුණාකර මාතෘකාවක් (Title) ඇතුළත් කරන්න.');
         return;
       }
 
@@ -6774,17 +6716,17 @@ class AppController {
           subject,
           examYear,
           paperName,
-          hints,
-          formulas,
+          hints: '',
+          formulas: '',
           scope
         };
 
         if (isEdit) {
           await dbService.updatePaperHint(existingHint.id, payload);
-          notificationService.showInAppBanner('Hint Updated! ✅', `"${title}" has been updated.`, 'success');
+          notificationService.showInAppBanner('Scope Updated! ✅', `"${title}" has been updated.`, 'success');
         } else {
           await dbService.createPaperHint(payload);
-          notificationService.showInAppBanner('Hint Published! 💡', `"${title}" has been published.`, 'success');
+          notificationService.showInAppBanner('Scope Published! 💡', `"${title}" has been published.`, 'success');
         }
 
         if (notify) {
