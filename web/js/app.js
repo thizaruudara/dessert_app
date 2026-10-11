@@ -506,6 +506,113 @@ class AppController {
     // Init notification service & enforce mandatory student notification permission
     notificationService.init(this.currentUser);
     this.enforceNotificationPermission();
+    this.startStudentNotificationWatchers();
+  }
+
+  // ── Real-Time Notification Watchers (Live Start, Leaderboard, Paper Hints) ──
+  startStudentNotificationWatchers() {
+    if (!this.currentUser || this.currentUser.role === 'admin') return;
+    const studentYear = this.currentUser.exam_year || this.currentUser.examYear || '2027 A/L';
+
+    // Cleanup any existing watchers
+    if (this._notifLiveUnsub) { try { this._notifLiveUnsub(); } catch (_) {} }
+    if (this._notifBoardsUnsub) { try { this._notifBoardsUnsub(); } catch (_) {} }
+    if (this._notifHintsUnsub) { try { this._notifHintsUnsub(); } catch (_) {} }
+
+    let liveSessionsInitialized = false;
+    const knownLiveSessionIds = new Set();
+
+    // 1. Live Exam Starting Monitor
+    this._notifLiveUnsub = dbService.streamPaperSessions(studentYear, (sessions) => {
+      if (!Array.isArray(sessions)) return;
+      const currentlyLive = sessions.filter(s => {
+        const st = dbService.computeSessionStatus(s);
+        return st.isLive || s.isLive || s.status === 'writing' || s.status === 'package_opening' || s.status === 'live';
+      });
+
+      if (!liveSessionsInitialized) {
+        liveSessionsInitialized = true;
+        currentlyLive.forEach(s => knownLiveSessionIds.add(s.id));
+        return;
+      }
+
+      currentlyLive.forEach(session => {
+        if (!knownLiveSessionIds.has(session.id)) {
+          knownLiveSessionIds.add(session.id);
+          notificationService.playChime();
+          notificationService.showInAppBanner(
+            '🔴 Live Exam Started!',
+            `"${session.title || 'Paper Session'}" is now LIVE! Tap to enter exam room.`,
+            'urgent'
+          );
+          notificationService.showLocalNotification('🔴 Live Exam Started!', {
+            body: `"${session.title || 'Paper Session'}" is now LIVE! Tap to enter exam room.`,
+            tag: `live-exam-${session.id}`,
+            data: { url: './index.html?tab=papers' }
+          });
+        }
+      });
+    });
+
+    // 2. Leaderboard Published Monitor
+    let boardsInitialized = false;
+    const knownBoardIds = new Set();
+    this._notifBoardsUnsub = dbService.streamPaperLeaderboards((boards) => {
+      if (!Array.isArray(boards)) return;
+      if (!boardsInitialized) {
+        boardsInitialized = true;
+        boards.forEach(b => knownBoardIds.add(b.id));
+        return;
+      }
+
+      boards.forEach(b => {
+        if (!knownBoardIds.has(b.id)) {
+          knownBoardIds.add(b.id);
+          notificationService.playChime();
+          notificationService.showInAppBanner(
+            '🏆 Leaderboard Published!',
+            `Paper results & rankings for "${b.title || 'Model Paper'}" are now available!`,
+            'success'
+          );
+          notificationService.showLocalNotification('🏆 Leaderboard Published!', {
+            body: `Paper results & rankings for "${b.title || 'Model Paper'}" are now available!`,
+            tag: `leaderboard-${b.id}`,
+            data: { url: './index.html?tab=ranks' }
+          });
+        }
+      });
+    });
+
+    // 3. Upcoming Paper Hints Published Monitor
+    let upcomingInitialized = false;
+    const knownUpcomingHints = new Map();
+    this._notifHintsUnsub = dbService.streamUpcomingPapers(studentYear, (upcomingList) => {
+      if (!Array.isArray(upcomingList)) return;
+      if (!upcomingInitialized) {
+        upcomingInitialized = true;
+        upcomingList.forEach(p => knownUpcomingHints.set(p.id, p.hints || ''));
+        return;
+      }
+
+      upcomingList.forEach(paper => {
+        const prevHints = knownUpcomingHints.get(paper.id);
+        const currHints = (paper.hints || '').trim();
+        if (currHints && (!knownUpcomingHints.has(paper.id) || (prevHints !== undefined && prevHints !== currHints))) {
+          knownUpcomingHints.set(paper.id, currHints);
+          notificationService.playChime();
+          notificationService.showInAppBanner(
+            '💡 New Paper Hints & Scope!',
+            `Teacher guidance & hints published for "${paper.title || 'Upcoming Paper'}".`,
+            'info'
+          );
+          notificationService.showLocalNotification('💡 New Paper Hints Published!', {
+            body: `Teacher guidance & hints published for "${paper.title || 'Upcoming Paper'}". Tap to view scope!`,
+            tag: `hints-${paper.id}`,
+            data: { url: './index.html?tab=papers' }
+          });
+        }
+      });
+    });
   }
 
   // ── Mandatory Student Push Notification Gatekeeper ────────────────────────
