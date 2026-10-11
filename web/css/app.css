@@ -1323,3 +1323,26 @@ button:active {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ── In-App Toast & Notification Safe Area Layout ── */
+#in-app-toast-container,
+.in-app-toast-container {
+  position: fixed !important;
+  top: max(72px, calc(env(safe-area-inset-top, 0px) + 18px)) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 99999999 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  max-width: 420px !important;
+  width: calc(100% - 32px) !important;
+  pointer-events: none !important;
+}
+
+@media (min-width: 769px) {
+  #in-app-toast-container,
+  .in-app-toast-container {
+    top: 24px !important;
+  }
+}

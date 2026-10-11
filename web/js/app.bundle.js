@@ -88362,17 +88362,17 @@ var NotificationService = class {
     if (!container) {
       container = document.createElement("div");
       container.id = "in-app-toast-container";
+      container.className = "in-app-toast-container";
       container.style.cssText = `
         position: fixed;
-        top: 20px;
-        top: max(16px, calc(env(safe-area-inset-top, 0px) + 14px));
+        top: max(72px, calc(env(safe-area-inset-top, 0px) + 18px));
         left: 50%;
         transform: translateX(-50%);
-        z-index: 9999999;
+        z-index: 99999999;
         display: flex;
         flex-direction: column;
         gap: 10px;
-        max-width: 400px;
+        max-width: 420px;
         width: calc(100% - 32px);
         pointer-events: none;
       `;
@@ -88382,24 +88382,26 @@ var NotificationService = class {
     const isUrgent = type === "urgent" || type === "error";
     const isSuccess = type === "success";
     const isWarning = type === "warning";
-    const bgBadge = isSuccess ? "#22C55E" : isUrgent ? "#EF4444" : isWarning ? "#F59E0B" : "#6366F1";
+    const bgBadge = isSuccess ? "#22C55E" : isUrgent ? "#EF4444" : isWarning ? "#F59E0B" : "#3B82F6";
     const iconSymbol = isSuccess ? "\u2713" : isUrgent ? "\u26A0\uFE0F" : isWarning ? "\u23F1\uFE0F" : "\u{1F514}";
     toast.style.cssText = `
-      background: #1E293B;
-      border: 1px solid ${bgBadge}80;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid ${bgBadge}60;
       border-left: 4px solid ${bgBadge};
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
-      border-radius: 14px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25);
+      border-radius: 16px;
       padding: 12px 14px;
       display: flex;
       align-items: center;
       gap: 12px;
       color: #FFFFFF;
-      font-family: 'Poppins', sans-serif;
+      font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       pointer-events: auto;
-      transform: translateY(20px);
+      transform: translateY(-20px);
       opacity: 0;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     `;
     toast.innerHTML = `
       <div style="width:34px; height:34px; border-radius:50%; background:${bgBadge}25; display:flex; align-items:center; justify-content:center; color:${bgBadge}; font-size:16px; font-weight:bold; flex-shrink:0;">
@@ -88409,11 +88411,11 @@ var NotificationService = class {
         <div style="font-size:12.5px; font-weight:700; color:#FFFFFF; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
           ${title}
         </div>
-        <div style="font-size:11px; color:#CBD5E1; line-height:1.4;">
+        <div style="font-size:11.5px; color:#CBD5E1; line-height:1.4;">
           ${message}
         </div>
       </div>
-      <button style="background:transparent; border:none; color:#94A3B8; font-size:16px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; display:flex; align-items:center;" onmouseover="this.style.color='#FFFFFF'" onmouseout="this.style.color='#94A3B8'" onclick="this.parentElement.remove()">
+      <button type="button" class="toast-close-btn" style="background:transparent; border:none; color:#94A3B8; font-size:16px; cursor:pointer; padding:6px 8px; border-radius:8px; line-height:1; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;" aria-label="Close notification">
         \u2715
       </button>
     `;
@@ -88423,11 +88425,31 @@ var NotificationService = class {
       toast.style.opacity = "1";
     });
     this.playChime();
-    setTimeout(() => {
-      toast.style.transform = "translateY(10px)";
+    let isDismissed = false;
+    const dismiss = () => {
+      if (isDismissed) return;
+      isDismissed = true;
+      toast.style.transform = "translateY(-20px)";
       toast.style.opacity = "0";
-      setTimeout(() => toast.remove(), 250);
-    }, 4500);
+      setTimeout(() => {
+        toast.remove();
+        if (container && container.children.length === 0) {
+          container.remove();
+        }
+      }, 280);
+    };
+    const closeBtn = toast.querySelector(".toast-close-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", (e2) => {
+        e2.stopPropagation();
+        dismiss();
+      });
+      closeBtn.addEventListener("touchstart", (e2) => {
+        e2.stopPropagation();
+        dismiss();
+      }, { passive: true });
+    }
+    setTimeout(dismiss, 4500);
   }
   playChime() {
     try {
