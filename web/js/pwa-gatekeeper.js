@@ -370,7 +370,7 @@ export class PwaGatekeeper {
 
         <div class="gatekeeper-header">
           <div class="gatekeeper-icon-wrap">
-            <img src="./icons/edupeak_clean_transparent.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.png'" />
+            <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.webp'" />
           </div>
           <span class="gatekeeper-badge">${info.badge}</span>
           <h1 class="gatekeeper-title">${info.title}</h1>

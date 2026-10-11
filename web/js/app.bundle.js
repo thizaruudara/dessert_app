@@ -90952,7 +90952,7 @@ var PwaGatekeeper = class {
 
         <div class="gatekeeper-header">
           <div class="gatekeeper-icon-wrap">
-            <img src="./icons/edupeak_clean_transparent.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.png'" />
+            <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.webp'" />
           </div>
           <span class="gatekeeper-badge">${info.badge}</span>
           <h1 class="gatekeeper-title">${info.title}</h1>
@@ -91454,7 +91454,7 @@ var AppController = class {
       <!-- Center Content: Logo + Badge (100% Dead Centered) -->
       <div class="splash-center-content">
         <div class="splash-logo-wrap">
-          <img src="./icons/edupeak_logo.png" alt="EduPeak" class="splash-logo-img" onerror="this.src='./icons/icon-192.png'" />
+          <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="splash-logo-img" onerror="this.src='./icons/edupeak_logo.webp'" />
         </div>
         <div class="splash-badge-wrap">
           <div class="splash-badge">
@@ -91509,7 +91509,7 @@ var AppController = class {
         <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:12px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
           <div class="auth-header" style="text-align:center; margin-bottom:20px;">
             <div class="auth-brand-logo-wrap" style="width:72px; height:72px; margin:0 auto 12px; border-radius:20px; background:linear-gradient(135deg, #EFF6FF, #DBEAFE); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(37,99,235,0.12); border:1px solid rgba(191,219,254,0.6);">
-              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="width:48px; height:48px; object-fit:contain;" onerror="this.src='./icons/icon-192.png'" />
+              <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="auth-brand-logo-img" style="width:48px; height:48px; object-fit:contain;" onerror="this.src='./icons/edupeak_logo.webp'" />
             </div>
             <div class="auth-title" style="font-size:24px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
             <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
