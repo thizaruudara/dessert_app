@@ -46,10 +46,38 @@ export class DbService {
         if (lbChanged) localStorage.setItem('edupeak_local_leaderboard', JSON.stringify(localLb));
       }
     } catch (_) {}
+    this._memCache = new Map();
+  }
+
+  getCached(key, maxAgeMs = 30000) {
+    const item = this._memCache.get(key);
+    if (item && (Date.now() - item.time < maxAgeMs)) {
+      return item.data;
+    }
+    return null;
+  }
+
+  setCache(key, data) {
+    this._memCache.set(key, { data, time: Date.now() });
+  }
+
+  clearCache(prefix) {
+    if (!prefix) {
+      this._memCache.clear();
+      return;
+    }
+    for (const k of this._memCache.keys()) {
+      if (k.startsWith(prefix)) this._memCache.delete(k);
+    }
   }
 
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
-  async getStudentDesserts(studentId, studentPhone, studentName) {
+  async getStudentDesserts(studentId, studentPhone, studentName, { forceRefresh = false } = {}) {
+    const cacheKey = `desserts_${studentId || ''}_${studentPhone || ''}_${studentName || ''}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 20000);
+      if (cached) return cached;
+    }
     let localList = [];
     try {
       localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
@@ -153,6 +181,7 @@ export class DbService {
     } catch (_) {}
 
     list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+    this.setCache(cacheKey, list);
     return list;
   }
 
@@ -305,7 +334,13 @@ export class DbService {
   }
 
   // Get student accumulated credits from local cache, submissions, and leaderboard
-  async getStudentCredits(studentId, studentPhone, studentIndex, studentName) {
+  async getStudentCredits(studentId, studentPhone, studentIndex, studentName, { forceRefresh = false } = {}) {
+    const cacheKey = `credits_${studentId || ''}_${studentPhone || ''}_${studentIndex || ''}_${studentName || ''}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 20000);
+      if (cached !== null && cached !== undefined) return cached;
+    }
+
     const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
     const cleanName = String(studentName || '').toLowerCase().trim();
     const cleanId = String(studentId || '').trim();
@@ -381,6 +416,7 @@ export class DbService {
           localStorage.setItem(k, String(dbCredits));
         } catch (_) {}
       }
+      this.setCache(cacheKey, dbCredits);
       return dbCredits;
     }
 
@@ -398,7 +434,9 @@ export class DbService {
       } catch (_) {}
     }
 
-    return localCredits > 0 ? localCredits : 0;
+    const finalCredits = localCredits > 0 ? localCredits : 0;
+    this.setCache(cacheKey, finalCredits);
+    return finalCredits;
   }
 
   // Award XP credits to student, update local leaderboard, and sync to Firestore
@@ -1047,7 +1085,22 @@ export class DbService {
     return [];
   }
 
-  async getPaperSessions(examYear) {
+  async getPaperSessions(examYear, { forceRefresh = false } = {}) {
+    const cacheKey = `paper_sessions_${examYear || 'all'}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.setCache(cacheKey, parsed);
+            return parsed;
+          }
+        }
+      } catch (_) {}
+    }
     try {
       const ref = collection(db, 'paper_sessions');
       const snap = await Promise.race([
@@ -1077,6 +1130,8 @@ export class DbService {
           if (aEnded !== bEnded) return aEnded ? 1 : -1;
           return getSessionOrderTime(b) - getSessionOrderTime(a);
         });
+        this.setCache(cacheKey, result);
+        try { localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(result)); } catch (_) {}
         return result;
       }
     } catch (e) {
@@ -1158,7 +1213,22 @@ export class DbService {
     }
   }
 
-  async getUpcomingPapers(examYear) {
+  async getUpcomingPapers(examYear, { forceRefresh = false } = {}) {
+    const cacheKey = `upcoming_papers_${examYear || 'all'}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.setCache(cacheKey, parsed);
+            return parsed;
+          }
+        }
+      } catch (_) {}
+    }
     try {
       const ref = collection(db, 'upcoming_papers');
       const snap = await Promise.race([
@@ -1168,8 +1238,13 @@ export class DbService {
       if (!snap.empty) {
         const list = snap.docs.map(d => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
         if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
-          return list.filter(p => this.matchesYear(p.examYear, examYear));
+          const res = list.filter(p => this.matchesYear(p.examYear, examYear));
+          this.setCache(cacheKey, res);
+          try { localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(res)); } catch (_) {}
+          return res;
         }
+        this.setCache(cacheKey, list);
+        try { localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(list)); } catch (_) {}
         return list;
       }
     } catch (e) {
@@ -1217,11 +1292,19 @@ export class DbService {
     return regData;
   }
 
-  async getStudentRegistration(paperId, studentId) {
+  async getStudentRegistration(paperId, studentId, { forceRefresh = false } = {}) {
+    if (!paperId || !studentId) return null;
+    const cacheKey = `paper_reg_${paperId}_${studentId}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached !== null && cached !== undefined) return cached;
+    }
     if (!paperId || !studentId) return null;
     try {
       const snap = await getDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`));
-      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      const res = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      this.setCache(cacheKey, res);
+      return res;
     } catch (error) {
       console.warn('[DB] getStudentRegistration error:', error);
       return null;
@@ -1741,7 +1824,12 @@ export class DbService {
     return [];
   }
 
-  async getLeaderboard(batch) {
+  async getLeaderboard(batch, { forceRefresh = false } = {}) {
+    const cacheKey = `leaderboard_${batch || 'all'}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached) return cached;
+    }
     let firestoreList = [];
     try {
       const q = collection(db, 'leaderboard_public');
@@ -1865,6 +1953,7 @@ export class DbService {
       s.rank = idx + 1;
     });
 
+    this.setCache(cacheKey, filtered);
     return filtered;
   }
 
@@ -1951,14 +2040,19 @@ export class DbService {
     }
   }
 
-  async getPaperLeaderboards() {
+  async getPaperLeaderboards({ forceRefresh = false } = {}) {
+    const cacheKey = 'paper_leaderboards';
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached) return cached;
+    }
     try {
       const ref = collection(db, 'paper_leaderboards');
       const snapshot = await Promise.race([
         getDocs(ref),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Paper leaderboards timeout')), 2800))
       ]);
-      return snapshot.docs.map((paperDoc) => {
+      const finalBoards = snapshot.docs.map((paperDoc) => {
         const data = paperDoc.data();
         const rawPublishedAt = data.publishedAt;
         const publishedAt = rawPublishedAt?.toDate
@@ -1986,6 +2080,8 @@ export class DbService {
           entries,
         };
       }).sort((a, b) => b.publishedAt - a.publishedAt);
+      this.setCache(cacheKey, finalBoards);
+      return finalBoards;
     } catch (e) {
       console.warn('[DB] getPaperLeaderboards error:', e);
       return [];
@@ -2153,17 +2249,32 @@ export class DbService {
     ];
   }
 
-  async getDailyInsight() {
+  async getDailyInsight({ forceRefresh = false } = {}) {
+    const cacheKey = 'daily_physics_insight';
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3600000);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem('edupeak_cached_daily_insight');
+        if (stored) {
+          const item = JSON.parse(stored);
+          if (item && item.concept) {
+            this.setCache(cacheKey, item);
+            return item;
+          }
+        }
+      } catch (_) {}
+    }
     try {
       const docRef = doc(db, 'system_config', 'daily_physics_insight');
       const snap = await Promise.race([
         getDoc(docRef),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('getDailyInsight timeout')), 2000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getDailyInsight timeout')), 600))
       ]);
       if (snap.exists()) {
         const data = snap.data();
         if (data && data.isCustom) {
-          return {
+          const customRes = {
             isCustom: true,
             concept: data.titleEnglish || data.titleSinhala || 'Physics Daily Concept',
             formula: data.formula || '',
@@ -2177,6 +2288,9 @@ export class DbService {
             tipEnglish: data.tipEnglish || '',
             topicCode: data.topicCode || 'topic_custom'
           };
+          this.setCache(cacheKey, customRes);
+          try { localStorage.setItem('edupeak_cached_daily_insight', JSON.stringify(customRes)); } catch (_) {}
+          return customRes;
         }
       }
     } catch (e) {
@@ -2186,7 +2300,7 @@ export class DbService {
     const presets = this.getPresetPhysicsInsights();
     const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
     const p = presets[dayOfYear % presets.length];
-    return {
+    const fallbackInsight = {
       isCustom: false,
       concept: p.titleEnglish,
       formula: p.formula,
@@ -2200,6 +2314,8 @@ export class DbService {
       tipEnglish: p.tipEnglish,
       topicCode: p.topicCode
     };
+    this.setCache(cacheKey, fallbackInsight);
+    return fallbackInsight;
   }
 
   async saveCustomPhysicsInsight(data, adminName = 'Admin') {

@@ -86336,9 +86336,34 @@ var DbService = class {
       }
     } catch (_) {
     }
+    this._memCache = /* @__PURE__ */ new Map();
+  }
+  getCached(key, maxAgeMs = 3e4) {
+    const item = this._memCache.get(key);
+    if (item && Date.now() - item.time < maxAgeMs) {
+      return item.data;
+    }
+    return null;
+  }
+  setCache(key, data) {
+    this._memCache.set(key, { data, time: Date.now() });
+  }
+  clearCache(prefix) {
+    if (!prefix) {
+      this._memCache.clear();
+      return;
+    }
+    for (const k2 of this._memCache.keys()) {
+      if (k2.startsWith(prefix)) this._memCache.delete(k2);
+    }
   }
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
-  async getStudentDesserts(studentId, studentPhone, studentName) {
+  async getStudentDesserts(studentId, studentPhone, studentName, { forceRefresh = false } = {}) {
+    const cacheKey = `desserts_${studentId || ""}_${studentPhone || ""}_${studentName || ""}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 2e4);
+      if (cached) return cached;
+    }
     let localList = [];
     try {
       localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
@@ -86424,6 +86449,7 @@ var DbService = class {
     } catch (_) {
     }
     list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
+    this.setCache(cacheKey, list);
     return list;
   }
   // Real-time listener for student's homework status
@@ -86549,7 +86575,12 @@ var DbService = class {
     return newDoc;
   }
   // Get student accumulated credits from local cache, submissions, and leaderboard
-  async getStudentCredits(studentId, studentPhone, studentIndex, studentName) {
+  async getStudentCredits(studentId, studentPhone, studentIndex, studentName, { forceRefresh = false } = {}) {
+    const cacheKey = `credits_${studentId || ""}_${studentPhone || ""}_${studentIndex || ""}_${studentName || ""}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 2e4);
+      if (cached !== null && cached !== void 0) return cached;
+    }
     const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
     const cleanName = String(studentName || "").toLowerCase().trim();
     const cleanId = String(studentId || "").trim();
@@ -86615,6 +86646,7 @@ var DbService = class {
         } catch (_) {
         }
       }
+      this.setCache(cacheKey, dbCredits);
       return dbCredits;
     }
     let localCredits = 0;
@@ -86630,7 +86662,9 @@ var DbService = class {
       } catch (_) {
       }
     }
-    return localCredits > 0 ? localCredits : 0;
+    const finalCredits = localCredits > 0 ? localCredits : 0;
+    this.setCache(cacheKey, finalCredits);
+    return finalCredits;
   }
   // Award XP credits to student, update local leaderboard, and sync to Firestore
   async awardStudentCredits({ studentId, studentName, studentPhone, examYear, credits }) {
@@ -87195,7 +87229,23 @@ var DbService = class {
   getMockUpcomingPapers(examYear) {
     return [];
   }
-  async getPaperSessions(examYear) {
+  async getPaperSessions(examYear, { forceRefresh = false } = {}) {
+    const cacheKey = `paper_sessions_${examYear || "all"}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3e4);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.setCache(cacheKey, parsed);
+            return parsed;
+          }
+        }
+      } catch (_) {
+      }
+    }
     try {
       const ref2 = collection(db, "paper_sessions");
       const snap = await Promise.race([
@@ -87225,6 +87275,11 @@ var DbService = class {
           if (aEnded !== bEnded) return aEnded ? 1 : -1;
           return getSessionOrderTime(b2) - getSessionOrderTime(a);
         });
+        this.setCache(cacheKey, result);
+        try {
+          localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(result));
+        } catch (_) {
+        }
         return result;
       }
     } catch (e2) {
@@ -87306,7 +87361,23 @@ var DbService = class {
       };
     }
   }
-  async getUpcomingPapers(examYear) {
+  async getUpcomingPapers(examYear, { forceRefresh = false } = {}) {
+    const cacheKey = `upcoming_papers_${examYear || "all"}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3e4);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.setCache(cacheKey, parsed);
+            return parsed;
+          }
+        }
+      } catch (_) {
+      }
+    }
     try {
       const ref2 = collection(db, "upcoming_papers");
       const snap = await Promise.race([
@@ -87316,7 +87387,18 @@ var DbService = class {
       if (!snap.empty) {
         const list = snap.docs.map((d) => this.normalizeUpcomingPaper(d.data(), d.id)).filter(Boolean);
         if (examYear && examYear !== "All" && examYear !== "All Batches") {
-          return list.filter((p2) => this.matchesYear(p2.examYear, examYear));
+          const res = list.filter((p2) => this.matchesYear(p2.examYear, examYear));
+          this.setCache(cacheKey, res);
+          try {
+            localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(res));
+          } catch (_) {
+          }
+          return res;
+        }
+        this.setCache(cacheKey, list);
+        try {
+          localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(list));
+        } catch (_) {
         }
         return list;
       }
@@ -87363,11 +87445,19 @@ var DbService = class {
     }
     return regData;
   }
-  async getStudentRegistration(paperId, studentId) {
+  async getStudentRegistration(paperId, studentId, { forceRefresh = false } = {}) {
+    if (!paperId || !studentId) return null;
+    const cacheKey = `paper_reg_${paperId}_${studentId}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3e4);
+      if (cached !== null && cached !== void 0) return cached;
+    }
     if (!paperId || !studentId) return null;
     try {
       const snap = await getDoc(doc(db, "paper_registrations", `${paperId}_${studentId}`));
-      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      const res = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      this.setCache(cacheKey, res);
+      return res;
     } catch (error) {
       console.warn("[DB] getStudentRegistration error:", error);
       return null;
@@ -87864,7 +87954,12 @@ var DbService = class {
   getSeedScholars() {
     return [];
   }
-  async getLeaderboard(batch) {
+  async getLeaderboard(batch, { forceRefresh = false } = {}) {
+    const cacheKey = `leaderboard_${batch || "all"}`;
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3e4);
+      if (cached) return cached;
+    }
     let firestoreList = [];
     try {
       const q = collection(db, "leaderboard_public");
@@ -87968,6 +88063,7 @@ var DbService = class {
     filtered.forEach((s2, idx) => {
       s2.rank = idx + 1;
     });
+    this.setCache(cacheKey, filtered);
     return filtered;
   }
   streamLeaderboard(batch, callback) {
@@ -88046,14 +88142,19 @@ var DbService = class {
       };
     }
   }
-  async getPaperLeaderboards() {
+  async getPaperLeaderboards({ forceRefresh = false } = {}) {
+    const cacheKey = "paper_leaderboards";
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3e4);
+      if (cached) return cached;
+    }
     try {
       const ref2 = collection(db, "paper_leaderboards");
       const snapshot = await Promise.race([
         getDocs(ref2),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Paper leaderboards timeout")), 2800))
       ]);
-      return snapshot.docs.map((paperDoc) => {
+      const finalBoards = snapshot.docs.map((paperDoc) => {
         const data = paperDoc.data();
         const rawPublishedAt = data.publishedAt;
         const publishedAt = rawPublishedAt?.toDate ? rawPublishedAt.toDate() : new Date(rawPublishedAt || Date.now());
@@ -88078,6 +88179,8 @@ var DbService = class {
           entries
         };
       }).sort((a, b2) => b2.publishedAt - a.publishedAt);
+      this.setCache(cacheKey, finalBoards);
+      return finalBoards;
     } catch (e2) {
       console.warn("[DB] getPaperLeaderboards error:", e2);
       return [];
@@ -88237,17 +88340,33 @@ var DbService = class {
       }
     ];
   }
-  async getDailyInsight() {
+  async getDailyInsight({ forceRefresh = false } = {}) {
+    const cacheKey = "daily_physics_insight";
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 36e5);
+      if (cached) return cached;
+      try {
+        const stored = localStorage.getItem("edupeak_cached_daily_insight");
+        if (stored) {
+          const item = JSON.parse(stored);
+          if (item && item.concept) {
+            this.setCache(cacheKey, item);
+            return item;
+          }
+        }
+      } catch (_) {
+      }
+    }
     try {
       const docRef = doc(db, "system_config", "daily_physics_insight");
       const snap = await Promise.race([
         getDoc(docRef),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("getDailyInsight timeout")), 2e3))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("getDailyInsight timeout")), 600))
       ]);
       if (snap.exists()) {
         const data = snap.data();
         if (data && data.isCustom) {
-          return {
+          const customRes = {
             isCustom: true,
             concept: data.titleEnglish || data.titleSinhala || "Physics Daily Concept",
             formula: data.formula || "",
@@ -88261,6 +88380,12 @@ var DbService = class {
             tipEnglish: data.tipEnglish || "",
             topicCode: data.topicCode || "topic_custom"
           };
+          this.setCache(cacheKey, customRes);
+          try {
+            localStorage.setItem("edupeak_cached_daily_insight", JSON.stringify(customRes));
+          } catch (_) {
+          }
+          return customRes;
         }
       }
     } catch (e2) {
@@ -88269,7 +88394,7 @@ var DbService = class {
     const presets = this.getPresetPhysicsInsights();
     const dayOfYear = Math.floor((/* @__PURE__ */ new Date() - new Date((/* @__PURE__ */ new Date()).getFullYear(), 0, 0)) / (1e3 * 60 * 60 * 24));
     const p2 = presets[dayOfYear % presets.length];
-    return {
+    const fallbackInsight = {
       isCustom: false,
       concept: p2.titleEnglish,
       formula: p2.formula,
@@ -88283,6 +88408,8 @@ var DbService = class {
       tipEnglish: p2.tipEnglish,
       topicCode: p2.topicCode
     };
+    this.setCache(cacheKey, fallbackInsight);
+    return fallbackInsight;
   }
   async saveCustomPhysicsInsight(data, adminName = "Admin") {
     try {
@@ -89941,8 +90068,14 @@ var AppController = class {
       return;
     }
     root.innerHTML = `
-      <!-- Main Scrollable Viewport -->
-      <div class="main-viewport" id="main-viewport"></div>
+      <!-- Main Scrollable Viewport with Persistent Tab Viewports (Instant Zero-Lag Navigation) -->
+      <div class="main-viewport" id="main-viewport">
+        <div id="tab-viewport-home" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-ranks" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-desserts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-profile" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+      </div>
 
       <!-- Bottom Navigation Bar (Matching student_shell.dart & real_dashboard_light_v4.html) -->
       <nav class="bottom-nav-bar">
@@ -90114,7 +90247,20 @@ var AppController = class {
       }
     });
   }
-  switchTab(tabName, { historyMode = "push" } = {}) {
+  getTabViewport(tabName) {
+    const mainVp = document.getElementById("main-viewport");
+    if (!mainVp) return null;
+    let panel = document.getElementById(`tab-viewport-${tabName}`);
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = `tab-viewport-${tabName}`;
+      panel.className = "tab-viewport";
+      panel.style.cssText = "display:none; width:100%; flex-direction:column; gap:16px;";
+      mainVp.appendChild(panel);
+    }
+    return panel;
+  }
+  switchTab(tabName, { historyMode = "push", forceRefresh = false } = {}) {
     const allowedTabs = ["home", "papers", "ranks", "desserts", "profile"];
     if (!allowedTabs.includes(tabName)) tabName = "home";
     const previousTab = this.currentTab;
@@ -90132,72 +90278,56 @@ var AppController = class {
       );
     }
     this.renderToken++;
-    if (this._papersUnsub) {
-      try {
-        this._papersUnsub();
-      } catch (_) {
+    document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.tab === tabName);
+    });
+    allowedTabs.forEach((t2) => {
+      const panel = this.getTabViewport(t2);
+      if (panel) {
+        if (t2 === tabName) {
+          panel.style.display = "flex";
+        } else {
+          panel.style.display = "none";
+        }
       }
-      this._papersUnsub = null;
+    });
+    const targetViewport = this.getTabViewport(tabName);
+    if (!targetViewport) return;
+    container.scrollTo({ top: 0, behavior: "instant" });
+    this._renderedTabs = this._renderedTabs || /* @__PURE__ */ new Set();
+    if (this._renderedTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0 && !targetViewport.innerHTML.includes("Loading your page")) {
+      return;
     }
-    if (this._upcomingPapersUnsub) {
-      try {
-        this._upcomingPapersUnsub();
-      } catch (_) {
-      }
-      this._upcomingPapersUnsub = null;
-    }
-    if (this._ranksUnsub) {
-      try {
-        this._ranksUnsub();
-      } catch (_) {
-      }
-      this._ranksUnsub = null;
-    }
-    if (this._dessertsUnsub) {
-      try {
-        this._dessertsUnsub();
-      } catch (_) {
-      }
-      this._dessertsUnsub = null;
-    }
-    container.innerHTML = `
+    targetViewport.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
         <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
         <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page\u2026</div>
       </div>
     `;
-    document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.tab === tabName);
-    });
-    container.classList.remove("tab-page-transition");
-    void container.offsetWidth;
-    container.classList.add("tab-page-transition");
+    const markRendered = () => {
+      if (targetViewport.isConnected && !targetViewport.innerHTML.includes("Loading your page")) {
+        this._renderedTabs.add(tabName);
+      }
+    };
     switch (tabName) {
       case "home":
-        this.renderHomeScreen(container).catch((err) => this.renderTabError(container, "Home", err));
+        this.renderHomeScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Home", err));
         break;
       case "papers":
-        container.innerHTML = `
-          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:16px;">
-            <div style="width:42px; height:42px; border:3.5px solid #E2E8F0; border-top-color:#6366F1; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
-            <div style="font-size:13.5px; font-weight:700; color:#475569;">\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0D9A\u0DBB\u0DB8\u0DD2\u0DB1\u0DCA...</div>
-          </div>
-        `;
-        this.renderPapersScreen(container).catch((err) => this.renderTabError(container, "Papers", err));
+        this.renderPapersScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Papers", err));
         break;
       case "ranks":
-        this.renderRanksScreen(container).catch((err) => this.renderTabError(container, "Ranks", err));
+        this.renderRanksScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Ranks", err));
         break;
       case "desserts":
-        this.renderDessertsScreen(container).catch((err) => this.renderTabError(container, "Desserts", err));
+        this.renderDessertsScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Desserts", err));
         break;
       case "profile":
-        this.renderProfileScreen(container).catch((err) => this.renderTabError(container, "Profile", err));
+        this.renderProfileScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Profile", err));
         break;
       default:
-        this.renderHomeScreen(container).catch((err) => this.renderTabError(container, "Home", err));
+        this.renderHomeScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Home", err));
     }
-    container.scrollTo({ top: 0, behavior: "smooth" });
   }
   renderTabError(container, tabTitle, err) {
     if (!container || !container.isConnected) return;
@@ -90213,7 +90343,8 @@ var AppController = class {
   }
   // ── 1. The Exact Student Cockpit (Home) ──────────────────────────────────
   async renderHomeScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = this._tabTokens["home"] = (this._tabTokens["home"] || 0) + 1;
     const user = this.currentUser || {};
     const studentName = user.name || "Student";
     const initial = studentName.charAt(0).toUpperCase();
@@ -90225,7 +90356,7 @@ var AppController = class {
       dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 0),
       dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens["home"] || !container.isConnected) return;
     let levelName = "Level 1 Novice";
     let targetXp = 100;
     let baseLevelXp = 0;
@@ -91184,7 +91315,8 @@ var AppController = class {
     });
   }
   async renderPapersScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = this._tabTokens["papers"] = (this._tabTokens["papers"] || 0) + 1;
     if (this.papersInterval) {
       clearInterval(this.papersInterval);
       this.papersInterval = null;
@@ -91216,7 +91348,7 @@ var AppController = class {
         session.id,
         await dbService.getStudentRegistration(session.id, studentId)
       ])));
-      if (renderToken !== this.renderToken || !container.isConnected) return;
+      if (renderToken !== this._tabTokens["papers"] || !container.isConnected) return;
       container.innerHTML = `
         <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
         <div class="screen-appbar">
@@ -91306,7 +91438,7 @@ var AppController = class {
       this._bindStudentLiveSessionActions(container, sessions, registrations, user);
       this._bindStudentUpcomingActions(container, upcomingList);
       this._papersUnsub = dbService.streamPaperSessions(activeTargetYear, async (liveSessions) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens["papers"]) return;
         const liveTab = container.querySelector("#papers-tab-live-content");
         if (!liveTab) return;
         const studentId2 = user.uid || user.id || "s_default";
@@ -91314,7 +91446,7 @@ var AppController = class {
           session.id,
           await dbService.getStudentRegistration(session.id, studentId2)
         ])));
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens["papers"]) return;
         const subSpan = container.querySelector("#tab-papers-live-sub");
         if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(liveSessions);
         liveTab.innerHTML = this._buildStudentLiveSessionsHTML(liveSessions, liveRegistrations, user, activeTargetYear, currentYear);
@@ -91322,7 +91454,7 @@ var AppController = class {
         this.startPapersTimer(container, liveSessions);
       });
       this._upcomingPapersUnsub = dbService.streamUpcomingPapers(activeTargetYear, (liveUpcoming) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens["papers"]) return;
         const upcomingTab = container.querySelector("#papers-tab-upcoming-content");
         if (!upcomingTab) return;
         upcomingTab.innerHTML = this._buildStudentUpcomingPapersHTML(liveUpcoming, activeTargetYear, currentYear);
@@ -91765,7 +91897,8 @@ var AppController = class {
   }
   // ── 3. Ranks Tab (Dessert XP Leagues & Paper Leaderboard - 1:1 Android) ───
   async renderRanksScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = this._tabTokens["ranks"] = (this._tabTokens["ranks"] || 0) + 1;
     this.ranksBoardType = this.ranksBoardType ?? 0;
     this.selectedLeague = this.selectedLeague ?? "All Scholars";
     const currentUser = this.currentUser || {};
@@ -91796,7 +91929,7 @@ var AppController = class {
       if (this.ranksBoardType === 0) leaderboardLoadError = true;
       else paperLeaderboardLoadError = true;
     }
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens["ranks"] || !container.isConnected) return;
     const leagues = [
       { name: "All Scholars", icon: "public" },
       { name: "Diamond", icon: "diamond" },
@@ -92125,7 +92258,7 @@ var AppController = class {
     });
     if (this.ranksBoardType === 0) {
       this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : void 0, (liveLeaders) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens["ranks"]) return;
         const currentSummary = leaders.map((l2) => `${l2.id}_${l2.credits}_${l2.name}`).join("|");
         const liveSummary = liveLeaders.map((l2) => `${l2.id}_${l2.credits}_${l2.name}`).join("|");
         if (currentSummary !== liveSummary) {
@@ -92134,7 +92267,7 @@ var AppController = class {
       });
     } else {
       this._ranksUnsub = dbService.streamPaperLeaderboards((livePaperBoards) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens["ranks"]) return;
         const currentSummary = paperBoards.map((b2) => `${b2.id}_${b2.entries?.length}_${b2.totalMarks}`).join("|");
         const liveSummary = livePaperBoards.map((b2) => `${b2.id}_${b2.entries?.length}_${b2.totalMarks}`).join("|");
         if (currentSummary !== liveSummary) {
@@ -92153,7 +92286,8 @@ var AppController = class {
   }
   // ── 4. Desserts Tab (Submit Homework & Submissions History - 1:1 Android) ──
   async renderDessertsScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = this._tabTokens["desserts"] = (this._tabTokens["desserts"] || 0) + 1;
     this.dessertsTab = this.dessertsTab ?? 0;
     this.selectedTopic = this.selectedTopic ?? "Mechanics";
     this.capturedHomeworkPhotos = this.capturedHomeworkPhotos ?? [];
@@ -92164,7 +92298,7 @@ var AppController = class {
     const sName = user.name || "";
     const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
     this._cachedDesserts = desserts;
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens["desserts"] || !container.isConnected) return;
     const topics = [
       "Mechanics",
       "Waves & Optics",
@@ -92506,7 +92640,8 @@ var AppController = class {
   }
   // ── 5. Profile Tab (Trophy Room, Dark Mode, Exam Batch & Avatar Picker - 1:1 Android) ──
   async renderProfileScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = this._tabTokens["profile"] = (this._tabTokens["profile"] || 0) + 1;
     const user = this.currentUser || {};
     const isStandalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
     const isDark = document.documentElement.getAttribute("data-theme") === "dark";
@@ -92520,9 +92655,10 @@ var AppController = class {
     }
     const approvedCount = desserts.filter((d) => d.status === "approved").length;
     const pendingCount = desserts.filter((d) => !d.status || d.status === "pending").length;
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens["profile"] || !container.isConnected) return;
     const totalCount = desserts.length;
     const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
+    if (renderToken !== this._tabTokens["profile"] || !container.isConnected) return;
     let memberSinceStr = "October 2026";
     if (user.createdAt) {
       try {
@@ -93750,8 +93886,14 @@ var AppController = class {
     this.currentMode = "admin";
     this.adminTab = this.adminTab || "dashboard";
     root.innerHTML = `
-      <!-- Main Scrollable Viewport -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;"></div>
+      <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;">
+        <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-students" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-broadcasts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+      </div>
 
       <!-- Contained Floating Action Button Slot (Strictly inside #app-root) -->
       <div id="admin-fab-slot"></div>
@@ -93785,6 +93927,7 @@ var AppController = class {
         this.switchAdminTab(btn.dataset.adminTab);
       });
     });
+    this._renderedAdminTabs = /* @__PURE__ */ new Set();
     this.switchAdminTab(this.adminTab);
   }
   returnToAdminDashboard() {
@@ -93795,64 +93938,79 @@ var AppController = class {
     window.history.replaceState({ ...window.history.state || {}, edupeakView: "admin" }, "", url);
     this.renderAdminApp();
   }
-  switchAdminTab(tabName) {
+  getAdminTabViewport(tabName) {
+    const mainVp = document.getElementById("admin-main-viewport");
+    if (!mainVp) return null;
+    let panel = document.getElementById(`admin-tab-viewport-${tabName}`);
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = `admin-tab-viewport-${tabName}`;
+      panel.className = "tab-viewport";
+      panel.style.cssText = "display:none; width:100%; flex-direction:column; gap:16px;";
+      mainVp.appendChild(panel);
+    }
+    return panel;
+  }
+  switchAdminTab(tabName, { forceRefresh = false } = {}) {
     this.adminTab = tabName;
     const viewport = document.getElementById("admin-main-viewport");
     if (!viewport) return;
     const fabSlot = document.getElementById("admin-fab-slot");
     if (fabSlot) fabSlot.innerHTML = "";
-    if (this._adminPapersUnsub) {
-      try {
-        this._adminPapersUnsub();
-      } catch (_) {
-      }
-      this._adminPapersUnsub = null;
-    }
-    if (this._adminBoardsUnsub) {
-      try {
-        this._adminBoardsUnsub();
-      } catch (_) {
-      }
-      this._adminBoardsUnsub = null;
-    }
-    if (this._adminUpcomingUnsub) {
-      try {
-        this._adminUpcomingUnsub();
-      } catch (_) {
-      }
-      this._adminUpcomingUnsub = null;
-    }
-    if (this._adminDessertsUnsub) {
-      try {
-        this._adminDessertsUnsub();
-      } catch (_) {
-      }
-      this._adminDessertsUnsub = null;
-    }
+    const allowedAdminTabs = ["dashboard", "papers", "sprints", "students", "broadcasts"];
     document.querySelectorAll("#admin-bottom-nav .nav-tab-btn").forEach((b2) => {
       b2.classList.toggle("active", b2.dataset.adminTab === tabName);
     });
-    viewport.classList.remove("tab-page-transition");
-    void viewport.offsetWidth;
-    viewport.classList.add("tab-page-transition");
+    allowedAdminTabs.forEach((t2) => {
+      const panel = this.getAdminTabViewport(t2);
+      if (panel) {
+        if (t2 === tabName) {
+          panel.style.display = "flex";
+        } else {
+          panel.style.display = "none";
+        }
+      }
+    });
+    const targetViewport = this.getAdminTabViewport(tabName);
+    if (!targetViewport) return;
+    viewport.scrollTo({ top: 0, behavior: "instant" });
+    this._renderedAdminTabs = this._renderedAdminTabs || /* @__PURE__ */ new Set();
+    if (this._renderedAdminTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0) {
+      return;
+    }
+    targetViewport.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
+        <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+        <div style="font-size:12px; font-weight:700; color:#64748B;">Loading admin console\u2026</div>
+      </div>
+    `;
+    const markRendered = () => {
+      this._renderedAdminTabs.add(tabName);
+    };
     switch (tabName) {
       case "dashboard":
-        this.renderAdminDashboardScreen(viewport);
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {
+        });
         break;
       case "papers":
-        this.renderAdminPapersScreen(viewport);
+        this.renderAdminPapersScreen(targetViewport).then(markRendered).catch(() => {
+        });
         break;
       case "sprints":
-        this.renderAdminSprintsScreen(viewport);
+        this.renderAdminSprintsScreen(targetViewport).then(markRendered).catch(() => {
+        });
         break;
       case "students":
-        this.renderAdminStudentsScreen(viewport);
+        this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch(() => {
+        });
         break;
       case "broadcasts":
-        this.renderAdminBroadcastsScreen(viewport);
+        this.renderAdminBroadcastsScreen(targetViewport).then(markRendered).catch(() => {
+        });
         break;
       default:
-        this.renderAdminDashboardScreen(viewport);
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {
+        });
     }
     viewport.scrollTo({ top: 0, behavior: "smooth" });
   }

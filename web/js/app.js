@@ -457,8 +457,14 @@ class AppController {
     }
 
     root.innerHTML = `
-      <!-- Main Scrollable Viewport -->
-      <div class="main-viewport" id="main-viewport"></div>
+      <!-- Main Scrollable Viewport with Persistent Tab Viewports (Instant Zero-Lag Navigation) -->
+      <div class="main-viewport" id="main-viewport">
+        <div id="tab-viewport-home" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-ranks" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-desserts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="tab-viewport-profile" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+      </div>
 
       <!-- Bottom Navigation Bar (Matching student_shell.dart & real_dashboard_light_v4.html) -->
       <nav class="bottom-nav-bar">
@@ -655,7 +661,21 @@ class AppController {
     });
   }
 
-  switchTab(tabName, { historyMode = 'push' } = {}) {
+  getTabViewport(tabName) {
+    const mainVp = document.getElementById('main-viewport');
+    if (!mainVp) return null;
+    let panel = document.getElementById(`tab-viewport-${tabName}`);
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = `tab-viewport-${tabName}`;
+      panel.className = 'tab-viewport';
+      panel.style.cssText = 'display:none; width:100%; flex-direction:column; gap:16px;';
+      mainVp.appendChild(panel);
+    }
+    return panel;
+  }
+
+  switchTab(tabName, { historyMode = 'push', forceRefresh = false } = {}) {
     const allowedTabs = ['home', 'papers', 'ranks', 'desserts', 'profile'];
     if (!allowedTabs.includes(tabName)) tabName = 'home';
     const previousTab = this.currentTab;
@@ -673,56 +693,80 @@ class AppController {
     }
     this.renderToken++;
 
-    if (this._papersUnsub) { try { this._papersUnsub(); } catch (_) {} this._papersUnsub = null; }
-    if (this._upcomingPapersUnsub) { try { this._upcomingPapersUnsub(); } catch (_) {} this._upcomingPapersUnsub = null; }
-    if (this._ranksUnsub) { try { this._ranksUnsub(); } catch (_) {} this._ranksUnsub = null; }
-    if (this._dessertsUnsub) { try { this._dessertsUnsub(); } catch (_) {} this._dessertsUnsub = null; }
+    // 1. Highlight bottom nav button immediately (0ms visual response)
+    document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
 
-    // Show a stable loading state while an async screen loads. A render token
-    // below prevents a slow page request from replacing a newer tab.
-    container.innerHTML = `
+    // 2. Instant tab switching: toggle visibility of persistent tab viewports
+    allowedTabs.forEach(t => {
+      const panel = this.getTabViewport(t);
+      if (panel) {
+        if (t === tabName) {
+          panel.style.display = 'flex';
+        } else {
+          panel.style.display = 'none';
+        }
+      }
+    });
+
+    const targetViewport = this.getTabViewport(tabName);
+    if (!targetViewport) return;
+
+    container.scrollTo({ top: 0, behavior: 'instant' });
+
+    this._renderedTabs = this._renderedTabs || new Set();
+
+    // 3. ZERO-LAG: If tab is already rendered once and not force-refreshing, it is ALREADY visible!
+    if (this._renderedTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0 && !targetViewport.innerHTML.includes('Loading your page')) {
+      return;
+    }
+
+    // 4. Initial load spinner for this tab on first open only
+    targetViewport.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
         <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
         <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page…</div>
       </div>
     `;
 
-    document.querySelectorAll('.nav-tab-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === tabName);
-    });
-
-    // Smooth page entrance transition matching Flutter 1:1
-    container.classList.remove('tab-page-transition');
-    void container.offsetWidth; // Force DOM reflow to re-trigger CSS keyframes
-    container.classList.add('tab-page-transition');
+    const markRendered = () => {
+      if (targetViewport.isConnected && !targetViewport.innerHTML.includes('Loading your page')) {
+        this._renderedTabs.add(tabName);
+      }
+    };
 
     switch (tabName) {
       case 'home':
-        this.renderHomeScreen(container).catch(err => this.renderTabError(container, 'Home', err));
+        this.renderHomeScreen(targetViewport)
+          .then(markRendered)
+          .catch(err => this.renderTabError(targetViewport, 'Home', err));
         break;
       case 'papers':
-        container.innerHTML = `
-          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:16px;">
-            <div style="width:42px; height:42px; border:3.5px solid #E2E8F0; border-top-color:#6366F1; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
-            <div style="font-size:13.5px; font-weight:700; color:#475569;">විභාග සැසි සූදානම් කරමින්...</div>
-          </div>
-        `;
-        this.renderPapersScreen(container).catch(err => this.renderTabError(container, 'Papers', err));
+        this.renderPapersScreen(targetViewport)
+          .then(markRendered)
+          .catch(err => this.renderTabError(targetViewport, 'Papers', err));
         break;
       case 'ranks':
-        this.renderRanksScreen(container).catch(err => this.renderTabError(container, 'Ranks', err));
+        this.renderRanksScreen(targetViewport)
+          .then(markRendered)
+          .catch(err => this.renderTabError(targetViewport, 'Ranks', err));
         break;
       case 'desserts':
-        this.renderDessertsScreen(container).catch(err => this.renderTabError(container, 'Desserts', err));
+        this.renderDessertsScreen(targetViewport)
+          .then(markRendered)
+          .catch(err => this.renderTabError(targetViewport, 'Desserts', err));
         break;
       case 'profile':
-        this.renderProfileScreen(container).catch(err => this.renderTabError(container, 'Profile', err));
+        this.renderProfileScreen(targetViewport)
+          .then(markRendered)
+          .catch(err => this.renderTabError(targetViewport, 'Profile', err));
         break;
       default:
-        this.renderHomeScreen(container).catch(err => this.renderTabError(container, 'Home', err));
+        this.renderHomeScreen(targetViewport)
+          .then(markRendered)
+          .catch(err => this.renderTabError(targetViewport, 'Home', err));
     }
-
-    container.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   renderTabError(container, tabTitle, err) {
@@ -740,7 +784,8 @@ class AppController {
 
   // ── 1. The Exact Student Cockpit (Home) ──────────────────────────────────
   async renderHomeScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = (this._tabTokens['home'] = (this._tabTokens['home'] || 0) + 1);
     const user = this.currentUser || {};
     const studentName = user.name || 'Student';
     const initial = studentName.charAt(0).toUpperCase();
@@ -753,7 +798,7 @@ class AppController {
       dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 0),
       dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens['home'] || !container.isConnected) return;
 
     // Dynamic level calculation based on student's earned XP
     let levelName = 'Level 1 Novice';
@@ -1757,7 +1802,8 @@ class AppController {
   }
 
   async renderPapersScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = (this._tabTokens['papers'] = (this._tabTokens['papers'] || 0) + 1);
     if (this.papersInterval) {
       clearInterval(this.papersInterval);
       this.papersInterval = null;
@@ -1785,7 +1831,7 @@ class AppController {
         session.id,
         await dbService.getStudentRegistration(session.id, studentId)
       ])));
-      if (renderToken !== this.renderToken || !container.isConnected) return;
+      if (renderToken !== this._tabTokens['papers'] || !container.isConnected) return;
 
       container.innerHTML = `
         <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
@@ -1885,7 +1931,7 @@ class AppController {
 
       // Real-time listener: immediately update in-place without reloading whole page
       this._papersUnsub = dbService.streamPaperSessions(activeTargetYear, async (liveSessions) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens['papers']) return;
         const liveTab = container.querySelector('#papers-tab-live-content');
         if (!liveTab) return;
         const studentId = user.uid || user.id || 's_default';
@@ -1893,7 +1939,7 @@ class AppController {
           session.id,
           await dbService.getStudentRegistration(session.id, studentId)
         ])));
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens['papers']) return;
         const subSpan = container.querySelector('#tab-papers-live-sub');
         if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(liveSessions);
         liveTab.innerHTML = this._buildStudentLiveSessionsHTML(liveSessions, liveRegistrations, user, activeTargetYear, currentYear);
@@ -1902,7 +1948,7 @@ class AppController {
       });
 
       this._upcomingPapersUnsub = dbService.streamUpcomingPapers(activeTargetYear, (liveUpcoming) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens['papers']) return;
         const upcomingTab = container.querySelector('#papers-tab-upcoming-content');
         if (!upcomingTab) return;
         upcomingTab.innerHTML = this._buildStudentUpcomingPapersHTML(liveUpcoming, activeTargetYear, currentYear);
@@ -2378,7 +2424,8 @@ class AppController {
 
   // ── 3. Ranks Tab (Dessert XP Leagues & Paper Leaderboard - 1:1 Android) ───
   async renderRanksScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = (this._tabTokens['ranks'] = (this._tabTokens['ranks'] || 0) + 1);
     this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Dessert, 1: Paper
     this.selectedLeague = this.selectedLeague ?? 'All Scholars';
     const currentUser = this.currentUser || {};
@@ -2406,7 +2453,7 @@ class AppController {
       if (this.ranksBoardType === 0) leaderboardLoadError = true;
       else paperLeaderboardLoadError = true;
     }
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens['ranks'] || !container.isConnected) return;
     const leagues = [
       { name: 'All Scholars', icon: 'public' },
       { name: 'Diamond', icon: 'diamond' },
@@ -2761,7 +2808,7 @@ class AppController {
 
     if (this.ranksBoardType === 0) {
       this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : undefined, (liveLeaders) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
         const currentSummary = leaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
         const liveSummary = liveLeaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
         if (currentSummary !== liveSummary) {
@@ -2770,7 +2817,7 @@ class AppController {
       });
     } else {
       this._ranksUnsub = dbService.streamPaperLeaderboards((livePaperBoards) => {
-        if (!container.isConnected || renderToken !== this.renderToken) return;
+        if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
         const currentSummary = paperBoards.map(b => `${b.id}_${b.entries?.length}_${b.totalMarks}`).join('|');
         const liveSummary = livePaperBoards.map(b => `${b.id}_${b.entries?.length}_${b.totalMarks}`).join('|');
         if (currentSummary !== liveSummary) {
@@ -2791,7 +2838,8 @@ class AppController {
 
   // ── 4. Desserts Tab (Submit Homework & Submissions History - 1:1 Android) ──
   async renderDessertsScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = (this._tabTokens['desserts'] = (this._tabTokens['desserts'] || 0) + 1);
     this.dessertsTab = this.dessertsTab ?? 0; // 0: Submit Homework, 1: History
     this.selectedTopic = this.selectedTopic ?? 'Mechanics';
     this.capturedHomeworkPhotos = this.capturedHomeworkPhotos ?? [];
@@ -2803,7 +2851,7 @@ class AppController {
     const sName = user.name || '';
     const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
     this._cachedDesserts = desserts;
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens['desserts'] || !container.isConnected) return;
 
     const topics = [
       'Mechanics',
@@ -3169,7 +3217,8 @@ class AppController {
 
   // ── 5. Profile Tab (Trophy Room, Dark Mode, Exam Batch & Avatar Picker - 1:1 Android) ──
   async renderProfileScreen(container) {
-    const renderToken = ++this.renderToken;
+    this._tabTokens = this._tabTokens || {};
+    const renderToken = (this._tabTokens['profile'] = (this._tabTokens['profile'] || 0) + 1);
     const user = this.currentUser || {};
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -3185,9 +3234,10 @@ class AppController {
     }
     const approvedCount = desserts.filter(d => d.status === 'approved').length;
     const pendingCount = desserts.filter(d => !d.status || d.status === 'pending').length;
-    if (renderToken !== this.renderToken || !container.isConnected) return;
+    if (renderToken !== this._tabTokens['profile'] || !container.isConnected) return;
     const totalCount = desserts.length;
     const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
+    if (renderToken !== this._tabTokens['profile'] || !container.isConnected) return;
 
     // Format member since date with full Firestore Timestamp support
     let memberSinceStr = 'October 2026';
@@ -4531,8 +4581,14 @@ class AppController {
     this.adminTab = this.adminTab || 'dashboard';
 
     root.innerHTML = `
-      <!-- Main Scrollable Viewport -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;"></div>
+      <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;">
+        <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-students" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-broadcasts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+      </div>
 
       <!-- Contained Floating Action Button Slot (Strictly inside #app-root) -->
       <div id="admin-fab-slot"></div>
@@ -4568,6 +4624,7 @@ class AppController {
       });
     });
 
+    this._renderedAdminTabs = new Set();
     this.switchAdminTab(this.adminTab);
   }
 
@@ -4579,7 +4636,22 @@ class AppController {
     window.history.replaceState({ ...(window.history.state || {}), edupeakView: 'admin' }, '', url);
     this.renderAdminApp();
   }
-  switchAdminTab(tabName) {
+
+  getAdminTabViewport(tabName) {
+    const mainVp = document.getElementById('admin-main-viewport');
+    if (!mainVp) return null;
+    let panel = document.getElementById(`admin-tab-viewport-${tabName}`);
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = `admin-tab-viewport-${tabName}`;
+      panel.className = 'tab-viewport';
+      panel.style.cssText = 'display:none; width:100%; flex-direction:column; gap:16px;';
+      mainVp.appendChild(panel);
+    }
+    return panel;
+  }
+
+  switchAdminTab(tabName, { forceRefresh = false } = {}) {
     this.adminTab = tabName;
     const viewport = document.getElementById('admin-main-viewport');
     if (!viewport) return;
@@ -4588,38 +4660,66 @@ class AppController {
     const fabSlot = document.getElementById('admin-fab-slot');
     if (fabSlot) fabSlot.innerHTML = '';
 
-    if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
-    if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
-    if (this._adminUpcomingUnsub) { try { this._adminUpcomingUnsub(); } catch (_) {} this._adminUpcomingUnsub = null; }
-    if (this._adminDessertsUnsub) { try { this._adminDessertsUnsub(); } catch (_) {} this._adminDessertsUnsub = null; }
+    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
 
+    // 1. Highlight bottom nav tab immediately (0ms feedback)
     document.querySelectorAll('#admin-bottom-nav .nav-tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.adminTab === tabName);
     });
 
-    // Smooth page entrance transition matching Flutter 1:1
-    viewport.classList.remove('tab-page-transition');
-    void viewport.offsetWidth; // Force DOM reflow to re-trigger CSS keyframes
-    viewport.classList.add('tab-page-transition');
+    // 2. Instant tab switching: toggle visibility of persistent tab viewports
+    allowedAdminTabs.forEach(t => {
+      const panel = this.getAdminTabViewport(t);
+      if (panel) {
+        if (t === tabName) {
+          panel.style.display = 'flex';
+        } else {
+          panel.style.display = 'none';
+        }
+      }
+    });
+
+    const targetViewport = this.getAdminTabViewport(tabName);
+    if (!targetViewport) return;
+
+    viewport.scrollTo({ top: 0, behavior: 'instant' });
+
+    this._renderedAdminTabs = this._renderedAdminTabs || new Set();
+
+    // 3. ZERO-LAG: If tab is already rendered once, it is visible immediately in 0ms!
+    if (this._renderedAdminTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0) {
+      return;
+    }
+
+    targetViewport.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
+        <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+        <div style="font-size:12px; font-weight:700; color:#64748B;">Loading admin console…</div>
+      </div>
+    `;
+
+    const markRendered = () => {
+      this._renderedAdminTabs.add(tabName);
+    };
 
     switch (tabName) {
       case 'dashboard':
-        this.renderAdminDashboardScreen(viewport);
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {});
         break;
       case 'papers':
-        this.renderAdminPapersScreen(viewport);
+        this.renderAdminPapersScreen(targetViewport).then(markRendered).catch(() => {});
         break;
       case 'sprints':
-        this.renderAdminSprintsScreen(viewport);
+        this.renderAdminSprintsScreen(targetViewport).then(markRendered).catch(() => {});
         break;
       case 'students':
-        this.renderAdminStudentsScreen(viewport);
+        this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch(() => {});
         break;
       case 'broadcasts':
-        this.renderAdminBroadcastsScreen(viewport);
+        this.renderAdminBroadcastsScreen(targetViewport).then(markRendered).catch(() => {});
         break;
       default:
-        this.renderAdminDashboardScreen(viewport);
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {});
     }
 
     viewport.scrollTo({ top: 0, behavior: 'smooth' });
