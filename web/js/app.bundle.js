@@ -96424,22 +96424,22 @@ var AppController = class {
     const subtitle = this.adminPaperTab === 0 ? "\u0DC3\u0DA2\u0DD3\u0DC0\u0DD3 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DC3\u0DC4 \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF \u0D85\u0DB0\u0DD3\u0D9A\u0DCA\u0DC2\u0DAB\u0DBA" : this.adminPaperTab === 1 ? "Paper Hints \u0DC3\u0DC4 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0D8B\u0DB4\u0DAF\u0DD9\u0DC3\u0DCA \u0D9A\u0DC5\u0DB8\u0DB1\u0DCF\u0D9A\u0DBB\u0DAB\u0DBA" : "Paper \u0DB4\u0DCA\u200D\u0DBB\u0DAD\u0DD2\u0DB5\u0DBD \u0DC3\u0DC4 Leaderboard \u0DB1\u0DD2\u0DBB\u0DCA\u0DB8\u0DCF\u0DAB\u0DBA";
     container.innerHTML = `
       <!-- Screen AppBar -->
-      <div class="apk-screen-appbar">
-        <div class="apk-appbar-left">
-          <div class="apk-appbar-icon-box">
+      <div class="apk-screen-appbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px;">
+        <div class="apk-appbar-left" style="min-width:0; flex:1; display:flex; align-items:center; gap:10px;">
+          <div class="apk-appbar-icon-box" style="flex-shrink:0;">
             <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">fact_check</span>
           </div>
-          <div>
-            <div class="apk-appbar-title">Paper Examination Hub</div>
-            <div class="apk-appbar-subtitle">${subtitle}</div>
+          <div style="min-width:0; flex:1; overflow:hidden;">
+            <div class="apk-appbar-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Paper Examination Hub</div>
+            <div class="apk-appbar-subtitle" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${subtitle}</div>
           </div>
         </div>
-        <div class="apk-appbar-actions">
-          <button class="apk-icon-action-btn" id="btn-admin-countdowns" title="A/L Exam Target Dates & Countdowns">
-            <span class="material-symbols-rounded" style="font-size:20px; color:#64748B;">timer</span>
+        <div class="apk-appbar-actions" style="display:flex; align-items:center; flex-wrap:nowrap !important; flex-shrink:0; gap:8px;">
+          <button class="apk-icon-action-btn" id="btn-admin-countdowns" title="A/L Exam Target Dates & Countdowns" style="width:36px; height:36px; border-radius:10px; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; align-items:center; justify-content:center; color:#475569; cursor:pointer;">
+            <span class="material-symbols-rounded" style="font-size:20px;">timer</span>
           </button>
-          <button class="apk-icon-action-btn" id="btn-admin-add-paper-head" title="Create" style="color:#2563EB;">
-            <span class="material-symbols-rounded" style="font-size:24px;">add_circle</span>
+          <button class="apk-icon-action-btn" id="btn-admin-add-paper-head" title="Create" style="width:36px; height:36px; border-radius:10px; background:#EFF6FF; border:1px solid #BFDBFE; display:flex; align-items:center; justify-content:center; color:#2563EB; cursor:pointer;">
+            <span class="material-symbols-rounded" style="font-size:22px;">add</span>
           </button>
         </div>
       </div>
@@ -97550,38 +97550,91 @@ var AppController = class {
       this.adminExpandedPaperBoards.add(boards[0].id);
       this.adminPaperBoardsInitialized = true;
     }
-    return `<div class="paper-results-list admin-paper-results-list">
+    return `<div class="paper-results-list admin-paper-results-list" style="display:flex; flex-direction:column; gap:14px;">
       ${boards.map((board, index) => {
       const entries = board.entries || [];
       const expanded = this.adminExpandedPaperBoards.has(board.id);
-      const published = board.publishedAt.toLocaleDateString(void 0, { year: "numeric", month: "short", day: "numeric" });
-      return `<article class="paper-board-card ${index === 0 ? "is-latest" : ""}">
-          <div style="display:flex; align-items:center; justify-content:space-between; padding-right:12px; background:#FFFFFF; border-radius:14px;">
-            <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}" style="flex:1;">
-              <span class="paper-board-heading-content">
-                <span class="paper-board-tag">${escapeHTML(board.subject)} \xB7 ${escapeHTML(board.examYear)}</span>
-                ${index === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ""}
-                <span class="paper-board-date">${escapeHTML(published)}</span>
-                <strong class="paper-board-title">${escapeHTML(board.paperTitle)}</strong>
-                <span class="paper-board-stats"><span>Max: ${board.totalMarks} marks</span><span>${entries.length} candidates</span></span>
-                ${!expanded && entries[0] ? `<span class="paper-winner-snippet">Rank 1: ${escapeHTML(entries[0].studentName)} (${entries[0].marks} marks \xB7 ${escapeHTML(entries[0].grade)})</span>` : ""}
-              </span>
-              <span class="material-symbols-rounded paper-expand-icon">${expanded ? "expand_less" : "expand_more"}</span>
+      const published = board.publishedAt ? board.publishedAt.toLocaleDateString ? board.publishedAt.toLocaleDateString(void 0, { year: "numeric", month: "short", day: "numeric" }) : new Date(board.publishedAt).toLocaleDateString(void 0, { year: "numeric", month: "short", day: "numeric" }) : "";
+      const totalMarks = board.totalMarks || 100;
+      const avgScore = entries.length ? (entries.reduce((sum, e2) => sum + (Number(e2.marks) || 0), 0) / entries.length).toFixed(1) : "\u2014";
+      return `<article class="paper-board-card ${index === 0 ? "is-latest" : ""}" style="box-shadow:0 3px 12px rgba(15,23,42,0.04); border-radius:16px; overflow:hidden; background:#FFFFFF; border:1px solid #E2E8F0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding-right:12px; background:#FFFFFF;">
+            <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}" style="flex:1; border:none; background:transparent; padding:14px 16px; cursor:pointer; text-align:left;">
+              <div class="paper-board-heading-content" style="display:flex; flex-direction:column; gap:6px;">
+                <div class="pb-badges-row" style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+                  <span class="paper-board-tag" style="background:#F1F5F9; color:#334155; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">${escapeHTML(board.subject)} \xB7 ${escapeHTML(board.examYear)}</span>
+                  ${index === 0 ? '<span class="paper-latest-tag" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; padding:3px 8px; border-radius:6px; font-size:10.5px; font-weight:800;">LATEST</span>' : ""}
+                  <span class="paper-board-date" style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:#64748B;">
+                    <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
+                    <span>${escapeHTML(published)}</span>
+                  </span>
+                </div>
+                <h3 class="paper-board-title" style="font-size:16px; font-weight:800; color:#0F172A; margin:2px 0;">${escapeHTML(board.paperTitle)}</h3>
+                <div class="paper-board-stats" style="display:flex; align-items:center; gap:8px; font-size:12px; color:#64748B;">
+                  <span class="pb-stat-pill" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">grade</span>
+                    <span>Max: ${totalMarks} marks</span>
+                  </span>
+                  <span>\xB7</span>
+                  <span class="pb-stat-pill" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">groups</span>
+                    <span>${entries.length} candidates</span>
+                  </span>
+                </div>
+                ${!expanded && entries[0] ? `<span class="paper-winner-snippet" style="font-size:11.5px; color:#475569; background:#F8FAFC; padding:4px 8px; border-radius:6px; display:inline-block; margin-top:2px; border:1px solid #E2E8F0;">Rank 1: <strong>${escapeHTML(entries[0].studentName)}</strong> (${entries[0].marks} marks \xB7 ${escapeHTML(entries[0].grade)})</span>` : ""}
+              </div>
+              <div class="paper-expand-circle" style="width:30px; height:30px; border-radius:8px; background:#F1F5F9; color:#475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:8px;">
+                <span class="material-symbols-rounded paper-expand-icon" style="font-size:20px;">${expanded ? "expand_less" : "expand_more"}</span>
+              </div>
             </button>
-            <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (\u0DB8\u0D9A\u0DCF \u0DAF\u0DD0\u0DB8\u0DD3\u0DB8)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:8px; cursor:pointer; flex-shrink:0;">
+            <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (\u0DB8\u0D9A\u0DCF \u0DAF\u0DD0\u0DB8\u0DD3\u0DB8)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
               <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
             </button>
           </div>
-          ${expanded ? `<div class="paper-results-content">
-            <div class="paper-results-list-heading">Full Candidate Rankings <span>${entries.length} ranked</span></div>
-            ${entries.length ? entries.map((entry) => `
-              <div class="paper-result-row">
-                <span class="paper-result-rank">#${entry.rank}</span>
-                <span class="paper-result-name">${escapeHTML(entry.studentName)}</span>
-                <span class="grade-badge grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
-                <strong class="paper-result-marks">${entry.marks} / ${board.totalMarks}</strong>
+          ${expanded ? `<div class="paper-results-content" style="padding:14px 16px 16px; border-top:1px solid #F1F5F9; background:#FFFFFF;">
+            <!-- Performance Summary Strip -->
+            <div class="exam-summary-strip" style="display:grid; grid-template-columns:repeat(3, 1fr); background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px 8px; margin-bottom:12px; text-align:center;">
+              <div class="ess-item" style="display:flex; flex-direction:column; gap:2px;">
+                <span class="ess-label" style="font-size:10px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.04em;">Top Score</span>
+                <span class="ess-val" style="font-size:14px; font-weight:800; color:#0F172A;">${entries[0] ? `${entries[0].marks} / ${totalMarks}` : "\u2014"}</span>
               </div>
-            `).join("") : '<div class="paper-results-empty">No candidate records published yet.</div>'}
+              <div class="ess-item" style="display:flex; flex-direction:column; gap:2px;">
+                <span class="ess-label" style="font-size:10px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.04em;">Average</span>
+                <span class="ess-val" style="font-size:14px; font-weight:800; color:#0F172A;">${avgScore}</span>
+              </div>
+              <div class="ess-item" style="display:flex; flex-direction:column; gap:2px;">
+                <span class="ess-label" style="font-size:10px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.04em;">Candidates</span>
+                <span class="ess-val" style="font-size:14px; font-weight:800; color:#0F172A;">${entries.length} Students</span>
+              </div>
+            </div>
+
+            <!-- Clean Rankings Table -->
+            <div class="paper-table-wrapper" style="border:1px solid #E2E8F0; border-radius:10px; overflow:hidden; background:#FFFFFF;">
+              <div class="paper-table-header" style="display:flex; align-items:center; padding:9px 12px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.03em;">
+                <span style="width:52px;">Rank</span>
+                <span style="flex:1; min-width:0;">Candidate Name</span>
+                <span style="width:50px; text-align:center;">Grade</span>
+                <span style="width:80px; text-align:right;">Marks</span>
+              </div>
+              <div class="paper-table-body" style="display:flex; flex-direction:column;">
+                ${entries.length ? entries.map((entry) => `
+                  <div class="paper-table-row" style="display:flex; align-items:center; padding:10px 12px; border-bottom:1px solid #F1F5F9; background:#FFFFFF;">
+                    <div class="ptr-rank" style="width:52px; display:flex; align-items:center;">
+                      <span class="rank-num" style="font-size:12px; font-weight:800; width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; ${entry.rank === 1 ? "background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;" : entry.rank === 2 ? "background:#F1F5F9; color:#475569; border:1px solid #E2E8F0;" : entry.rank === 3 ? "background:#FFEDD5; color:#C2410C; border:1px solid #FED7AA;" : "background:#F8FAFC; color:#64748B; border:1px solid #E2E8F0;"}">#${entry.rank}</span>
+                    </div>
+                    <div class="ptr-student" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
+                      <span class="ptr-name" style="font-size:13.5px; font-weight:700; color:#0F172A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(entry.studentName)}</span>
+                    </div>
+                    <div class="ptr-grade" style="width:50px; display:flex; align-items:center; justify-content:center;">
+                      <span class="grade-pill" style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; ${entry.grade === "A" ? "background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0;" : entry.grade === "B" ? "background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;" : entry.grade === "C" ? "background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;" : "background:#F1F5F9; color:#475569; border:1px solid #E2E8F0;"}">${escapeHTML(entry.grade || "A")}</span>
+                    </div>
+                    <div class="ptr-marks" style="width:80px; text-align:right; font-size:13px; font-weight:800; color:#0F172A;">
+                      <span>${entry.marks}</span> <small style="color:#94A3B8; font-weight:600;">/ ${totalMarks}</small>
+                    </div>
+                  </div>
+                `).join("") : '<div style="padding:16px; text-align:center; color:#94A3B8; font-size:12.5px;">No candidate records published yet.</div>'}
+              </div>
+            </div>
           </div>` : ""}
         </article>`;
     }).join("")}

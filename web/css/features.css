@@ -3738,13 +3738,20 @@ button:focus-visible {
 
 /* Flexible action rows that never blow out their containers */
 .paper-actions-row,
-.apk-appbar-actions,
 .apk-actions-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+}
+
+.apk-appbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap !important;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* Prevent flex child blowouts */
