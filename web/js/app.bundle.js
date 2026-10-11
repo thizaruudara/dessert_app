@@ -90907,6 +90907,10 @@ var PwaGatekeeper = class {
   }
   unlockApp() {
     this.isUnlocked = true;
+    document.documentElement.classList.remove("gatekeeper-active");
+    document.body.classList.remove("gatekeeper-active");
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", "#F6FAFF");
     const gatekeeperEl = document.getElementById("pwa-gatekeeper-overlay");
     if (gatekeeperEl) {
       gatekeeperEl.classList.add("fade-out");
@@ -90924,18 +90928,21 @@ var PwaGatekeeper = class {
   renderGatekeeper() {
     const existing = document.getElementById("pwa-gatekeeper-overlay");
     if (existing) existing.remove();
+    document.documentElement.classList.add("gatekeeper-active");
+    document.body.classList.add("gatekeeper-active");
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", "#F1F5F9");
     const platform = this.detectPlatform();
     const info = this.getInstructions(platform);
     const overlay = document.createElement("div");
     overlay.id = "pwa-gatekeeper-overlay";
     overlay.className = "gatekeeper-overlay";
     overlay.innerHTML = `
-      <div class="gatekeeper-ambient-glow glow-1"></div>
-      <div class="gatekeeper-ambient-glow glow-2"></div>
-
       <div class="gatekeeper-card">
+        <div class="card-ambient-glow"></div>
+
         <!-- Top bar with detected device chip -->
-        <div class="gatekeeper-top-bar" style="display:flex; justify-content:center; align-items:center; margin-bottom:12px;">
+        <div class="gatekeeper-top-bar">
           <div class="gatekeeper-device-chip" title="${info.deviceLabel}">
             <span>${platform.isIOS ? "\u{1F34F} iOS" : platform.isAndroid ? "\u{1F916} Android" : "\u{1F4BB} PC"}</span>
             <span>\u2022</span>
@@ -90945,7 +90952,7 @@ var PwaGatekeeper = class {
 
         <div class="gatekeeper-header">
           <div class="gatekeeper-icon-wrap">
-            <img src="./icons/edupeak_logo.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/icon-192.png'" />
+            <img src="./icons/edupeak_transparent_logo.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.png'" />
             <div class="icon-ring-pulse"></div>
           </div>
           <span class="gatekeeper-badge">${info.badge}</span>
