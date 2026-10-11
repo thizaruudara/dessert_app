@@ -53893,6 +53893,7 @@ var AuthService = class {
           ...profile,
           uid: profile.id,
           // For backward compatibility with existing views
+          studentId: profile.studentId || profile.student_id || profile.id,
           role,
           isSubscribed: subscription.isSubscribed,
           subscriptionDetails: subscription
@@ -87032,7 +87033,14 @@ var DbService = class {
           const key = (u2.studentId || u2.id || u2.phone || u2.name).toLowerCase().trim();
           if (map2.has(key)) {
             const existing = map2.get(key);
-            map2.set(key, { ...existing, ...u2 });
+            map2.set(key, {
+              ...u2,
+              ...existing,
+              name: existing.name || u2.name,
+              studentId: existing.studentId || existing.id || u2.studentId || u2.id,
+              id: existing.id || u2.id,
+              credits: Math.max(Number(existing.credits) || 0, Number(u2.credits) || 0)
+            });
           }
         }
       }
@@ -92720,7 +92728,7 @@ var AppController = class {
         <!-- Student ID Badge -->
         <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; padding:3px 10px; background:#F1F5F9; border-radius:12px; font-size:11px; font-weight:700; color:#475569;">
           <span class="material-symbols-rounded" style="font-size:14px; color:#475569;">badge</span>
-          <span>${user.studentId || "EP-" + (user.phone ? user.phone.slice(-4) : "2026")}</span>
+          <span>${user.studentId || (user.id && String(user.id).startsWith("EP-") ? user.id : null) || "EP-" + (user.phone ? user.phone.slice(-4) : "2026")}</span>
         </div>
 
         <div style="margin-top:10px; padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800; background: ${isStandalone ? "#ECFDF5" : "#FEF3C7"}; color: ${isStandalone ? "#047857" : "#B45309"}; border: 1px solid ${isStandalone ? "#A7F3D0" : "#FDE68A"};">

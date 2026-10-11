@@ -3301,7 +3301,7 @@ class AppController {
         <!-- Student ID Badge -->
         <div style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; padding:3px 10px; background:#F1F5F9; border-radius:12px; font-size:11px; font-weight:700; color:#475569;">
           <span class="material-symbols-rounded" style="font-size:14px; color:#475569;">badge</span>
-          <span>${user.studentId || ('EP-' + (user.phone ? user.phone.slice(-4) : '2026'))}</span>
+          <span>${user.studentId || (user.id && String(user.id).startsWith('EP-') ? user.id : null) || ('EP-' + (user.phone ? user.phone.slice(-4) : '2026'))}</span>
         </div>
 
         <div style="margin-top:10px; padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800; background: ${isStandalone ? '#ECFDF5' : '#FEF3C7'}; color: ${isStandalone ? '#047857' : '#B45309'}; border: 1px solid ${isStandalone ? '#A7F3D0' : '#FDE68A'};">

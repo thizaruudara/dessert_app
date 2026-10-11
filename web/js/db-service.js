@@ -857,7 +857,14 @@ export class DbService {
           const key = (u.studentId || u.id || u.phone || u.name).toLowerCase().trim();
           if (map.has(key)) {
             const existing = map.get(key);
-            map.set(key, { ...existing, ...u });
+            map.set(key, {
+              ...u,
+              ...existing,
+              name: existing.name || u.name,
+              studentId: existing.studentId || existing.id || u.studentId || u.id,
+              id: existing.id || u.id,
+              credits: Math.max(Number(existing.credits) || 0, Number(u.credits) || 0)
+            });
           }
         }
       }

@@ -149,6 +149,7 @@ export class AuthService {
         this.currentUser = {
           ...profile,
           uid: profile.id, // For backward compatibility with existing views
+          studentId: profile.studentId || profile.student_id || profile.id,
           role,
           isSubscribed: subscription.isSubscribed,
           subscriptionDetails: subscription
