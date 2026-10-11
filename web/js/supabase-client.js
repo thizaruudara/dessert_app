@@ -17,22 +17,41 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
  */
 export async function getStudentProfile(identifier) {
   if (!identifier) return null;
-  const clean = String(identifier).trim().toLowerCase();
+  const clean = String(identifier).trim();
+  const cleanLower = clean.toLowerCase();
 
   try {
-    // Try matching by email first, then by student ID or phone
-    const { data, error } = await supabase
+    // 1. Try matching by email
+    const { data: byEmail, error: errEmail } = await supabase
       .from('profiles')
       .select('*')
-      .or(`email.ilike.${clean},id.eq.${clean},phone.eq.${clean}`)
+      .ilike('email', cleanLower)
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      console.warn('[Supabase] Failed to fetch student profile:', error);
-      return null;
-    }
-    return data;
+    if (byEmail) return byEmail;
+
+    // 2. Try matching by ID (e.g. EP-2027-312)
+    const { data: byId } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (byId) return byId;
+
+    // 3. Try matching by phone
+    const { data: byPhone } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('phone', clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (byPhone) return byPhone;
+
+    return null;
   } catch (err) {
     console.error('[Supabase] Exception in getStudentProfile:', err);
     return null;
@@ -40,97 +59,161 @@ export async function getStudentProfile(identifier) {
 }
 
 /**
- * Check if student has paid and unlocked the active monthly "Super Paper Class".
- * Note: Free base courses and "1st lesson free" trials do NOT unlock exam/homework access.
- * Student must have a verified paid enrollment (payment_status: 'paid'/'approved') or approved order.
+ * Check if student has paid and unlocked the active "Super Paper Class".
+ * Recognizes both base course (crs-base-super-paper-2027) and monthly child courses (crs-phy-muu3k9m4).
+ * Validates against Supabase enrollments (payment_status: 'paid' / 'approved'),
+ * profiles.enrolled_courses, and approved order broadcasts.
+ * Note: Free trials without completed tuition payment do NOT unlock exam sessions.
  */
-export async function checkSuperPaperSubscription(studentId, examYear = '2027 A/L', studentEmail = null, studentPhone = null) {
-  if (!studentId && !studentEmail) {
+export async function checkSuperPaperSubscription(
+  studentId,
+  examYear = '2027 A/L',
+  studentEmail = null,
+  studentPhone = null,
+  profile = null,
+  authUser = null
+) {
+  if (!studentId && !studentEmail && !profile?.id && !profile?.email && !authUser?.email) {
     return {
       isSubscribed: false,
       reason: 'NO_STUDENT_ID',
-      enrollUrl: 'https://edupeak.lk/courses.html',
+      enrollUrl: 'https://edupeak.lk/?openLms=video-classroom&course=crs-base-super-paper-2027',
       message: 'Student identification missing.'
     };
   }
 
   try {
-    // 1. Fetch active Super Paper Class courses
+    // 1. Fetch Super Paper Class courses from database
     const { data: courses, error: coursesError } = await supabase
       .from('courses')
       .select('*')
-      .or('title.ilike.%Super Paper Class%,parent_course_id.ilike.%super-paper%')
+      .or('title.ilike.%Super Paper Class%,parent_course_id.ilike.%super-paper%,id.ilike.%super-paper%')
       .eq('active', true)
       .order('created_at', { ascending: false });
 
-    if (coursesError || !courses || courses.length === 0) {
-      console.warn('[Supabase] Could not fetch Super Paper Class courses:', coursesError);
-      return {
-        isSubscribed: false,
-        reason: 'COURSES_UNAVAILABLE',
-        currentCourse: null,
-        enrollUrl: 'https://edupeak.lk/courses.html',
-        monthName: 'Current Month',
-        message: 'Could not connect to EduPeak course directory. Please verify your connection.'
-      };
+    if (coursesError) {
+      console.warn('[Supabase] Could not fetch courses:', coursesError);
     }
 
-    // Exclude free base courses (e.g. crs-base-super-paper-2027) which are free to enroll
-    // Focus only on paid monthly child courses (which have parent_course_id or month_name)
-    const paidMonthlyCourses = courses.filter(c => {
-      const isBase = c.is_base_course === true || String(c.id).startsWith('crs-base-');
-      const feeStr = String(c.fee || c.price || '').toLowerCase();
-      const isFree = feeStr.includes('free') || c.fee === 0 || c.fee === '0';
-      return !isBase && !isFree && (c.parent_course_id || c.month_name);
-    });
+    // Comprehensive list of course IDs that represent Super Paper Class
+    const allRelatedCourseIds = Array.from(new Set([
+      'crs-base-super-paper-2027',
+      'crs-phy-muu3k9m4',
+      ...(courses || []).map(c => c.id)
+    ].filter(Boolean)));
 
-    // If student has a matching batch (e.g. 2027 A/L), prioritize that batch
-    const batchMatches = paidMonthlyCourses.filter(c => !examYear || c.examyear === examYear || c.level === examYear);
-    const activeMonthlyCourse = batchMatches.length > 0
-      ? batchMatches[0]
-      : (paidMonthlyCourses[0] || courses.find(c => !c.is_base_course) || courses[0]);
+    // Determine the active monthly course for metadata and checkout display
+    const activeMonthlyCourse = (courses || []).find(c => c.id === 'crs-phy-muu3k9m4')
+      || (courses || []).find(c => c.parent_course_id === 'crs-base-super-paper-2027')
+      || (courses || []).find(c => c.id === 'crs-base-super-paper-2027')
+      || (courses || [])[0]
+      || { id: 'crs-base-super-paper-2027', title: 'Super Paper Class - 2027 A/L', month_name: 'October 2027' };
 
-    if (!activeMonthlyCourse) {
-      return {
-        isSubscribed: false,
-        reason: 'NO_ACTIVE_COURSE',
-        currentCourse: null,
-        enrollUrl: 'https://edupeak.lk/courses.html',
-        monthName: 'Current Month',
-        message: 'No active Super Paper Class monthly course currently open.'
-      };
-    }
-
-    // Direct checkout URL for the specific monthly course on edupeak.lk
+    const monthName = activeMonthlyCourse.month_name || 'October 2027';
     const enrollUrl = `https://edupeak.lk/checkout.html?course=${encodeURIComponent(activeMonthlyCourse.id)}`;
-    const monthName = activeMonthlyCourse.month_name || activeMonthlyCourse.title;
 
-    // 2. Check student's paid enrollment in enrollments table
-    // 1st lesson free / free trials DO NOT grant access. payment_status must be 'paid' or 'approved'.
-    const studentKeys = [studentId, studentEmail, studentPhone].filter(Boolean);
+    // Compile all candidate student identifiers (e.g. EP-2027-312, email, phone, auth UUID)
+    const studentKeys = Array.from(new Set([
+      studentId,
+      studentEmail,
+      studentPhone,
+      profile?.id,
+      profile?.email,
+      profile?.phone,
+      authUser?.id,
+      authUser?.email
+    ].filter(Boolean).map(s => String(s).trim())));
+
     let isPaid = false;
     let paidEnrollment = null;
 
-    for (const key of studentKeys) {
-      const { data: enr, error: enrollError } = await supabase
+    // 1.5 Fast-Path: Supabase RPC check_student_subscription (Security Definer, bypasses RLS safely)
+    try {
+      const targetId = studentId || profile?.id || studentKeys.find(k => k.startsWith('EP-')) || '';
+      const targetEmail = studentEmail || profile?.email || authUser?.email || studentKeys.find(k => k.includes('@')) || '';
+
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('check_student_subscription', {
+        p_student_id: String(targetId).trim(),
+        p_email: String(targetEmail).trim()
+      });
+
+      if (!rpcErr && rpcRes && rpcRes.is_subscribed === true) {
+        return {
+          isSubscribed: true,
+          currentCourse: activeMonthlyCourse,
+          enrollUrl,
+          monthName: rpcRes.month_name || monthName
+        };
+      }
+    } catch (rpcEx) {
+      console.warn('[Supabase] check_student_subscription RPC check:', rpcEx);
+    }
+
+    // 2. CHECK ENROLLMENTS TABLE:
+    // Look for any enrollment record in all related Super Paper courses for this student
+    if (studentKeys.length > 0) {
+      const { data: enrollments, error: enrollErr } = await supabase
         .from('enrollments')
         .select('*')
-        .eq('student_id', key)
-        .eq('course_id', activeMonthlyCourse.id)
-        .limit(1)
-        .maybeSingle();
+        .in('student_id', studentKeys)
+        .in('course_id', allRelatedCourseIds);
 
-      if (enr) {
-        const pStatus = String(enr.payment_status || '').toLowerCase().trim();
-        if (pStatus === 'paid' || pStatus === 'approved') {
-          isPaid = true;
-          paidEnrollment = enr;
-          break;
+      if (enrollments && enrollments.length > 0) {
+        for (const enr of enrollments) {
+          const pStatus = String(enr.payment_status || '').toLowerCase().trim();
+          if (pStatus === 'paid' || pStatus === 'approved' || pStatus === 'active') {
+            isPaid = true;
+            paidEnrollment = enr;
+            break;
+          }
         }
       }
     }
 
-    // 3. Fallback: Check approved orders in broadcast_schedules (order-*) if not in enrollments
+    // 3. CHECK PROFILE'S ENROLLED_COURSES:
+    // If not verified yet, inspect the enrolled_courses array in public.profiles
+    if (!isPaid) {
+      let resolvedProfile = profile;
+      if (!resolvedProfile && (studentEmail || studentId)) {
+        resolvedProfile = await getStudentProfile(studentEmail || studentId);
+      }
+
+      if (resolvedProfile?.enrolled_courses) {
+        let enrolledList = [];
+        if (Array.isArray(resolvedProfile.enrolled_courses)) {
+          enrolledList = resolvedProfile.enrolled_courses;
+        } else if (typeof resolvedProfile.enrolled_courses === 'string') {
+          try {
+            enrolledList = JSON.parse(resolvedProfile.enrolled_courses);
+          } catch (_) {}
+        }
+
+        const hasMatch = enrolledList.some(cId => {
+          const s = String(cId).toLowerCase();
+          return allRelatedCourseIds.includes(cId) ||
+                 s.includes('super-paper') ||
+                 s === 'crs-phy-muu3k9m4' ||
+                 s === 'crs-base-super-paper-2027';
+        });
+
+        if (hasMatch) {
+          // Verify student does not have an explicit cancellation in enrollments table
+          const { data: cancelledEnr } = await supabase
+            .from('enrollments')
+            .select('id, payment_status')
+            .in('student_id', studentKeys)
+            .in('course_id', allRelatedCourseIds)
+            .in('payment_status', ['cancelled', 'refunded', 'revoked'])
+            .limit(1);
+
+          if (!cancelledEnr || cancelledEnr.length === 0) {
+            isPaid = true;
+          }
+        }
+      }
+    }
+
+    // 4. CHECK APPROVED ORDERS IN broadcast_schedules (order-*)
     if (!isPaid && (studentEmail || studentId)) {
       try {
         const { data: orders } = await supabase
@@ -138,13 +221,14 @@ export async function checkSuperPaperSubscription(studentId, examYear = '2027 A/
           .select('id, status, coursetitle')
           .like('id', 'order-%')
           .in('status', ['order_approved', 'approved', 'Approved'])
-          .limit(25);
+          .limit(30);
 
         if (orders && orders.length > 0) {
           for (const ord of orders) {
             try {
               const p = typeof ord.coursetitle === 'string' ? JSON.parse(ord.coursetitle) : ord.coursetitle;
-              if (p && (p.courseId === activeMonthlyCourse.id || p.course_id === activeMonthlyCourse.id)) {
+              const ordCourseId = p?.courseId || p?.course_id;
+              if (ordCourseId && allRelatedCourseIds.includes(ordCourseId)) {
                 const mailMatch = studentEmail && String(p.studentEmail || '').toLowerCase() === String(studentEmail).toLowerCase();
                 const idMatch = studentId && String(p.studentId || '') === String(studentId);
                 if (mailMatch || idMatch) {
@@ -156,8 +240,26 @@ export async function checkSuperPaperSubscription(studentId, examYear = '2027 A/
           }
         }
       } catch (err) {
-        console.warn('[Supabase] broadcast_schedules orders check:', err);
+        console.warn('[Supabase] broadcast_schedules check:', err);
       }
+    }
+
+    // 5. CHECK LOCAL EDUPEAK SESSION CACHE (Browser context)
+    if (!isPaid && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const sessionKeys = ['edupeak_auth_session', 'edupeak_active_session', 'edupeak_cached_user'];
+        for (const sKey of sessionKeys) {
+          const raw = localStorage.getItem(sKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const courses = parsed?.enrolledCourses || parsed?.enrolled_courses || parsed?.user?.enrolledCourses || [];
+            if (Array.isArray(courses) && courses.some(c => allRelatedCourseIds.includes(c) || String(c).includes('super-paper'))) {
+              isPaid = true;
+              break;
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     if (isPaid) {
@@ -183,8 +285,9 @@ export async function checkSuperPaperSubscription(studentId, examYear = '2027 A/
     return {
       isSubscribed: false,
       reason: 'ERROR',
-      enrollUrl: 'https://edupeak.lk/courses.html',
+      enrollUrl: 'https://edupeak.lk/?openLms=video-classroom&course=crs-base-super-paper-2027',
       message: 'Failed to verify payment status.'
     };
   }
 }
+

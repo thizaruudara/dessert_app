@@ -53594,83 +53594,122 @@ var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 async function getStudentProfile(identifier) {
   if (!identifier) return null;
-  const clean = String(identifier).trim().toLowerCase();
+  const clean = String(identifier).trim();
+  const cleanLower = clean.toLowerCase();
   try {
-    const { data, error } = await supabase.from("profiles").select("*").or(`email.ilike.${clean},id.eq.${clean},phone.eq.${clean}`).limit(1).maybeSingle();
-    if (error) {
-      console.warn("[Supabase] Failed to fetch student profile:", error);
-      return null;
-    }
-    return data;
+    const { data: byEmail, error: errEmail } = await supabase.from("profiles").select("*").ilike("email", cleanLower).limit(1).maybeSingle();
+    if (byEmail) return byEmail;
+    const { data: byId } = await supabase.from("profiles").select("*").eq("id", clean).limit(1).maybeSingle();
+    if (byId) return byId;
+    const { data: byPhone } = await supabase.from("profiles").select("*").eq("phone", clean).limit(1).maybeSingle();
+    if (byPhone) return byPhone;
+    return null;
   } catch (err) {
     console.error("[Supabase] Exception in getStudentProfile:", err);
     return null;
   }
 }
-async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L", studentEmail = null, studentPhone = null) {
-  if (!studentId && !studentEmail) {
+async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L", studentEmail = null, studentPhone = null, profile = null, authUser = null) {
+  if (!studentId && !studentEmail && !profile?.id && !profile?.email && !authUser?.email) {
     return {
       isSubscribed: false,
       reason: "NO_STUDENT_ID",
-      enrollUrl: "https://edupeak.lk/courses.html",
+      enrollUrl: "https://edupeak.lk/?openLms=video-classroom&course=crs-base-super-paper-2027",
       message: "Student identification missing."
     };
   }
   try {
-    const { data: courses, error: coursesError } = await supabase.from("courses").select("*").or("title.ilike.%Super Paper Class%,parent_course_id.ilike.%super-paper%").eq("active", true).order("created_at", { ascending: false });
-    if (coursesError || !courses || courses.length === 0) {
-      console.warn("[Supabase] Could not fetch Super Paper Class courses:", coursesError);
-      return {
-        isSubscribed: false,
-        reason: "COURSES_UNAVAILABLE",
-        currentCourse: null,
-        enrollUrl: "https://edupeak.lk/courses.html",
-        monthName: "Current Month",
-        message: "Could not connect to EduPeak course directory. Please verify your connection."
-      };
+    const { data: courses, error: coursesError } = await supabase.from("courses").select("*").or("title.ilike.%Super Paper Class%,parent_course_id.ilike.%super-paper%,id.ilike.%super-paper%").eq("active", true).order("created_at", { ascending: false });
+    if (coursesError) {
+      console.warn("[Supabase] Could not fetch courses:", coursesError);
     }
-    const paidMonthlyCourses = courses.filter((c2) => {
-      const isBase = c2.is_base_course === true || String(c2.id).startsWith("crs-base-");
-      const feeStr = String(c2.fee || c2.price || "").toLowerCase();
-      const isFree = feeStr.includes("free") || c2.fee === 0 || c2.fee === "0";
-      return !isBase && !isFree && (c2.parent_course_id || c2.month_name);
-    });
-    const batchMatches = paidMonthlyCourses.filter((c2) => !examYear || c2.examyear === examYear || c2.level === examYear);
-    const activeMonthlyCourse = batchMatches.length > 0 ? batchMatches[0] : paidMonthlyCourses[0] || courses.find((c2) => !c2.is_base_course) || courses[0];
-    if (!activeMonthlyCourse) {
-      return {
-        isSubscribed: false,
-        reason: "NO_ACTIVE_COURSE",
-        currentCourse: null,
-        enrollUrl: "https://edupeak.lk/courses.html",
-        monthName: "Current Month",
-        message: "No active Super Paper Class monthly course currently open."
-      };
-    }
+    const allRelatedCourseIds = Array.from(new Set([
+      "crs-base-super-paper-2027",
+      "crs-phy-muu3k9m4",
+      ...(courses || []).map((c2) => c2.id)
+    ].filter(Boolean)));
+    const activeMonthlyCourse = (courses || []).find((c2) => c2.id === "crs-phy-muu3k9m4") || (courses || []).find((c2) => c2.parent_course_id === "crs-base-super-paper-2027") || (courses || []).find((c2) => c2.id === "crs-base-super-paper-2027") || (courses || [])[0] || { id: "crs-base-super-paper-2027", title: "Super Paper Class - 2027 A/L", month_name: "October 2027" };
+    const monthName = activeMonthlyCourse.month_name || "October 2027";
     const enrollUrl = `https://edupeak.lk/checkout.html?course=${encodeURIComponent(activeMonthlyCourse.id)}`;
-    const monthName = activeMonthlyCourse.month_name || activeMonthlyCourse.title;
-    const studentKeys = [studentId, studentEmail, studentPhone].filter(Boolean);
+    const studentKeys = Array.from(new Set([
+      studentId,
+      studentEmail,
+      studentPhone,
+      profile?.id,
+      profile?.email,
+      profile?.phone,
+      authUser?.id,
+      authUser?.email
+    ].filter(Boolean).map((s2) => String(s2).trim())));
     let isPaid = false;
     let paidEnrollment = null;
-    for (const key of studentKeys) {
-      const { data: enr, error: enrollError } = await supabase.from("enrollments").select("*").eq("student_id", key).eq("course_id", activeMonthlyCourse.id).limit(1).maybeSingle();
-      if (enr) {
-        const pStatus = String(enr.payment_status || "").toLowerCase().trim();
-        if (pStatus === "paid" || pStatus === "approved") {
-          isPaid = true;
-          paidEnrollment = enr;
-          break;
+    try {
+      const targetId = studentId || profile?.id || studentKeys.find((k2) => k2.startsWith("EP-")) || "";
+      const targetEmail = studentEmail || profile?.email || authUser?.email || studentKeys.find((k2) => k2.includes("@")) || "";
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc("check_student_subscription", {
+        p_student_id: String(targetId).trim(),
+        p_email: String(targetEmail).trim()
+      });
+      if (!rpcErr && rpcRes && rpcRes.is_subscribed === true) {
+        return {
+          isSubscribed: true,
+          currentCourse: activeMonthlyCourse,
+          enrollUrl,
+          monthName: rpcRes.month_name || monthName
+        };
+      }
+    } catch (rpcEx) {
+      console.warn("[Supabase] check_student_subscription RPC check:", rpcEx);
+    }
+    if (studentKeys.length > 0) {
+      const { data: enrollments, error: enrollErr } = await supabase.from("enrollments").select("*").in("student_id", studentKeys).in("course_id", allRelatedCourseIds);
+      if (enrollments && enrollments.length > 0) {
+        for (const enr of enrollments) {
+          const pStatus = String(enr.payment_status || "").toLowerCase().trim();
+          if (pStatus === "paid" || pStatus === "approved" || pStatus === "active") {
+            isPaid = true;
+            paidEnrollment = enr;
+            break;
+          }
+        }
+      }
+    }
+    if (!isPaid) {
+      let resolvedProfile = profile;
+      if (!resolvedProfile && (studentEmail || studentId)) {
+        resolvedProfile = await getStudentProfile(studentEmail || studentId);
+      }
+      if (resolvedProfile?.enrolled_courses) {
+        let enrolledList = [];
+        if (Array.isArray(resolvedProfile.enrolled_courses)) {
+          enrolledList = resolvedProfile.enrolled_courses;
+        } else if (typeof resolvedProfile.enrolled_courses === "string") {
+          try {
+            enrolledList = JSON.parse(resolvedProfile.enrolled_courses);
+          } catch (_) {
+          }
+        }
+        const hasMatch = enrolledList.some((cId) => {
+          const s2 = String(cId).toLowerCase();
+          return allRelatedCourseIds.includes(cId) || s2.includes("super-paper") || s2 === "crs-phy-muu3k9m4" || s2 === "crs-base-super-paper-2027";
+        });
+        if (hasMatch) {
+          const { data: cancelledEnr } = await supabase.from("enrollments").select("id, payment_status").in("student_id", studentKeys).in("course_id", allRelatedCourseIds).in("payment_status", ["cancelled", "refunded", "revoked"]).limit(1);
+          if (!cancelledEnr || cancelledEnr.length === 0) {
+            isPaid = true;
+          }
         }
       }
     }
     if (!isPaid && (studentEmail || studentId)) {
       try {
-        const { data: orders } = await supabase.from("broadcast_schedules").select("id, status, coursetitle").like("id", "order-%").in("status", ["order_approved", "approved", "Approved"]).limit(25);
+        const { data: orders } = await supabase.from("broadcast_schedules").select("id, status, coursetitle").like("id", "order-%").in("status", ["order_approved", "approved", "Approved"]).limit(30);
         if (orders && orders.length > 0) {
           for (const ord of orders) {
             try {
               const p2 = typeof ord.coursetitle === "string" ? JSON.parse(ord.coursetitle) : ord.coursetitle;
-              if (p2 && (p2.courseId === activeMonthlyCourse.id || p2.course_id === activeMonthlyCourse.id)) {
+              const ordCourseId = p2?.courseId || p2?.course_id;
+              if (ordCourseId && allRelatedCourseIds.includes(ordCourseId)) {
                 const mailMatch = studentEmail && String(p2.studentEmail || "").toLowerCase() === String(studentEmail).toLowerCase();
                 const idMatch = studentId && String(p2.studentId || "") === String(studentId);
                 if (mailMatch || idMatch) {
@@ -53683,7 +53722,24 @@ async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L", stu
           }
         }
       } catch (err) {
-        console.warn("[Supabase] broadcast_schedules orders check:", err);
+        console.warn("[Supabase] broadcast_schedules check:", err);
+      }
+    }
+    if (!isPaid && typeof window !== "undefined" && window.localStorage) {
+      try {
+        const sessionKeys = ["edupeak_auth_session", "edupeak_active_session", "edupeak_cached_user"];
+        for (const sKey of sessionKeys) {
+          const raw = localStorage.getItem(sKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const courses2 = parsed?.enrolledCourses || parsed?.enrolled_courses || parsed?.user?.enrolledCourses || [];
+            if (Array.isArray(courses2) && courses2.some((c2) => allRelatedCourseIds.includes(c2) || String(c2).includes("super-paper"))) {
+              isPaid = true;
+              break;
+            }
+          }
+        }
+      } catch (_) {
       }
     }
     if (isPaid) {
@@ -53708,7 +53764,7 @@ async function checkSuperPaperSubscription(studentId, examYear = "2027 A/L", stu
     return {
       isSubscribed: false,
       reason: "ERROR",
-      enrollUrl: "https://edupeak.lk/courses.html",
+      enrollUrl: "https://edupeak.lk/?openLms=video-classroom&course=crs-base-super-paper-2027",
       message: "Failed to verify payment status."
     };
   }
@@ -53770,6 +53826,8 @@ var AuthService = class {
       const { data: { session }, error: getSessionErr } = await supabase.auth.getSession();
       if (!getSessionErr && session?.user && localStorage.getItem("edupeak_is_logged_out") !== "true") {
         await this.syncProfileFromAuthUser(session.user);
+      } else if (this.currentUser && localStorage.getItem("edupeak_is_logged_out") !== "true") {
+        await this.refreshSubscription();
       } else {
         if (localStorage.getItem("edupeak_is_logged_out") === "true") {
           this.currentUser = null;
@@ -53801,7 +53859,7 @@ var AuthService = class {
     if (!authUser) return null;
     const email = authUser.email;
     try {
-      const profile = await getStudentProfile(email);
+      const profile = await getStudentProfile(email || authUser.id);
       if (!profile) {
         console.warn("[Auth] No profile row found in Supabase for:", email);
         this.currentUser = {
@@ -53822,7 +53880,14 @@ var AuthService = class {
         const role = profile.role || authUser.app_metadata?.role || "student";
         let subscription = { isSubscribed: true };
         if (role === "student") {
-          subscription = await checkSuperPaperSubscription(profile.id, profile.exam_year, profile.email, profile.phone);
+          subscription = await checkSuperPaperSubscription(
+            profile.id,
+            profile.exam_year,
+            profile.email,
+            profile.phone,
+            profile,
+            authUser
+          );
         }
         this.currentUser = {
           ...profile,
@@ -53893,13 +53958,35 @@ var AuthService = class {
   }
   // Refresh subscription status on demand
   async refreshSubscription() {
-    if (!this.currentUser || this.currentUser.role !== "student") return;
-    const sub = await checkSuperPaperSubscription(this.currentUser.id, this.currentUser.exam_year, this.currentUser.email, this.currentUser.phone);
-    this.currentUser.isSubscribed = sub.isSubscribed;
-    this.currentUser.subscriptionDetails = sub;
-    localStorage.setItem("edupeak_cached_user", JSON.stringify(this.currentUser));
-    this.notify();
-    return sub;
+    if (!this.currentUser) return { isSubscribed: false };
+    if (this.currentUser.role && this.currentUser.role !== "student") {
+      return { isSubscribed: true };
+    }
+    try {
+      const identifier = this.currentUser.email || this.currentUser.id || this.currentUser.phone;
+      const liveProfile = await getStudentProfile(identifier);
+      const activeData = liveProfile || this.currentUser;
+      const sub = await checkSuperPaperSubscription(
+        activeData.id || this.currentUser.id,
+        activeData.exam_year || this.currentUser.exam_year || "2027 A/L",
+        activeData.email || this.currentUser.email,
+        activeData.phone || this.currentUser.phone,
+        activeData,
+        this.currentUser
+      );
+      this.currentUser = {
+        ...this.currentUser,
+        ...liveProfile || {},
+        isSubscribed: sub.isSubscribed,
+        subscriptionDetails: sub
+      };
+      localStorage.setItem("edupeak_cached_user", JSON.stringify(this.currentUser));
+      this.notify();
+      return sub;
+    } catch (err) {
+      console.error("[Auth] refreshSubscription error:", err);
+      return { isSubscribed: false, error: err };
+    }
   }
 };
 var authService = new AuthService();
@@ -89502,6 +89589,29 @@ var AppController = class {
       const allowedTabs = ["home", "papers", "ranks", "desserts", "profile"];
       this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : "home", { historyMode: "none" });
     });
+    document.addEventListener("click", async (e2) => {
+      const target = e2.target.closest("#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription");
+      if (target) {
+        e2.preventDefault();
+        const origContent = target.innerHTML;
+        target.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; animation: spin 1s linear infinite;">sync</span> <span>Checking...</span>';
+        target.style.pointerEvents = "none";
+        try {
+          const res = await authService.refreshSubscription();
+          if (res && res.isSubscribed) {
+            notificationService.showLocalToast("\u2705 Subscription verified! Full access unlocked.");
+          } else {
+            notificationService.showLocalToast("\u26A0\uFE0F Course payment not found on edupeak.lk yet.");
+          }
+        } finally {
+          target.innerHTML = origContent;
+          target.style.pointerEvents = "auto";
+        }
+        if (this.currentMode === "student") {
+          this.switchTab(this.currentTab || "home", { historyMode: "none" });
+        }
+      }
+    });
     const savedTheme = localStorage.getItem("edupeak_theme") || "light";
     document.documentElement.setAttribute("data-theme", savedTheme);
     this.renderSplashScreen();
@@ -91072,10 +91182,16 @@ var AppController = class {
                 </div>
               </div>
             </div>
-            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
-              <span>Enroll / Pay on EduPeak.lk</span>
-              <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
-            </a>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+                <span>Enroll / Pay on EduPeak.lk</span>
+                <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
+              </a>
+              <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-rounded" style="font-size: 14px;">sync</span>
+                <span>Re-check Access</span>
+              </button>
+            </div>
           </div>
         ` : ""}
 
@@ -92013,10 +92129,16 @@ var AppController = class {
               </div>
             </div>
           </div>
-          <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
-            <span>Enroll / Pay on EduPeak.lk</span>
-            <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
-          </a>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : "https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4")}" target="_blank" rel="noopener noreferrer" style="background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+              <span>Enroll / Pay on EduPeak.lk</span>
+              <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
+            </a>
+            <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-rounded" style="font-size: 14px;">sync</span>
+              <span>Re-check Access</span>
+            </button>
+          </div>
         </div>
       ` : ""}
 

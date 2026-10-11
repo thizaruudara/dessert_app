@@ -71,6 +71,9 @@ export class AuthService {
       const { data: { session }, error: getSessionErr } = await supabase.auth.getSession();
       if (!getSessionErr && session?.user && localStorage.getItem('edupeak_is_logged_out') !== 'true') {
         await this.syncProfileFromAuthUser(session.user);
+      } else if (this.currentUser && localStorage.getItem('edupeak_is_logged_out') !== 'true') {
+        // Re-verify cached user against Supabase to ensure fresh subscription and profile state
+        await this.refreshSubscription();
       } else {
         if (localStorage.getItem('edupeak_is_logged_out') === 'true') {
           this.currentUser = null;
@@ -107,7 +110,7 @@ export class AuthService {
 
     try {
       // Fetch authoritative student profile from Supabase profiles table
-      const profile = await getStudentProfile(email);
+      const profile = await getStudentProfile(email || authUser.id);
 
       if (!profile) {
         console.warn('[Auth] No profile row found in Supabase for:', email);
@@ -133,7 +136,14 @@ export class AuthService {
         let subscription = { isSubscribed: true };
         if (role === 'student') {
           // Check monthly course subscription for Super Paper Class
-          subscription = await checkSuperPaperSubscription(profile.id, profile.exam_year, profile.email, profile.phone);
+          subscription = await checkSuperPaperSubscription(
+            profile.id,
+            profile.exam_year,
+            profile.email,
+            profile.phone,
+            profile,
+            authUser
+          );
         }
 
         this.currentUser = {
@@ -222,13 +232,39 @@ export class AuthService {
 
   // Refresh subscription status on demand
   async refreshSubscription() {
-    if (!this.currentUser || this.currentUser.role !== 'student') return;
-    const sub = await checkSuperPaperSubscription(this.currentUser.id, this.currentUser.exam_year, this.currentUser.email, this.currentUser.phone);
-    this.currentUser.isSubscribed = sub.isSubscribed;
-    this.currentUser.subscriptionDetails = sub;
-    localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
-    this.notify();
-    return sub;
+    if (!this.currentUser) return { isSubscribed: false };
+    if (this.currentUser.role && this.currentUser.role !== 'student') {
+      return { isSubscribed: true };
+    }
+
+    try {
+      const identifier = this.currentUser.email || this.currentUser.id || this.currentUser.phone;
+      const liveProfile = await getStudentProfile(identifier);
+      const activeData = liveProfile || this.currentUser;
+
+      const sub = await checkSuperPaperSubscription(
+        activeData.id || this.currentUser.id,
+        activeData.exam_year || this.currentUser.exam_year || '2027 A/L',
+        activeData.email || this.currentUser.email,
+        activeData.phone || this.currentUser.phone,
+        activeData,
+        this.currentUser
+      );
+
+      this.currentUser = {
+        ...this.currentUser,
+        ...(liveProfile || {}),
+        isSubscribed: sub.isSubscribed,
+        subscriptionDetails: sub
+      };
+
+      localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
+      this.notify();
+      return sub;
+    } catch (err) {
+      console.error('[Auth] refreshSubscription error:', err);
+      return { isSubscribed: false, error: err };
+    }
   }
 }
 

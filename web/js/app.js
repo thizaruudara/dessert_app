@@ -139,6 +139,31 @@ class AppController {
       this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : 'home', { historyMode: 'none' });
     });
 
+    // Delegated Re-check Subscription Handler for all tabs and modals
+    document.addEventListener('click', async (e) => {
+      const target = e.target.closest('#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription');
+      if (target) {
+        e.preventDefault();
+        const origContent = target.innerHTML;
+        target.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; animation: spin 1s linear infinite;">sync</span> <span>Checking...</span>';
+        target.style.pointerEvents = 'none';
+        try {
+          const res = await authService.refreshSubscription();
+          if (res && res.isSubscribed) {
+            notificationService.showLocalToast('✅ Subscription verified! Full access unlocked.');
+          } else {
+            notificationService.showLocalToast('⚠️ Course payment not found on edupeak.lk yet.');
+          }
+        } finally {
+          target.innerHTML = origContent;
+          target.style.pointerEvents = 'auto';
+        }
+        if (this.currentMode === 'student') {
+          this.switchTab(this.currentTab || 'home', { historyMode: 'none' });
+        }
+      }
+    });
+
     // 0. Theme Initialization
     const savedTheme = localStorage.getItem('edupeak_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -1797,10 +1822,16 @@ class AppController {
                 </div>
               </div>
             </div>
-            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
-              <span>Enroll / Pay on EduPeak.lk</span>
-              <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
-            </a>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+                <span>Enroll / Pay on EduPeak.lk</span>
+                <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
+              </a>
+              <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-rounded" style="font-size: 14px;">sync</span>
+                <span>Re-check Access</span>
+              </button>
+            </div>
           </div>
         ` : ''}
 
@@ -2809,10 +2840,16 @@ class AppController {
               </div>
             </div>
           </div>
-          <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="align-self: flex-start; background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
-            <span>Enroll / Pay on EduPeak.lk</span>
-            <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
-          </a>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <a href="${user.subscriptionDetails?.enrollUrl || (user.subscriptionDetails?.currentCourse?.id ? `https://edupeak.lk/checkout.html?course=${encodeURIComponent(user.subscriptionDetails.currentCourse.id)}` : 'https://edupeak.lk/checkout.html?course=crs-phy-muu3k9m4')}" target="_blank" rel="noopener noreferrer" style="background: #D97706; color: white; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+              <span>Enroll / Pay on EduPeak.lk</span>
+              <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
+            </a>
+            <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-rounded" style="font-size: 14px;">sync</span>
+              <span>Re-check Access</span>
+            </button>
+          </div>
         </div>
       ` : ''}
 
