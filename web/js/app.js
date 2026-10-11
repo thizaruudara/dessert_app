@@ -902,7 +902,7 @@ class AppController {
       dbService.getDailyInsight().catch(() => ({})),
       dbService.getPaperSessions(activeTargetYear).catch(() => []),
       dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone).catch(() => 0),
+      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName).catch(() => 0),
       dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
     ]);
     if (renderToken !== this._tabTokens['home'] || !container.isConnected) return;
@@ -3310,7 +3310,7 @@ class AppController {
           `"${approvedItem.subject || 'Dessert'}" has been approved (+${approvedItem.creditsAwarded || 100} XP)!`,
           'success'
         );
-        dbService.getStudentCredits(sId, sPhone).then(pts => {
+        dbService.getStudentCredits(sId, sPhone, user?.studentId || user?.id, sName).then(pts => {
           if (this.currentUser) this.currentUser.credits = pts;
         }).catch(() => {});
       }
@@ -3343,7 +3343,7 @@ class AppController {
     const pendingCount = desserts.filter(d => !d.status || d.status === 'pending').length;
     if (renderToken !== this._tabTokens['profile'] || !container.isConnected) return;
     const totalCount = desserts.length;
-    const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone);
+    const creditsXP = await dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, user.name);
     if (renderToken !== this._tabTokens['profile'] || !container.isConnected) return;
 
     // Format member since date with full Firestore Timestamp support
@@ -3383,7 +3383,7 @@ class AppController {
 
       <!-- Large DP with Camera Badge -->
       <div class="hero-card" style="align-items:center; text-align:center; padding:22px;">
-        <div class="profile-avatar-stack">
+        <div class="profile-avatar-stack" style="cursor:pointer;" title="Tap to change photo">
           ${user.avatarUrl ? `
             <img src="${user.avatarUrl}" class="profile-avatar-img" />
           ` : `
@@ -3550,7 +3550,12 @@ class AppController {
       this.openEditNameDialog(container);
     });
 
-    document.getElementById('btn-change-avatar')?.addEventListener('click', () => {
+    document.getElementById('btn-change-avatar')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openAvatarPickerSheet(container);
+    });
+
+    document.querySelector('.profile-avatar-stack')?.addEventListener('click', () => {
       this.openAvatarPickerSheet(container);
     });
 
@@ -3592,7 +3597,13 @@ class AppController {
     modal.className = 'app-modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:92vh; overflow-y:auto;">
+      <div class="modal-sheet" style="max-height:92vh; overflow-y:auto; position:relative;">
+        <!-- Saving overlay -->
+        <div id="avatar-saving-indicator" style="display:none; position:absolute; inset:0; background:rgba(15,23,42,0.88); backdrop-filter:blur(8px); border-radius:24px; z-index:99; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#FFFFFF;">
+          <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+          <div style="font-size:13px; font-weight:700;">Saving Profile Photo...</div>
+        </div>
+
         <!-- Drag pill -->
         <div style="width:36px; height:4px; background:#CBD5E1; border-radius:2px; margin:0 auto 12px auto;"></div>
 
@@ -3677,13 +3688,48 @@ class AppController {
       if (camCont) camCont.style.display = 'none';
     };
 
+    const compressImage = (dataUrl) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const size = 320;
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const minDim = Math.min(img.width || size, img.height || size);
+          const startX = ((img.width || size) - minDim) / 2;
+          const startY = ((img.height || size) - minDim) / 2;
+          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, size, size);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      });
+    };
+
     const saveAndClose = async (newUrl) => {
-      stopWebcam();
-      await authService.updateProfile({ avatarUrl: newUrl });
-      if (this.currentUser) this.currentUser.avatarUrl = newUrl;
-      notificationService.showInAppBanner('Profile Photo Updated!', 'Your portrait is now updated across all portals.', 'success');
-      modal.remove();
-      if (profileContainer) this.renderProfileScreen(profileContainer);
+      try {
+        stopWebcam();
+        const indicator = modal.querySelector('#avatar-saving-indicator');
+        if (indicator) indicator.style.display = 'flex';
+
+        let finalUrl = newUrl;
+        if (newUrl && newUrl.startsWith('data:image')) {
+          finalUrl = await compressImage(newUrl);
+        }
+
+        await authService.updateProfile({ avatarUrl: finalUrl });
+        if (this.currentUser) this.currentUser.avatarUrl = finalUrl;
+        notificationService.showInAppBanner('Profile Photo Updated!', 'Your portrait is now updated across all portals.', 'success');
+        modal.remove();
+        if (profileContainer) this.renderProfileScreen(profileContainer);
+      } catch (err) {
+        console.error('[Profile] Save avatar error:', err);
+        if (this.currentUser) this.currentUser.avatarUrl = newUrl;
+        modal.remove();
+        if (profileContainer) this.renderProfileScreen(profileContainer);
+      }
     };
 
     modal.querySelector('#btn-close-avatar-sheet')?.addEventListener('click', () => {
@@ -3699,7 +3745,7 @@ class AppController {
       });
     });
 
-    // Gallery File Upload (Reads as Base64 Data URL)
+    // Gallery File Upload (Reads as Base64 Data URL and auto-compresses)
     modal.querySelector('#input-gallery-avatar')?.addEventListener('change', (e) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -3723,7 +3769,7 @@ class AppController {
           camCont.style.display = 'flex';
         }
       } catch (err) {
-        alert('Could not access camera: ' + err.message);
+        alert('Could not access camera: ' + (err.message || 'Permission denied'));
       }
     });
 
@@ -3735,14 +3781,14 @@ class AppController {
       const videoEl = modal.querySelector('#avatar-webcam-preview');
       if (!videoEl) return;
       const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 400;
+      canvas.width = 360;
+      canvas.height = 360;
       const ctx = canvas.getContext('2d');
       // Draw centered square crop
-      const minDim = Math.min(videoEl.videoWidth || 400, videoEl.videoHeight || 400);
-      const startX = ((videoEl.videoWidth || 400) - minDim) / 2;
-      const startY = ((videoEl.videoHeight || 400) - minDim) / 2;
-      ctx.drawImage(videoEl, startX, startY, minDim, minDim, 0, 0, 400, 400);
+      const minDim = Math.min(videoEl.videoWidth || 360, videoEl.videoHeight || 360);
+      const startX = ((videoEl.videoWidth || 360) - minDim) / 2;
+      const startY = ((videoEl.videoHeight || 360) - minDim) / 2;
+      ctx.drawImage(videoEl, startX, startY, minDim, minDim, 0, 0, 360, 360);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       saveAndClose(dataUrl);
     });

@@ -337,7 +337,7 @@ export class DbService {
   async getStudentCredits(studentId, studentPhone, studentIndex, studentName, { forceRefresh = false } = {}) {
     const cacheKey = `credits_${studentId || ''}_${studentPhone || ''}_${studentIndex || ''}_${studentName || ''}`;
     if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 20000);
+      const cached = this.getCached(cacheKey, 10000);
       if (cached !== null && cached !== undefined) return cached;
     }
 
@@ -348,7 +348,7 @@ export class DbService {
 
     let dbCredits = 0;
 
-    // 1. Check live Firestore leaderboard_public (authoritative source for student XP)
+    // 1. Check live Firestore leaderboard_public
     const idsToFetch = Array.from(new Set([cleanIdx, cleanId].filter(Boolean)));
     for (const fetchId of idsToFetch) {
       try {
@@ -363,7 +363,7 @@ export class DbService {
       } catch (_) {}
     }
 
-    // 2. Read live credits from Firestore users collection
+    // 2. Read live credits from Firestore users collection by direct IDs
     for (const fetchId of idsToFetch) {
       try {
         const uSnap = await Promise.race([
@@ -377,12 +377,51 @@ export class DbService {
       } catch (_) {}
     }
 
-    // 3. Fallback: Sum up approved dessert submissions for this student
+    // 3. Query Firestore users collection by phone variants
+    if (cleanPhone) {
+      const phoneVariants = [
+        cleanPhone,
+        '+94' + cleanPhone.slice(-9),
+        '0' + cleanPhone.slice(-9),
+        '94' + cleanPhone.slice(-9)
+      ];
+      try {
+        const usersRef = collection(db, 'users');
+        for (const pv of phoneVariants) {
+          const qSnap = await getDocs(query(usersRef, where('phone', '==', pv))).catch(() => null);
+          if (qSnap && !qSnap.empty) {
+            qSnap.forEach(d => {
+              const uCredits = Number(d.data()?.credits) || 0;
+              if (uCredits > 0) dbCredits = Math.max(dbCredits, uCredits);
+            });
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4. Query Firestore users collection by studentId field
+    if (cleanId) {
+      try {
+        const usersRef = collection(db, 'users');
+        const qSnap = await getDocs(query(usersRef, where('studentId', '==', cleanId))).catch(() => null);
+        if (qSnap && !qSnap.empty) {
+          qSnap.forEach(d => {
+            const uCredits = Number(d.data()?.credits) || 0;
+            if (uCredits > 0) dbCredits = Math.max(dbCredits, uCredits);
+          });
+        }
+      } catch (_) {}
+    }
+
+    // 5. Query live Firestore approved desserts submissions
     let approvedDessertCredits = 0;
     try {
-      const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-      localDesserts.forEach(d => {
-        if (d.status === 'approved') {
+      const dessertsRef = collection(db, 'desserts');
+      const dSnap = await getDocs(query(dessertsRef, where('status', '==', 'approved'))).catch(() => null);
+      if (dSnap && !dSnap.empty) {
+        dSnap.forEach(docSnap => {
+          const d = docSnap.data();
           const dPhone = String(d.studentPhone || d.phone || '').replace(/\D/g, '');
           const dId = String(d.studentId || d.id || '').trim();
           const dName = String(d.studentName || '').toLowerCase().trim();
@@ -393,9 +432,31 @@ export class DbService {
           if (matches) {
             approvedDessertCredits += Number(d.creditsAwarded) || 0;
           }
-        }
-      });
+        });
+      }
     } catch (_) {}
+
+    // Fallback to local desserts cache if network was offline
+    if (approvedDessertCredits === 0) {
+      try {
+        const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+        localDesserts.forEach(d => {
+          if (d.status === 'approved') {
+            const dPhone = String(d.studentPhone || d.phone || '').replace(/\D/g, '');
+            const dId = String(d.studentId || d.id || '').trim();
+            const dName = String(d.studentName || '').toLowerCase().trim();
+            const matches = (cleanId && dId === cleanId) ||
+              (cleanIdx && dId === cleanIdx) ||
+              (cleanPhone && dPhone && (dPhone.endsWith(cleanPhone.slice(-9)) || cleanPhone.endsWith(dPhone.slice(-9)))) ||
+              (cleanName && dName && dName === cleanName);
+            if (matches) {
+              approvedDessertCredits += Number(d.creditsAwarded) || 0;
+            }
+          }
+        });
+      } catch (_) {}
+    }
+
     if (approvedDessertCredits > 0) {
       dbCredits = Math.max(dbCredits, approvedDessertCredits);
     }
@@ -420,7 +481,7 @@ export class DbService {
       return dbCredits;
     }
 
-    // 4. Offline fallback only: check local cache, explicitly filtering out legacy contaminated values (355 / 155 / 305)
+    // 6. Offline fallback only: check local cache, explicitly filtering out legacy contaminated values (355 / 155 / 305)
     let localCredits = 0;
     for (const k of keysToCheck) {
       try {

@@ -218,24 +218,51 @@ export class AuthService {
   async updateProfile(updates = {}) {
     if (!this.currentUser) return null;
 
+    // 1. Immediately apply updates to memory and local storage
+    this.currentUser = { ...this.currentUser, ...updates };
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', this.currentUser.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      this.currentUser = { ...this.currentUser, ...data };
       localStorage.setItem('edupeak_cached_user', JSON.stringify(this.currentUser));
-      this.notify();
-      return this.currentUser;
-    } catch (err) {
-      console.error('[Auth] updateProfile error:', err);
-      throw err;
+    } catch (_) {}
+
+    // 2. Persist to Firestore users collection
+    try {
+      const { db, doc, setDoc } = await import('./firebase-config.js');
+      const uIds = Array.from(new Set([
+        this.currentUser.id,
+        this.currentUser.uid,
+        this.currentUser.studentId,
+        this.currentUser.phone
+      ].filter(Boolean)));
+
+      for (const uId of uIds) {
+        try {
+          await setDoc(doc(db, 'users', String(uId)), {
+            ...updates,
+            updatedAt: new Date()
+          }, { merge: true });
+        } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[Auth] Firestore profile update note:', e);
     }
+
+    // 3. Try syncing to Supabase profiles / logins table safely
+    try {
+      if (this.currentUser.id) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: this.currentUser.id,
+            ...updates,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[Auth] Supabase profiles update note:', e);
+    }
+
+    this.notify();
+    return this.currentUser;
   }
 
   // Refresh subscription status on demand
