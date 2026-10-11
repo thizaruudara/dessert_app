@@ -18,22 +18,37 @@
   align-items: center;
   justify-content: center;
   padding: 8px 6px;
+  min-height: 44px;
   border-radius: 12px;
   border: none;
   background: transparent;
-  color: #64748B;
+  color: #475569;
   font-weight: 700;
   font-size: 12.5px;
   cursor: pointer;
+  touch-action: manipulation;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: center;
 }
 
 .sub-tab-btn .tab-sub {
   font-size: 10px;
-  font-weight: 500;
-  color: #94A3B8;
+  font-weight: 600;
+  color: #64748B;
   margin-top: 2px;
+}
+
+.sub-tab-btn:hover {
+  color: #1E293B;
+}
+
+.sub-tab-btn:active {
+  transform: scale(0.97);
+}
+
+.sub-tab-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .sub-tab-btn.active {
@@ -43,8 +58,8 @@
 }
 
 .sub-tab-btn.active .tab-sub {
-  color: #3B82F6;
-  font-weight: 600;
+  color: #2563EB;
+  font-weight: 700;
 }
 
 /* ── Screen AppBars ── */
@@ -245,6 +260,7 @@
   color: white;
   border: none;
   padding: 11px 12px;
+  min-height: 44px;
   border-radius: 12px;
   font-size: 12.5px;
   font-weight: 800;
@@ -254,6 +270,22 @@
   justify-content: center;
   gap: 6px;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  touch-action: manipulation;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+}
+
+.btn-exam-hall:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32);
+}
+
+.btn-exam-hall:active {
+  transform: scale(0.97);
+}
+
+.btn-exam-hall:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .btn-paper-script {
@@ -261,6 +293,7 @@
   border: 1.5px solid #CBD5E1;
   color: #1E293B;
   padding: 11px 12px;
+  min-height: 44px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 700;
@@ -269,6 +302,22 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  touch-action: manipulation;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, border-color 0.18s ease;
+}
+
+.btn-paper-script:hover {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+}
+
+.btn-paper-script:active {
+  transform: scale(0.97);
+}
+
+.btn-paper-script:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* Upcoming Hints Cards */
@@ -1056,7 +1105,8 @@
 }
 
 .topic-chip {
-  padding: 5px 12px;
+  padding: 6px 12px;
+  min-height: 34px;
   border-radius: 8px;
   font-size: 11.5px;
   font-weight: 700;
@@ -1064,7 +1114,22 @@
   border: 1px solid #CBD5E1;
   color: #334155;
   cursor: pointer;
-  transition: all 0.15s ease;
+  touch-action: manipulation;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.topic-chip:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.topic-chip:active {
+  transform: scale(0.96);
+}
+
+.topic-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .topic-chip.active {
@@ -1085,19 +1150,32 @@
   border: 1.5px dashed #2563EB;
   color: #2563EB;
   padding: 12px;
+  min-height: 60px;
   border-radius: 14px;
   font-weight: 800;
   font-size: 12.5px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  touch-action: manipulation;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .capture-btn:hover {
   background: #EFF6FF;
+  border-color: #1D4ED8;
+}
+
+.capture-btn:active {
+  transform: scale(0.97);
+}
+
+.capture-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* Multi-Page Photo Thumbnails Carousel */
@@ -1145,8 +1223,8 @@
   right: 4px;
   background: #EF4444;
   color: white;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: none;
   display: flex;
@@ -1155,6 +1233,22 @@
   font-size: 11px;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  touch-action: manipulation;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.photo-delete-btn::before {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+
+.photo-delete-btn:hover {
+  background: #DC2626;
+}
+
+.photo-delete-btn:active {
+  transform: scale(0.9);
 }
 
 .telegram-guide-card {
@@ -1387,6 +1481,7 @@
   border: 1.5px solid #E2E8F0;
   border-radius: 14px;
   padding: 12px 14px;
+  min-height: 50px;
   text-align: left;
   font-size: 13.5px;
   font-weight: 600;
@@ -1396,7 +1491,22 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
-  transition: all 0.15s ease;
+  touch-action: manipulation;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mcq-choice-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.mcq-choice-btn:active {
+  transform: scale(0.985);
+}
+
+.mcq-choice-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .mcq-choice-btn.selected {

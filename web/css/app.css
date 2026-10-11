@@ -33,6 +33,22 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  scroll-behavior: smooth;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+::selection {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 body {
   background: #F1F5F9;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -44,6 +60,8 @@ body {
   padding: 0;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Google Material Symbols Rounded (1:1 with Flutter Icons) */
@@ -504,14 +522,14 @@ body {
 .cd-label {
   font-size: 9.5px;
   font-weight: 700;
-  color: #64748B;
+  color: #475569;
   margin-top: 4px;
   letter-spacing: 0.3px;
 }
 
 .cd-colon {
   font-weight: 800;
-  color: #94A3B8;
+  color: #64748B;
   font-size: 15px;
 }
 
@@ -527,19 +545,27 @@ body {
   border: 1px solid #E2E8F0;
   border-radius: 18px;
   padding: 12px 6px;
+  min-height: 84px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  touch-action: manipulation;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .action-card-item:hover {
   transform: translateY(-2px);
+  border-color: #CBD5E1;
 }
 
 .action-card-item:active {
   transform: scale(0.96);
+}
+
+.action-card-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .action-box-mcq { box-shadow: 0 4px 12px rgba(234, 88, 12, 0.08); }
@@ -631,6 +657,7 @@ body {
   color: #FFFFFF;
   border-radius: 12px;
   padding: 12px;
+  min-height: 44px;
   font-size: 13px;
   font-weight: 800;
   display: flex;
@@ -639,11 +666,24 @@ body {
   gap: 6px;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
   cursor: pointer;
-  transition: transform 0.15s ease;
+  touch-action: manipulation;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .sprint-start-btn:hover {
+  background: #1D4ED8;
   transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32);
+}
+
+.sprint-start-btn:active {
+  transform: scale(0.97);
+}
+
+.sprint-start-btn:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.5);
 }
 
 /* ── 7. Weekly Study Quests Card ── */
@@ -839,6 +879,7 @@ body {
   margin-top: 4px;
   width: 100%;
   padding: 12px;
+  min-height: 46px;
   background: #0F172A;
   border: none;
   border-radius: 12px;
@@ -852,11 +893,23 @@ body {
   gap: 6px;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
-  transition: transform 0.15s ease;
+  touch-action: manipulation;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .btn-view-exam-room:hover {
+  background: #1E293B;
   transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.32);
+}
+
+.btn-view-exam-room:active {
+  transform: scale(0.97);
+}
+
+.btn-view-exam-room:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ── 9. High-Yield Physics Concept & Formula Vault (Bilingual) ── */
@@ -972,6 +1025,7 @@ body {
 
 .btn-ask-ai-tutor {
   padding: 11px 14px;
+  min-height: 44px;
   background: #EFF6FF;
   border: 1px solid #DBEAFE;
   border-radius: 12px;
@@ -983,11 +1037,21 @@ body {
   font-weight: 700;
   color: #2563EB;
   cursor: pointer;
-  transition: all 0.2s ease;
+  touch-action: manipulation;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-ask-ai-tutor:hover {
   background: #DBEAFE;
+}
+
+.btn-ask-ai-tutor:active {
+  transform: scale(0.97);
+}
+
+.btn-ask-ai-tutor:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ── 10. AI Tutor Quick Inquiries List ── */
@@ -1022,16 +1086,27 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 11px 12px;
+  min-height: 44px;
   background: #F8FAFC;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  touch-action: manipulation;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .inquiry-item-btn:hover {
   background: #EFF6FF;
   border-color: #BFDBFE;
+}
+
+.inquiry-item-btn:active {
+  transform: scale(0.98);
+}
+
+.inquiry-item-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .inquiry-text {
@@ -1077,32 +1152,37 @@ body {
   gap: 3px;
   background: transparent;
   border: none;
-  outline: none !important;
-  box-shadow: none !important;
+  outline: none;
   color: #64748B;
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   position: relative;
   padding: 4px 6px;
+  min-height: 48px;
+  min-width: 44px;
   border-radius: 16px;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+  touch-action: manipulation;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
   flex: 1;
   max-width: 82px;
 }
 
-.nav-tab-btn:focus,
-.nav-tab-btn:focus-visible,
-.nav-tab-btn:focus-within {
-  outline: none !important;
-  box-shadow: none !important;
+.nav-tab-btn:hover {
+  color: #1E293B;
+}
+
+.nav-tab-btn:focus-visible {
+  outline: 2px solid #2563EB !important;
+  outline-offset: -2px !important;
+  border-radius: 16px;
 }
 
 .nav-tab-btn:active {
-  transform: scale(0.90);
+  transform: scale(0.96);
 }
 
 .nav-pill-icon {
@@ -1226,15 +1306,38 @@ body {
 .modal-close-btn {
   background: #F1F5F9;
   border: none;
-  color: #64748B;
-  width: 32px;
-  height: 32px;
+  color: #475569;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   cursor: pointer;
+  position: relative;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.modal-close-btn::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+.modal-close-btn:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.modal-close-btn:active {
+  transform: scale(0.92);
+}
+
+.modal-close-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .form-group {
@@ -1252,18 +1355,19 @@ body {
 .form-input, .form-select, .form-textarea {
   width: 100%;
   background: #F8FAFC;
-  border: 1px solid #CBD5E1;
+  border: 1.5px solid #CBD5E1;
   color: #0F172A;
   padding: 12px 14px;
   border-radius: 12px;
-  font-size: 13.5px;
+  font-size: 14px;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   border-color: #2563EB;
   background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .btn-primary {
@@ -1273,15 +1377,28 @@ body {
   font-weight: 800;
   font-size: 14px;
   padding: 13px;
+  min-height: 48px;
   border: none;
   border-radius: 14px;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
-  transition: transform 0.15s ease;
+  touch-action: manipulation;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.btn-primary:hover {
+  background: #1D4ED8;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.38);
 }
 
 .btn-primary:active {
   transform: scale(0.98);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.5);
 }
 
 /* Tactile button feedback & loading states */
@@ -1344,5 +1461,25 @@ button:active {
   #in-app-toast-container,
   .in-app-toast-container {
     top: 24px !important;
+  }
+}
+
+/* ── UIUX Accessibility, Touch Targets & Motion Enhancements ── */
+button:disabled,
+.btn-disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(20%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
