@@ -90645,7 +90645,6 @@ var PwaGatekeeper = class {
     });
     this.container = null;
     this.isUnlocked = false;
-    this.lang = localStorage.getItem("edupeak_gatekeeper_lang") || "si";
     this.deferredPrompt = window.__edupeakInstallPrompt || null;
     window.addEventListener("beforeinstallprompt", (e2) => {
       e2.preventDefault();
@@ -90681,7 +90680,7 @@ var PwaGatekeeper = class {
     let browserName = "Browser";
     if (isInApp) {
       browser2 = "inapp";
-      browserName = "In-App Webview (Facebook / WhatsApp / Social)";
+      browserName = "In-App Webview";
     } else if (/Edg\/|EdgiOS|EdgA/i.test(ua2)) {
       browser2 = "edge";
       browserName = "Microsoft Edge";
@@ -90728,7 +90727,6 @@ var PwaGatekeeper = class {
     };
   }
   getInstructions(platform) {
-    const isSi = this.lang === "si";
     const { os, browser: browser2, isInApp, osName, browserName } = platform;
     let title = "";
     let subtitle = "";
@@ -90738,152 +90736,152 @@ var PwaGatekeeper = class {
     let allowNativeInstall = Boolean(this.deferredPrompt);
     let showCopyLink = false;
     if (isInApp) {
-      badge = isSi ? "\u26A0\uFE0F \u0DB6\u0DCF\u0DC4\u0DD2\u0DBB Browser \u0D91\u0D9A\u0D9A\u0DCA \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA\u0DBA\u0DD2" : "\u26A0\uFE0F External Browser Required";
-      title = isSi ? "Chrome \u0DC4\u0DDD Safari \u0DB8\u0D9C\u0DD2\u0DB1\u0DCA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Open in Chrome or Safari";
-      subtitle = isSi ? "\u0D94\u0DB6 \u0DB8\u0DD9\u0DB8 \u0DB4\u0DD2\u0DA7\u0DD4\u0DC0 \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB \u0D87\u0DAD\u0DCA\u0DAD\u0DDA \u0DC3\u0DB8\u0DCF\u0DA2 \u0DB8\u0DCF\u0DB0\u0DCA\u200D\u0DBA App \u0D91\u0D9A\u0D9A\u0DCA (Facebook/WhatsApp) \u0DAD\u0DD4\u0DC5\u0DD2\u0DB1\u0DD2. Add to Home Screen \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8 \u0DC3\u0DB3\u0DC4\u0DCF \u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0DB4\u0DCA\u200D\u0DBB\u0DB0\u0DCF\u0DB1 Browser \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1." : "You are viewing EduPeak inside an in-app social browser. To add EduPeak to your Home Screen, please open it in Chrome or Safari.";
+      badge = "\u26A0\uFE0F External Browser \u0D91\u0D9A\u0D9A\u0DCA \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA\u0DBA\u0DD2";
+      title = "Chrome \u0DC4\u0DDD Safari \u0DB8\u0D9C\u0DD2\u0DB1\u0DCA Open \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1";
+      subtitle = "\u0D94\u0DB6 \u0DB8\u0DD9\u0DB8 \u0DB4\u0DD2\u0DA7\u0DD4\u0DC0 \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB \u0D87\u0DAD\u0DCA\u0DAD\u0DDA Social Media App \u0D91\u0D9A\u0D9A\u0DCA (WhatsApp/FB) \u0DAD\u0DD4\u0DC5\u0DD2\u0DB1\u0DD2. Add to Home Screen \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8 \u0DC3\u0DB3\u0DC4\u0DCF \u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0DB4\u0DCA\u200D\u0DBB\u0DB0\u0DCF\u0DB1 Browser \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Open \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.";
       showCopyLink = true;
       steps = [
         {
           num: "1",
-          title: isSi ? "\u0DB8\u0DD9\u0DB1\u0DD4 \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DB1\u0DCA\u0DB1" : "Tap the Menu Button",
-          desc: isSi ? "\u0D89\u0DC4\u0DC5 \u0DC4\u0DDD \u0DB4\u0DC4\u0DC5 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 \u0DAD\u0DD2\u0DAD\u0DCA 3 (\u22EE \u0DC4\u0DDD \u22EF) \u0DC4\u0DDD Share \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA \u0D94\u0DB6\u0DB1\u0DCA\u0DB1." : "Tap the 3 dots (\u22EE or \u22EF) or Share icon in your current app.",
+          title: "Menu (\u22EE \u0DC4\u0DDD \u22EF) \u0DC4\u0DDD Share Icon \u0D91\u0D9A Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: "\u0D89\u0DC4\u0DC5 \u0DC4\u0DDD \u0DB4\u0DC4\u0DC5 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 3-dots Menu \u0D91\u0D9A (\u22EE \u0DC4\u0DDD \u22EF) \u0DC4\u0DDD Share \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>`
         },
         {
           num: "2",
-          title: isSi ? '"Open in Chrome" \u0DC4\u0DDD "Open in Safari" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1' : 'Select "Open in Chrome" or "Open in Safari"',
-          desc: isSi ? '\u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DD9\u0DB1\u0DCA "Open in external browser" / "Open in Chrome / Safari" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.' : 'Choose "Open in external browser" or "Open in Safari / Chrome" from the options.',
+          title: '"Open in Chrome" \u0DC4\u0DDD "Open in Safari" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: '\u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DD9\u0DB1\u0DCA <strong>"Open in external browser"</strong> / <strong>"Open in Chrome / Safari"</strong> \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`
         },
         {
           num: "3",
-          title: isSi ? "Home Screen \u0D91\u0D9A\u0DA7 \u0D91\u0D9A\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Add to Home Screen",
-          desc: isSi ? "\u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0DC0\u0DB1 Browser \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DC4\u0DAD \u0D8B\u0DB4\u0DAF\u0DD9\u0DC3\u0DCA \u0D85\u0DB1\u0DD4\u0DC0 Add to Home Screen \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1." : "Follow the prompt in your main browser to install EduPeak on your Home Screen.",
+          title: "Home Screen \u0D91\u0D9A\u0DA7 Add \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1",
+          desc: "\u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0DC0\u0DB1 Browser \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Add to Home Screen \u0D9A\u0DBB EduPeak App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
         }
       ];
     } else if (os === "ios" && (browser2 === "safari" || browser2 === "other")) {
-      badge = isSi ? "\u{1F34E} iOS Home Screen \u0DC3\u0DCA\u0DAE\u0DCF\u0DB4\u0DB1\u0DBA \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA\u0DBA\u0DD2" : "\u{1F34E} iOS Home Screen Required";
-      title = isSi ? "EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 Home Screen \u0D91\u0D9A\u0DA7 \u0D91\u0D9A\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Install EduPeak on Your Home Screen";
-      subtitle = isSi ? "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DB3\u0DC4\u0DCF <strong>\u0D9A\u0DD0\u0DB8\u0DBB\u0DCF Proctored \u0DB4\u0DAF\u0DCA\u0DB0\u0DAD\u0DD2\u0DBA</strong>, <strong>\u0DC3\u0DA2\u0DD3\u0DC0\u0DD3 Push Alerts</strong> \u0DC3\u0DC4 <strong>Fullscreen \u0D85\u0DAD\u0DCA\u0DAF\u0DD0\u0D9A\u0DD3\u0DB8</strong> \u0DBD\u0DB6\u0DCF\u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 EduPeak Home Screen \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0D9A\u0DCA\u200D\u0DBB\u0DD2\u0DBA\u0DCF\u0DAD\u0DCA\u0DB8\u0D9A \u0DC0\u0DD2\u0DBA \u0DBA\u0DD4\u0DAD\u0DD4\u0DBA." : "To enable <strong>Live Exam Proctoring</strong>, <strong>Real-Time Push Alerts</strong>, and distraction-free fullscreen, Apple requires EduPeak to be launched from your Home Screen.";
+      badge = "\u{1F34E} iOS Home Screen Required";
+      title = "EduPeak App \u0D91\u0D9A Home Screen \u0D91\u0D9A\u0DA7 Add \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1";
+      subtitle = "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DB3\u0DC4\u0DCF <strong>Live Camera Proctoring</strong>, <strong>Real-Time Push Alerts</strong> \u0DC3\u0DC4 <strong>Fullscreen Exam Mode</strong> \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DC3\u0DB3\u0DC4\u0DCF EduPeak App \u0D91\u0D9A Home Screen \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Open \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8 \u0D85\u0DB1\u0DD2\u0DC0\u0DCF\u0DBB\u0DCA\u0DBA \u0DC0\u0DDA.";
       showSafariArrow = true;
       steps = [
         {
           num: "1",
-          title: isSi ? "Safari Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 (\u238B) \u0D94\u0DB6\u0DB1\u0DCA\u0DB1" : "Tap Safari Share Button (\u238B)",
-          desc: isSi ? "Safari \u0DC4\u0DD2 \u0DB4\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 (\u0D9A\u0DDC\u0DA7\u0DD4\u0DC0\u0D9A\u0DCA \u0DAD\u0DD4\u0DC5 \u0D8B\u0DA9\u0DA7 \u0D8A\u0DAD\u0DBD\u0DBA\u0D9A\u0DCA \u0D87\u0DAD\u0DD2 \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA) \u0D94\u0DB6\u0DB1\u0DCA\u0DB1." : "Tap the Share icon in the Safari bottom navigation bar.",
+          title: "Safari \u0DB4\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 Share Icon (\u238B) \u0D91\u0D9A Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: "Safari \u0DC4\u0DD2 \u0DB4\u0DC4\u0DC5 navigation bar \u0D91\u0D9A\u0DDA \u0D87\u0DAD\u0DD2 Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 (\u0D9A\u0DDC\u0DA7\u0DD4\u0DC0 \u0DAD\u0DD4\u0DC5 \u0D8B\u0DA9 \u0D8A\u0DAD\u0DBD\u0DBA) Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>`
         },
         {
           num: "2",
-          title: isSi ? '"Add to Home Screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1' : 'Select "Add to Home Screen"',
-          desc: isSi ? 'Share \u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DDA \u0DB4\u0DC4\u0DC5\u0DA7 \u0D9C\u0DDC\u0DC3\u0DCA <strong>"Add to Home Screen"</strong> (\u2795 \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA) \u0D94\u0DB6\u0DB1\u0DCA\u0DB1.' : 'Scroll down the share sheet and tap <strong>"Add to Home Screen"</strong> (\u2795 icon).',
+          title: 'Share sheet \u0D91\u0D9A\u0DD9\u0DB1\u0DCA "Add to Home Screen" (+) \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: '\u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DDA \u0DB4\u0DC4\u0DC5\u0DA7 Scroll \u0D9A\u0DBB \u2795 <strong>"Add to Home Screen"</strong> option \u0D91\u0D9A \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
         },
         {
           num: "3",
-          title: isSi ? '"Add" \u0D94\u0DB6\u0DCF Home Screen \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Launch \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1' : 'Tap "Add" & Launch from Home Screen',
-          desc: isSi ? '\u0D89\u0DC4\u0DC5 \u0DAF\u0D9A\u0DD4\u0DAB\u0DDA \u0D87\u0DAD\u0DD2 <strong>"Add"</strong> \u0D94\u0DB6\u0DB1\u0DCA\u0DB1. \u0D89\u0DB1\u0DCA\u0DB4\u0DC3\u0DD4 \u0D94\u0DB6\u0DDA Home Screen \u0DC4\u0DD2 \u0D87\u0DAD\u0DD2 <strong>EduPeak</strong> \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA\u0DD9\u0DB1\u0DCA \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1!' : 'Tap <strong>"Add"</strong> in the top-right corner. Then launch <strong>EduPeak</strong> from your Home Screen!',
+          title: '\u0D89\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 "Add" Click \u0D9A\u0DBB App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Open \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: '\u0D89\u0DC4\u0DC5 \u0DAF\u0D9A\u0DD4\u0DAB\u0DD4 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 <strong>"Add"</strong> \u0D94\u0DB6\u0DCF, Home Screen \u0D91\u0D9A\u0DDA \u0DC4\u0DD0\u0DAF\u0DD4\u0DB1\u0DD4 <strong>EduPeak App</strong> icon \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1!',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
         }
       ];
     } else if (os === "ios") {
-      badge = isSi ? "\u{1F34E} Safari Browser \u0DB7\u0DCF\u0DC0\u0DD2\u0DAD\u0DCF \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "\u{1F34E} Use Apple Safari";
-      title = isSi ? "Safari \u0DB8\u0D9C\u0DD2\u0DB1\u0DCA Home Screen \u0D91\u0D9A\u0DA7 \u0D91\u0D9A\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Please Open in Apple Safari";
-      subtitle = isSi ? "Apple iOS \u0DB8\u0DD9\u0DC4\u0DD9\u0DBA\u0DD4\u0DB8\u0DCA \u0DB4\u0DAF\u0DCA\u0DB0\u0DAD\u0DD2\u0DBA\u0DDA Web Push Notifications \u0DC3\u0DC4 Home Screen App \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DBD\u0DB6\u0DCF\u0DAF\u0DD9\u0DB1\u0DCA\u0DB1\u0DDA <strong>Apple Safari Browser</strong> \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DB8\u0DAB\u0DD2." : "Apple iOS only supports full PWA installation and Push Notifications when launched via the <strong>Apple Safari</strong> browser.";
+      badge = "\u{1F34E} Apple Safari Browser Required";
+      title = "EduPeak Link \u0D91\u0D9A Safari \u0DB8\u0D9C\u0DD2\u0DB1\u0DCA Open \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1";
+      subtitle = "Apple iOS \u0DC0\u0DBD Web Push Notifications \u0DC3\u0DC4 Home Screen App \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DBD\u0DB6\u0DCF\u0DAF\u0DD9\u0DB1\u0DCA\u0DB1\u0DDA <strong>Apple Safari Browser</strong> \u0DC4\u0DBB\u0DC4\u0DCF \u0DB4\u0DB8\u0DAB\u0DD2.";
       showCopyLink = true;
       steps = [
         {
           num: "1",
-          title: isSi ? "\u0DBD\u0DD2\u0DB1\u0DCA\u0D9A\u0DCA \u0D91\u0D9A Copy \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1" : "Copy the Website Link",
-          desc: isSi ? '\u0DB4\u0DC4\u0DAD \u0D87\u0DAD\u0DD2 "Copy Link" \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DCF EduPeak \u0DC0\u0DD9\u0DB6\u0DCA \u0DBD\u0DD2\u0DB4\u0DD2\u0DB1\u0DBA Copy \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1.' : 'Tap "Copy Link" below to copy the EduPeak web address to your clipboard.',
+          title: "EduPeak Link \u0D91\u0D9A Copy \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1",
+          desc: '\u0DB4\u0DC4\u0DAD \u0D87\u0DAD\u0DD2 "Copy Link" \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DCF EduPeak web address \u0D91\u0D9A Copy \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
         },
         {
           num: "2",
-          title: isSi ? "Apple Safari \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Open Apple Safari",
-          desc: isSi ? "\u0D94\u0DB6\u0DDA iPhone \u0DC4\u0DD2 \u0D87\u0DAD\u0DD2 Safari Browser \u0D91\u0D9A \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB \u0DBD\u0DD2\u0DB4\u0DD2\u0DB1\u0DBA Paste \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1." : "Open Safari on your iPhone, paste the copied link, and open it.",
+          title: "Apple Safari Browser \u0D91\u0D9A Open \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: "\u0D94\u0DB6\u0DDA iPhone \u0DC4\u0DD2 \u0D87\u0DAD\u0DD2 Safari Browser \u0D91\u0D9A Open \u0D9A\u0DBB Copy \u0D9A\u0DBB\u0D9C\u0DAD\u0DCA Link \u0D91\u0D9A Paste \u0D9A\u0DBB \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>`
         },
         {
           num: "3",
-          title: isSi ? "Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8\u0DD9\u0DB1\u0DCA Add to Home Screen \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Add to Home Screen via Safari",
-          desc: isSi ? 'Safari \u0DC4\u0DD2 \u0DB4\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 (\u238B) \u0D94\u0DB6\u0DCF "Add to Home Screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.' : 'Tap the Safari Share button (\u238B) and select "Add to Home Screen".',
+          title: "Share (\u238B) \u0DB8\u0D9C\u0DD2\u0DB1\u0DCA Add to Home Screen \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: 'Safari \u0DB4\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 Share icon \u0D91\u0D9A (\u238B) \u0D94\u0DB6\u0DCF "Add to Home Screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
         }
       ];
     } else if (os === "android" && browser2 === "chrome") {
-      badge = isSi ? "\u{1F916} Android Home Screen \u0DC3\u0DCA\u0DAE\u0DCF\u0DB4\u0DB1\u0DBA \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA\u0DBA\u0DD2" : "\u{1F916} Android Installation Required";
-      title = isSi ? "EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 Phone \u0D91\u0D9A\u0DA7 Install \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Install EduPeak on Your Phone";
-      subtitle = isSi ? "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC0\u0DBD\u0DAF\u0DD3 \u0DC0\u0DD9\u0DB1\u0DAD\u0DCA Tab \u0DC0\u0DBD\u0DA7 \u0DB8\u0DCF\u0DBB\u0DD4\u0DC0\u0DD3\u0DB8 \u0DC0\u0DD0\u0DC5\u0DD0\u0D9A\u0DCA\u0DC0\u0DD3\u0DB8\u0DA7 \u0DC3\u0DC4 <strong>\u0DC3\u0DA2\u0DD3\u0DC0\u0DD3 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C Push Alerts</strong> \u0DBD\u0DB6\u0DCF\u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 EduPeak Home Screen App \u0D91\u0D9A\u0D9A\u0DCA \u0DBD\u0DD9\u0DC3 \u0DB7\u0DCF\u0DC0\u0DD2\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1." : "To prevent accidental tab switching during live exams and receive <strong>Real-Time Paper Alerts</strong>, install EduPeak as a standalone app.";
+      badge = "\u{1F916} Android Home Screen App";
+      title = "EduPeak App \u0D91\u0D9A Phone \u0D91\u0D9A\u0DA7 Install \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1";
+      subtitle = "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0D85\u0DAD\u0DBB\u0DAD\u0DD4\u0DBB accidental tab switches \u0DC0\u0DD0\u0DC5\u0DD0\u0D9A\u0DCA\u0DC0\u0DD3\u0DB8\u0DA7 \u0DC3\u0DC4 <strong>Real-Time Paper Push Alerts</strong> \u0DBD\u0DB6\u0DCF\u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 EduPeak Home Screen App \u0D91\u0D9A\u0D9A\u0DCA \u0DBD\u0DD9\u0DC3 Use \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.";
       allowNativeInstall = true;
       steps = [
         {
           num: "1",
-          title: isSi ? "Chrome \u0DB8\u0DD9\u0DB1\u0DD4\u0DC0 (\u22EE) \u0D94\u0DB6\u0DB1\u0DCA\u0DB1" : "Tap the Chrome Menu (\u22EE)",
-          desc: isSi ? "Chrome Browser \u0DC4\u0DD2 \u0D89\u0DC4\u0DC5 \u0DAF\u0D9A\u0DD4\u0DAB\u0DD4 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 \u0DAD\u0DD2\u0DAD\u0DCA 3 (\u22EE) \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA \u0D94\u0DB6\u0DB1\u0DCA\u0DB1." : "Tap the three-dot menu (\u22EE) in the top-right corner of Chrome.",
+          title: "Chrome Menu \u0DC4\u0DD2 \u0DAD\u0DD2\u0DAD\u0DCA 3 (\u22EE) Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: "Chrome browser \u0DC4\u0DD2 \u0D89\u0DC4\u0DC5 \u0DAF\u0D9A\u0DD4\u0DAB\u0DD4 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 3-dots Menu (\u22EE) icon \u0D91\u0D9A Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>`
         },
         {
           num: "2",
-          title: isSi ? '"Install app" \u0DC4\u0DDD "Add to Home screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1' : 'Select "Install app" or "Add to Home screen"',
-          desc: isSi ? '\u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DD9\u0DB1\u0DCA <strong>"Install app"</strong> \u0DC4\u0DDD <strong>"Add to Home screen"</strong> \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.' : 'Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong> from the dropdown menu.',
+          title: '"Install app" \u0DC4\u0DDD "Add to Home screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: 'Menu \u0D91\u0D9A\u0DD9\u0DB1\u0DCA <strong>"Install app"</strong> \u0DC4\u0DDD <strong>"Add to Home screen"</strong> option \u0D91\u0D9A \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
         },
         {
           num: "3",
-          title: isSi ? '"Install" \u0D94\u0DB6\u0DCF Home Screen \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Launch \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1' : 'Tap "Install" & Open from Home Screen',
-          desc: isSi ? '\u0DB4\u0DD9\u0DB1\u0DCA\u0DC0\u0DB1 Dialog \u0D91\u0D9A\u0DDA <strong>"Install"</strong> \u0D94\u0DB6\u0DB1\u0DCA\u0DB1. \u0D89\u0DB1\u0DCA\u0DB4\u0DC3\u0DD4 Home Screen \u0DC4\u0DD2 \u0D87\u0DAD\u0DD2 <strong>EduPeak</strong> \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA\u0DD9\u0DB1\u0DCA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1!' : 'Confirm by tapping <strong>"Install"</strong>. Then launch EduPeak directly from your phone screen!',
+          title: '"Install" Confirm \u0D9A\u0DBB App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Open \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: '\u0DB4\u0DD9\u0DB1\u0DCA\u0DC0\u0DB1 dialog \u0D91\u0D9A\u0DDA <strong>"Install"</strong> \u0D94\u0DB6\u0DCF Home Screen \u0D91\u0D9A\u0DDA \u0DC4\u0DD0\u0DAF\u0DD9\u0DB1 <strong>EduPeak App</strong> icon \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1!',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
         }
       ];
     } else if (os === "android") {
-      badge = isSi ? "\u{1F4F1} Home Screen \u0DC3\u0DCA\u0DAE\u0DCF\u0DB4\u0DB1\u0DBA \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA\u0DBA\u0DD2" : "\u{1F4F1} Home Screen Installation Required";
-      title = isSi ? "EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 Home Screen \u0D91\u0D9A\u0DA7 \u0D91\u0D9A\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Add EduPeak to Your Home Screen";
-      subtitle = isSi ? "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DC4 Push \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DC3\u0DB8\u0DCA\u0DB4\u0DD6\u0DBB\u0DCA\u0DAB\u0DBA\u0DD9\u0DB1\u0DCA\u0DB8 \u0DBD\u0DB6\u0DCF\u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 \u0D94\u0DB6\u0D9C\u0DDA \u0DAF\u0DD4\u0DBB\u0D9A\u0DAE\u0DB1\u0DBA\u0DDA Home Screen \u0D91\u0D9A\u0DA7 \u0D91\u0D9A\u0DCA \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1." : "Install EduPeak on your home screen for full access to exams, push alerts, and camera submissions.";
+      badge = "\u{1F4F1} Android Home Screen Installation";
+      title = "EduPeak App \u0D91\u0D9A Home Screen \u0D91\u0D9A\u0DA7 Add \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1";
+      subtitle = "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DC4 Push Alerts \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DBD\u0DB6\u0DCF\u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 \u0D94\u0DB6\u0D9C\u0DDA Phone \u0D91\u0D9A\u0DDA Home Screen \u0D91\u0D9A\u0DA7 Add \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1.";
       allowNativeInstall = true;
       steps = [
         {
           num: "1",
-          title: isSi ? "Browser \u0DB8\u0DD9\u0DB1\u0DD4\u0DC0 (\u2630 \u0DC4\u0DDD \u22EE) \u0D94\u0DB6\u0DB1\u0DCA\u0DB1" : "Tap Browser Menu (\u2630 or \u22EE)",
-          desc: isSi ? "\u0DB4\u0DC4\u0DC5 \u0DC4\u0DDD \u0D89\u0DC4\u0DC5 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 Browser \u0DB8\u0DD9\u0DB1\u0DD4 \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DB1\u0DCA\u0DB1." : "Tap the browser menu button at the top or bottom of your screen.",
+          title: "Browser Menu (\u2630 \u0DC4\u0DDD \u22EE) \u0D91\u0D9A Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: "\u0DB4\u0DC4\u0DC5 \u0DC4\u0DDD \u0D89\u0DC4\u0DC5 \u0D9A\u0DD9\u0DC5\u0DC0\u0DBB\u0DDA \u0D87\u0DAD\u0DD2 Menu \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 Tap \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`
         },
         {
           num: "2",
-          title: isSi ? '"+ Add page to" -> "Home screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1' : 'Select "+ Add page to" -> "Home screen"',
-          desc: isSi ? '\u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DD9\u0DB1\u0DCA <strong>"+ Add page to"</strong> \u0DAD\u0DDD\u0DBB\u0DCF <strong>"Home screen"</strong> \u0D94\u0DB6\u0DB1\u0DCA\u0DB1.' : 'Tap <strong>"+ Add page to"</strong> then select <strong>"Home screen"</strong>.',
+          title: '"+ Add page to" \u2794 "Home screen" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: '\u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DD9\u0DB1\u0DCA <strong>"+ Add page to"</strong> \u0DAD\u0DDD\u0DBB\u0DCF <strong>"Home screen"</strong> option \u0D91\u0D9A Click \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
         },
         {
           num: "3",
-          title: isSi ? '"Add" \u0DAD\u0DC4\u0DC0\u0DD4\u0DBB\u0DD4 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1' : 'Tap "Add" & Open App',
-          desc: isSi ? '"Add" \u0D94\u0DB6\u0DCF \u0DAD\u0DC4\u0DC0\u0DD4\u0DBB\u0DD4 \u0D9A\u0DBB Home Screen \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA\u0DD9\u0DB1\u0DCA \u0D87\u0DAD\u0DD4\u0DC5\u0DD4 \u0DC0\u0DB1\u0DCA\u0DB1.' : 'Confirm by tapping "Add". Then open EduPeak from your Home Screen.',
+          title: '"Add" Confirm \u0D9A\u0DBB App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Open \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: '"Add" \u0D94\u0DB6\u0DCF Confirm \u0D9A\u0DBB Home Screen \u0D91\u0D9A\u0DDA \u0DC4\u0DD0\u0DAF\u0DD9\u0DB1 EduPeak App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
         }
       ];
     } else {
-      badge = isSi ? "\u{1F4BB} Desktop App \u0DC3\u0DCA\u0DAE\u0DCF\u0DB4\u0DB1\u0DBA" : "\u{1F4BB} Desktop App Installation";
-      title = isSi ? "EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 \u0DB4\u0DBB\u0DD2\u0D9C\u0DAB\u0D9A\u0DBA\u0DA7 Install \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Install EduPeak as a Desktop App";
-      subtitle = isSi ? "\u0DC0\u0DA9\u0DCF\u0DAD\u0DCA \u0DC0\u0DDA\u0D9C\u0DC0\u0DAD\u0DCA \u0D9A\u0DCA\u200D\u0DBB\u0DD2\u0DBA\u0DCF\u0D9A\u0DCF\u0DBB\u0DD3\u0DAD\u0DCA\u0DC0\u0DBA\u0D9A\u0DCA \u0DC3\u0DC4 \u0DAD\u0DB1\u0DD2 \u0D9A\u0DC0\u0DD4\u0DC5\u0DD4\u0DC0\u0D9A Fullscreen \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0D85\u0DAD\u0DCA\u0DAF\u0DD0\u0D9A\u0DD3\u0DB8\u0D9A\u0DCA \u0DC3\u0DB3\u0DC4\u0DCF EduPeak \u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 \u0D94\u0DB6\u0DDA \u0DB4\u0DBB\u0DD2\u0D9C\u0DAB\u0D9A\u0DBA\u0DA7 Install \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1." : "For enhanced speed, fullscreen proctoring, and a dedicated desktop window, install EduPeak on your PC or Mac.";
+      badge = "\u{1F4BB} Desktop App Installation";
+      title = "EduPeak App \u0D91\u0D9A \u0DB4\u0DBB\u0DD2\u0D9C\u0DAB\u0D9A\u0DBA\u0DA7 Install \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1";
+      subtitle = "\u0DC0\u0DDA\u0D9C\u0DC0\u0DAD\u0DCA performance, dedicated window \u0DC3\u0DC4 fullscreen exam mode \u0D85\u0DAD\u0DCA\u0DAF\u0DD0\u0D9A\u0DD3\u0DB8\u0D9A\u0DCA \u0DC3\u0DB3\u0DC4\u0DCF EduPeak App \u0D91\u0D9A PC / Laptop \u0D91\u0D9A\u0DA7 Install \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1.";
       allowNativeInstall = true;
       steps = [
         {
           num: "1",
-          title: isSi ? "\u0DBD\u0DD2\u0DB4\u0DD2\u0DB1 \u0DAD\u0DD3\u0DBB\u0DD4\u0DC0\u0DDA (Address Bar) \u0D87\u0DAD\u0DD2 Install \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA (\u2295) \u0D9A\u0DCA\u0DBD\u0DD2\u0D9A\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "Click the Install Icon (\u2295) in Address Bar",
-          desc: isSi ? "Browser \u0D91\u0D9A\u0DDA \u0D89\u0DC4\u0DC5 \u0DBD\u0DD2\u0DB4\u0DD2\u0DB1 \u0DAD\u0DD3\u0DBB\u0DD4\u0DC0\u0DDA (URL bar) \u0DAF\u0D9A\u0DD4\u0DAB\u0DD4 \u0DB4\u0DC3 \u0D87\u0DAD\u0DD2 Install / App \u0D85\u0DBA\u0DD2\u0D9A\u0DB1\u0DBA \u0D94\u0DB6\u0DB1\u0DCA\u0DB1." : "Look for the Install icon (\u2295 / computer icon) at the right end of the URL address bar.",
+          title: "Address Bar \u0D91\u0D9A\u0DDA \u0D87\u0DAD\u0DD2 Install Icon (\u2295) \u0D91\u0D9A Click \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1",
+          desc: "Browser \u0D91\u0D9A\u0DDA \u0D89\u0DC4\u0DC5 URL Address Bar \u0D91\u0D9A\u0DDA \u0DAF\u0D9A\u0DD4\u0DAB\u0DD4 \u0DB4\u0DC3 \u0D87\u0DAD\u0DD2 Install / App icon \u0D91\u0D9A Click \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.",
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
         },
         {
           num: "2",
-          title: isSi ? '\u0DC4\u0DDD Browser Menu (\u22EE) -> "Install EduPeak" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1' : 'Or Browser Menu (\u22EE) -> "Install EduPeak"',
-          desc: isSi ? 'Browser \u0DB8\u0DD9\u0DB1\u0DD4\u0DC0\u0DDA (\u22EE) <strong>"Save and share"</strong> \u0DC4\u0DDD <strong>"Install EduPeak"</strong> \u0D9A\u0DCA\u0DBD\u0DD2\u0D9A\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.' : 'Click the browser menu (\u22EE) and select <strong>"Save and share"</strong> or <strong>"Install EduPeak"</strong>.',
+          title: '\u0DB1\u0DD0\u0DAD\u0DC4\u0DDC\u0DAD\u0DCA Chrome Menu (\u22EE) \u2794 "Install EduPeak" \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1',
+          desc: 'Browser Menu (\u22EE) \u0D91\u0D9A\u0DD9\u0DB1\u0DCA <strong>"Save and share"</strong> \u0DC4\u0DDD <strong>"Install EduPeak"</strong> Click \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>`
         },
         {
           num: "3",
-          title: isSi ? '"Install" \u0D9A\u0DCA\u0DBD\u0DD2\u0D9A\u0DCA \u0D9A\u0DBB App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1' : 'Click "Install" & Launch',
-          desc: isSi ? '\u0DAD\u0DC4\u0DC0\u0DD4\u0DBB\u0DD4 \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA Dialog \u0D91\u0D9A\u0DDA <strong>"Install"</strong> \u0D94\u0DB6\u0DCF Desktop App \u0D91\u0D9A \u0DBD\u0DD9\u0DC3 \u0D8D\u0DA2\u0DD4\u0DC0\u0DB8 \u0DB7\u0DCF\u0DC0\u0DD2\u0DAD\u0DCF \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.' : 'Click <strong>"Install"</strong> to launch EduPeak in a clean desktop application window.',
+          title: '"Install" Click \u0D9A\u0DBB Desktop App \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1',
+          desc: 'Confirm dialog \u0D91\u0D9A\u0DDA <strong>"Install"</strong> \u0D94\u0DB6\u0DCF Desktop App \u0D91\u0D9A\u0D9A\u0DCA \u0DBD\u0DD9\u0DC3 standalone \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1.',
           icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
         }
       ];
@@ -90914,7 +90912,7 @@ var PwaGatekeeper = class {
       gatekeeperEl.classList.add("fade-out");
       setTimeout(() => {
         gatekeeperEl.remove();
-      }, 350);
+      }, 300);
     }
     const appEl = document.getElementById("app-root");
     if (appEl) {
@@ -90928,7 +90926,6 @@ var PwaGatekeeper = class {
     if (existing) existing.remove();
     const platform = this.detectPlatform();
     const info = this.getInstructions(platform);
-    const isSi = this.lang === "si";
     const overlay = document.createElement("div");
     overlay.id = "pwa-gatekeeper-overlay";
     overlay.className = "gatekeeper-overlay";
@@ -90937,19 +90934,12 @@ var PwaGatekeeper = class {
       <div class="gatekeeper-ambient-glow glow-2"></div>
 
       <div class="gatekeeper-card">
-        <!-- Top App Emblem & Language Selector -->
-        <div class="gatekeeper-top-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <div class="gatekeeper-lang-toggle" style="display:inline-flex; background:rgba(255,255,255,0.08); padding:3px; border-radius:20px; border:1px solid rgba(255,255,255,0.12);">
-            <button type="button" id="btn-lang-si" class="lang-pill ${isSi ? "active" : ""}" style="border:none; background:${isSi ? "#2563EB" : "transparent"}; color:${isSi ? "#fff" : "#94A3B8"}; font-size:11.5px; font-weight:800; padding:4px 12px; border-radius:16px; cursor:pointer; transition:all 0.2s;">
-              \u0DC3\u0DD2\u0D82\u0DC4\u0DBD
-            </button>
-            <button type="button" id="btn-lang-en" class="lang-pill ${!isSi ? "active" : ""}" style="border:none; background:${!isSi ? "#2563EB" : "transparent"}; color:${!isSi ? "#fff" : "#94A3B8"}; font-size:11.5px; font-weight:800; padding:4px 12px; border-radius:16px; cursor:pointer; transition:all 0.2s;">
-              English
-            </button>
-          </div>
-
-          <div class="gatekeeper-device-chip" style="font-size:11px; font-weight:700; color:#38BDF8; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.25); padding:4px 10px; border-radius:14px; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${info.deviceLabel}">
-            ${platform.isIOS ? "\u{1F34F} iOS" : platform.isAndroid ? "\u{1F916} Android" : "\u{1F4BB} PC"} \u2022 ${platform.browserName.split(" ")[0]}
+        <!-- Top bar with detected device chip -->
+        <div class="gatekeeper-top-bar" style="display:flex; justify-content:center; align-items:center; margin-bottom:12px;">
+          <div class="gatekeeper-device-chip" title="${info.deviceLabel}">
+            <span>${platform.isIOS ? "\u{1F34F} iOS" : platform.isAndroid ? "\u{1F916} Android" : "\u{1F4BB} PC"}</span>
+            <span>\u2022</span>
+            <span>${platform.browserName}</span>
           </div>
         </div>
 
@@ -90963,11 +90953,11 @@ var PwaGatekeeper = class {
           <p class="gatekeeper-subtitle">${info.subtitle}</p>
         </div>
 
-        <!-- One-Tap Native Install Button (if available via beforeinstallprompt) -->
-        <div id="native-install-wrapper" style="margin-bottom:14px; ${this.deferredPrompt ? "display:block;" : "display:none;"}">
-          <button id="btn-native-install" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(135deg, #2563EB 0%, #06B6D4 100%); color:#FFFFFF; border:none; padding:13px 18px; border-radius:16px; font-size:14.5px; font-weight:800; box-shadow:0 8px 24px rgba(37,99,235,0.45); cursor:pointer; transition:transform 0.15s ease;">
+        <!-- One-Tap Native Install Button (Android / Chromium only via beforeinstallprompt) -->
+        <div id="native-install-wrapper" style="margin-bottom:14px; ${!platform.isIOS && this.deferredPrompt ? "display:block;" : "display:none;"}">
+          <button id="btn-native-install" class="btn-native-install">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>${isSi ? "\u0DBA\u0DD9\u0DAF\u0DD4\u0DB8 \u0DAF\u0DD0\u0DB1\u0DCA\u0DB8 Install \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u{1F4F2}" : "Install EduPeak App Now \u{1F4F2}"}</span>
+            <span>EduPeak App \u0D91\u0D9A \u0DAF\u0DD0\u0DB1\u0DCA\u0DB8 Install \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1 \u{1F4F2}</span>
           </button>
         </div>
 
@@ -90989,9 +90979,9 @@ var PwaGatekeeper = class {
 
         ${info.showCopyLink ? `
           <div style="margin-bottom:14px;">
-            <button id="btn-copy-web-link" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); color:#F8FAFC; padding:10px 14px; border-radius:14px; font-size:12.5px; font-weight:700; cursor:pointer;">
+            <button id="btn-copy-web-link" class="btn-copy-web-link">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span>${isSi ? "\u0DC0\u0DD9\u0DB6\u0DCA \u0DBD\u0DD2\u0DB4\u0DD2\u0DB1\u0DBA (Link) Copy \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1" : "Copy Website Link to Clipboard"}</span>
+              <span>EduPeak Link \u0D91\u0D9A Copy \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1 (Copy Link)</span>
             </button>
           </div>
         ` : ""}
@@ -90999,23 +90989,23 @@ var PwaGatekeeper = class {
         <!-- Live Status Bar & Recheck Verification -->
         <div class="gatekeeper-status-box">
           <div class="status-pulse-dot"></div>
-          <span class="status-text">${isSi ? "\u0DC3\u0DCA\u0DAE\u0DCF\u0DB4\u0DB1\u0DBA \u0D9A\u0DBB Home Screen \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1..." : "Waiting for launch from Home Screen..."}</span>
+          <span class="status-text">Home Screen \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Open \u0D9A\u0DBB\u0DB1 \u0DAD\u0DD9\u0D9A\u0DCA \u0DBB\u0DD0\u0DB3\u0DD3 \u0DC3\u0DD2\u0DA7\u0DD2\u0DB1\u0DCA\u0DB1...</span>
           <button id="btn-recheck-standalone" class="btn-recheck" style="white-space:nowrap;">
-            ${isSi ? "\u0DB1\u0DD0\u0DC0\u0DAD \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u21BB" : "Re-check \u21BB"}
+            \u0DB1\u0DD0\u0DC0\u0DAD Check \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u21BB
           </button>
         </div>
 
         <!-- Testing / Temporary Bypass Footer -->
         <div class="gatekeeper-dev-footer">
-          <button id="btn-browser-bypass" class="btn-dev-preview" style="background:transparent; color:#94A3B8; border:1px dashed rgba(255,255,255,0.2); font-size:11.5px; padding:8px 12px; border-radius:10px; cursor:pointer;">
-            ${isSi ? "Browser \u0D91\u0D9A\u0DD9\u0DB1\u0DCA \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DA7 \u0DBA\u0DB1\u0DCA\u0DB1 (\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DC3\u0DD3\u0DB8\u0DCF \u0DC0\u0DD2\u0DBA \u0DC4\u0DD0\u0D9A) \u2192" : "Continue in Browser (Exams may be restricted) \u2192"}
+          <button id="btn-browser-bypass" class="btn-dev-preview">
+            Browser \u0D91\u0D9A\u0DD9\u0DB1\u0DCA Continue \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 (\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DB4\u0DC4\u0DC3\u0DD4\u0D9A\u0DB8\u0DCA \u0DC3\u0DD3\u0DB8\u0DCF \u0DC0\u0DD2\u0DBA \u0DC4\u0DD0\u0D9A) \u2192
           </button>
         </div>
       </div>
 
       <!-- Animated Pointer for iOS Safari Bottom Bar -->
       <div class="safari-arrow-indicator ${info.showSafariArrow ? "active" : ""}">
-        <span class="arrow-text">${isSi ? "\u0DB4\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DB1\u0DCA\u0DB1" : "Tap Share below"}</span>
+        <span class="arrow-text">\u0DB4\u0DC4\u0DC5 \u0D87\u0DAD\u0DD2 Share \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DB1\u0DCA\u0DB1</span>
         <div class="bouncing-arrow">\u2193</div>
       </div>
     `;
@@ -91026,30 +91016,13 @@ var PwaGatekeeper = class {
     }
   }
   updateInstallButtonVisibility() {
+    const platform = this.detectPlatform();
     const wrapper = document.getElementById("native-install-wrapper");
-    if (wrapper && this.deferredPrompt) {
+    if (wrapper && !platform.isIOS && this.deferredPrompt) {
       wrapper.style.display = "block";
     }
   }
   attachEventListeners() {
-    const btnSi = document.getElementById("btn-lang-si");
-    if (btnSi) {
-      btnSi.addEventListener("click", () => {
-        this.lang = "si";
-        localStorage.setItem("edupeak_gatekeeper_lang", "si");
-        this.renderGatekeeper();
-        this.attachEventListeners();
-      });
-    }
-    const btnEn = document.getElementById("btn-lang-en");
-    if (btnEn) {
-      btnEn.addEventListener("click", () => {
-        this.lang = "en";
-        localStorage.setItem("edupeak_gatekeeper_lang", "en");
-        this.renderGatekeeper();
-        this.attachEventListeners();
-      });
-    }
     const btnNative = document.getElementById("btn-native-install");
     if (btnNative && this.deferredPrompt) {
       btnNative.addEventListener("click", async () => {
@@ -91074,7 +91047,7 @@ var PwaGatekeeper = class {
         const link = window.location.origin + window.location.pathname;
         navigator.clipboard.writeText(link).then(() => {
           const orig = btnCopy.innerHTML;
-          btnCopy.innerHTML = `<span>\u2705 ${this.lang === "si" ? "Link \u0D91\u0D9A Copy \u0DC0\u0DD2\u0DBA!" : "Link Copied!"}</span>`;
+          btnCopy.innerHTML = `<span>\u2705 Link \u0D91\u0D9A Copy \u0DC0\u0DD2\u0DBA! (Copied)</span>`;
           setTimeout(() => {
             btnCopy.innerHTML = orig;
           }, 2e3);
@@ -91087,14 +91060,14 @@ var PwaGatekeeper = class {
     if (recheckBtn) {
       recheckBtn.addEventListener("click", () => {
         if (this.isStandaloneMode()) {
-          recheckBtn.textContent = this.lang === "si" ? "\u2705 \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DBA\u0DD2!" : "\u2705 Standalone Active!";
+          recheckBtn.textContent = "\u2705 \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DBA\u0DD2! (Unlocked)";
           setTimeout(() => {
             this.unlockApp();
           }, 300);
         } else {
-          recheckBtn.textContent = this.lang === "si" ? "\u274C \u0DAD\u0DC0\u0DB8\u0DAD\u0DCA Browser \u0D91\u0D9A\u0DDA" : "\u274C Still in Browser";
+          recheckBtn.textContent = "\u274C \u0DAD\u0DC0\u0DB8\u0DAD\u0DCA Browser \u0D91\u0D9A\u0DDA";
           setTimeout(() => {
-            recheckBtn.textContent = this.lang === "si" ? "\u0DB1\u0DD0\u0DC0\u0DAD \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u21BB" : "Re-check \u21BB";
+            recheckBtn.textContent = "\u0DB1\u0DD0\u0DC0\u0DAD Check \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u21BB";
           }, 1800);
         }
       });
