@@ -90952,8 +90952,7 @@ var PwaGatekeeper = class {
 
         <div class="gatekeeper-header">
           <div class="gatekeeper-icon-wrap">
-            <img src="./icons/edupeak_transparent_logo.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.png'" />
-            <div class="icon-ring-pulse"></div>
+            <img src="./icons/edupeak_clean_transparent.png" alt="EduPeak" class="gatekeeper-icon" onerror="this.src='./icons/edupeak_logo.png'" />
           </div>
           <span class="gatekeeper-badge">${info.badge}</span>
           <h1 class="gatekeeper-title">${info.title}</h1>

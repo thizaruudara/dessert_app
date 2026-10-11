@@ -123,39 +123,27 @@ body.gatekeeper-active {
 
 .gatekeeper-icon-wrap {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: auto;
+  height: auto;
   margin: 0 auto 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
-  border-radius: 20px;
-  border: 1px solid rgba(191, 219, 254, 0.7);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .gatekeeper-icon {
-  width: 48px;
-  height: 48px;
+  height: 56px;
+  width: auto;
+  max-width: 160px;
   object-fit: contain;
-  position: relative;
-  z-index: 2;
-  filter: drop-shadow(0 2px 6px rgba(37, 99, 235, 0.2));
-}
-
-.icon-ring-pulse {
-  position: absolute;
-  inset: -4px;
-  border-radius: 24px;
-  border: 2px solid rgba(37, 99, 235, 0.35);
-  animation: pulseRing 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
-  z-index: 1;
-}
-
-@keyframes pulseRing {
-  0% { transform: scale(0.96); opacity: 0.9; }
-  100% { transform: scale(1.2); opacity: 0; }
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 4px 14px rgba(37, 99, 235, 0.22));
 }
 
 .gatekeeper-badge {
