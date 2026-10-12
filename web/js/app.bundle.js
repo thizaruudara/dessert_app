@@ -89325,6 +89325,32 @@ var DbService = class {
       });
     } catch (_) {
     }
+    let supabaseList = [];
+    try {
+      if (typeof supabase !== "undefined" && supabase) {
+        const { data: supaProfiles } = await supabase
+          .from("profiles")
+          .select("id, name, full_name, email, phone, role, exam_year, credits")
+          .limit(150);
+        if (Array.isArray(supaProfiles)) {
+          supabaseList = supaProfiles.map((p) => ({
+            id: p.id,
+            role: p.role || "student",
+            name: p.full_name || p.name || "Student",
+            examYear: p.exam_year || "2027 A/L",
+            credits: Number(p.credits) || 0,
+            avatarUrl: "",
+            studentPhone: p.phone || ""
+          }));
+        }
+      }
+    } catch (_) {}
+    const map = new Map();
+    for (const s2 of supabaseList) {
+      if (!s2.name) continue;
+      const key = s2.name.toLowerCase().trim();
+      map.set(key, { ...s2, credits: Number(s2.credits) || 0 });
+    }
     for (const s2 of localLb) {
       if (!s2.name) continue;
       const key = s2.name.toLowerCase().trim();

@@ -2033,131 +2033,182 @@ export class DbService {
       const cached = this.getCached(cacheKey, 30000);
       if (cached) return cached;
     }
-    let firestoreList = [];
-    try {
-      const q = collection(db, 'leaderboard_public');
-      const snapshot = await Promise.race([
-        getDocs(q),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500))
-      ]);
-      firestoreList = snapshot.docs.map((studentDoc) => {
-        const student = studentDoc.data();
-        return {
-          rank: 0,
-          id: studentDoc.id,
-          role: 'student',
-          name: student.name || 'Student',
-          examYear: student.examYear || '2027 A/L',
-          credits: Number(student.credits) || 0,
-          avatarUrl: student.avatarUrl || student.photoUrl || '',
-          studentPhone: student.studentPhone || student.phone || ''
-        };
-      });
-    } catch (e) {
-      console.warn('[DB] Firestore leaderboard fetch note:', e);
-    }
 
-    // Read local leaderboard cache
-    let localLb = [];
     try {
-      localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
-    } catch (_) {}
-
-    // Read approved dessert submissions to aggregate real XP for students
-    const dessertCreditMap = {};
-    const dessertBatchMap = {};
-    try {
-      const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
-      localDesserts.forEach(d => {
-        if (d.status === 'approved') {
-          const key = (d.studentName || d.studentId || '').trim();
-          const amt = Number(d.creditsAwarded) || 0;
-          if (key) {
-            dessertCreditMap[key] = (dessertCreditMap[key] || 0) + amt;
-            if (d.examYear) dessertBatchMap[key] = d.examYear;
+      // 1. Fetch from Supabase profiles (real verified student scholars)
+      let supabaseList = [];
+      try {
+        if (supabase) {
+          const { data: supaProfiles, error: supaErr } = await supabase
+            .from('profiles')
+            .select('id, name, full_name, email, phone, role, exam_year, credits')
+            .limit(150);
+          if (!supaErr && Array.isArray(supaProfiles)) {
+            supabaseList = supaProfiles.map((p) => ({
+              id: p.id,
+              role: p.role || 'student',
+              name: p.full_name || p.name || 'Student',
+              examYear: p.exam_year || '2027 A/L',
+              credits: Number(p.credits) || 0,
+              avatarUrl: '',
+              studentPhone: p.phone || ''
+            }));
           }
         }
-      });
-    } catch (_) {}
-
-    // No fake seed scholars - use only real verified scholars
-
-    // 2. Local leaderboard entries
-    for (const s of localLb) {
-      if (!s.name) continue;
-      const key = s.name.toLowerCase().trim();
-      const existing = map.get(key) || {};
-      map.set(key, { ...existing, ...s, credits: Number(s.credits) || existing.credits || 0 });
-    }
-
-    // 3. Firestore entries
-    for (const s of firestoreList) {
-      if (!s.name) continue;
-      const key = s.name.toLowerCase().trim();
-      const existing = map.get(key) || {};
-      map.set(key, { ...existing, ...s, credits: Math.max(Number(s.credits) || 0, existing.credits || 0) });
-    }
-
-    // 4. Incorporate aggregated dessert XP
-    for (const [studentKey, awardedXp] of Object.entries(dessertCreditMap)) {
-      const normKey = studentKey.toLowerCase().trim();
-      let found = false;
-      for (const [k, v] of map.entries()) {
-        if (k === normKey || (v.id && v.id.toLowerCase() === normKey)) {
-          v.credits = Math.max(v.credits, (v.credits || 0) + awardedXp);
-          found = true;
-          break;
-        }
+      } catch (e) {
+        console.warn('[DB] Supabase leaderboard fetch note:', e);
       }
-      if (!found) {
-        map.set(normKey, {
-          id: 'student_' + studentKey.replace(/\s+/g, '_'),
-          name: studentKey,
-          role: 'student',
-          examYear: dessertBatchMap[studentKey] || '2027 A/L',
-          credits: awardedXp,
-          avatarUrl: ''
+
+      // 2. Fetch from Firestore public leaderboard collection
+      let firestoreList = [];
+      try {
+        const q = collection(db, 'leaderboard_public');
+        const snapshot = await Promise.race([
+          getDocs(q),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500))
+        ]);
+        firestoreList = snapshot.docs.map((studentDoc) => {
+          const student = studentDoc.data();
+          return {
+            rank: 0,
+            id: studentDoc.id,
+            role: 'student',
+            name: student.name || 'Student',
+            examYear: student.examYear || '2027 A/L',
+            credits: Number(student.credits) || 0,
+            avatarUrl: student.avatarUrl || student.photoUrl || '',
+            studentPhone: student.studentPhone || student.phone || ''
+          };
         });
+      } catch (e) {
+        console.warn('[DB] Firestore leaderboard fetch note:', e);
       }
-    }
 
-    // 5. Check if current student has direct local credits
-    try {
-      const currentStoredUser = JSON.parse(localStorage.getItem('edupeak_auth_user') || 'null');
-      if (currentStoredUser && currentStoredUser.name) {
-        const key = currentStoredUser.name.toLowerCase().trim();
-        const customCredits = localStorage.getItem(`edupeak_credits_${currentStoredUser.uid || currentStoredUser.id}`);
-        if (customCredits && map.has(key)) {
-          let cNum = Number(customCredits) || 0;
-          if (cNum === 355 || cNum === 155 || cNum === 305) cNum = 200;
-          map.get(key).credits = Math.max(map.get(key).credits, cNum);
+      // 3. Read local leaderboard cache
+      let localLb = [];
+      try {
+        localLb = JSON.parse(localStorage.getItem('edupeak_local_leaderboard') || '[]');
+      } catch (_) {}
+
+      // 4. Read approved dessert submissions to aggregate real XP for students
+      const dessertCreditMap = {};
+      const dessertBatchMap = {};
+      try {
+        const localDesserts = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
+        localDesserts.forEach((d) => {
+          if (d.status === 'approved') {
+            const key = (d.studentName || d.studentId || '').trim();
+            const amt = Number(d.creditsAwarded) || 0;
+            if (key) {
+              dessertCreditMap[key] = (dessertCreditMap[key] || 0) + amt;
+              if (d.examYear) dessertBatchMap[key] = d.examYear;
+            }
+          }
+        });
+      } catch (_) {}
+
+      const map = new Map();
+
+      // Aggregate Supabase entries
+      for (const s of supabaseList) {
+        if (!s.name) continue;
+        const key = s.name.toLowerCase().trim();
+        map.set(key, { ...s, credits: Number(s.credits) || 0 });
+      }
+
+      // Aggregate local leaderboard entries
+      for (const s of localLb) {
+        if (!s.name) continue;
+        const key = s.name.toLowerCase().trim();
+        const existing = map.get(key) || {};
+        map.set(key, { ...existing, ...s, credits: Math.max(Number(s.credits) || 0, existing.credits || 0) });
+      }
+
+      // Aggregate Firestore entries
+      for (const s of firestoreList) {
+        if (!s.name) continue;
+        const key = s.name.toLowerCase().trim();
+        const existing = map.get(key) || {};
+        map.set(key, { ...existing, ...s, credits: Math.max(Number(s.credits) || 0, existing.credits || 0) });
+      }
+
+      // Incorporate aggregated dessert XP
+      for (const [studentKey, awardedXp] of Object.entries(dessertCreditMap)) {
+        const normKey = studentKey.toLowerCase().trim();
+        let found = false;
+        for (const [k, v] of map.entries()) {
+          if (k === normKey || (v.id && v.id.toLowerCase() === normKey)) {
+            v.credits = Math.max(v.credits, (v.credits || 0) + awardedXp);
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          map.set(normKey, {
+            id: 'student_' + studentKey.replace(/\s+/g, '_'),
+            name: studentKey,
+            role: 'student',
+            examYear: dessertBatchMap[studentKey] || '2027 A/L',
+            credits: awardedXp,
+            avatarUrl: ''
+          });
         }
       }
-    } catch (_) {}
 
-    const allStudents = Array.from(map.values());
+      // Check if current logged-in student has direct local credits or needs to be on board
+      try {
+        const currentStoredUser = JSON.parse(
+          localStorage.getItem('edupeak_cached_user') ||
+          localStorage.getItem('edupeak_auth_user') ||
+          'null'
+        );
+        if (currentStoredUser && currentStoredUser.name && currentStoredUser.role === 'student') {
+          const key = currentStoredUser.name.toLowerCase().trim();
+          const customCredits = localStorage.getItem(`edupeak_credits_${currentStoredUser.uid || currentStoredUser.id}`);
+          let cNum = Number(customCredits) || Number(currentStoredUser.credits) || 0;
+          if (cNum === 355 || cNum === 155 || cNum === 305) cNum = 200;
+          if (map.has(key)) {
+            map.get(key).credits = Math.max(map.get(key).credits, cNum);
+          } else {
+            map.set(key, {
+              id: currentStoredUser.uid || currentStoredUser.id || 'student_me',
+              name: currentStoredUser.name,
+              role: 'student',
+              examYear: currentStoredUser.examYear || currentStoredUser.exam_year || '2027 A/L',
+              credits: cNum,
+              avatarUrl: currentStoredUser.avatarUrl || ''
+            });
+          }
+        }
+      } catch (_) {}
 
-    // 6. Filter by batch
-    const normalizeBatch = (b) => String(b || '').replace(/\s+/g, '').toUpperCase();
-    const targetBatchNorm = normalizeBatch(batch);
+      const allStudents = Array.from(map.values());
 
-    const filtered = allStudents.filter(student => {
-      if (student.role !== 'student' || this.isStaffOrAdmin(student)) return false;
-      if (!batch || batch === 'All Batches' || targetBatchNorm === 'ALL' || targetBatchNorm === 'ALLBATCHES') return true;
-      const sBatchNorm = normalizeBatch(student.examYear);
-      return sBatchNorm === targetBatchNorm || sBatchNorm === 'ALL' || sBatchNorm === 'ALLBATCHES';
-    });
+      // Filter by batch
+      const normalizeBatch = (b) => String(b || '').replace(/\s+/g, '').toUpperCase();
+      const targetBatchNorm = normalizeBatch(batch);
 
-    // 7. Sort descending by credits
-    filtered.sort((a, b) => (b.credits - a.credits) || a.name.localeCompare(b.name));
+      const filtered = allStudents.filter(student => {
+        if (student.role !== 'student' || this.isStaffOrAdmin(student)) return false;
+        if (!batch || batch === 'All Batches' || targetBatchNorm === 'ALL' || targetBatchNorm === 'ALLBATCHES') return true;
+        const sBatchNorm = normalizeBatch(student.examYear);
+        return sBatchNorm === targetBatchNorm || sBatchNorm === 'ALL' || sBatchNorm === 'ALLBATCHES';
+      });
 
-    // 8. Assign ranks
-    filtered.forEach((s, idx) => {
-      s.rank = idx + 1;
-    });
+      // Sort descending by credits
+      filtered.sort((a, b) => (b.credits - a.credits) || a.name.localeCompare(b.name));
 
-    this.setCache(cacheKey, filtered);
-    return filtered;
+      // Assign ranks
+      filtered.forEach((s, idx) => {
+        s.rank = idx + 1;
+      });
+
+      this.setCache(cacheKey, filtered);
+      return filtered;
+    } catch (err) {
+      console.error('[DB] getLeaderboard unexpected error:', err);
+      return [];
+    }
   }
 
   streamLeaderboard(batch, callback) {
