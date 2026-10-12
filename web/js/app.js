@@ -226,7 +226,7 @@ class AppController {
       <!-- Center Content: Logo + Badge (100% Dead Centered) -->
       <div class="splash-center-content">
         <div class="splash-logo-wrap">
-          <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="splash-logo-img" onerror="this.src='./icons/edupeak_logo.webp'" />
+          <img src="./icons/edupeak_logo.png" alt="EduPeak" class="splash-logo-img" onerror="this.src='./icons/edupeak_logo.png'" />
         </div>
         <div class="splash-badge-wrap">
           <div class="splash-badge">
@@ -287,7 +287,7 @@ class AppController {
         <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:12px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
           <div class="auth-header" style="text-align:center; margin-bottom:20px;">
             <div class="auth-brand-logo-wrap" style="margin:0 auto 10px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; box-shadow:none;">
-              <img src="./icons/edupeak_logo.svg" alt="EduPeak" class="auth-brand-logo-img" style="height:52px; width:auto; max-width:160px; object-fit:contain; background:transparent;" onerror="this.src='./icons/edupeak_logo.webp'" />
+              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="height:52px; width:auto; max-width:160px; object-fit:contain; background:transparent;" onerror="this.src='./icons/edupeak_logo.png'" />
             </div>
             <div class="auth-title" style="font-size:24px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
             <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
