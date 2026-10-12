@@ -93175,10 +93175,9 @@ var AppController = class {
       const user = this.currentUser || { name: "Student", phone: "", examYear: "2027 A/L" };
       const currentYear = user.examYear || "2027 A/L";
       const activeTargetYear = currentYear;
-      const [sessions, paperHints, paperBoards] = await Promise.all([
+      const [sessions, paperHints] = await Promise.all([
         dbService.getPaperSessions(activeTargetYear).catch(() => []),
-        dbService.getPaperHints(activeTargetYear).catch(() => []),
-        dbService.getPaperLeaderboards().catch(() => [])
+        dbService.getPaperHints(activeTargetYear).catch(() => [])
       ]);
       const studentId = user.uid || user.id || "s_default";
       const registrations = new Map(await Promise.all(sessions.map(async (session) => [
@@ -93186,6 +93185,7 @@ var AppController = class {
         await dbService.getStudentRegistration(session.id, studentId)
       ])));
       if (renderToken !== this._tabTokens["papers"] || !container.isConnected) return;
+      if (this.papersTab > 1) this.papersTab = 0;
       container.innerHTML = `
         <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
         <div class="screen-appbar">
@@ -93195,7 +93195,7 @@ var AppController = class {
             </div>
             <div>
               <div class="appbar-title">Paper Examination Hub</div>
-              <div class="appbar-subtitle" id="papers-batch-subtitle">${currentYear} \u2022 \u0DC3\u0DA2\u0DD3\u0DC0\u0DD3 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C, Hints \u0DC3\u0DC4 \u0DB4\u0DCA\u200D\u0DBB\u0DAD\u0DD2\u0DB5\u0DBD</div>
+              <div class="appbar-subtitle" id="papers-batch-subtitle">${currentYear} \u2022 \u0DC3\u0DA2\u0DD3\u0DC0\u0DD3 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DC4 Hints</div>
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
@@ -93234,28 +93234,21 @@ var AppController = class {
           </div>
         ` : ""}
 
-        <!-- 3-Segment Switcher Tabs (Live Sessions, Paper Hints, Leaderboard) -->
-        <div class="sub-tabs-container" style="margin: 6px 16px 14px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
-          <button class="sub-tab-btn ${this.papersTab === 0 ? "active" : ""}" id="tab-papers-live" style="padding:10px 4px;">
-            <span style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:16px;">sensors</span>
-              <span style="font-size:12px;">Live Sessions</span>
+        <!-- 2-Segment Switcher Tabs (Live Sessions, Paper Hints) -->
+        <div class="sub-tabs-container" style="margin: 6px 16px 14px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <button class="sub-tab-btn ${this.papersTab === 0 ? "active" : ""}" id="tab-papers-live" style="padding:10px 8px;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:17px;">sensors</span>
+              <span style="font-size:12.5px; font-weight:700;">Live Sessions</span>
             </span>
-            <span class="tab-sub" id="tab-papers-live-sub" style="font-size:10px;">${this._computeLiveTabSubtitle(sessions)}</span>
+            <span class="tab-sub" id="tab-papers-live-sub" style="font-size:10.5px;">${this._computeLiveTabSubtitle(sessions)}</span>
           </button>
-          <button class="sub-tab-btn ${this.papersTab === 1 ? "active" : ""}" id="tab-papers-hints" style="padding:10px 4px;">
-            <span style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
-              <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">lightbulb</span>
-              <span style="font-size:12px;">Paper Hints</span>
+          <button class="sub-tab-btn ${this.papersTab === 1 ? "active" : ""}" id="tab-papers-hints" style="padding:10px 8px;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-rounded filled" style="font-size:17px; color:#F59E0B;">lightbulb</span>
+              <span style="font-size:12.5px; font-weight:700;">Paper Hints</span>
             </span>
-            <span class="tab-sub" style="font-size:10px;">Scope & Clues</span>
-          </button>
-          <button class="sub-tab-btn ${this.papersTab === 2 ? "active" : ""}" id="tab-papers-leaderboard" style="padding:10px 4px;">
-            <span style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:16px; color:#10B981;">emoji_events</span>
-              <span style="font-size:12px;">Leaderboard</span>
-            </span>
-            <span class="tab-sub" style="font-size:10px;">Rankings</span>
+            <span class="tab-sub" style="font-size:10.5px;">Scope & Clues</span>
           </button>
         </div>
 
@@ -93268,11 +93261,6 @@ var AppController = class {
         <div id="papers-tab-hints-content" style="${this.papersTab === 1 ? "display:flex; flex-direction:column; gap:16px;" : "display:none;"}">
           ${this._buildStudentPaperHintsHTML(paperHints, activeTargetYear, currentYear)}
         </div>
-
-        <!-- Tab 2: Paper Leaderboard View -->
-        <div id="papers-tab-leaderboard-content" style="${this.papersTab === 2 ? "display:flex; flex-direction:column; gap:16px;" : "display:none;"}">
-          ${this._buildStudentPaperLeaderboardHTML(paperBoards, activeTargetYear)}
-        </div>
       `;
       this.startPapersTimer(container, sessions);
       document.getElementById("tab-papers-live")?.addEventListener("click", () => {
@@ -93281,10 +93269,6 @@ var AppController = class {
       });
       document.getElementById("tab-papers-hints")?.addEventListener("click", () => {
         this.papersTab = 1;
-        this.renderPapersScreen(container);
-      });
-      document.getElementById("tab-papers-leaderboard")?.addEventListener("click", () => {
-        this.papersTab = 2;
         this.renderPapersScreen(container);
       });
       document.getElementById("btn-refresh-papers")?.addEventListener("click", () => this.renderPapersScreen(container));
