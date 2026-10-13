@@ -515,110 +515,173 @@ class AppController {
     this.startStudentNotificationWatchers();
   }
 
-  // ── Real-Time Notification Watchers (Live Start, Leaderboard, Paper Hints) ──
+  // ── Real-Time Notification Watchers (Scheduled, Live Start, Leaderboard, Hints) ──
   startStudentNotificationWatchers() {
     if (!this.currentUser || this.currentUser.role === 'admin') return;
     const studentYear = this.currentUser.exam_year || this.currentUser.examYear || '2027 A/L';
+    const studentId = this.currentUser.uid || this.currentUser.id || '';
+    const studentPhone = this.currentUser.phone || '';
 
     // Cleanup any existing watchers
     if (this._notifLiveUnsub) { try { this._notifLiveUnsub(); } catch (_) {} }
     if (this._notifBoardsUnsub) { try { this._notifBoardsUnsub(); } catch (_) {} }
     if (this._notifHintsUnsub) { try { this._notifHintsUnsub(); } catch (_) {} }
+    if (this._notifDirectUnsub) { try { this._notifDirectUnsub(); } catch (_) {} }
 
-    let liveSessionsInitialized = false;
+    let sessionsInitialized = false;
+    const knownScheduledSessionIds = new Set();
     const knownLiveSessionIds = new Set();
 
-    // 1. Live Exam Starting Monitor
+    // 1. Paper Sessions Monitor (Scheduled Session & Live Start Alerts filtered by Student Exam Year)
     this._notifLiveUnsub = dbService.streamPaperSessions(studentYear, (sessions) => {
       if (!Array.isArray(sessions)) return;
-      const currentlyLive = sessions.filter(s => {
-        const st = dbService.computeSessionStatus(s);
-        return st.isLive || s.isLive || s.status === 'writing' || s.status === 'package_opening' || s.status === 'live';
-      });
 
-      if (!liveSessionsInitialized) {
-        liveSessionsInitialized = true;
-        currentlyLive.forEach(s => knownLiveSessionIds.add(s.id));
+      if (!sessionsInitialized) {
+        sessionsInitialized = true;
+        sessions.forEach(s => {
+          if (dbService.matchesYear(s.examYear, studentYear)) {
+            knownScheduledSessionIds.add(s.id);
+            const st = dbService.computeSessionStatus(s);
+            if (st.isLive || s.isLive || s.status === 'writing' || s.status === 'package_opening' || s.status === 'live' || s.status === 'active') {
+              knownLiveSessionIds.add(s.id);
+            }
+          }
+        });
         return;
       }
 
-      currentlyLive.forEach(session => {
-        if (!knownLiveSessionIds.has(session.id)) {
+      sessions.forEach(session => {
+        // Enforce strict exam year filtering: student only receives notifications for their exam year
+        if (!dbService.matchesYear(session.examYear, studentYear)) return;
+
+        const st = dbService.computeSessionStatus(session);
+        const isLiveNow = st.isLive || session.isLive || session.status === 'writing' || session.status === 'package_opening' || session.status === 'live' || session.status === 'active';
+
+        // 1A. When a Paper Session is newly Scheduled for registration
+        if (!knownScheduledSessionIds.has(session.id)) {
+          knownScheduledSessionIds.add(session.id);
+          // Check if admin decided students should receive notification
+          if (session.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = '📅 New Paper Session Scheduled!';
+            const body = `"${session.title || 'Paper Session'}" (${session.examYear || studentYear}) is scheduled. Tap to register your slot!`;
+            notificationService.showInAppBanner(title, body, 'info');
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `paper-scheduled-${session.id}`,
+              data: { url: './index.html?tab=papers' }
+            });
+          }
+        }
+
+        // 1B. When a Paper Session is Started Live by Admin
+        if (isLiveNow && !knownLiveSessionIds.has(session.id)) {
           knownLiveSessionIds.add(session.id);
-          notificationService.playChime();
-          notificationService.showInAppBanner(
-            '🔴 Live Exam Started!',
-            `"${session.title || 'Paper Session'}" is now LIVE! Tap to enter exam room.`,
-            'urgent'
-          );
-          notificationService.showLocalNotification('🔴 Live Exam Started!', {
-            body: `"${session.title || 'Paper Session'}" is now LIVE! Tap to enter exam room.`,
-            tag: `live-exam-${session.id}`,
-            data: { url: './index.html?tab=papers' }
-          });
+          // Check if admin decided students should receive notification upon start
+          if (session.notifyOnStart !== false && session.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = '🔴 Live Exam Started!';
+            const body = `"${session.title || 'Paper Session'}" (${session.examYear || studentYear}) is now LIVE! Tap to enter exam room.`;
+            notificationService.showInAppBanner(title, body, 'urgent');
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `live-exam-${session.id}`,
+              data: { url: './index.html?tab=papers' }
+            });
+          }
         }
       });
     });
 
-    // 2. Leaderboard Published Monitor
+    // 2. Leaderboard Published Monitor (Filtered strictly by student's exam year)
     let boardsInitialized = false;
     const knownBoardIds = new Set();
     this._notifBoardsUnsub = dbService.streamPaperLeaderboards((boards) => {
       if (!Array.isArray(boards)) return;
       if (!boardsInitialized) {
         boardsInitialized = true;
-        boards.forEach(b => knownBoardIds.add(b.id));
+        boards.forEach(b => {
+          if (dbService.matchesYear(b.examYear, studentYear)) {
+            knownBoardIds.add(b.id);
+          }
+        });
         return;
       }
 
       boards.forEach(b => {
+        // Enforce strict exam year filtering: student must get notification about ONLY their exam year
+        if (!dbService.matchesYear(b.examYear, studentYear)) return;
+
         if (!knownBoardIds.has(b.id)) {
           knownBoardIds.add(b.id);
-          notificationService.playChime();
-          notificationService.showInAppBanner(
-            '🏆 Leaderboard Published!',
-            `Paper results & rankings for "${b.title || 'Model Paper'}" are now available!`,
-            'success'
-          );
-          notificationService.showLocalNotification('🏆 Leaderboard Published!', {
-            body: `Paper results & rankings for "${b.title || 'Model Paper'}" are now available!`,
-            tag: `leaderboard-${b.id}`,
-            data: { url: './index.html?tab=ranks' }
-          });
+          // Check if admin enabled push notifications for this leaderboard
+          if (b.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = '🏆 Leaderboard Published!';
+            const body = `Paper results & rankings for "${b.paperTitle || b.title || 'Model Paper'}" (${b.examYear || studentYear}) are now available!`;
+            notificationService.showInAppBanner(title, body, 'success');
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `leaderboard-${b.id}`,
+              data: { url: './index.html?tab=ranks' }
+            });
+          }
         }
       });
     });
 
-    // 3. Upcoming Paper Hints Published Monitor
-    let upcomingInitialized = false;
-    const knownUpcomingHints = new Map();
-    this._notifHintsUnsub = dbService.streamUpcomingPapers(studentYear, (upcomingList) => {
-      if (!Array.isArray(upcomingList)) return;
-      if (!upcomingInitialized) {
-        upcomingInitialized = true;
-        upcomingList.forEach(p => knownUpcomingHints.set(p.id, p.hints || ''));
+    // 3. Paper Hints & Scope Monitor (Filtered strictly by student's exam year)
+    let hintsInitialized = false;
+    const knownHintIds = new Set();
+    this._notifHintsUnsub = dbService.streamPaperHints(studentYear, (hintsList) => {
+      if (!Array.isArray(hintsList)) return;
+      if (!hintsInitialized) {
+        hintsInitialized = true;
+        hintsList.forEach(h => {
+          if (dbService.matchesYear(h.examYear, studentYear)) {
+            knownHintIds.add(h.id);
+          }
+        });
         return;
       }
 
-      upcomingList.forEach(paper => {
-        const prevHints = knownUpcomingHints.get(paper.id);
-        const currHints = (paper.hints || '').trim();
-        if (currHints && (!knownUpcomingHints.has(paper.id) || (prevHints !== undefined && prevHints !== currHints))) {
-          knownUpcomingHints.set(paper.id, currHints);
-          notificationService.playChime();
-          notificationService.showInAppBanner(
-            '💡 New Paper Hints & Scope!',
-            `Teacher guidance & hints published for "${paper.title || 'Upcoming Paper'}".`,
-            'info'
-          );
-          notificationService.showLocalNotification('💡 New Paper Hints Published!', {
-            body: `Teacher guidance & hints published for "${paper.title || 'Upcoming Paper'}". Tap to view scope!`,
-            tag: `hints-${paper.id}`,
-            data: { url: './index.html?tab=papers' }
-          });
+      hintsList.forEach(hint => {
+        // Enforce strict exam year filtering: student only receives hint notifications for their exam year
+        if (!dbService.matchesYear(hint.examYear, studentYear)) return;
+
+        if (!knownHintIds.has(hint.id)) {
+          knownHintIds.add(hint.id);
+          // Check if admin enabled push notification for this hint
+          if (hint.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = '💡 New Paper Hint Published!';
+            const body = `Exclusive guidance & scope published for "${hint.title || hint.paperName || 'Model Paper'}" (${hint.examYear || studentYear}).`;
+            notificationService.showInAppBanner(title, body, 'info');
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `hints-${hint.id}`,
+              data: { url: './index.html?tab=papers' }
+            });
+          }
         }
       });
     });
+
+    // 4. Direct Teacher Alerts to Student (if available)
+    if (typeof dbService.streamStudentDirectNotifications === 'function') {
+      this._notifDirectUnsub = dbService.streamStudentDirectNotifications(studentId, studentPhone, (notif) => {
+        if (!notif) return;
+        notificationService.playChime();
+        const title = notif.title || 'Message from Teacher';
+        const body = notif.message || '';
+        notificationService.showInAppBanner(title, body, 'info');
+        notificationService.showLocalNotification(title, {
+          body,
+          tag: `direct-msg-${notif.id || Date.now()}`,
+          data: { url: './index.html' }
+        });
+      });
+    }
   }
 
   // ── Mandatory Student Push Notification Gatekeeper ────────────────────────
@@ -1534,6 +1597,7 @@ class AppController {
       const isTimeUp = statusInfo.isTimeUp;
       const isLive = statusInfo.isLive;
       const isWaiting = statusInfo.isWaiting;
+      const isScheduled = statusInfo.isScheduled || session.status === 'scheduled' || (!session.isStarted && !session.isLive);
 
       let packageRemainingSecs = 600;
       if (session.packageOpeningStartedAt) {
@@ -1574,6 +1638,10 @@ class AppController {
             ` : isEnded ? `
               <span style="background:rgba(100,116,139,0.12); color:#64748B; border:1px solid rgba(100,116,139,0.3); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
                 <span class="material-symbols-rounded" style="font-size:13px;">check_circle</span> <span>ENDED</span>
+              </span>
+            ` : (isScheduled && !isLive && !isEnded) ? `
+              <span style="background:rgba(37,99,235,0.12); color:#2563EB; border:1px solid rgba(37,99,235,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">event_available</span> <span>SCHEDULED • REGISTRATION OPEN</span>
               </span>
             ` : ''}
           </div>
@@ -1686,6 +1754,16 @@ class AppController {
                 <div style="font-size:12px; font-weight:800; color:#6366F1; margin-top:2px;">පොරොත්තු ශාලාවට පිවිසෙන්න (Self-Check)</div>
               </div>
             </div>
+          ` : (isScheduled && !isLive && !isEnded) ? `
+            <div class="phase-status-banner-box scheduled" style="background:#EFF6FF; border:1px solid #BFDBFE; padding:13px 15px; border-radius:14px; display:flex; align-items:center; gap:12px;">
+              <span class="material-symbols-rounded" style="font-size:26px; color:#2563EB;">how_to_reg</span>
+              <div>
+                <div style="font-size:12px; font-weight:800; color:#1E40AF;">විභාග සැසිය සැලසුම් කර ඇත (Session Scheduled - Registration Open)</div>
+                <div style="font-size:11.5px; color:#3B82F6; margin-top:2px;">
+                  ${reg ? `ඔබ ${reg.slotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} සඳහා සාර්ථකව ලියාපදිංචි වී ඇත. Admin විසින් සැසිය Start කරන තෙක් රැඳී සිටින්න.` : 'කරුණාකර ඉහත ඇති Slot එකක් තෝරා ඔබගේ ආසනය වෙන්කරවා ගන්න.'}
+                </div>
+              </div>
+            </div>
           ` : isEnded ? `
             <div class="phase-status-banner-box ended" style="margin-bottom:0; background:#F8FAFC; border:1px solid #E2E8F0; padding:13px 15px; border-radius:14px; display:flex; align-items:center; gap:12px;">
               <span class="material-symbols-rounded" style="font-size:26px; color:#64748B;">cancel</span>
@@ -1727,7 +1805,17 @@ class AppController {
               <span class="material-symbols-rounded" style="font-size:18px;">document_scanner</span>
               <span>Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)</span>
             </button>
-          ` : isWaiting ? `
+          ` : (isScheduled && !isLive && !isEnded) ? (reg ? `
+            <div style="background:#F1F5F9; border:1.5px solid #CBD5E1; color:#334155; padding:12px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">how_to_reg</span>
+              <span>✓ Registered for ${selectedSlotId === 'slot2' ? 'Slot 2' : 'Slot 1'} • Waiting for Session Start</span>
+            </div>
+          ` : `
+            <button class="btn-primary" style="background:#2563EB; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="this.closest('.paper-session-card').querySelector('.slot-selection-box').click()">
+              <span class="material-symbols-rounded" style="font-size:18px;">how_to_reg</span>
+              <span>Select a Slot Above to Register (කරුණාකර Slot එකක් තෝරන්න)</span>
+            </button>
+          `) : isWaiting ? `
             <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
               <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
               <span>Enter Waiting Room (පොරොත්තු ශාලාව)</span>
@@ -5827,6 +5915,17 @@ class AppController {
       };
     });
 
+    // Edit leaderboard buttons
+    container.querySelectorAll('[data-edit-paper-board]').forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.editPaperBoard;
+        if (!id) return;
+        const b = (boards || []).find(x => x.id === id);
+        if (b) this.openAdminCreateLeaderboardModal(b);
+      };
+    });
+
     // Delete leaderboard buttons
     container.querySelectorAll('[data-delete-paper-board]').forEach((btn) => {
       btn.onclick = async (e) => {
@@ -5976,13 +6075,14 @@ class AppController {
     const status = this._computePaperStatus(session);
     const isEnded = status === 'ended';
     const isLive = status === 'live';
+    const isScheduled = status === 'scheduled' || (!isEnded && !isLive);
     const isUpcoming = status === 'upcoming';
 
-    let badgeText = 'Upcoming';
-    let badgeIcon = 'schedule';
-    let badgeBg = 'rgba(245, 158, 11, 0.12)';
-    let badgeBorder = '#F59E0B';
-    let badgeColor = '#D97706';
+    let badgeText = 'Scheduled (Registration Open)';
+    let badgeIcon = 'how_to_reg';
+    let badgeBg = 'rgba(37, 99, 235, 0.12)';
+    let badgeBorder = '#3B82F6';
+    let badgeColor = '#2563EB';
 
     if (isEnded) {
       badgeText = 'Ended';
@@ -5996,6 +6096,12 @@ class AppController {
       badgeBg = 'rgba(34, 197, 94, 0.12)';
       badgeBorder = '#22C55E';
       badgeColor = '#16A34A';
+    } else if (isScheduled) {
+      badgeText = 'Scheduled (Registration Open)';
+      badgeIcon = 'how_to_reg';
+      badgeBg = 'rgba(37, 99, 235, 0.12)';
+      badgeBorder = '#3B82F6';
+      badgeColor = '#2563EB';
     }
 
     const dateFormatted = this._formatSessionDate(session.date);
@@ -6111,10 +6217,10 @@ class AppController {
                 <span class="material-symbols-rounded" style="font-size:16px;">stop_circle</span>
                 <span>End Session (සැසිය අවසන් කරන්න)</span>
               </button>
-              ${isUpcoming ? `
-                <button data-start-session="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #22C55E; background:transparent; color:#22C55E; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;">
-                  <span class="material-symbols-rounded" style="font-size:16px;">play_arrow</span>
-                  <span>Start Now</span>
+              ${(!isEnded && !isLive) ? `
+                <button data-start-session="${session.id}" style="padding:10px 16px; border-radius:10px; border:none; background:#16A34A; color:#FFFFFF; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
+                  <span class="material-symbols-rounded filled" style="font-size:16px;">play_arrow</span>
+                  <span>Start Session (සැසිය ආරම්භ කරන්න)</span>
                 </button>
               ` : ''}
               <button data-delete-paper="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #FCA5A5; background:#FEF2F2; color:#DC2626; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;" title="Delete Session (මකා දමන්න)">
@@ -6223,6 +6329,22 @@ class AppController {
           </div>
           ` : ''}
 
+          <!-- Student Push Notification Settings on Modify -->
+          <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:11.5px; font-weight:800; color:#1E40AF; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">notifications_active</span>
+              <span>Student Push Notifications (සිසුන්ට දැනුම්දීම්):</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="edit-paper-notify-scheduled" ${session.notifyStudents !== false ? 'checked' : ''} style="width:15px; height:15px; accent-color:#2563EB;" />
+              <span>Allow notifications to <strong>${session.examYear || 'students'}</strong> for this session 🔔</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="edit-paper-notify-start" ${session.notifyOnStart !== false ? 'checked' : ''} style="width:15px; height:15px; accent-color:#2563EB;" />
+              <span>Notify students immediately when Admin starts the session live 🔴</span>
+            </label>
+          </div>
+
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="apk-btn-primary" id="btn-cancel-edit-times" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
               Cancel
@@ -6292,7 +6414,15 @@ class AppController {
         };
       }
 
-      await dbService.updateSlotTimes(session.id, { slot1: updatedSlot1, slot2: updatedSlot2 });
+      const notifyStudents = document.getElementById('edit-paper-notify-scheduled')?.checked !== false;
+      const notifyOnStart = document.getElementById('edit-paper-notify-start')?.checked !== false;
+
+      await dbService.updateSlotTimes(session.id, {
+        slot1: updatedSlot1,
+        slot2: updatedSlot2,
+        notifyStudents,
+        notifyOnStart
+      });
       notificationService.showInAppBanner('Times Updated', 'Session Times Updated Successfully!', 'success');
       modal.remove();
       this.renderAdminPapersScreen(container);
@@ -6483,10 +6613,65 @@ class AppController {
     });
   }
 
+  _showStartSessionConfirmation(session, container) {
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:390px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="background:rgba(34,197,94,0.15); color:#16A34A; width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:24px;">play_arrow</span>
+          </div>
+          <div>
+            <div style="font-size:16px; font-weight:800; color:#0F172A;">Start Paper Session?</div>
+            <div style="font-size:11px; color:#64748B;">${session.title} (${session.examYear || 'Batch'})</div>
+          </div>
+        </div>
+        <div style="font-size:12px; color:#475569; line-height:1.5;">
+          ඔබට මෙම විභාග සැසිය දැන් සක්‍රීය (LIVE) කිරීමට අවශ්‍ය බව සහතිකද?<br><br>
+          සැසිය ආරම්භ කළ පසු ලියාපදිංචි වූ සිසුන්ට විභාග කාමරයට පිවිස කැමරාව ඉදිරියේ ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීමට සහ ලිවීමට හැකියාව ලැබේ.
+        </div>
+        <div style="margin-top:12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:10px 12px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:700; color:#1E293B; cursor:pointer;">
+            <input type="checkbox" id="chk-start-notify-students" ${session.notifyOnStart !== false ? 'checked' : ''} style="width:16px; height:16px; accent-color:#16A34A;" />
+            <span>Send Live Push Notification to ${session.examYear || 'students'} 🔴🔔</span>
+          </label>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="apk-btn-primary" id="btn-cancel-start" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+            Cancel
+          </button>
+          <button class="apk-btn-primary" id="btn-confirm-start" style="flex:1.4; background:#16A34A;">
+            Start Session Now (ආරම්භ කරන්න)
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.getElementById('btn-cancel-start')?.addEventListener('click', () => modal.remove());
+    const confirmBtn = document.getElementById('btn-confirm-start');
+    confirmBtn?.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Starting...';
+      const notify = document.getElementById('chk-start-notify-students')?.checked !== false;
+      try {
+        await dbService.startPaperSession(session.id, { notifyStudents: notify });
+        notificationService.showInAppBanner('Session Live! 🔴', `"${session.title}" (${session.examYear}) සැසිය සක්‍රීය කරන ලදී (Live).`, 'success');
+      } catch (err) {
+        console.error('Failed to start session:', err);
+        alert('Error starting session: ' + err.message);
+      } finally {
+        modal.remove();
+        this.renderAdminPapersScreen(container);
+      }
+    });
+  }
+
   async _startSessionNow(session, container) {
-    await dbService.startPaperSession(session.id);
-    notificationService.showInAppBanner('Session Live', 'සැසිය සක්‍රීය කරන ලදී (Session is now Live)!', 'success');
-    this.renderAdminPapersScreen(container);
+    this._showStartSessionConfirmation(session, container);
   }
 
   async _reopenSession(session, container) {
@@ -6716,8 +6901,8 @@ class AppController {
           </div>
 
           <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1E293B; cursor:pointer; background:#EFF6FF; padding:10px 12px; border-radius:10px; border:1px solid #DBEAFE;">
-            <input type="checkbox" id="hint-input-notify" checked style="width:16px; height:16px; accent-color:#2563EB;" />
-            <span>Send Push Alert to Students immediately 🔔</span>
+            <input type="checkbox" id="hint-input-notify" ${existingHint?.notifyStudents === false ? '' : 'checked'} style="width:16px; height:16px; accent-color:#2563EB;" />
+            <span>Send Push Alert to <strong id="lbl-hint-batch-target">${currentBatch}</strong> students 💡🔔</span>
           </label>
 
           <div style="display:flex; gap:10px; margin-top:8px;">
@@ -6737,6 +6922,12 @@ class AppController {
     document.getElementById('btn-close-hint-modal')?.addEventListener('click', () => modal.remove());
     document.getElementById('btn-cancel-hint')?.addEventListener('click', () => modal.remove());
 
+    const batchSelect = document.getElementById('hint-input-batch');
+    batchSelect?.addEventListener('change', () => {
+      const lbl = document.getElementById('lbl-hint-batch-target');
+      if (lbl) lbl.textContent = batchSelect.value || 'All Batches';
+    });
+
     const saveBtn = document.getElementById('btn-save-hint');
     saveBtn?.addEventListener('click', async () => {
       const title = document.getElementById('hint-input-title')?.value.trim();
@@ -6745,7 +6936,7 @@ class AppController {
       const paperName = document.getElementById('hint-input-paper-name')?.value.trim();
       const scopeRaw = document.getElementById('hint-input-scope')?.value.trim();
       const scope = scopeRaw ? scopeRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-      const notify = document.getElementById('hint-input-notify')?.checked;
+      const notify = document.getElementById('hint-input-notify')?.checked !== false;
 
       if (!title) {
         alert('කරුණාකර මාතෘකාවක් (Title) ඇතුළත් කරන්න.');
@@ -6763,7 +6954,8 @@ class AppController {
           paperName,
           hints: '',
           formulas: '',
-          scope
+          scope,
+          notifyStudents: notify
         };
 
         if (isEdit) {
@@ -6855,10 +7047,14 @@ class AppController {
               <div class="paper-expand-circle" style="width:30px; height:30px; border-radius:8px; background:#F1F5F9; color:#475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:8px;">
                 <span class="material-symbols-rounded paper-expand-icon" style="font-size:20px;">${expanded ? 'expand_less' : 'expand_more'}</span>
               </div>
-            </button>
-            <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (මකා දැමීම)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
-              <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
-            </button>
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+              <button class="apk-icon-action-btn" type="button" data-edit-paper-board="${escapeHTML(board.id)}" title="Edit Leaderboard (වෙනස් කිරීම)" style="color:#2563EB; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #BFDBFE; background:#EFF6FF; border-radius:10px; cursor:pointer; flex-shrink:0;">
+                <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
+              </button>
+              <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (මකා දැමීම)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
+                <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+              </button>
+            </div>
           </div>
           ${expanded ? `<div class="paper-results-content" style="padding:14px 16px 16px; border-top:1px solid #F1F5F9; background:#FFFFFF;">
             <!-- Performance Summary Strip -->
@@ -8350,12 +8546,28 @@ class AppController {
             </div>
           </div>
 
+          <!-- Student Push Notification Settings -->
+          <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:12px; font-weight:800; color:#1E40AF; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">notifications_active</span>
+              <span>Student Push Notifications (සිසුන්ට දැනුම්දීම්):</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="new-paper-notify-scheduled" checked style="width:16px; height:16px; accent-color:#2563EB;" />
+              <span>Notify <strong id="lbl-target-batch-notif">2027 A/L</strong> students that this session is scheduled for registration 🔔</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="new-paper-notify-start" checked style="width:16px; height:16px; accent-color:#2563EB;" />
+              <span>Notify students immediately when Admin starts the session live 🔴</span>
+            </label>
+          </div>
+
           <div style="display:flex; gap:10px; margin-top:8px;">
             <button class="apk-btn-primary" id="btn-cancel-create-paper" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
               Cancel
             </button>
             <button class="apk-btn-primary" id="btn-save-new-paper" style="flex:1.5; background:#2563EB; padding:13px; font-size:13px;">
-              Create Paper (නිර්මාණය කරන්න)
+              Schedule Session (සැසිය Schedule කරන්න)
             </button>
           </div>
         </div>
@@ -8381,6 +8593,14 @@ class AppController {
         try { el.showPicker?.(); } catch (_) {}
       });
     });
+
+    const yearSelect = document.getElementById('new-paper-year');
+    const updateYearNotifLabel = () => {
+      const lbl = document.getElementById('lbl-target-batch-notif');
+      if (lbl && yearSelect) lbl.textContent = yearSelect.value || 'All Batches';
+    };
+    yearSelect?.addEventListener('change', updateYearNotifLabel);
+    updateYearNotifLabel();
 
     const updateCalculatedEndTimes = () => {
       const dur = Number(document.getElementById('new-paper-duration')?.value) || 120;
@@ -8669,6 +8889,9 @@ class AppController {
         saveBtn.textContent = 'Creating Session...';
       }
 
+      const notifyScheduled = modal.querySelector('#new-paper-notify-scheduled')?.checked !== false;
+      const notifyOnStart = modal.querySelector('#new-paper-notify-start')?.checked !== false;
+
       try {
         await dbService.savePaperSession({
           title,
@@ -8680,16 +8903,20 @@ class AppController {
           date: examDate,
           durationMinutes: duration,
           totalMarks: marks,
-          status: 'upcoming',
-          currentPhase: 'waiting',
+          status: 'scheduled',
+          currentPhase: 'registration',
+          isStarted: false,
           isEnded: false,
           isLive: false,
           isTimeUp: false,
+          notifyStudents: notifyScheduled,
+          notifyOnStart: notifyOnStart,
+          scheduledAt: new Date().toISOString(),
           slot1,
           slot2
         });
 
-        notificationService.showInAppBanner('Paper Created!', 'Paper Session එක සාර්ථකව නිර්මාණය කරන ලදී (Upcoming Session).', 'success');
+        notificationService.showInAppBanner('Paper Scheduled!', 'Paper Session එක සාර්ථකව Schedule කරන ලදී (Registration Open).', 'success');
         modal.remove();
         this.refreshAdminTab('papers');
       } catch (err) {
@@ -8697,20 +8924,26 @@ class AppController {
         alert('Error creating paper session: ' + err.message);
         if (saveBtn) {
           saveBtn.disabled = false;
-          saveBtn.textContent = 'Create Paper (නිර්මාණය කරන්න)';
+          saveBtn.textContent = 'Schedule Session (සැසිය Schedule කරන්න)';
         }
       }
     });
   }
 
-  openAdminCreateLeaderboardModal() {
+  openAdminCreateLeaderboardModal(existingBoard = null) {
+    const isEdit = !!existingBoard;
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     modal.style.display = 'flex';
 
-    let entries = [
-      { studentName: '', indexNumber: '', marks: 85, grade: 'A', remarks: 'Excellent' }
-    ];
+    let entries = (Array.isArray(existingBoard?.entries) && existingBoard.entries.length > 0)
+      ? existingBoard.entries.map(e => ({ ...e }))
+      : [
+          { studentName: '', indexNumber: '', marks: 85, grade: 'A', remarks: 'Excellent' }
+        ];
+
+    const currentBatch = existingBoard?.examYear || '2027 A/L';
+    const batches = ['2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L', 'All Batches'];
 
     const calculateGrade = (marks) => {
       const m = Number(marks) || 0;
@@ -8783,7 +9016,7 @@ class AppController {
         <div class="modal-header">
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:8px;">
             <span class="material-symbols-rounded filled" style="color:#D97706; font-size:22px;">emoji_events</span>
-            <span>Publish Paper Leaderboard</span>
+            <span>${isEdit ? 'Edit Paper Leaderboard' : 'Publish Paper Leaderboard'}</span>
           </div>
           <button class="modal-close-btn" id="btn-close-new-lb">
             <span class="material-symbols-rounded">close</span>
@@ -8793,7 +9026,7 @@ class AppController {
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
           <div>
             <div class="form-label">Paper Title / Evaluation Name:</div>
-            <input type="text" id="new-lb-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 Official Leaderboard" />
+            <input type="text" id="new-lb-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 Official Leaderboard" value="${existingBoard?.paperTitle ? existingBoard.paperTitle.replace(/"/g, '&quot;') : ''}" />
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -8806,13 +9039,7 @@ class AppController {
             <div>
               <div class="form-label">Exam Year / Batch:</div>
               <select id="new-lb-year" class="form-textarea" style="height:40px; padding:8px;">
-                <option value="2024 A/L">2024 A/L</option>
-                <option value="2025 A/L">2025 A/L</option>
-                <option value="2026 A/L">2026 A/L</option>
-                <option value="2027 A/L" selected>2027 A/L</option>
-                <option value="2028 A/L">2028 A/L</option>
-                <option value="2029 A/L">2029 A/L</option>
-                <option value="All Batches">All Batches</option>
+                ${batches.map(b => `<option value="${b}" ${b === currentBatch ? 'selected' : ''}>${b}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -8820,12 +9047,24 @@ class AppController {
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div>
               <div class="form-label">Total Marks:</div>
-              <input type="number" id="new-lb-total-marks" class="form-textarea" style="height:40px;" value="100" min="1" max="1000" />
+              <input type="number" id="new-lb-total-marks" class="form-textarea" style="height:40px;" value="${existingBoard?.totalMarks || 100}" min="1" max="1000" />
             </div>
             <div>
               <div class="form-label">Evaluation Date:</div>
-              <input type="date" id="new-lb-date" class="form-textarea" style="height:40px;" value="${new Date().toISOString().split('T')[0]}" />
+              <input type="date" id="new-lb-date" class="form-textarea" style="height:40px;" value="${existingBoard?.paperDate || new Date().toISOString().split('T')[0]}" />
             </div>
+          </div>
+
+          <!-- Student Push Notification Settings -->
+          <div style="background:#FEF3C7; border:1.5px solid #FCD34D; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:12px; font-weight:800; color:#92400E; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#D97706;">notifications_active</span>
+              <span>Student Push Notification (සිසුන්ට දැනුම්දීම්):</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="new-lb-notify" ${existingBoard?.notifyStudents === false ? '' : 'checked'} style="width:16px; height:16px; accent-color:#D97706;" />
+              <span>Send Leaderboard Push Alert to <strong id="lbl-target-lb-batch">${currentBatch}</strong> students 🏆🔔</span>
+            </label>
           </div>
 
           <div style="margin-top:6px;">
@@ -8845,7 +9084,7 @@ class AppController {
             </button>
             <button class="apk-btn-primary" id="btn-save-new-lb" style="flex:1.5; background:#D97706; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
               <span class="material-symbols-rounded" style="font-size:18px;">publish</span>
-              <span>Publish Leaderboard</span>
+              <span>${isEdit ? 'Update Leaderboard' : 'Publish Leaderboard'}</span>
             </button>
           </div>
         </div>
@@ -8858,6 +9097,12 @@ class AppController {
     modal.querySelector('#btn-close-new-lb')?.addEventListener('click', () => modal.remove());
     modal.querySelector('#btn-cancel-new-lb')?.addEventListener('click', () => modal.remove());
 
+    const yearSelect = modal.querySelector('#new-lb-year');
+    yearSelect?.addEventListener('change', () => {
+      const lbl = modal.querySelector('#lbl-target-lb-batch');
+      if (lbl) lbl.textContent = yearSelect.value || 'All Batches';
+    });
+
     modal.querySelector('#btn-add-lb-candidate')?.addEventListener('click', () => {
       entries.push({ studentName: '', indexNumber: '', marks: 75, grade: 'A', remarks: '' });
       renderCandidateRows();
@@ -8869,6 +9114,7 @@ class AppController {
       const examYear = modal.querySelector('#new-lb-year')?.value || '2027 A/L';
       const totalMarks = Number(modal.querySelector('#new-lb-total-marks')?.value) || 100;
       const paperDate = modal.querySelector('#new-lb-date')?.value || new Date().toISOString().split('T')[0];
+      const notifyStudents = modal.querySelector('#new-lb-notify')?.checked !== false;
 
       if (!paperTitle) {
         alert('කරුණාකර Leaderboard Title එක ඇතුළත් කරන්න (Please enter Leaderboard Title)');
@@ -8889,17 +9135,23 @@ class AppController {
           remarks: e.remarks || ''
         }));
 
-      await dbService.savePaperLeaderboard({
+      const payload = {
         paperTitle,
         subject,
         examYear,
         totalMarks,
         paperDate,
-        publishedAt: new Date().toISOString(),
+        publishedAt: existingBoard?.publishedAt || new Date().toISOString(),
+        notifyStudents,
         entries: sortedEntries
-      });
+      };
+      if (isEdit && existingBoard?.id) {
+        payload.id = existingBoard.id;
+      }
 
-      notificationService.showInAppBanner('Leaderboard Published!', 'Paper Leaderboard එක සාර්ථකව Real-Time Publish කරන ලදී.', 'success');
+      await dbService.savePaperLeaderboard(payload);
+
+      notificationService.showInAppBanner(isEdit ? 'Leaderboard Updated!' : 'Leaderboard Published!', `Paper Leaderboard එක සාර්ථකව ${isEdit ? 'Update' : 'Publish'} කරන ලදී.`, 'success');
       modal.remove();
       this.refreshAdminTab('papers');
     });

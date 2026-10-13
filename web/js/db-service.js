@@ -791,12 +791,29 @@ export class DbService {
   // Admin: Save or update paper session
   async savePaperSession(session) {
     try {
+      const isNew = !session.id;
       const ref = collection(db, 'paper_sessions');
-      const docRef = await addDoc(ref, {
+      const payload = {
         ...session,
-        createdAt: new Date().toISOString()
-      });
-      return { id: docRef.id, ...session };
+        status: session.status || 'scheduled',
+        currentPhase: session.currentPhase || 'registration',
+        isStarted: session.isStarted === true,
+        isLive: session.isLive === true,
+        isEnded: session.isEnded === true,
+        notifyStudents: session.notifyStudents !== false,
+        notifyOnStart: session.notifyOnStart !== false,
+        updatedAt: new Date().toISOString()
+      };
+      if (isNew) {
+        payload.createdAt = new Date().toISOString();
+        payload.scheduledAt = session.scheduledAt || new Date().toISOString();
+        const docRef = await addDoc(ref, payload);
+        return { id: docRef.id, ...payload };
+      } else {
+        const docRef = doc(db, 'paper_sessions', session.id);
+        await setDoc(docRef, payload, { merge: true });
+        return { id: session.id, ...payload };
+      }
     } catch (e) {
       console.warn('[DB] Saved paper locally:', e);
       throw e;
@@ -972,47 +989,44 @@ export class DbService {
   // Unified status computation across Admin and Student views
   computeSessionStatus(session) {
     if (!session) {
-      return { isEnded: false, isLive: false, isWaiting: false, isUpcoming: true, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: 'upcoming' };
+      return { isEnded: false, isLive: false, isWaiting: false, isUpcoming: true, isScheduled: false, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: 'upcoming' };
     }
     const isEnded = !!(session.isEnded || session.status === 'ended' || session.currentPhase === 'ended');
     if (isEnded) {
-      return { isEnded: true, isLive: false, isWaiting: false, isUpcoming: false, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: 'ended' };
+      return { isEnded: true, isLive: false, isWaiting: false, isUpcoming: false, isScheduled: false, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: 'ended' };
     }
     const isPackageOpening = session.currentPhase === 'package_opening';
     const isWriting = session.currentPhase === 'writing';
     const isTimeUp = session.currentPhase === 'time_up' || !!session.isTimeUp;
     
-    // Check if slot 1 start time has passed
-    let isAfterSlot1 = false;
-    if (session.slot1?.startTime) {
-      const s1 = new Date(session.slot1.startTime);
-      if (!isNaN(s1.getTime())) {
-        isAfterSlot1 = new Date() >= s1;
-      }
-    }
-
-    const isLive = !!(
-      session.isLive ||
+    // Explicitly live / started session
+    const isExplicitlyLive = !!(
+      session.isLive === true ||
+      session.isStarted === true ||
       session.status === 'active' ||
       session.status === 'live' ||
       isPackageOpening ||
       isWriting ||
-      isTimeUp ||
-      isAfterSlot1
+      isTimeUp
     );
 
+    // If session is scheduled for student registration and not yet started by admin
+    const isScheduled = (session.status === 'scheduled' || session.currentPhase === 'registration' || session.isStarted === false) && !isExplicitlyLive;
+
+    const isLive = isExplicitlyLive;
     const isWaiting = !isLive && session.currentPhase === 'waiting';
-    const isUpcoming = !isLive && !isEnded;
+    const isUpcoming = (!isLive && !isEnded) || isScheduled;
 
     return {
       isEnded,
       isLive,
       isWaiting,
       isUpcoming,
+      isScheduled,
       isPackageOpening,
       isWriting,
       isTimeUp,
-      statusText: isLive ? 'live' : (isEnded ? 'ended' : 'upcoming')
+      statusText: isLive ? 'live' : (isEnded ? 'ended' : (isScheduled ? 'scheduled' : 'upcoming'))
     };
   }
 
@@ -1075,17 +1089,19 @@ export class DbService {
       };
     }
 
-    const rawStatus = raw.status || 'upcoming';
+    const rawStatus = raw.status || 'scheduled';
     const isEnded = !!(raw.isEnded || rawStatus === 'ended' || raw.currentPhase === 'ended');
     let phase = raw.currentPhase || '';
     if (!phase) {
       if (isEnded) phase = 'ended';
       else if (raw.isTimeUp) phase = 'time_up';
       else if (rawStatus === 'active') phase = 'writing';
-      else phase = 'waiting';
+      else if (rawStatus === 'scheduled') phase = 'registration';
+      else phase = 'registration';
     }
 
-    const isLive = !isEnded && (raw.isLive === true || rawStatus === 'active' || rawStatus === 'live' || phase === 'package_opening' || phase === 'writing' || phase === 'time_up');
+    const isLive = !isEnded && (raw.isLive === true || raw.isStarted === true || rawStatus === 'active' || rawStatus === 'live' || phase === 'package_opening' || phase === 'writing' || phase === 'time_up');
+    const isScheduled = !isEnded && !isLive && (rawStatus === 'scheduled' || phase === 'registration' || raw.isStarted === false);
 
     return {
       ...raw,
@@ -1099,11 +1115,15 @@ export class DbService {
       date: raw.date || todayIso,
       durationMinutes: duration,
       totalMarks: Number(raw.totalMarks) || 100,
-      status: isEnded ? 'ended' : (isLive ? 'active' : rawStatus),
+      status: isEnded ? 'ended' : (isLive ? 'active' : (isScheduled ? 'scheduled' : rawStatus)),
       currentPhase: phase,
       isEnded,
       isLive,
+      isStarted: !!(raw.isStarted || isLive),
+      isScheduled,
       isTimeUp: !!raw.isTimeUp,
+      notifyStudents: raw.notifyStudents !== false,
+      notifyOnStart: raw.notifyOnStart !== false,
       slot1,
       slot2,
       packageOpeningStartedAt: parseTime(raw.packageOpeningStartedAt, null),
@@ -1165,6 +1185,7 @@ export class DbService {
       hints: raw.hints || raw.instructions || '',
       formulas: raw.formulas || '',
       scope: Array.isArray(raw.scope) ? raw.scope : (typeof raw.scope === 'string' ? raw.scope.split(',').map(s => s.trim()).filter(Boolean) : (Array.isArray(raw.syllabusTopics) ? raw.syllabusTopics : [])),
+      notifyStudents: raw.notifyStudents !== false,
       isPublished: raw.isPublished !== false,
       publishedAt: parseTime(raw.publishedAt || raw.createdAt),
       createdAt: raw.createdAt || new Date().toISOString()
@@ -1450,6 +1471,7 @@ export class DbService {
     const payload = {
       ...hintData,
       id,
+      notifyStudents: hintData.notifyStudents !== false,
       publishedAt: serverTimestamp(),
       createdAt: new Date().toISOString(),
       isPublished: true
@@ -1464,6 +1486,7 @@ export class DbService {
     const ref = doc(db, 'paper_hints', hintId);
     await updateDoc(ref, {
       ...hintData,
+      notifyStudents: hintData.notifyStudents !== false,
       updatedAt: serverTimestamp()
     });
     this.clearCache('paper_hints');
@@ -1805,9 +1828,30 @@ export class DbService {
     }).catch(() => {});
   }
 
-  async startPaperSession(paperId) {
+  async startPaperSession(paperId, { notifyStudents = true } = {}) {
     if (!paperId) return;
-    return this.setSessionPhase(paperId, 'package_opening', { forceResetTimer: true });
+    const nowIso = new Date().toISOString();
+    try {
+      const docRef = doc(db, 'paper_sessions', paperId);
+      await updateDoc(docRef, {
+        status: 'active',
+        currentPhase: 'package_opening',
+        isLive: true,
+        isStarted: true,
+        startedAt: nowIso,
+        packageOpeningStartedAt: nowIso,
+        notifyOnStart: notifyStudents !== false,
+        lastStartedTimestamp: Date.now()
+      });
+    } catch (e) {
+      console.warn('[DB] startPaperSession updateDoc error:', e);
+    }
+    this.broadcastProctorAlert({
+      paperId,
+      senderName: 'Admin / Examiner',
+      message: '📦 විභාග සැසිය ආරම්භ විය! කැමරාව ඉදිරියේ ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කරන්න. (Exam is Live)',
+      type: 'urgent'
+    }).catch(() => {});
   }
 
   async reopenPaperSession(paperId) {
@@ -1856,14 +1900,17 @@ export class DbService {
     }
   }
 
-  async updateSlotTimes(paperId, { slot1, slot2 }) {
+  async updateSlotTimes(paperId, { slot1, slot2, notifyStudents, notifyOnStart }) {
     if (!paperId) return;
     try {
       const docRef = doc(db, 'paper_sessions', paperId);
       const updates = {};
       if (slot1) updates.slot1 = slot1;
       if (slot2) updates.slot2 = slot2;
+      if (notifyStudents !== undefined) updates.notifyStudents = notifyStudents;
+      if (notifyOnStart !== undefined) updates.notifyOnStart = notifyOnStart;
       await updateDoc(docRef, updates);
+      this.clearCache('paper_sessions');
     } catch (e) {
       console.warn('[DB] updateSlotTimes error:', e);
     }
@@ -2252,6 +2299,102 @@ export class DbService {
     };
   }
 
+  async sendStudentPushNotification({ studentId, studentPhone, studentName, title, message, sender = 'Teacher' }) {
+    const payload = {
+      studentId: String(studentId || '').trim(),
+      studentPhone: String(studentPhone || '').trim(),
+      studentName: String(studentName || 'Student').trim(),
+      title: String(title || '').trim(),
+      message: String(message || '').trim(),
+      sender: String(sender || 'Teacher').trim(),
+      createdAt: serverTimestamp ? serverTimestamp() : new Date(),
+      timestamp: Date.now(),
+      read: false
+    };
+
+    try {
+      if (db) {
+        await addDoc(collection(db, 'student_notifications'), payload);
+      }
+    } catch (e) {
+      console.warn('[DB] Firestore student notification note:', e);
+    }
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('edupeak_student_notifs');
+        bc.postMessage(payload);
+        bc.close();
+      }
+    } catch (_) {}
+
+    return true;
+  }
+
+  streamStudentDirectNotifications(studentId, studentPhone, callback) {
+    if (!db || (!studentId && !studentPhone)) return () => {};
+    let initialized = false;
+    const seenIds = new Set();
+    const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
+    const cleanId = String(studentId || '').trim();
+
+    try {
+      const q = query(
+        collection(db, 'student_notifications'),
+        orderBy('timestamp', 'desc'),
+        limit(20)
+      );
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!initialized) {
+          initialized = true;
+          snapshot.docs.forEach(d => seenIds.add(d.id));
+          return;
+        }
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added' && !seenIds.has(change.doc.id)) {
+            seenIds.add(change.doc.id);
+            const data = change.doc.data();
+            const targetId = String(data.studentId || '').trim();
+            const targetPhone = String(data.studentPhone || '').replace(/\D/g, '');
+            const isForMe = (cleanId && targetId && cleanId === targetId) ||
+              (cleanPhone && targetPhone && cleanPhone === targetPhone);
+            if (isForMe) {
+              callback({ id: change.doc.id, ...data });
+            }
+          }
+        });
+      }, (err) => {
+        console.warn('[DB] streamStudentDirectNotifications warning:', err);
+      });
+
+      let bc = null;
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          bc = new BroadcastChannel('edupeak_student_notifs');
+          bc.onmessage = (event) => {
+            const data = event.data;
+            if (!data) return;
+            const targetId = String(data.studentId || '').trim();
+            const targetPhone = String(data.studentPhone || '').replace(/\D/g, '');
+            const isForMe = (cleanId && targetId && cleanId === targetId) ||
+              (cleanPhone && targetPhone && cleanPhone === targetPhone);
+            if (isForMe) {
+              callback(data);
+            }
+          };
+        }
+      } catch (_) {}
+
+      return () => {
+        try { unsubscribe(); } catch (_) {}
+        try { if (bc) bc.close(); } catch (_) {}
+      };
+    } catch (e) {
+      console.warn('[DB] streamStudentDirectNotifications error:', e);
+      return () => {};
+    }
+  }
+
   streamPaperLeaderboards(callback) {
     try {
       const ref = collection(db, 'paper_leaderboards');
@@ -2281,6 +2424,7 @@ export class DbService {
             paperDate: String(data.paperDate || ''),
             totalMarks: Number(data.totalMarks) || 100,
             publishedAt: Number.isNaN(publishedAt.getTime()) ? new Date(0) : publishedAt,
+            notifyStudents: data.notifyStudents !== false,
             entries,
           };
         }).sort((a, b) => b.publishedAt - a.publishedAt);
@@ -2331,6 +2475,7 @@ export class DbService {
           paperDate: String(data.paperDate || ''),
           totalMarks: Number(data.totalMarks) || 100,
           publishedAt: Number.isNaN(publishedAt.getTime()) ? new Date(0) : publishedAt,
+          notifyStudents: data.notifyStudents !== false,
           entries,
         };
       }).sort((a, b) => b.publishedAt - a.publishedAt);
@@ -2346,17 +2491,18 @@ export class DbService {
     try {
       const isNew = !leaderboard.id;
       const ref = collection(db, 'paper_leaderboards');
+      const payload = {
+        ...leaderboard,
+        notifyStudents: leaderboard.notifyStudents !== false,
+        publishedAt: leaderboard.publishedAt || new Date().toISOString()
+      };
       if (isNew) {
-        const docRef = await addDoc(ref, {
-          ...leaderboard,
-          publishedAt: leaderboard.publishedAt || new Date().toISOString()
-        });
+        const docRef = await addDoc(ref, payload);
+        this.clearCache('paper_leaderboards');
         return docRef.id;
       } else {
-        await setDoc(doc(db, 'paper_leaderboards', leaderboard.id), {
-          ...leaderboard,
-          publishedAt: leaderboard.publishedAt || new Date().toISOString()
-        }, { merge: true });
+        await setDoc(doc(db, 'paper_leaderboards', leaderboard.id), payload, { merge: true });
+        this.clearCache('paper_leaderboards');
         return leaderboard.id;
       }
     } catch (e) {

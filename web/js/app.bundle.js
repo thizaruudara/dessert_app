@@ -10927,15 +10927,15 @@ var init_build2 = __esm({
     };
     decodeOrbit = (str) => {
       const res = decodeVLQ(str);
-      const map2 = /* @__PURE__ */ new Map();
+      const map = /* @__PURE__ */ new Map();
       let currentKey = 0;
       for (let i2 = 0; i2 < res.length; i2 += 2) {
         currentKey += res[i2];
         const zz = res[i2 + 1];
         const delta = zz >>> 1 ^ -(zz & 1);
-        map2.set(currentKey, currentKey + delta);
+        map.set(currentKey, currentKey + delta);
       }
-      return map2;
+      return map;
     };
     LazyMap = class {
       constructor(initializer) {
@@ -88103,12 +88103,29 @@ var DbService = class {
   // Admin: Save or update paper session
   async savePaperSession(session) {
     try {
+      const isNew = !session.id;
       const ref2 = collection(db, "paper_sessions");
-      const docRef = await addDoc(ref2, {
+      const payload = {
         ...session,
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
-      });
-      return { id: docRef.id, ...session };
+        status: session.status || "scheduled",
+        currentPhase: session.currentPhase || "registration",
+        isStarted: session.isStarted === true,
+        isLive: session.isLive === true,
+        isEnded: session.isEnded === true,
+        notifyStudents: session.notifyStudents !== false,
+        notifyOnStart: session.notifyOnStart !== false,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      if (isNew) {
+        payload.createdAt = (/* @__PURE__ */ new Date()).toISOString();
+        payload.scheduledAt = session.scheduledAt || (/* @__PURE__ */ new Date()).toISOString();
+        const docRef = await addDoc(ref2, payload);
+        return { id: docRef.id, ...payload };
+      } else {
+        const docRef = doc(db, "paper_sessions", session.id);
+        await setDoc(docRef, payload, { merge: true });
+        return { id: session.id, ...payload };
+      }
     } catch (e2) {
       console.warn("[DB] Saved paper locally:", e2);
       throw e2;
@@ -88143,14 +88160,14 @@ var DbService = class {
   }
   // Admin: Get student roster - ONLY students who have logged into Dessert App
   async getAllStudents() {
-    const map2 = /* @__PURE__ */ new Map();
+    const map = /* @__PURE__ */ new Map();
     try {
       const { data: supaStudents, error: supaErr } = await supabase.rpc("get_all_students_for_admin");
       if (!supaErr && Array.isArray(supaStudents)) {
         for (const u2 of supaStudents) {
           if (this.isStaffOrAdmin(u2)) continue;
           const key = (u2.studentId || u2.id || u2.phone || u2.email || u2.name).toLowerCase().trim();
-          map2.set(key, {
+          map.set(key, {
             id: u2.id || u2.studentId,
             studentId: u2.studentId || u2.id,
             name: u2.name,
@@ -88174,7 +88191,7 @@ var DbService = class {
         if (loginRows && loginRows.length > 0) {
           for (const l2 of loginRows) {
             const key = (l2.student_id || l2.phone || l2.email || l2.name).toLowerCase().trim();
-            map2.set(key, {
+            map.set(key, {
               id: l2.student_id,
               studentId: l2.student_id,
               name: l2.name,
@@ -88208,9 +88225,9 @@ var DbService = class {
           const u2 = { id: d.id, ...d.data() };
           if (this.isStaffOrAdmin(u2)) continue;
           const key = (u2.studentId || u2.id || u2.phone || u2.name).toLowerCase().trim();
-          if (map2.has(key)) {
-            const existing = map2.get(key);
-            map2.set(key, {
+          if (map.has(key)) {
+            const existing = map.get(key);
+            map.set(key, {
               ...u2,
               ...existing,
               name: existing.name || u2.name,
@@ -88223,7 +88240,7 @@ var DbService = class {
       }
     } catch (_) {
     }
-    const students = Array.from(map2.values()).filter((u2) => !this.isStaffOrAdmin(u2));
+    const students = Array.from(map.values()).filter((u2) => !this.isStaffOrAdmin(u2));
     await Promise.all(students.map(async (st2) => {
       const trueCredits = await this.getStudentCredits(
         st2.id,
@@ -88260,34 +88277,30 @@ var DbService = class {
   // Unified status computation across Admin and Student views
   computeSessionStatus(session) {
     if (!session) {
-      return { isEnded: false, isLive: false, isWaiting: false, isUpcoming: true, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: "upcoming" };
+      return { isEnded: false, isLive: false, isWaiting: false, isUpcoming: true, isScheduled: false, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: "upcoming" };
     }
     const isEnded = !!(session.isEnded || session.status === "ended" || session.currentPhase === "ended");
     if (isEnded) {
-      return { isEnded: true, isLive: false, isWaiting: false, isUpcoming: false, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: "ended" };
+      return { isEnded: true, isLive: false, isWaiting: false, isUpcoming: false, isScheduled: false, isPackageOpening: false, isWriting: false, isTimeUp: false, statusText: "ended" };
     }
     const isPackageOpening = session.currentPhase === "package_opening";
     const isWriting = session.currentPhase === "writing";
     const isTimeUp = session.currentPhase === "time_up" || !!session.isTimeUp;
-    let isAfterSlot1 = false;
-    if (session.slot1?.startTime) {
-      const s1 = new Date(session.slot1.startTime);
-      if (!isNaN(s1.getTime())) {
-        isAfterSlot1 = /* @__PURE__ */ new Date() >= s1;
-      }
-    }
-    const isLive = !!(session.isLive || session.status === "active" || session.status === "live" || isPackageOpening || isWriting || isTimeUp || isAfterSlot1);
+    const isExplicitlyLive = !!(session.isLive === true || session.isStarted === true || session.status === "active" || session.status === "live" || isPackageOpening || isWriting || isTimeUp);
+    const isScheduled = (session.status === "scheduled" || session.currentPhase === "registration" || session.isStarted === false) && !isExplicitlyLive;
+    const isLive = isExplicitlyLive;
     const isWaiting = !isLive && session.currentPhase === "waiting";
-    const isUpcoming = !isLive && !isEnded;
+    const isUpcoming = !isLive && !isEnded || isScheduled;
     return {
       isEnded,
       isLive,
       isWaiting,
       isUpcoming,
+      isScheduled,
       isPackageOpening,
       isWriting,
       isTimeUp,
-      statusText: isLive ? "live" : isEnded ? "ended" : "upcoming"
+      statusText: isLive ? "live" : isEnded ? "ended" : isScheduled ? "scheduled" : "upcoming"
     };
   }
   // ── 2. Paper Sessions (Online Exam Hall - 1:1 Mobile Parity) ───────────────
@@ -88341,16 +88354,18 @@ var DbService = class {
         registeredCount: Number(rawSlot2?.registeredCount || (rawSlot2?.seatsLeft !== void 0 ? Math.max(0, 100 - rawSlot2.seatsLeft) : 32))
       };
     }
-    const rawStatus = raw.status || "upcoming";
+    const rawStatus = raw.status || "scheduled";
     const isEnded = !!(raw.isEnded || rawStatus === "ended" || raw.currentPhase === "ended");
     let phase = raw.currentPhase || "";
     if (!phase) {
       if (isEnded) phase = "ended";
       else if (raw.isTimeUp) phase = "time_up";
       else if (rawStatus === "active") phase = "writing";
-      else phase = "waiting";
+      else if (rawStatus === "scheduled") phase = "registration";
+      else phase = "registration";
     }
-    const isLive = !isEnded && (raw.isLive === true || rawStatus === "active" || rawStatus === "live" || phase === "package_opening" || phase === "writing" || phase === "time_up");
+    const isLive = !isEnded && (raw.isLive === true || raw.isStarted === true || rawStatus === "active" || rawStatus === "live" || phase === "package_opening" || phase === "writing" || phase === "time_up");
+    const isScheduled = !isEnded && !isLive && (rawStatus === "scheduled" || phase === "registration" || raw.isStarted === false);
     return {
       ...raw,
       id: id || raw.id || "paper_" + Date.now(),
@@ -88363,11 +88378,15 @@ var DbService = class {
       date: raw.date || todayIso,
       durationMinutes: duration,
       totalMarks: Number(raw.totalMarks) || 100,
-      status: isEnded ? "ended" : isLive ? "active" : rawStatus,
+      status: isEnded ? "ended" : isLive ? "active" : isScheduled ? "scheduled" : rawStatus,
       currentPhase: phase,
       isEnded,
       isLive,
+      isStarted: !!(raw.isStarted || isLive),
+      isScheduled,
       isTimeUp: !!raw.isTimeUp,
+      notifyStudents: raw.notifyStudents !== false,
+      notifyOnStart: raw.notifyOnStart !== false,
       slot1,
       slot2,
       packageOpeningStartedAt: parseTime(raw.packageOpeningStartedAt, null),
@@ -88430,6 +88449,7 @@ var DbService = class {
       hints: raw.hints || raw.instructions || "",
       formulas: raw.formulas || "",
       scope: Array.isArray(raw.scope) ? raw.scope : typeof raw.scope === "string" ? raw.scope.split(",").map((s2) => s2.trim()).filter(Boolean) : Array.isArray(raw.syllabusTopics) ? raw.syllabusTopics : [],
+      notifyStudents: raw.notifyStudents !== false,
       isPublished: raw.isPublished !== false,
       publishedAt: parseTime(raw.publishedAt || raw.createdAt),
       createdAt: raw.createdAt || (/* @__PURE__ */ new Date()).toISOString()
@@ -88725,6 +88745,7 @@ var DbService = class {
     const payload = {
       ...hintData,
       id,
+      notifyStudents: hintData.notifyStudents !== false,
       publishedAt: serverTimestamp(),
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
       isPublished: true
@@ -88738,6 +88759,7 @@ var DbService = class {
     const ref2 = doc(db, "paper_hints", hintId);
     await updateDoc(ref2, {
       ...hintData,
+      notifyStudents: hintData.notifyStudents !== false,
       updatedAt: serverTimestamp()
     });
     this.clearCache("paper_hints");
@@ -89069,9 +89091,31 @@ var DbService = class {
     }).catch(() => {
     });
   }
-  async startPaperSession(paperId) {
+  async startPaperSession(paperId, { notifyStudents = true } = {}) {
     if (!paperId) return;
-    return this.setSessionPhase(paperId, "package_opening", { forceResetTimer: true });
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    try {
+      const docRef = doc(db, "paper_sessions", paperId);
+      await updateDoc(docRef, {
+        status: "active",
+        currentPhase: "package_opening",
+        isLive: true,
+        isStarted: true,
+        startedAt: nowIso,
+        packageOpeningStartedAt: nowIso,
+        notifyOnStart: notifyStudents !== false,
+        lastStartedTimestamp: Date.now()
+      });
+    } catch (e2) {
+      console.warn("[DB] startPaperSession updateDoc error:", e2);
+    }
+    this.broadcastProctorAlert({
+      paperId,
+      senderName: "Admin / Examiner",
+      message: "\u{1F4E6} \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0DC0\u0DD2\u0DBA! \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1. (Exam is Live)",
+      type: "urgent"
+    }).catch(() => {
+    });
   }
   async reopenPaperSession(paperId) {
     if (!paperId) return;
@@ -89117,14 +89161,17 @@ var DbService = class {
       return false;
     }
   }
-  async updateSlotTimes(paperId, { slot1, slot2 }) {
+  async updateSlotTimes(paperId, { slot1, slot2, notifyStudents, notifyOnStart }) {
     if (!paperId) return;
     try {
       const docRef = doc(db, "paper_sessions", paperId);
       const updates = {};
       if (slot1) updates.slot1 = slot1;
       if (slot2) updates.slot2 = slot2;
+      if (notifyStudents !== void 0) updates.notifyStudents = notifyStudents;
+      if (notifyOnStart !== void 0) updates.notifyOnStart = notifyOnStart;
       await updateDoc(docRef, updates);
+      this.clearCache("paper_sessions");
     } catch (e2) {
       console.warn("[DB] updateSlotTimes error:", e2);
     }
@@ -89281,137 +89328,152 @@ var DbService = class {
       const cached = this.getCached(cacheKey, 3e4);
       if (cached) return cached;
     }
-    let firestoreList = [];
     try {
-      const q = collection(db, "leaderboard_public");
-      const snapshot = await Promise.race([
-        getDocs(q),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), 3500))
-      ]);
-      firestoreList = snapshot.docs.map((studentDoc) => {
-        const student = studentDoc.data();
-        return {
-          rank: 0,
-          id: studentDoc.id,
-          role: "student",
-          name: student.name || "Student",
-          examYear: student.examYear || "2027 A/L",
-          credits: Number(student.credits) || 0,
-          avatarUrl: student.avatarUrl || student.photoUrl || "",
-          studentPhone: student.studentPhone || student.phone || ""
-        };
-      });
-    } catch (e2) {
-      console.warn("[DB] Firestore leaderboard fetch note:", e2);
-    }
-    let localLb = [];
-    try {
-      localLb = JSON.parse(localStorage.getItem("edupeak_local_leaderboard") || "[]");
-    } catch (_) {
-    }
-    const dessertCreditMap = {};
-    const dessertBatchMap = {};
-    try {
-      const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
-      localDesserts.forEach((d) => {
-        if (d.status === "approved") {
-          const key = (d.studentName || d.studentId || "").trim();
-          const amt = Number(d.creditsAwarded) || 0;
-          if (key) {
-            dessertCreditMap[key] = (dessertCreditMap[key] || 0) + amt;
-            if (d.examYear) dessertBatchMap[key] = d.examYear;
+      let supabaseList = [];
+      try {
+        if (supabase) {
+          const { data: supaProfiles, error: supaErr } = await supabase.from("profiles").select("id, name, full_name, email, phone, role, exam_year, credits").limit(150);
+          if (!supaErr && Array.isArray(supaProfiles)) {
+            supabaseList = supaProfiles.map((p2) => ({
+              id: p2.id,
+              role: p2.role || "student",
+              name: p2.full_name || p2.name || "Student",
+              examYear: p2.exam_year || "2027 A/L",
+              credits: Number(p2.credits) || 0,
+              avatarUrl: "",
+              studentPhone: p2.phone || ""
+            }));
           }
         }
-      });
-    } catch (_) {
-    }
-    let supabaseList = [];
-    try {
-      if (typeof supabase !== "undefined" && supabase) {
-        const { data: supaProfiles } = await supabase
-          .from("profiles")
-          .select("id, name, full_name, email, phone, role, exam_year, credits")
-          .limit(150);
-        if (Array.isArray(supaProfiles)) {
-          supabaseList = supaProfiles.map((p) => ({
-            id: p.id,
-            role: p.role || "student",
-            name: p.full_name || p.name || "Student",
-            examYear: p.exam_year || "2027 A/L",
-            credits: Number(p.credits) || 0,
-            avatarUrl: "",
-            studentPhone: p.phone || ""
-          }));
-        }
+      } catch (e2) {
+        console.warn("[DB] Supabase leaderboard fetch note:", e2);
       }
-    } catch (_) {}
-    const map = new Map();
-    for (const s2 of supabaseList) {
-      if (!s2.name) continue;
-      const key = s2.name.toLowerCase().trim();
-      map.set(key, { ...s2, credits: Number(s2.credits) || 0 });
-    }
-    for (const s2 of localLb) {
-      if (!s2.name) continue;
-      const key = s2.name.toLowerCase().trim();
-      const existing = map.get(key) || {};
-      map.set(key, { ...existing, ...s2, credits: Number(s2.credits) || existing.credits || 0 });
-    }
-    for (const s2 of firestoreList) {
-      if (!s2.name) continue;
-      const key = s2.name.toLowerCase().trim();
-      const existing = map.get(key) || {};
-      map.set(key, { ...existing, ...s2, credits: Math.max(Number(s2.credits) || 0, existing.credits || 0) });
-    }
-    for (const [studentKey, awardedXp] of Object.entries(dessertCreditMap)) {
-      const normKey = studentKey.toLowerCase().trim();
-      let found = false;
-      for (const [k2, v2] of map.entries()) {
-        if (k2 === normKey || v2.id && v2.id.toLowerCase() === normKey) {
-          v2.credits = Math.max(v2.credits, (v2.credits || 0) + awardedXp);
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        map.set(normKey, {
-          id: "student_" + studentKey.replace(/\s+/g, "_"),
-          name: studentKey,
-          role: "student",
-          examYear: dessertBatchMap[studentKey] || "2027 A/L",
-          credits: awardedXp,
-          avatarUrl: ""
+      let firestoreList = [];
+      try {
+        const q = collection(db, "leaderboard_public");
+        const snapshot = await Promise.race([
+          getDocs(q),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), 3500))
+        ]);
+        firestoreList = snapshot.docs.map((studentDoc) => {
+          const student = studentDoc.data();
+          return {
+            rank: 0,
+            id: studentDoc.id,
+            role: "student",
+            name: student.name || "Student",
+            examYear: student.examYear || "2027 A/L",
+            credits: Number(student.credits) || 0,
+            avatarUrl: student.avatarUrl || student.photoUrl || "",
+            studentPhone: student.studentPhone || student.phone || ""
+          };
         });
+      } catch (e2) {
+        console.warn("[DB] Firestore leaderboard fetch note:", e2);
       }
-    }
-    try {
-      const currentStoredUser = JSON.parse(localStorage.getItem("edupeak_auth_user") || "null");
-      if (currentStoredUser && currentStoredUser.name) {
-        const key = currentStoredUser.name.toLowerCase().trim();
-        const customCredits = localStorage.getItem(`edupeak_credits_${currentStoredUser.uid || currentStoredUser.id}`);
-        if (customCredits && map.has(key)) {
-          let cNum = Number(customCredits) || 0;
-          if (cNum === 355 || cNum === 155 || cNum === 305) cNum = 200;
-          map.get(key).credits = Math.max(map.get(key).credits, cNum);
+      let localLb = [];
+      try {
+        localLb = JSON.parse(localStorage.getItem("edupeak_local_leaderboard") || "[]");
+      } catch (_) {
+      }
+      const dessertCreditMap = {};
+      const dessertBatchMap = {};
+      try {
+        const localDesserts = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
+        localDesserts.forEach((d) => {
+          if (d.status === "approved") {
+            const key = (d.studentName || d.studentId || "").trim();
+            const amt = Number(d.creditsAwarded) || 0;
+            if (key) {
+              dessertCreditMap[key] = (dessertCreditMap[key] || 0) + amt;
+              if (d.examYear) dessertBatchMap[key] = d.examYear;
+            }
+          }
+        });
+      } catch (_) {
+      }
+      const map = /* @__PURE__ */ new Map();
+      for (const s2 of supabaseList) {
+        if (!s2.name) continue;
+        const key = s2.name.toLowerCase().trim();
+        map.set(key, { ...s2, credits: Number(s2.credits) || 0 });
+      }
+      for (const s2 of localLb) {
+        if (!s2.name) continue;
+        const key = s2.name.toLowerCase().trim();
+        const existing = map.get(key) || {};
+        map.set(key, { ...existing, ...s2, credits: Math.max(Number(s2.credits) || 0, existing.credits || 0) });
+      }
+      for (const s2 of firestoreList) {
+        if (!s2.name) continue;
+        const key = s2.name.toLowerCase().trim();
+        const existing = map.get(key) || {};
+        map.set(key, { ...existing, ...s2, credits: Math.max(Number(s2.credits) || 0, existing.credits || 0) });
+      }
+      for (const [studentKey, awardedXp] of Object.entries(dessertCreditMap)) {
+        const normKey = studentKey.toLowerCase().trim();
+        let found = false;
+        for (const [k2, v2] of map.entries()) {
+          if (k2 === normKey || v2.id && v2.id.toLowerCase() === normKey) {
+            v2.credits = Math.max(v2.credits, (v2.credits || 0) + awardedXp);
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          map.set(normKey, {
+            id: "student_" + studentKey.replace(/\s+/g, "_"),
+            name: studentKey,
+            role: "student",
+            examYear: dessertBatchMap[studentKey] || "2027 A/L",
+            credits: awardedXp,
+            avatarUrl: ""
+          });
         }
       }
-    } catch (_) {
+      try {
+        const currentStoredUser = JSON.parse(
+          localStorage.getItem("edupeak_cached_user") || localStorage.getItem("edupeak_auth_user") || "null"
+        );
+        if (currentStoredUser && currentStoredUser.name && currentStoredUser.role === "student") {
+          const key = currentStoredUser.name.toLowerCase().trim();
+          const customCredits = localStorage.getItem(`edupeak_credits_${currentStoredUser.uid || currentStoredUser.id}`);
+          let cNum = Number(customCredits) || Number(currentStoredUser.credits) || 0;
+          if (cNum === 355 || cNum === 155 || cNum === 305) cNum = 200;
+          if (map.has(key)) {
+            map.get(key).credits = Math.max(map.get(key).credits, cNum);
+          } else {
+            map.set(key, {
+              id: currentStoredUser.uid || currentStoredUser.id || "student_me",
+              name: currentStoredUser.name,
+              role: "student",
+              examYear: currentStoredUser.examYear || currentStoredUser.exam_year || "2027 A/L",
+              credits: cNum,
+              avatarUrl: currentStoredUser.avatarUrl || ""
+            });
+          }
+        }
+      } catch (_) {
+      }
+      const allStudents = Array.from(map.values());
+      const normalizeBatch = (b2) => String(b2 || "").replace(/\s+/g, "").toUpperCase();
+      const targetBatchNorm = normalizeBatch(batch);
+      const filtered = allStudents.filter((student) => {
+        if (student.role !== "student" || this.isStaffOrAdmin(student)) return false;
+        if (!batch || batch === "All Batches" || targetBatchNorm === "ALL" || targetBatchNorm === "ALLBATCHES") return true;
+        const sBatchNorm = normalizeBatch(student.examYear);
+        return sBatchNorm === targetBatchNorm || sBatchNorm === "ALL" || sBatchNorm === "ALLBATCHES";
+      });
+      filtered.sort((a, b2) => b2.credits - a.credits || a.name.localeCompare(b2.name));
+      filtered.forEach((s2, idx) => {
+        s2.rank = idx + 1;
+      });
+      this.setCache(cacheKey, filtered);
+      return filtered;
+    } catch (err) {
+      console.error("[DB] getLeaderboard unexpected error:", err);
+      return [];
     }
-    const allStudents = Array.from(map.values());
-    const normalizeBatch = (b2) => String(b2 || "").replace(/\s+/g, "").toUpperCase();
-    const targetBatchNorm = normalizeBatch(batch);
-    const filtered = allStudents.filter((student) => {
-      if (student.role !== "student" || this.isStaffOrAdmin(student)) return false;
-      if (!batch || batch === "All Batches" || targetBatchNorm === "ALL" || targetBatchNorm === "ALLBATCHES") return true;
-      const sBatchNorm = normalizeBatch(student.examYear);
-      return sBatchNorm === targetBatchNorm || sBatchNorm === "ALL" || sBatchNorm === "ALLBATCHES";
-    });
-    filtered.sort((a, b2) => b2.credits - a.credits || a.name.localeCompare(b2.name));
-    filtered.forEach((s2, idx) => {
-      s2.rank = idx + 1;
-    });
-    this.setCache(cacheKey, filtered);
-    return filtered;
   }
   streamLeaderboard(batch, callback) {
     let active = true;
@@ -89450,6 +89512,102 @@ var DbService = class {
       }
     };
   }
+  async sendStudentPushNotification({ studentId, studentPhone, studentName, title, message, sender = "Teacher" }) {
+    const payload = {
+      studentId: String(studentId || "").trim(),
+      studentPhone: String(studentPhone || "").trim(),
+      studentName: String(studentName || "Student").trim(),
+      title: String(title || "").trim(),
+      message: String(message || "").trim(),
+      sender: String(sender || "Teacher").trim(),
+      createdAt: serverTimestamp ? serverTimestamp() : /* @__PURE__ */ new Date(),
+      timestamp: Date.now(),
+      read: false
+    };
+    try {
+      if (db) {
+        await addDoc(collection(db, "student_notifications"), payload);
+      }
+    } catch (e2) {
+      console.warn("[DB] Firestore student notification note:", e2);
+    }
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("edupeak_student_notifs");
+        bc.postMessage(payload);
+        bc.close();
+      }
+    } catch (_) {
+    }
+    return true;
+  }
+  streamStudentDirectNotifications(studentId, studentPhone, callback) {
+    if (!db || !studentId && !studentPhone) return () => {
+    };
+    let initialized = false;
+    const seenIds = /* @__PURE__ */ new Set();
+    const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
+    const cleanId = String(studentId || "").trim();
+    try {
+      const q = query(
+        collection(db, "student_notifications"),
+        orderBy("timestamp", "desc"),
+        limit(20)
+      );
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!initialized) {
+          initialized = true;
+          snapshot.docs.forEach((d) => seenIds.add(d.id));
+          return;
+        }
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added" && !seenIds.has(change.doc.id)) {
+            seenIds.add(change.doc.id);
+            const data = change.doc.data();
+            const targetId = String(data.studentId || "").trim();
+            const targetPhone = String(data.studentPhone || "").replace(/\D/g, "");
+            const isForMe = cleanId && targetId && cleanId === targetId || cleanPhone && targetPhone && cleanPhone === targetPhone;
+            if (isForMe) {
+              callback({ id: change.doc.id, ...data });
+            }
+          }
+        });
+      }, (err) => {
+        console.warn("[DB] streamStudentDirectNotifications warning:", err);
+      });
+      let bc = null;
+      try {
+        if (typeof BroadcastChannel !== "undefined") {
+          bc = new BroadcastChannel("edupeak_student_notifs");
+          bc.onmessage = (event) => {
+            const data = event.data;
+            if (!data) return;
+            const targetId = String(data.studentId || "").trim();
+            const targetPhone = String(data.studentPhone || "").replace(/\D/g, "");
+            const isForMe = cleanId && targetId && cleanId === targetId || cleanPhone && targetPhone && cleanPhone === targetPhone;
+            if (isForMe) {
+              callback(data);
+            }
+          };
+        }
+      } catch (_) {
+      }
+      return () => {
+        try {
+          unsubscribe();
+        } catch (_) {
+        }
+        try {
+          if (bc) bc.close();
+        } catch (_) {
+        }
+      };
+    } catch (e2) {
+      console.warn("[DB] streamStudentDirectNotifications error:", e2);
+      return () => {
+      };
+    }
+  }
   streamPaperLeaderboards(callback) {
     try {
       const ref2 = collection(db, "paper_leaderboards");
@@ -89476,6 +89634,7 @@ var DbService = class {
             paperDate: String(data.paperDate || ""),
             totalMarks: Number(data.totalMarks) || 100,
             publishedAt: Number.isNaN(publishedAt.getTime()) ? /* @__PURE__ */ new Date(0) : publishedAt,
+            notifyStudents: data.notifyStudents !== false,
             entries
           };
         }).sort((a, b2) => b2.publishedAt - a.publishedAt);
@@ -89523,6 +89682,7 @@ var DbService = class {
           paperDate: String(data.paperDate || ""),
           totalMarks: Number(data.totalMarks) || 100,
           publishedAt: Number.isNaN(publishedAt.getTime()) ? /* @__PURE__ */ new Date(0) : publishedAt,
+          notifyStudents: data.notifyStudents !== false,
           entries
         };
       }).sort((a, b2) => b2.publishedAt - a.publishedAt);
@@ -89537,17 +89697,18 @@ var DbService = class {
     try {
       const isNew = !leaderboard.id;
       const ref2 = collection(db, "paper_leaderboards");
+      const payload = {
+        ...leaderboard,
+        notifyStudents: leaderboard.notifyStudents !== false,
+        publishedAt: leaderboard.publishedAt || (/* @__PURE__ */ new Date()).toISOString()
+      };
       if (isNew) {
-        const docRef = await addDoc(ref2, {
-          ...leaderboard,
-          publishedAt: leaderboard.publishedAt || (/* @__PURE__ */ new Date()).toISOString()
-        });
+        const docRef = await addDoc(ref2, payload);
+        this.clearCache("paper_leaderboards");
         return docRef.id;
       } else {
-        await setDoc(doc(db, "paper_leaderboards", leaderboard.id), {
-          ...leaderboard,
-          publishedAt: leaderboard.publishedAt || (/* @__PURE__ */ new Date()).toISOString()
-        }, { merge: true });
+        await setDoc(doc(db, "paper_leaderboards", leaderboard.id), payload, { merge: true });
+        this.clearCache("paper_leaderboards");
         return leaderboard.id;
       }
     } catch (e2) {
@@ -91829,10 +91990,12 @@ var AppController = class {
     this.enforceNotificationPermission();
     this.startStudentNotificationWatchers();
   }
-  // ── Real-Time Notification Watchers (Live Start, Leaderboard, Paper Hints) ──
+  // ── Real-Time Notification Watchers (Scheduled, Live Start, Leaderboard, Hints) ──
   startStudentNotificationWatchers() {
     if (!this.currentUser || this.currentUser.role === "admin") return;
     const studentYear = this.currentUser.exam_year || this.currentUser.examYear || "2027 A/L";
+    const studentId = this.currentUser.uid || this.currentUser.id || "";
+    const studentPhone = this.currentUser.phone || "";
     if (this._notifLiveUnsub) {
       try {
         this._notifLiveUnsub();
@@ -91851,33 +92014,61 @@ var AppController = class {
       } catch (_) {
       }
     }
-    let liveSessionsInitialized = false;
+    if (this._notifDirectUnsub) {
+      try {
+        this._notifDirectUnsub();
+      } catch (_) {
+      }
+    }
+    let sessionsInitialized = false;
+    const knownScheduledSessionIds = /* @__PURE__ */ new Set();
     const knownLiveSessionIds = /* @__PURE__ */ new Set();
     this._notifLiveUnsub = dbService.streamPaperSessions(studentYear, (sessions) => {
       if (!Array.isArray(sessions)) return;
-      const currentlyLive = sessions.filter((s2) => {
-        const st2 = dbService.computeSessionStatus(s2);
-        return st2.isLive || s2.isLive || s2.status === "writing" || s2.status === "package_opening" || s2.status === "live";
-      });
-      if (!liveSessionsInitialized) {
-        liveSessionsInitialized = true;
-        currentlyLive.forEach((s2) => knownLiveSessionIds.add(s2.id));
+      if (!sessionsInitialized) {
+        sessionsInitialized = true;
+        sessions.forEach((s2) => {
+          if (dbService.matchesYear(s2.examYear, studentYear)) {
+            knownScheduledSessionIds.add(s2.id);
+            const st2 = dbService.computeSessionStatus(s2);
+            if (st2.isLive || s2.isLive || s2.status === "writing" || s2.status === "package_opening" || s2.status === "live" || s2.status === "active") {
+              knownLiveSessionIds.add(s2.id);
+            }
+          }
+        });
         return;
       }
-      currentlyLive.forEach((session) => {
-        if (!knownLiveSessionIds.has(session.id)) {
+      sessions.forEach((session) => {
+        if (!dbService.matchesYear(session.examYear, studentYear)) return;
+        const st2 = dbService.computeSessionStatus(session);
+        const isLiveNow = st2.isLive || session.isLive || session.status === "writing" || session.status === "package_opening" || session.status === "live" || session.status === "active";
+        if (!knownScheduledSessionIds.has(session.id)) {
+          knownScheduledSessionIds.add(session.id);
+          if (session.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = "\u{1F4C5} New Paper Session Scheduled!";
+            const body = `"${session.title || "Paper Session"}" (${session.examYear || studentYear}) is scheduled. Tap to register your slot!`;
+            notificationService.showInAppBanner(title, body, "info");
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `paper-scheduled-${session.id}`,
+              data: { url: "./index.html?tab=papers" }
+            });
+          }
+        }
+        if (isLiveNow && !knownLiveSessionIds.has(session.id)) {
           knownLiveSessionIds.add(session.id);
-          notificationService.playChime();
-          notificationService.showInAppBanner(
-            "\u{1F534} Live Exam Started!",
-            `"${session.title || "Paper Session"}" is now LIVE! Tap to enter exam room.`,
-            "urgent"
-          );
-          notificationService.showLocalNotification("\u{1F534} Live Exam Started!", {
-            body: `"${session.title || "Paper Session"}" is now LIVE! Tap to enter exam room.`,
-            tag: `live-exam-${session.id}`,
-            data: { url: "./index.html?tab=papers" }
-          });
+          if (session.notifyOnStart !== false && session.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = "\u{1F534} Live Exam Started!";
+            const body = `"${session.title || "Paper Session"}" (${session.examYear || studentYear}) is now LIVE! Tap to enter exam room.`;
+            notificationService.showInAppBanner(title, body, "urgent");
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `live-exam-${session.id}`,
+              data: { url: "./index.html?tab=papers" }
+            });
+          }
         }
       });
     });
@@ -91887,54 +92078,76 @@ var AppController = class {
       if (!Array.isArray(boards)) return;
       if (!boardsInitialized) {
         boardsInitialized = true;
-        boards.forEach((b2) => knownBoardIds.add(b2.id));
+        boards.forEach((b2) => {
+          if (dbService.matchesYear(b2.examYear, studentYear)) {
+            knownBoardIds.add(b2.id);
+          }
+        });
         return;
       }
       boards.forEach((b2) => {
+        if (!dbService.matchesYear(b2.examYear, studentYear)) return;
         if (!knownBoardIds.has(b2.id)) {
           knownBoardIds.add(b2.id);
-          notificationService.playChime();
-          notificationService.showInAppBanner(
-            "\u{1F3C6} Leaderboard Published!",
-            `Paper results & rankings for "${b2.title || "Model Paper"}" are now available!`,
-            "success"
-          );
-          notificationService.showLocalNotification("\u{1F3C6} Leaderboard Published!", {
-            body: `Paper results & rankings for "${b2.title || "Model Paper"}" are now available!`,
-            tag: `leaderboard-${b2.id}`,
-            data: { url: "./index.html?tab=ranks" }
-          });
+          if (b2.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = "\u{1F3C6} Leaderboard Published!";
+            const body = `Paper results & rankings for "${b2.paperTitle || b2.title || "Model Paper"}" (${b2.examYear || studentYear}) are now available!`;
+            notificationService.showInAppBanner(title, body, "success");
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `leaderboard-${b2.id}`,
+              data: { url: "./index.html?tab=ranks" }
+            });
+          }
         }
       });
     });
-    let upcomingInitialized = false;
-    const knownUpcomingHints = /* @__PURE__ */ new Map();
-    this._notifHintsUnsub = dbService.streamUpcomingPapers(studentYear, (upcomingList) => {
-      if (!Array.isArray(upcomingList)) return;
-      if (!upcomingInitialized) {
-        upcomingInitialized = true;
-        upcomingList.forEach((p2) => knownUpcomingHints.set(p2.id, p2.hints || ""));
+    let hintsInitialized = false;
+    const knownHintIds = /* @__PURE__ */ new Set();
+    this._notifHintsUnsub = dbService.streamPaperHints(studentYear, (hintsList) => {
+      if (!Array.isArray(hintsList)) return;
+      if (!hintsInitialized) {
+        hintsInitialized = true;
+        hintsList.forEach((h) => {
+          if (dbService.matchesYear(h.examYear, studentYear)) {
+            knownHintIds.add(h.id);
+          }
+        });
         return;
       }
-      upcomingList.forEach((paper) => {
-        const prevHints = knownUpcomingHints.get(paper.id);
-        const currHints = (paper.hints || "").trim();
-        if (currHints && (!knownUpcomingHints.has(paper.id) || prevHints !== void 0 && prevHints !== currHints)) {
-          knownUpcomingHints.set(paper.id, currHints);
-          notificationService.playChime();
-          notificationService.showInAppBanner(
-            "\u{1F4A1} New Paper Hints & Scope!",
-            `Teacher guidance & hints published for "${paper.title || "Upcoming Paper"}".`,
-            "info"
-          );
-          notificationService.showLocalNotification("\u{1F4A1} New Paper Hints Published!", {
-            body: `Teacher guidance & hints published for "${paper.title || "Upcoming Paper"}". Tap to view scope!`,
-            tag: `hints-${paper.id}`,
-            data: { url: "./index.html?tab=papers" }
-          });
+      hintsList.forEach((hint) => {
+        if (!dbService.matchesYear(hint.examYear, studentYear)) return;
+        if (!knownHintIds.has(hint.id)) {
+          knownHintIds.add(hint.id);
+          if (hint.notifyStudents !== false) {
+            notificationService.playChime();
+            const title = "\u{1F4A1} New Paper Hint Published!";
+            const body = `Exclusive guidance & scope published for "${hint.title || hint.paperName || "Model Paper"}" (${hint.examYear || studentYear}).`;
+            notificationService.showInAppBanner(title, body, "info");
+            notificationService.showLocalNotification(title, {
+              body,
+              tag: `hints-${hint.id}`,
+              data: { url: "./index.html?tab=papers" }
+            });
+          }
         }
       });
     });
+    if (typeof dbService.streamStudentDirectNotifications === "function") {
+      this._notifDirectUnsub = dbService.streamStudentDirectNotifications(studentId, studentPhone, (notif) => {
+        if (!notif) return;
+        notificationService.playChime();
+        const title = notif.title || "Message from Teacher";
+        const body = notif.message || "";
+        notificationService.showInAppBanner(title, body, "info");
+        notificationService.showLocalNotification(title, {
+          body,
+          tag: `direct-msg-${notif.id || Date.now()}`,
+          data: { url: "./index.html" }
+        });
+      });
+    }
   }
   // ── Mandatory Student Push Notification Gatekeeper ────────────────────────
   enforceNotificationPermission() {
@@ -92773,6 +92986,7 @@ var AppController = class {
       const isTimeUp = statusInfo.isTimeUp;
       const isLive = statusInfo.isLive;
       const isWaiting = statusInfo.isWaiting;
+      const isScheduled = statusInfo.isScheduled || session.status === "scheduled" || !session.isStarted && !session.isLive;
       let packageRemainingSecs = 600;
       if (session.packageOpeningStartedAt) {
         const elapsed = Math.floor((Date.now() - new Date(session.packageOpeningStartedAt).getTime()) / 1e3);
@@ -92810,6 +93024,10 @@ var AppController = class {
             ` : isEnded ? `
               <span style="background:rgba(100,116,139,0.12); color:#64748B; border:1px solid rgba(100,116,139,0.3); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
                 <span class="material-symbols-rounded" style="font-size:13px;">check_circle</span> <span>ENDED</span>
+              </span>
+            ` : isScheduled && !isLive && !isEnded ? `
+              <span style="background:rgba(37,99,235,0.12); color:#2563EB; border:1px solid rgba(37,99,235,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:13px;">event_available</span> <span>SCHEDULED \u2022 REGISTRATION OPEN</span>
               </span>
             ` : ""}
           </div>
@@ -92922,6 +93140,16 @@ var AppController = class {
                 <div style="font-size:12px; font-weight:800; color:#6366F1; margin-top:2px;">\u0DB4\u0DDC\u0DBB\u0DDC\u0DAD\u0DCA\u0DAD\u0DD4 \u0DC1\u0DCF\u0DBD\u0DCF\u0DC0\u0DA7 \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1 (Self-Check)</div>
               </div>
             </div>
+          ` : isScheduled && !isLive && !isEnded ? `
+            <div class="phase-status-banner-box scheduled" style="background:#EFF6FF; border:1px solid #BFDBFE; padding:13px 15px; border-radius:14px; display:flex; align-items:center; gap:12px;">
+              <span class="material-symbols-rounded" style="font-size:26px; color:#2563EB;">how_to_reg</span>
+              <div>
+                <div style="font-size:12px; font-weight:800; color:#1E40AF;">\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DD0\u0DBD\u0DC3\u0DD4\u0DB8\u0DCA \u0D9A\u0DBB \u0D87\u0DAD (Session Scheduled - Registration Open)</div>
+                <div style="font-size:11.5px; color:#3B82F6; margin-top:2px;">
+                  ${reg ? `\u0D94\u0DB6 ${reg.slotId === "slot2" ? "Slot 2 (Evening)" : "Slot 1 (Morning)"} \u0DC3\u0DB3\u0DC4\u0DCF \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 \u0DBD\u0DD2\u0DBA\u0DCF\u0DB4\u0DAF\u0DD2\u0D82\u0DA0\u0DD2 \u0DC0\u0DD3 \u0D87\u0DAD. Admin \u0DC0\u0DD2\u0DC3\u0DD2\u0DB1\u0DCA \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Start \u0D9A\u0DBB\u0DB1 \u0DAD\u0DD9\u0D9A\u0DCA \u0DBB\u0DD0\u0DB3\u0DD3 \u0DC3\u0DD2\u0DA7\u0DD2\u0DB1\u0DCA\u0DB1.` : "\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0D89\u0DC4\u0DAD \u0D87\u0DAD\u0DD2 Slot \u0D91\u0D9A\u0D9A\u0DCA \u0DAD\u0DDD\u0DBB\u0DCF \u0D94\u0DB6\u0D9C\u0DDA \u0D86\u0DC3\u0DB1\u0DBA \u0DC0\u0DD9\u0DB1\u0DCA\u0D9A\u0DBB\u0DC0\u0DCF \u0D9C\u0DB1\u0DCA\u0DB1."}
+                </div>
+              </div>
+            </div>
           ` : isEnded ? `
             <div class="phase-status-banner-box ended" style="margin-bottom:0; background:#F8FAFC; border:1px solid #E2E8F0; padding:13px 15px; border-radius:14px; display:flex; align-items:center; gap:12px;">
               <span class="material-symbols-rounded" style="font-size:26px; color:#64748B;">cancel</span>
@@ -92962,6 +93190,16 @@ var AppController = class {
             <button class="btn-primary" style="background:#DC2626; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-scan-answers="${session.id}">
               <span class="material-symbols-rounded" style="font-size:18px;">document_scanner</span>
               <span>Scan Answers (\u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0DB4\u0DAD\u0DCA\u200D\u0DBB Scan \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)</span>
+            </button>
+          ` : isScheduled && !isLive && !isEnded ? reg ? `
+            <div style="background:#F1F5F9; border:1.5px solid #CBD5E1; color:#334155; padding:12px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">how_to_reg</span>
+              <span>\u2713 Registered for ${selectedSlotId === "slot2" ? "Slot 2" : "Slot 1"} \u2022 Waiting for Session Start</span>
+            </div>
+          ` : `
+            <button class="btn-primary" style="background:#2563EB; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="this.closest('.paper-session-card').querySelector('.slot-selection-box').click()">
+              <span class="material-symbols-rounded" style="font-size:18px;">how_to_reg</span>
+              <span>Select a Slot Above to Register (\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB Slot \u0D91\u0D9A\u0D9A\u0DCA \u0DAD\u0DDD\u0DBB\u0DB1\u0DCA\u0DB1)</span>
             </button>
           ` : isWaiting ? `
             <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
@@ -96758,6 +96996,15 @@ var AppController = class {
         this.renderAdminPapersScreen(container);
       };
     });
+    container.querySelectorAll("[data-edit-paper-board]").forEach((btn) => {
+      btn.onclick = (e2) => {
+        e2.stopPropagation();
+        const id = btn.dataset.editPaperBoard;
+        if (!id) return;
+        const b2 = (boards || []).find((x2) => x2.id === id);
+        if (b2) this.openAdminCreateLeaderboardModal(b2);
+      };
+    });
     container.querySelectorAll("[data-delete-paper-board]").forEach((btn) => {
       btn.onclick = async (e2) => {
         e2.stopPropagation();
@@ -96890,12 +97137,13 @@ var AppController = class {
     const status = this._computePaperStatus(session);
     const isEnded = status === "ended";
     const isLive = status === "live";
+    const isScheduled = status === "scheduled" || !isEnded && !isLive;
     const isUpcoming = status === "upcoming";
-    let badgeText = "Upcoming";
-    let badgeIcon = "schedule";
-    let badgeBg = "rgba(245, 158, 11, 0.12)";
-    let badgeBorder = "#F59E0B";
-    let badgeColor = "#D97706";
+    let badgeText = "Scheduled (Registration Open)";
+    let badgeIcon = "how_to_reg";
+    let badgeBg = "rgba(37, 99, 235, 0.12)";
+    let badgeBorder = "#3B82F6";
+    let badgeColor = "#2563EB";
     if (isEnded) {
       badgeText = "Ended";
       badgeIcon = "cancel";
@@ -96908,6 +97156,12 @@ var AppController = class {
       badgeBg = "rgba(34, 197, 94, 0.12)";
       badgeBorder = "#22C55E";
       badgeColor = "#16A34A";
+    } else if (isScheduled) {
+      badgeText = "Scheduled (Registration Open)";
+      badgeIcon = "how_to_reg";
+      badgeBg = "rgba(37, 99, 235, 0.12)";
+      badgeBorder = "#3B82F6";
+      badgeColor = "#2563EB";
     }
     const dateFormatted = this._formatSessionDate(session.date);
     const hasSlot2 = !!(session.slot2 && session.slot2.startTime);
@@ -97019,10 +97273,10 @@ var AppController = class {
                 <span class="material-symbols-rounded" style="font-size:16px;">stop_circle</span>
                 <span>End Session (\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)</span>
               </button>
-              ${isUpcoming ? `
-                <button data-start-session="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #22C55E; background:transparent; color:#22C55E; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;">
-                  <span class="material-symbols-rounded" style="font-size:16px;">play_arrow</span>
-                  <span>Start Now</span>
+              ${!isEnded && !isLive ? `
+                <button data-start-session="${session.id}" style="padding:10px 16px; border-radius:10px; border:none; background:#16A34A; color:#FFFFFF; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 8px rgba(22,163,74,0.25);">
+                  <span class="material-symbols-rounded filled" style="font-size:16px;">play_arrow</span>
+                  <span>Start Session (\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)</span>
                 </button>
               ` : ""}
               <button data-delete-paper="${session.id}" style="padding:10px 14px; border-radius:10px; border:1px solid #FCA5A5; background:#FEF2F2; color:#DC2626; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap;" title="Delete Session (\u0DB8\u0D9A\u0DCF \u0DAF\u0DB8\u0DB1\u0DCA\u0DB1)">
@@ -97130,6 +97384,22 @@ var AppController = class {
           </div>
           ` : ""}
 
+          <!-- Student Push Notification Settings on Modify -->
+          <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:11.5px; font-weight:800; color:#1E40AF; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">notifications_active</span>
+              <span>Student Push Notifications (\u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DAF\u0DD0\u0DB1\u0DD4\u0DB8\u0DCA\u0DAF\u0DD3\u0DB8\u0DCA):</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="edit-paper-notify-scheduled" ${session.notifyStudents !== false ? "checked" : ""} style="width:15px; height:15px; accent-color:#2563EB;" />
+              <span>Allow notifications to <strong>${session.examYear || "students"}</strong> for this session \u{1F514}</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="edit-paper-notify-start" ${session.notifyOnStart !== false ? "checked" : ""} style="width:15px; height:15px; accent-color:#2563EB;" />
+              <span>Notify students immediately when Admin starts the session live \u{1F534}</span>
+            </label>
+          </div>
+
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="apk-btn-primary" id="btn-cancel-edit-times" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
               Cancel
@@ -97195,7 +97465,14 @@ var AppController = class {
           endTime: makeIsoTimeForEdit(newS2End)
         };
       }
-      await dbService.updateSlotTimes(session.id, { slot1: updatedSlot1, slot2: updatedSlot2 });
+      const notifyStudents = document.getElementById("edit-paper-notify-scheduled")?.checked !== false;
+      const notifyOnStart = document.getElementById("edit-paper-notify-start")?.checked !== false;
+      await dbService.updateSlotTimes(session.id, {
+        slot1: updatedSlot1,
+        slot2: updatedSlot2,
+        notifyStudents,
+        notifyOnStart
+      });
       notificationService.showInAppBanner("Times Updated", "Session Times Updated Successfully!", "success");
       modal.remove();
       this.renderAdminPapersScreen(container);
@@ -97377,10 +97654,65 @@ var AppController = class {
       this.renderAdminPapersScreen(container);
     });
   }
+  _showStartSessionConfirmation(session, container) {
+    const modal = document.createElement("div");
+    modal.className = "app-modal";
+    modal.style.display = "flex";
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:390px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="background:rgba(34,197,94,0.15); color:#16A34A; width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:24px;">play_arrow</span>
+          </div>
+          <div>
+            <div style="font-size:16px; font-weight:800; color:#0F172A;">Start Paper Session?</div>
+            <div style="font-size:11px; color:#64748B;">${session.title} (${session.examYear || "Batch"})</div>
+          </div>
+        </div>
+        <div style="font-size:12px; color:#475569; line-height:1.5;">
+          \u0D94\u0DB6\u0DA7 \u0DB8\u0DD9\u0DB8 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DAF\u0DD0\u0DB1\u0DCA \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA (LIVE) \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA \u0DB6\u0DC0 \u0DC3\u0DC4\u0DAD\u0DD2\u0D9A\u0DAF?<br><br>
+          \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DC5 \u0DB4\u0DC3\u0DD4 \u0DBD\u0DD2\u0DBA\u0DCF\u0DB4\u0DAF\u0DD2\u0D82\u0DA0\u0DD2 \u0DC0\u0DD6 \u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0D9A\u0DCF\u0DB8\u0DBB\u0DBA\u0DA7 \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3 \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0DC3\u0DC4 \u0DBD\u0DD2\u0DC0\u0DD3\u0DB8\u0DA7 \u0DC4\u0DD0\u0D9A\u0DD2\u0DBA\u0DCF\u0DC0 \u0DBD\u0DD0\u0DB6\u0DDA.
+        </div>
+        <div style="margin-top:12px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:10px 12px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:700; color:#1E293B; cursor:pointer;">
+            <input type="checkbox" id="chk-start-notify-students" ${session.notifyOnStart !== false ? "checked" : ""} style="width:16px; height:16px; accent-color:#16A34A;" />
+            <span>Send Live Push Notification to ${session.examYear || "students"} \u{1F534}\u{1F514}</span>
+          </label>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="apk-btn-primary" id="btn-cancel-start" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+            Cancel
+          </button>
+          <button class="apk-btn-primary" id="btn-confirm-start" style="flex:1.4; background:#16A34A;">
+            Start Session Now (\u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (e2) => {
+      if (e2.target === modal) modal.remove();
+    });
+    document.getElementById("btn-cancel-start")?.addEventListener("click", () => modal.remove());
+    const confirmBtn = document.getElementById("btn-confirm-start");
+    confirmBtn?.addEventListener("click", async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "Starting...";
+      const notify = document.getElementById("chk-start-notify-students")?.checked !== false;
+      try {
+        await dbService.startPaperSession(session.id, { notifyStudents: notify });
+        notificationService.showInAppBanner("Session Live! \u{1F534}", `"${session.title}" (${session.examYear}) \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3 (Live).`, "success");
+      } catch (err) {
+        console.error("Failed to start session:", err);
+        alert("Error starting session: " + err.message);
+      } finally {
+        modal.remove();
+        this.renderAdminPapersScreen(container);
+      }
+    });
+  }
   async _startSessionNow(session, container) {
-    await dbService.startPaperSession(session.id);
-    notificationService.showInAppBanner("Session Live", "\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3 (Session is now Live)!", "success");
-    this.renderAdminPapersScreen(container);
+    this._showStartSessionConfirmation(session, container);
   }
   async _reopenSession(session, container) {
     await dbService.reopenPaperSession(session.id);
@@ -97591,8 +97923,8 @@ var AppController = class {
           </div>
 
           <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1E293B; cursor:pointer; background:#EFF6FF; padding:10px 12px; border-radius:10px; border:1px solid #DBEAFE;">
-            <input type="checkbox" id="hint-input-notify" checked style="width:16px; height:16px; accent-color:#2563EB;" />
-            <span>Send Push Alert to Students immediately \u{1F514}</span>
+            <input type="checkbox" id="hint-input-notify" ${existingHint?.notifyStudents === false ? "" : "checked"} style="width:16px; height:16px; accent-color:#2563EB;" />
+            <span>Send Push Alert to <strong id="lbl-hint-batch-target">${currentBatch}</strong> students \u{1F4A1}\u{1F514}</span>
           </label>
 
           <div style="display:flex; gap:10px; margin-top:8px;">
@@ -97612,6 +97944,11 @@ var AppController = class {
     });
     document.getElementById("btn-close-hint-modal")?.addEventListener("click", () => modal.remove());
     document.getElementById("btn-cancel-hint")?.addEventListener("click", () => modal.remove());
+    const batchSelect = document.getElementById("hint-input-batch");
+    batchSelect?.addEventListener("change", () => {
+      const lbl = document.getElementById("lbl-hint-batch-target");
+      if (lbl) lbl.textContent = batchSelect.value || "All Batches";
+    });
     const saveBtn = document.getElementById("btn-save-hint");
     saveBtn?.addEventListener("click", async () => {
       const title = document.getElementById("hint-input-title")?.value.trim();
@@ -97620,7 +97957,7 @@ var AppController = class {
       const paperName = document.getElementById("hint-input-paper-name")?.value.trim();
       const scopeRaw = document.getElementById("hint-input-scope")?.value.trim();
       const scope = scopeRaw ? scopeRaw.split(",").map((s2) => s2.trim()).filter(Boolean) : [];
-      const notify = document.getElementById("hint-input-notify")?.checked;
+      const notify = document.getElementById("hint-input-notify")?.checked !== false;
       if (!title) {
         alert("\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0DB8\u0DCF\u0DAD\u0DD8\u0D9A\u0DCF\u0DC0\u0D9A\u0DCA (Title) \u0D87\u0DAD\u0DD4\u0DC5\u0DAD\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.");
         return;
@@ -97635,7 +97972,8 @@ var AppController = class {
           paperName,
           hints: "",
           formulas: "",
-          scope
+          scope,
+          notifyStudents: notify
         };
         if (isEdit) {
           await dbService.updatePaperHint(existingHint.id, payload);
@@ -97723,10 +98061,14 @@ var AppController = class {
               <div class="paper-expand-circle" style="width:30px; height:30px; border-radius:8px; background:#F1F5F9; color:#475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:8px;">
                 <span class="material-symbols-rounded paper-expand-icon" style="font-size:20px;">${expanded ? "expand_less" : "expand_more"}</span>
               </div>
-            </button>
-            <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (\u0DB8\u0D9A\u0DCF \u0DAF\u0DD0\u0DB8\u0DD3\u0DB8)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
-              <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
-            </button>
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+              <button class="apk-icon-action-btn" type="button" data-edit-paper-board="${escapeHTML(board.id)}" title="Edit Leaderboard (\u0DC0\u0DD9\u0DB1\u0DC3\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8)" style="color:#2563EB; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #BFDBFE; background:#EFF6FF; border-radius:10px; cursor:pointer; flex-shrink:0;">
+                <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
+              </button>
+              <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (\u0DB8\u0D9A\u0DCF \u0DAF\u0DD0\u0DB8\u0DD3\u0DB8)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
+                <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+              </button>
+            </div>
           </div>
           ${expanded ? `<div class="paper-results-content" style="padding:14px 16px 16px; border-top:1px solid #F1F5F9; background:#FFFFFF;">
             <!-- Performance Summary Strip -->
@@ -99102,12 +99444,28 @@ var AppController = class {
             </div>
           </div>
 
+          <!-- Student Push Notification Settings -->
+          <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:12px; font-weight:800; color:#1E40AF; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">notifications_active</span>
+              <span>Student Push Notifications (\u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DAF\u0DD0\u0DB1\u0DD4\u0DB8\u0DCA\u0DAF\u0DD3\u0DB8\u0DCA):</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="new-paper-notify-scheduled" checked style="width:16px; height:16px; accent-color:#2563EB;" />
+              <span>Notify <strong id="lbl-target-batch-notif">2027 A/L</strong> students that this session is scheduled for registration \u{1F514}</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="new-paper-notify-start" checked style="width:16px; height:16px; accent-color:#2563EB;" />
+              <span>Notify students immediately when Admin starts the session live \u{1F534}</span>
+            </label>
+          </div>
+
           <div style="display:flex; gap:10px; margin-top:8px;">
             <button class="apk-btn-primary" id="btn-cancel-create-paper" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
               Cancel
             </button>
             <button class="apk-btn-primary" id="btn-save-new-paper" style="flex:1.5; background:#2563EB; padding:13px; font-size:13px;">
-              Create Paper (\u0DB1\u0DD2\u0DBB\u0DCA\u0DB8\u0DCF\u0DAB\u0DBA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)
+              Schedule Session (\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Schedule \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)
             </button>
           </div>
         </div>
@@ -99135,6 +99493,13 @@ var AppController = class {
         }
       });
     });
+    const yearSelect = document.getElementById("new-paper-year");
+    const updateYearNotifLabel = () => {
+      const lbl = document.getElementById("lbl-target-batch-notif");
+      if (lbl && yearSelect) lbl.textContent = yearSelect.value || "All Batches";
+    };
+    yearSelect?.addEventListener("change", updateYearNotifLabel);
+    updateYearNotifLabel();
     const updateCalculatedEndTimes = () => {
       const dur = Number(document.getElementById("new-paper-duration")?.value) || 120;
       const s1Val = document.getElementById("new-s1-start")?.value || "08:30";
@@ -99389,6 +99754,8 @@ var AppController = class {
         saveBtn.disabled = true;
         saveBtn.textContent = "Creating Session...";
       }
+      const notifyScheduled = modal.querySelector("#new-paper-notify-scheduled")?.checked !== false;
+      const notifyOnStart = modal.querySelector("#new-paper-notify-start")?.checked !== false;
       try {
         await dbService.savePaperSession({
           title,
@@ -99400,15 +99767,19 @@ var AppController = class {
           date: examDate,
           durationMinutes: duration,
           totalMarks: marks,
-          status: "upcoming",
-          currentPhase: "waiting",
+          status: "scheduled",
+          currentPhase: "registration",
+          isStarted: false,
           isEnded: false,
           isLive: false,
           isTimeUp: false,
+          notifyStudents: notifyScheduled,
+          notifyOnStart,
+          scheduledAt: (/* @__PURE__ */ new Date()).toISOString(),
           slot1,
           slot2
         });
-        notificationService.showInAppBanner("Paper Created!", "Paper Session \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 \u0DB1\u0DD2\u0DBB\u0DCA\u0DB8\u0DCF\u0DAB\u0DBA \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3 (Upcoming Session).", "success");
+        notificationService.showInAppBanner("Paper Scheduled!", "Paper Session \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 Schedule \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3 (Registration Open).", "success");
         modal.remove();
         this.refreshAdminTab("papers");
       } catch (err) {
@@ -99416,18 +99787,21 @@ var AppController = class {
         alert("Error creating paper session: " + err.message);
         if (saveBtn) {
           saveBtn.disabled = false;
-          saveBtn.textContent = "Create Paper (\u0DB1\u0DD2\u0DBB\u0DCA\u0DB8\u0DCF\u0DAB\u0DBA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)";
+          saveBtn.textContent = "Schedule Session (\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Schedule \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)";
         }
       }
     });
   }
-  openAdminCreateLeaderboardModal() {
+  openAdminCreateLeaderboardModal(existingBoard = null) {
+    const isEdit = !!existingBoard;
     const modal = document.createElement("div");
     modal.className = "app-modal";
     modal.style.display = "flex";
-    let entries = [
+    let entries = Array.isArray(existingBoard?.entries) && existingBoard.entries.length > 0 ? existingBoard.entries.map((e2) => ({ ...e2 })) : [
       { studentName: "", indexNumber: "", marks: 85, grade: "A", remarks: "Excellent" }
     ];
+    const currentBatch = existingBoard?.examYear || "2027 A/L";
+    const batches = ["2024 A/L", "2025 A/L", "2026 A/L", "2027 A/L", "2028 A/L", "2029 A/L", "All Batches"];
     const calculateGrade = (marks) => {
       const m2 = Number(marks) || 0;
       if (m2 >= 75) return "A";
@@ -99499,7 +99873,7 @@ var AppController = class {
         <div class="modal-header">
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:8px;">
             <span class="material-symbols-rounded filled" style="color:#D97706; font-size:22px;">emoji_events</span>
-            <span>Publish Paper Leaderboard</span>
+            <span>${isEdit ? "Edit Paper Leaderboard" : "Publish Paper Leaderboard"}</span>
           </div>
           <button class="modal-close-btn" id="btn-close-new-lb">
             <span class="material-symbols-rounded">close</span>
@@ -99509,7 +99883,7 @@ var AppController = class {
         <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
           <div>
             <div class="form-label">Paper Title / Evaluation Name:</div>
-            <input type="text" id="new-lb-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 Official Leaderboard" />
+            <input type="text" id="new-lb-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 Official Leaderboard" value="${existingBoard?.paperTitle ? existingBoard.paperTitle.replace(/"/g, "&quot;") : ""}" />
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -99522,13 +99896,7 @@ var AppController = class {
             <div>
               <div class="form-label">Exam Year / Batch:</div>
               <select id="new-lb-year" class="form-textarea" style="height:40px; padding:8px;">
-                <option value="2024 A/L">2024 A/L</option>
-                <option value="2025 A/L">2025 A/L</option>
-                <option value="2026 A/L">2026 A/L</option>
-                <option value="2027 A/L" selected>2027 A/L</option>
-                <option value="2028 A/L">2028 A/L</option>
-                <option value="2029 A/L">2029 A/L</option>
-                <option value="All Batches">All Batches</option>
+                ${batches.map((b2) => `<option value="${b2}" ${b2 === currentBatch ? "selected" : ""}>${b2}</option>`).join("")}
               </select>
             </div>
           </div>
@@ -99536,12 +99904,24 @@ var AppController = class {
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div>
               <div class="form-label">Total Marks:</div>
-              <input type="number" id="new-lb-total-marks" class="form-textarea" style="height:40px;" value="100" min="1" max="1000" />
+              <input type="number" id="new-lb-total-marks" class="form-textarea" style="height:40px;" value="${existingBoard?.totalMarks || 100}" min="1" max="1000" />
             </div>
             <div>
               <div class="form-label">Evaluation Date:</div>
-              <input type="date" id="new-lb-date" class="form-textarea" style="height:40px;" value="${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}" />
+              <input type="date" id="new-lb-date" class="form-textarea" style="height:40px;" value="${existingBoard?.paperDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0]}" />
             </div>
+          </div>
+
+          <!-- Student Push Notification Settings -->
+          <div style="background:#FEF3C7; border:1.5px solid #FCD34D; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:12px; font-weight:800; color:#92400E; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#D97706;">notifications_active</span>
+              <span>Student Push Notification (\u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DAF\u0DD0\u0DB1\u0DD4\u0DB8\u0DCA\u0DAF\u0DD3\u0DB8\u0DCA):</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
+              <input type="checkbox" id="new-lb-notify" ${existingBoard?.notifyStudents === false ? "" : "checked"} style="width:16px; height:16px; accent-color:#D97706;" />
+              <span>Send Leaderboard Push Alert to <strong id="lbl-target-lb-batch">${currentBatch}</strong> students \u{1F3C6}\u{1F514}</span>
+            </label>
           </div>
 
           <div style="margin-top:6px;">
@@ -99561,7 +99941,7 @@ var AppController = class {
             </button>
             <button class="apk-btn-primary" id="btn-save-new-lb" style="flex:1.5; background:#D97706; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
               <span class="material-symbols-rounded" style="font-size:18px;">publish</span>
-              <span>Publish Leaderboard</span>
+              <span>${isEdit ? "Update Leaderboard" : "Publish Leaderboard"}</span>
             </button>
           </div>
         </div>
@@ -99571,6 +99951,11 @@ var AppController = class {
     renderCandidateRows();
     modal.querySelector("#btn-close-new-lb")?.addEventListener("click", () => modal.remove());
     modal.querySelector("#btn-cancel-new-lb")?.addEventListener("click", () => modal.remove());
+    const yearSelect = modal.querySelector("#new-lb-year");
+    yearSelect?.addEventListener("change", () => {
+      const lbl = modal.querySelector("#lbl-target-lb-batch");
+      if (lbl) lbl.textContent = yearSelect.value || "All Batches";
+    });
     modal.querySelector("#btn-add-lb-candidate")?.addEventListener("click", () => {
       entries.push({ studentName: "", indexNumber: "", marks: 75, grade: "A", remarks: "" });
       renderCandidateRows();
@@ -99581,6 +99966,7 @@ var AppController = class {
       const examYear = modal.querySelector("#new-lb-year")?.value || "2027 A/L";
       const totalMarks = Number(modal.querySelector("#new-lb-total-marks")?.value) || 100;
       const paperDate = modal.querySelector("#new-lb-date")?.value || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const notifyStudents = modal.querySelector("#new-lb-notify")?.checked !== false;
       if (!paperTitle) {
         alert("\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB Leaderboard Title \u0D91\u0D9A \u0D87\u0DAD\u0DD4\u0DC5\u0DAD\u0DCA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 (Please enter Leaderboard Title)");
         return;
@@ -99595,16 +99981,21 @@ var AppController = class {
         grade: calculateGrade(e2.marks),
         remarks: e2.remarks || ""
       }));
-      await dbService.savePaperLeaderboard({
+      const payload = {
         paperTitle,
         subject,
         examYear,
         totalMarks,
         paperDate,
-        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        publishedAt: existingBoard?.publishedAt || (/* @__PURE__ */ new Date()).toISOString(),
+        notifyStudents,
         entries: sortedEntries
-      });
-      notificationService.showInAppBanner("Leaderboard Published!", "Paper Leaderboard \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 Real-Time Publish \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3.", "success");
+      };
+      if (isEdit && existingBoard?.id) {
+        payload.id = existingBoard.id;
+      }
+      await dbService.savePaperLeaderboard(payload);
+      notificationService.showInAppBanner(isEdit ? "Leaderboard Updated!" : "Leaderboard Published!", `Paper Leaderboard \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 ${isEdit ? "Update" : "Publish"} \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3.`, "success");
       modal.remove();
       this.refreshAdminTab("papers");
     });
