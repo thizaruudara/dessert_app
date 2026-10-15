@@ -294,6 +294,48 @@ class PaperSessionService {
     await _firestore.collection('paper_registrations').doc(regDocId).set(updates, SetOptions(merge: true));
   }
 
+  static String normalizePhone(String? phone) {
+    if (phone == null || phone.isEmpty) return '';
+    String cleaned = phone.replaceAll(RegExp(r'[^\d+]'), '').trim();
+    if (cleaned.startsWith('+94')) {
+      cleaned = '0${cleaned.substring(3)}';
+    } else if (cleaned.startsWith('94') && cleaned.length >= 11) {
+      cleaned = '0${cleaned.substring(2)}';
+    }
+    return cleaned;
+  }
+
+  static List<PaperRegistration> deduplicateRegistrations(List<PaperRegistration> regs) {
+    final Map<String, PaperRegistration> map = {};
+    for (final reg in regs) {
+      final normPhone = normalizePhone(reg.studentPhone);
+      final key = (normPhone.isNotEmpty && normPhone.length >= 9)
+          ? normPhone
+          : (reg.studentId.isNotEmpty ? reg.studentId : reg.id);
+      if (key.isEmpty) continue;
+
+      if (!map.containsKey(key)) {
+        map[key] = reg;
+      } else {
+        final existing = map[key]!;
+        final isSub = reg.isSubmitted || reg.status == 'submitted' || reg.submissionPhotos.isNotEmpty;
+        final existSub = existing.isSubmitted || existing.status == 'submitted' || existing.submissionPhotos.isNotEmpty;
+        final isCam = reg.isCameraActive || reg.isOnline;
+        final existCam = existing.isCameraActive || existing.isOnline;
+
+        map[key] = existing.copyWith(
+          studentPhone: normPhone.isNotEmpty ? normPhone : existing.studentPhone,
+          status: (existSub || isSub) ? 'submitted' : (isCam ? 'live' : existing.status),
+          isCameraActive: existCam || isCam,
+          submissionPhotos: (existSub && existing.submissionPhotos.isNotEmpty)
+              ? existing.submissionPhotos
+              : (reg.submissionPhotos.isNotEmpty ? reg.submissionPhotos : existing.submissionPhotos),
+        );
+      }
+    }
+    return map.values.toList();
+  }
+
   // ── 8. Stream All Students in a Session / Slot (For Admin Invigilator Grid) ─
   Stream<List<PaperRegistration>> streamSlotRegistrations(String paperId, String? slotId) {
     if (paperId.isEmpty) return Stream.value([]);
@@ -311,8 +353,9 @@ class PaperSessionService {
           debugPrint('Error parsing slot registration ${doc.id}: $e');
         }
       }
-      if (slotId == null || slotId.isEmpty) return all;
-      return all.where((reg) {
+      final deduped = deduplicateRegistrations(all);
+      if (slotId == null || slotId.isEmpty) return deduped;
+      return deduped.where((reg) {
         final regSlot = (reg.selectedSlot.isEmpty || reg.selectedSlot == 'null') ? 'slot1' : reg.selectedSlot;
         return regSlot == slotId;
       }).toList();

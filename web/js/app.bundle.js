@@ -89161,6 +89161,16 @@ async function callBackend(endpoint, payload, { authenticated = true } = {}) {
 }
 
 // js/db-service.js
+function normalizePhone(rawPhone) {
+  if (!rawPhone) return "";
+  let cleaned = String(rawPhone).replace(/[^\d+]/g, "").trim();
+  if (cleaned.startsWith("+94")) {
+    cleaned = "0" + cleaned.slice(3);
+  } else if (cleaned.startsWith("94") && cleaned.length >= 11) {
+    cleaned = "0" + cleaned.slice(2);
+  }
+  return cleaned;
+}
 var DbService = class {
   constructor() {
     this.dessertListeners = [];
@@ -90658,9 +90668,47 @@ var DbService = class {
     await deleteDoc(doc(db, "paper_hints", hintId));
     this.clearCache("paper_hints");
   }
+  deduplicateRegistrations(registrations) {
+    if (!Array.isArray(registrations)) return [];
+    const map = /* @__PURE__ */ new Map();
+    for (const reg of registrations) {
+      if (!reg) continue;
+      const rawPhone = reg.studentPhone || reg.phone || "";
+      const normPhone = normalizePhone(rawPhone);
+      const key = normPhone && normPhone.length >= 9 ? normPhone : reg.studentId || reg.uid || reg.id;
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, { ...reg, studentPhone: normPhone || rawPhone });
+      } else {
+        const existing = map.get(key);
+        const isSub = reg.status === "submitted" || reg.isSubmitted === true || Array.isArray(reg.submissionPhotos) && reg.submissionPhotos.length > 0 || reg.mcqScore !== void 0;
+        const existSub = existing.status === "submitted" || existing.isSubmitted === true || Array.isArray(existing.submissionPhotos) && existing.submissionPhotos.length > 0 || existing.mcqScore !== void 0;
+        const hasCam = !!(reg.isCameraActive && (reg.cameraSnapshotUrl || reg.lastCameraPing));
+        const existCam = !!(existing.isCameraActive && (existing.cameraSnapshotUrl || existing.lastCameraPing));
+        const merged = {
+          ...existing,
+          ...reg,
+          studentPhone: normPhone || existing.studentPhone || rawPhone,
+          status: existSub || isSub ? "submitted" : reg.status || existing.status,
+          isSubmitted: existSub || isSub,
+          submissionPhotos: existSub && existing.submissionPhotos?.length ? existing.submissionPhotos : reg.submissionPhotos || existing.submissionPhotos || [],
+          isCameraActive: existCam || hasCam,
+          cameraSnapshotUrl: reg.cameraSnapshotUrl || existing.cameraSnapshotUrl,
+          lastCameraPing: reg.lastCameraPing || existing.lastCameraPing,
+          selectedSlot: reg.selectedSlot || existing.selectedSlot || "slot1"
+        };
+        map.set(key, merged);
+      }
+    }
+    return Array.from(map.values());
+  }
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
     if (!paperId || !studentId) return null;
-    const existing = await this.getStudentRegistration(paperId, studentId);
+    const normPhone = normalizePhone(studentPhone);
+    let existing = await this.getStudentRegistration(paperId, studentId);
+    if (!existing && normPhone) {
+      existing = await this.getStudentRegistration(paperId, normPhone);
+    }
     if (existing && (existing.status === "submitted" || existing.isSubmitted === true || existing.submissionPhotos && existing.submissionPhotos.length > 0)) {
       return existing;
     }
@@ -90671,7 +90719,7 @@ var DbService = class {
       paperId,
       studentId,
       studentName,
-      studentPhone,
+      studentPhone: normPhone || studentPhone || "",
       selectedSlot: slotId,
       slotId,
       status: "registered",
@@ -90731,11 +90779,13 @@ var DbService = class {
       const list = [];
       snap.forEach((d) => {
         const data = { id: d.id, ...d.data() };
-        if (!slotId || slotId === "all" || data.selectedSlot === slotId || !data.selectedSlot && slotId === "slot1") {
-          list.push(data);
-        }
+        list.push(data);
       });
-      return list;
+      const deduped = this.deduplicateRegistrations(list);
+      if (!slotId || slotId === "all") {
+        return deduped;
+      }
+      return deduped.filter((r2) => (r2.selectedSlot || "slot1") === slotId);
     } catch (e2) {
       console.warn("[DB] getSlotRegistrations error:", e2);
       return [];
@@ -90752,10 +90802,11 @@ var DbService = class {
         snapshot.forEach((d) => {
           all.push({ id: d.id, ...d.data() });
         });
+        const deduped = this.deduplicateRegistrations(all);
         if (!slotId || slotId === "all") {
-          callback(all);
+          callback(deduped);
         } else {
-          callback(all.filter((r2) => (r2.selectedSlot || "slot1") === slotId));
+          callback(deduped.filter((r2) => (r2.selectedSlot || "slot1") === slotId));
         }
       }, (err) => {
         console.warn("[DB] streamSlotRegistrations error:", err);
@@ -102709,8 +102760,9 @@ This will purge all associated submissions and records.`)) {
     modal.style.display = "flex";
     modal.style.justifyContent = "center";
     modal.style.alignItems = "center";
-    modal.style.background = "rgba(11, 15, 25, 0.9)";
-    modal.style.backdropFilter = "blur(12px)";
+    modal.style.background = "#0F172A";
+    modal.style.backdropFilter = "none";
+    modal.style.webkitBackdropFilter = "none";
     modal.style.zIndex = "9999";
     let activeTab = "slot1";
     let allStudents = [];
@@ -102816,6 +102868,7 @@ This will purge all associated submissions and records.`)) {
     };
     const render = () => {
       this._renderProctorHall = render;
+      allStudents = dbService.deduplicateRegistrations(allStudents || []);
       const slot1Students = allStudents.filter((s2) => (s2.selectedSlot || "slot1") === "slot1");
       const slot2Students = allStudents.filter((s2) => s2.selectedSlot === "slot2");
       const submittedStudents = allStudents.filter((s2) => isStudentSubmitted(s2));
@@ -102854,10 +102907,10 @@ This will purge all associated submissions and records.`)) {
       const isEnded = session.isEnded || phase === "ended";
       const isTimeUp = session.isTimeUp || phase === "time_up";
       modal.innerHTML = `
-        <div style="width:100%; max-width:440px; height:92vh; max-height:890px; border-radius:24px; border:1px solid #334155; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow:hidden; font-family:'Poppins','Plus Jakarta Sans',sans-serif; box-shadow:0 25px 60px rgba(0,0,0,0.7); position:relative;">
+        <div class="proctor-hall-shell" style="position:relative;">
           
           <!-- \u2500\u2500 AppBar (matching admin_live_proctor_screen.dart AppBar) \u2500\u2500 -->
-          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 0 14px; flex-shrink:0;">
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 10px 14px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
               <div style="display:flex; flex-direction:column; gap:2px;">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -103345,7 +103398,7 @@ This will purge all associated submissions and records.`)) {
     });
     unsubs.push(unsubSession);
     const unsubRegs = dbService.streamSlotRegistrations(session.id, "all", (regs) => {
-      allStudents = regs || [];
+      allStudents = dbService.deduplicateRegistrations(regs || []);
       render();
     });
     unsubs.push(unsubRegs);
@@ -103934,7 +103987,7 @@ This will purge all associated submissions and records.`)) {
       else if (times.isPackageOpening) subtitleText = "\u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DCA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8";
       roomContainer.innerHTML = `
         <!-- AppBar matching Flutter AppBar -->
-        <div style="background:#1E293B; height:56px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0;">
+        <div style="background:#1E293B; min-height:56px; padding:calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0;">
           <div style="display:flex; align-items:center; gap:12px;">
             <button id="btn-appbar-back" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; display:flex; align-items:center; padding:4px;">
               <span class="material-symbols-rounded">arrow_back</span>

@@ -21,6 +21,17 @@ import {
 import { callBackend } from './backend-api.js';
 import { supabase } from './supabase-client.js';
 
+export function normalizePhone(rawPhone) {
+  if (!rawPhone) return '';
+  let cleaned = String(rawPhone).replace(/[^\d+]/g, '').trim();
+  if (cleaned.startsWith('+94')) {
+    cleaned = '0' + cleaned.slice(3);
+  } else if (cleaned.startsWith('94') && cleaned.length >= 11) {
+    cleaned = '0' + cleaned.slice(2);
+  }
+  return cleaned;
+}
+
 export class DbService {
   constructor() {
     this.dessertListeners = [];
@@ -1664,9 +1675,53 @@ export class DbService {
     this.clearCache('paper_hints');
   }
 
+  deduplicateRegistrations(registrations) {
+    if (!Array.isArray(registrations)) return [];
+    const map = new Map();
+
+    for (const reg of registrations) {
+      if (!reg) continue;
+      const rawPhone = reg.studentPhone || reg.phone || '';
+      const normPhone = normalizePhone(rawPhone);
+      // Key by normalized phone if present; fallback to studentId / uid / id
+      const key = (normPhone && normPhone.length >= 9) ? normPhone : (reg.studentId || reg.uid || reg.id);
+      if (!key) continue;
+
+      if (!map.has(key)) {
+        map.set(key, { ...reg, studentPhone: normPhone || rawPhone });
+      } else {
+        const existing = map.get(key);
+        const isSub = (reg.status === 'submitted' || reg.isSubmitted === true || (Array.isArray(reg.submissionPhotos) && reg.submissionPhotos.length > 0) || reg.mcqScore !== undefined);
+        const existSub = (existing.status === 'submitted' || existing.isSubmitted === true || (Array.isArray(existing.submissionPhotos) && existing.submissionPhotos.length > 0) || existing.mcqScore !== undefined);
+
+        const hasCam = !!(reg.isCameraActive && (reg.cameraSnapshotUrl || reg.lastCameraPing));
+        const existCam = !!(existing.isCameraActive && (existing.cameraSnapshotUrl || existing.lastCameraPing));
+
+        const merged = {
+          ...existing,
+          ...reg,
+          studentPhone: normPhone || existing.studentPhone || rawPhone,
+          status: (existSub || isSub) ? 'submitted' : (reg.status || existing.status),
+          isSubmitted: existSub || isSub,
+          submissionPhotos: (existSub && existing.submissionPhotos?.length) ? existing.submissionPhotos : (reg.submissionPhotos || existing.submissionPhotos || []),
+          isCameraActive: existCam || hasCam,
+          cameraSnapshotUrl: reg.cameraSnapshotUrl || existing.cameraSnapshotUrl,
+          lastCameraPing: reg.lastCameraPing || existing.lastCameraPing,
+          selectedSlot: reg.selectedSlot || existing.selectedSlot || 'slot1'
+        };
+        map.set(key, merged);
+      }
+    }
+    return Array.from(map.values());
+  }
+
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
     if (!paperId || !studentId) return null;
-    const existing = await this.getStudentRegistration(paperId, studentId);
+    const normPhone = normalizePhone(studentPhone);
+    let existing = await this.getStudentRegistration(paperId, studentId);
+    if (!existing && normPhone) {
+      existing = await this.getStudentRegistration(paperId, normPhone);
+    }
     if (existing && (existing.status === 'submitted' || existing.isSubmitted === true || (existing.submissionPhotos && existing.submissionPhotos.length > 0))) {
       return existing; // DO NOT OVERWRITE SUBMITTED STATE!
     }
@@ -1678,7 +1733,7 @@ export class DbService {
       paperId,
       studentId,
       studentName,
-      studentPhone,
+      studentPhone: normPhone || studentPhone || '',
       selectedSlot: slotId,
       slotId: slotId,
       status: 'registered',
@@ -1740,11 +1795,13 @@ export class DbService {
       const list = [];
       snap.forEach(d => {
         const data = { id: d.id, ...d.data() };
-        if (!slotId || slotId === 'all' || data.selectedSlot === slotId || (!data.selectedSlot && slotId === 'slot1')) {
-          list.push(data);
-        }
+        list.push(data);
       });
-      return list;
+      const deduped = this.deduplicateRegistrations(list);
+      if (!slotId || slotId === 'all') {
+        return deduped;
+      }
+      return deduped.filter(r => (r.selectedSlot || 'slot1') === slotId);
     } catch (e) {
       console.warn('[DB] getSlotRegistrations error:', e);
       return [];
@@ -1761,10 +1818,11 @@ export class DbService {
         snapshot.forEach(d => {
           all.push({ id: d.id, ...d.data() });
         });
+        const deduped = this.deduplicateRegistrations(all);
         if (!slotId || slotId === 'all') {
-          callback(all);
+          callback(deduped);
         } else {
-          callback(all.filter(r => (r.selectedSlot || 'slot1') === slotId));
+          callback(deduped.filter(r => (r.selectedSlot || 'slot1') === slotId));
         }
       }, (err) => {
         console.warn('[DB] streamSlotRegistrations error:', err);

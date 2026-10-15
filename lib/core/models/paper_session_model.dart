@@ -355,6 +355,44 @@ class PaperRegistration {
       'agoraUid': agoraUid,
     };
   }
+
+  PaperRegistration copyWith({
+    String? id,
+    String? paperId,
+    String? studentId,
+    String? studentName,
+    String? studentPhone,
+    String? selectedSlot,
+    String? status,
+    DateTime? registeredAt,
+    DateTime? joinedAt,
+    DateTime? submittedAt,
+    DateTime? lastCameraPing,
+    bool? isCameraActive,
+    String? cameraSnapshotUrl,
+    String? submissionUrl,
+    List<String>? submissionPhotos,
+    int? agoraUid,
+  }) {
+    return PaperRegistration(
+      id: id ?? this.id,
+      paperId: paperId ?? this.paperId,
+      studentId: studentId ?? this.studentId,
+      studentName: studentName ?? this.studentName,
+      studentPhone: studentPhone ?? this.studentPhone,
+      selectedSlot: selectedSlot ?? this.selectedSlot,
+      status: status ?? this.status,
+      registeredAt: registeredAt ?? this.registeredAt,
+      joinedAt: joinedAt ?? this.joinedAt,
+      submittedAt: submittedAt ?? this.submittedAt,
+      lastCameraPing: lastCameraPing ?? this.lastCameraPing,
+      isCameraActive: isCameraActive ?? this.isCameraActive,
+      cameraSnapshotUrl: cameraSnapshotUrl ?? this.cameraSnapshotUrl,
+      submissionUrl: submissionUrl ?? this.submissionUrl,
+      submissionPhotos: submissionPhotos ?? this.submissionPhotos,
+      agoraUid: agoraUid ?? this.agoraUid,
+    );
+  }
 }
 
 class ProctorAlert {

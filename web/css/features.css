@@ -4187,3 +4187,46 @@ button:focus-visible {
 .notif-enable-btn:active {
   transform: translateY(1px);
 }
+
+/* ── Eliminate Top Cloud/Fog Blur Overlay Across All Pages & Modals ── */
+.app-top-scrim,
+.status-bar-scrim,
+.top-cloud-overlay,
+.ios-notch-scrim {
+  display: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── Live Invigilator Proctor Hall Fullscreen Responsive Shell ── */
+.proctor-hall-shell {
+  width: 100%;
+  max-width: 440px;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0 !important;
+  border: none !important;
+  display: flex;
+  flex-direction: column;
+  background: #0F172A !important;
+  color: #F8FAFC;
+  overflow: hidden;
+  font-family: 'Poppins', 'Plus Jakarta Sans', sans-serif;
+  position: relative;
+  box-shadow: none;
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 480px) {
+  .proctor-hall-shell {
+    height: min(890px, 92vh);
+    max-height: 890px;
+    border-radius: 24px !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7) !important;
+    padding-top: 0;
+  }
+}
+

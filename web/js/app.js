@@ -1,7 +1,7 @@
 // EduPeak Exact 1:1 Android App Replica Controller
 // Matches current_real_dashboard.png, screen_cockpit_full.png & real_dashboard_light_v4.html
 import { authService } from './auth-service.js';
-import { dbService } from './db-service.js';
+import { dbService, normalizePhone } from './db-service.js';
 import { notificationService } from './notification-service.js';
 import { cameraService } from './camera-service.js';
 import { storageService } from './storage-service.js';
@@ -9901,8 +9901,9 @@ class AppController {
     modal.style.display = 'flex';
     modal.style.justifyContent = 'center';
     modal.style.alignItems = 'center';
-    modal.style.background = 'rgba(11, 15, 25, 0.9)';
-    modal.style.backdropFilter = 'blur(12px)';
+    modal.style.background = '#0F172A';
+    modal.style.backdropFilter = 'none';
+    modal.style.webkitBackdropFilter = 'none';
     modal.style.zIndex = '9999';
 
     let activeTab = 'slot1'; // 'slot1', 'slot2', 'answers'
@@ -10033,6 +10034,7 @@ class AppController {
 
     const render = () => {
       this._renderProctorHall = render;
+      allStudents = dbService.deduplicateRegistrations(allStudents || []);
       const slot1Students = allStudents.filter(s => (s.selectedSlot || 'slot1') === 'slot1');
       const slot2Students = allStudents.filter(s => s.selectedSlot === 'slot2');
       const submittedStudents = allStudents.filter(s => isStudentSubmitted(s));
@@ -10076,10 +10078,10 @@ class AppController {
       const isTimeUp = session.isTimeUp || phase === 'time_up';
 
       modal.innerHTML = `
-        <div style="width:100%; max-width:440px; height:92vh; max-height:890px; border-radius:24px; border:1px solid #334155; display:flex; flex-direction:column; background:#0F172A; color:#F8FAFC; overflow:hidden; font-family:'Poppins','Plus Jakarta Sans',sans-serif; box-shadow:0 25px 60px rgba(0,0,0,0.7); position:relative;">
+        <div class="proctor-hall-shell" style="position:relative;">
           
           <!-- ── AppBar (matching admin_live_proctor_screen.dart AppBar) ── -->
-          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 0 14px; flex-shrink:0;">
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 10px 14px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
               <div style="display:flex; flex-direction:column; gap:2px;">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -10588,7 +10590,7 @@ class AppController {
     unsubs.push(unsubSession);
 
     const unsubRegs = dbService.streamSlotRegistrations(session.id, 'all', (regs) => {
-      allStudents = regs || [];
+      allStudents = dbService.deduplicateRegistrations(regs || []);
       render();
     });
     unsubs.push(unsubRegs);
@@ -11234,7 +11236,7 @@ class AppController {
       // Build HTML
       roomContainer.innerHTML = `
         <!-- AppBar matching Flutter AppBar -->
-        <div style="background:#1E293B; height:56px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0;">
+        <div style="background:#1E293B; min-height:56px; padding:calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-shrink:0;">
           <div style="display:flex; align-items:center; gap:12px;">
             <button id="btn-appbar-back" style="background:transparent; border:none; color:#FFFFFF; font-size:18px; cursor:pointer; display:flex; align-items:center; padding:4px;">
               <span class="material-symbols-rounded">arrow_back</span>
