@@ -94257,8 +94257,10 @@ var AppController = class {
     filtered.forEach((student, index) => {
       student.rank = index + 1;
     });
-    const top3 = filtered.slice(0, 3);
-    const visibleRankRows = filtered;
+    const first = filtered[0] || null;
+    const second = filtered[1] || null;
+    const third = filtered[2] || null;
+    const rest = filtered.slice(3);
     const currentUserId = currentUser.uid || currentUser.id;
     const isMe = (student) => student.id && student.id === currentUserId || currentUser.phone && student.studentPhone && String(student.studentPhone).replace(/\D/g, "") === String(currentUser.phone).replace(/\D/g, "") || currentUser.name && student.name && student.name.trim().toLowerCase() === String(currentUser.name).trim().toLowerCase();
     const currentUserRank = filtered.findIndex((student) => isMe(student)) + 1;
@@ -94266,6 +94268,56 @@ var AppController = class {
     const nextRankEntry = currentUserRank > 1 ? filtered[currentUserRank - 2] : null;
     const emptyBatchLabel = isAdmin ? this.selectedRanksBatch === "All Batches" ? "" : this.selectedRanksBatch : studentBatch;
     const xpToNextRank = nextRankEntry ? Math.max(1, nextRankEntry.credits - currentUserEntry.credits + 1) : 0;
+    const renderPodiumCard = (student, rankNumber, posClass) => {
+      if (!student) {
+        return `
+          <div class="podium-card ${posClass} podium-empty" style="opacity:0.35; border-style:dashed;">
+            <div class="podium-avatar-wrapper">
+              <div class="podium-avatar" style="background:#F1F5F9; color:#94A3B8; border:1.5px dashed #CBD5E1;">\u2014</div>
+              <div class="podium-rank-badge ${rankNumber === 1 ? "badge-gold" : rankNumber === 2 ? "badge-silver" : "badge-bronze"}">${rankNumber}</div>
+            </div>
+            <div class="podium-info">
+              <div class="podium-name" style="color:#94A3B8;">Awaiting</div>
+              <div class="podium-batch">\u2014</div>
+              <div class="podium-xp-pill" style="background:#F1F5F9; color:#94A3B8; border:1px solid #E2E8F0;">0 XP</div>
+            </div>
+          </div>
+        `;
+      }
+      const isCurrent = isMe(student);
+      const isRank1 = rankNumber === 1;
+      const isRank2 = rankNumber === 2;
+      const badgeClass = isRank1 ? "badge-gold" : isRank2 ? "badge-silver" : "badge-bronze";
+      const xpPillClass = isRank1 ? "xp-gold" : isRank2 ? "xp-silver" : "xp-bronze";
+      const iconName = isRank1 ? "stars" : "military_tech";
+      const iconColor = isRank1 ? "#F59E0B" : isRank2 ? "#94A3B8" : "#D97706";
+      return `
+        <div class="podium-card ${posClass} ${isCurrent ? "is-current-user" : ""}">
+          ${isRank1 ? `
+            <div class="podium-crown-badge">
+              <span class="crown-icon">\u{1F451}</span>
+            </div>
+          ` : ""}
+          <div class="podium-avatar-wrapper">
+            <div class="podium-avatar ${getAvatarClass(student.name)}">
+              ${escapeHTML2(getInitials(student.name))}
+            </div>
+            <div class="podium-rank-badge ${badgeClass}">${rankNumber}</div>
+          </div>
+          <div class="podium-info">
+            <div class="podium-name" title="${escapeHTML2(student.name)}">
+              ${escapeHTML2(student.name)}
+              ${isCurrent ? '<span class="rank-you-tag">You</span>' : ""}
+            </div>
+            <div class="podium-batch">${escapeHTML2(student.examYear || "Scholar")}</div>
+            <div class="podium-xp-pill ${xpPillClass}">
+              <span class="material-symbols-rounded filled" style="font-size:13px; color:${iconColor};">${iconName}</span>
+              <span>${student.credits} XP</span>
+            </div>
+          </div>
+        </div>
+      `;
+    };
     const rankingContent = leaderboardLoadError ? `<div class="leaderboard-state" role="status">
           <span class="material-symbols-rounded">cloud_off</span>
           <strong>Leaderboard unavailable</strong>
@@ -94275,31 +94327,48 @@ var AppController = class {
             <span class="material-symbols-rounded">emoji_events</span>
             <strong>${!emptyBatchLabel ? "No students ranked yet" : `No students ranked in ${escapeHTML2(emptyBatchLabel)} yet`}</strong>
             <span>Rankings appear here when student XP records are available.</span>
-          </div>` : `<div class="ranks-list">
-            ${visibleRankRows.map((student) => `
-              <div class="rank-list-item ${isMe(student) ? "is-current-user" : ""}">
-                <div class="rank-item-left">
-                  <span class="rank-index ${student.rank <= 3 ? `top-rank-${student.rank}` : ""}">#${student.rank}</span>
-                  <div class="rank-avatar">${escapeHTML2(String(student.name || "S").charAt(0).toUpperCase())}</div>
-                  <div class="rank-name-box">
-                    <div class="rank-student-name">
-                      <span>${escapeHTML2(student.name)}</span>
-                      ${isMe(student) ? '<span class="rank-you-tag">You</span>' : ""}
-                    </div>
-                    <div class="rank-batch-tag">${escapeHTML2(student.examYear || "General Batch")}</div>
-                  </div>
-                </div>
-                <span class="rank-xp-pill">${student.credits} XP</span>
-              </div>
-            `).join("")}
+          </div>` : `
+          <!-- Top 3 Podium: Left (Rank 2), Center (Rank 1 - Priority), Right (Rank 3) -->
+          <div class="leaderboard-podium-section">
+            <div class="podium-container">
+              ${renderPodiumCard(second, 2, "podium-card-2")}
+              ${renderPodiumCard(first, 1, "podium-card-1")}
+              ${renderPodiumCard(third, 3, "podium-card-3")}
+            </div>
           </div>
+
+          ${rest.length > 0 ? `
+            <div class="leaderboard-divider-row" style="display:flex; align-items:center; justify-content:space-between; margin:16px 4px 10px; padding:0 2px;">
+              <span style="font-size:11.5px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px;">All Scholars (Ranks 4+)</span>
+              <span style="font-size:11px; font-weight:600; color:#94A3B8;">${filtered.length} Total Ranked</span>
+            </div>
+            <div class="ranks-list">
+              ${rest.map((student) => `
+                <div class="rank-list-item ${isMe(student) ? "is-current-user" : ""}">
+                  <div class="rank-item-left">
+                    <span class="rank-index">#${student.rank}</span>
+                    <div class="rank-avatar ${getAvatarClass(student.name)}">${escapeHTML2(getInitials(student.name))}</div>
+                    <div class="rank-name-box">
+                      <div class="rank-student-name">
+                        <span>${escapeHTML2(student.name)}</span>
+                        ${isMe(student) ? '<span class="rank-you-tag">You</span>' : ""}
+                      </div>
+                      <div class="rank-batch-tag">${escapeHTML2(student.examYear || "General Batch")}</div>
+                    </div>
+                  </div>
+                  <span class="rank-xp-pill">${student.credits} XP</span>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+
           ${currentUserEntry ? `
             <div class="my-rank-sticky-bar">
               <div class="my-rank-info">
                 <span class="my-rank-num">#${currentUserRank}</span>
                 <div>
                   <div class="my-rank-name">${escapeHTML2(currentUserEntry.name)} (You)</div>
-                  <div class="my-rank-next">${nextRankEntry ? `Next rank: +${xpToNextRank} XP needed` : "You are ranked #1!"}</div>
+                  <div class="my-rank-next">${nextRankEntry ? `Next rank: +${xpToNextRank} XP needed` : "You are ranked #1! \u{1F451}"}</div>
                 </div>
               </div>
               <span class="my-rank-xp">${currentUserEntry.credits} XP</span>
@@ -94378,6 +94447,61 @@ var AppController = class {
                             <span class="srb-metric">Rank <strong>#${myEntry.rank}</strong></span>
                             <span class="grade-pill grade-${escapeHTML2(myEntry.grade)}">${escapeHTML2(myEntry.grade)}</span>
                             <span class="srb-score"><strong>${myEntry.marks}</strong> <small style="color:#64748B;">/ ${totalMarks}</small></span>
+                          </div>
+                        </div>
+                      ` : ""}
+                      ${entries.length >= 3 ? `
+                        <!-- Paper Top 3 Podium (Left: Rank 2, Center: Rank 1 - Priority, Right: Rank 3) -->
+                        <div class="leaderboard-podium-section" style="margin: 10px 0 16px;">
+                          <div class="podium-container">
+                            <!-- Rank 2: Left -->
+                            <div class="podium-card podium-card-2 ${myEntry && entries[1].rank === myEntry.rank ? "is-current-user" : ""}">
+                              <div class="podium-avatar-wrapper">
+                                <div class="podium-avatar ${getAvatarClass(entries[1].studentName)}">${escapeHTML2(getInitials(entries[1].studentName))}</div>
+                                <div class="podium-rank-badge badge-silver">2</div>
+                              </div>
+                              <div class="podium-info">
+                                <div class="podium-name" title="${escapeHTML2(entries[1].studentName)}">${escapeHTML2(entries[1].studentName)}</div>
+                                <div class="podium-batch"><span class="grade-pill grade-${escapeHTML2(entries[1].grade)}" style="font-size:9.5px; padding:1px 6px;">Grade ${escapeHTML2(entries[1].grade)}</span></div>
+                                <div class="podium-xp-pill xp-silver">
+                                  <span>${entries[1].marks}</span>
+                                  <small style="opacity:0.75; font-size:9.5px;">/${totalMarks}</small>
+                                </div>
+                              </div>
+                            </div>
+
+                            <!-- Rank 1: Middle (Priority Focus) -->
+                            <div class="podium-card podium-card-1 ${myEntry && entries[0].rank === myEntry.rank ? "is-current-user" : ""}">
+                              <div class="podium-crown-badge"><span class="crown-icon">\u{1F451}</span></div>
+                              <div class="podium-avatar-wrapper">
+                                <div class="podium-avatar ${getAvatarClass(entries[0].studentName)}">${escapeHTML2(getInitials(entries[0].studentName))}</div>
+                                <div class="podium-rank-badge badge-gold">1</div>
+                              </div>
+                              <div class="podium-info">
+                                <div class="podium-name" title="${escapeHTML2(entries[0].studentName)}">${escapeHTML2(entries[0].studentName)}</div>
+                                <div class="podium-batch"><span class="grade-pill grade-${escapeHTML2(entries[0].grade)}" style="font-size:9.5px; padding:1px 6px;">Grade ${escapeHTML2(entries[0].grade)}</span></div>
+                                <div class="podium-xp-pill xp-gold">
+                                  <span>${entries[0].marks}</span>
+                                  <small style="opacity:0.75; font-size:9.5px;">/${totalMarks}</small>
+                                </div>
+                              </div>
+                            </div>
+
+                            <!-- Rank 3: Right -->
+                            <div class="podium-card podium-card-3 ${myEntry && entries[2].rank === myEntry.rank ? "is-current-user" : ""}">
+                              <div class="podium-avatar-wrapper">
+                                <div class="podium-avatar ${getAvatarClass(entries[2].studentName)}">${escapeHTML2(getInitials(entries[2].studentName))}</div>
+                                <div class="podium-rank-badge badge-bronze">3</div>
+                              </div>
+                              <div class="podium-info">
+                                <div class="podium-name" title="${escapeHTML2(entries[2].studentName)}">${escapeHTML2(entries[2].studentName)}</div>
+                                <div class="podium-batch"><span class="grade-pill grade-${escapeHTML2(entries[2].grade)}" style="font-size:9.5px; padding:1px 6px;">Grade ${escapeHTML2(entries[2].grade)}</span></div>
+                                <div class="podium-xp-pill xp-bronze">
+                                  <span>${entries[2].marks}</span>
+                                  <small style="opacity:0.75; font-size:9.5px;">/${totalMarks}</small>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ` : ""}
