@@ -271,7 +271,9 @@ export class DbService {
   }
 
   // Real-time listener for student's homework status
-  listenToStudentDesserts(studentId, studentPhone, callback, studentName) {
+  listenToStudentDesserts(studentId, studentPhone, arg3, arg4) {
+    const callback = typeof arg3 === 'function' ? arg3 : (typeof arg4 === 'function' ? arg4 : () => {});
+    const studentName = typeof arg3 === 'string' ? arg3 : (typeof arg4 === 'string' ? arg4 : '');
     const cleanId = String(studentId || '').trim();
     const cleanPhone = String(studentPhone || '').replace(/\D/g, '');
     const cleanName = String(studentName || '').trim().toLowerCase();
@@ -333,6 +335,8 @@ export class DbService {
         } catch (_) {}
 
         list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+        const cacheKey = `student_desserts_${cleanId}_${cleanPhone}_${cleanName}`;
+        this.setCache(cacheKey, list);
         callback(list);
       }, (err) => {
         console.warn('[DB] Desserts snapshot listener error:', err);
@@ -874,12 +878,21 @@ export class DbService {
           localList = JSON.parse(localStorage.getItem('edupeak_local_desserts') || '[]');
         } catch (_) {}
 
+        // Overlay local review modifications so approved state is never overwritten by stale snapshot
+        for (let i = 0; i < list.length; i++) {
+          const matchingLocal = localList.find(loc => loc.id === list[i].id || (loc.submittedAt && loc.submittedAt === list[i].submittedAt));
+          if (matchingLocal && (matchingLocal.reviewedAt || matchingLocal.status !== 'pending')) {
+            list[i] = { ...list[i], ...matchingLocal };
+          }
+        }
+
         for (const loc of localList) {
           if (!list.some(d => d.id === loc.id || (d.submittedAt && d.submittedAt === loc.submittedAt))) {
             list.push(loc);
           }
         }
         list.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+        this.setCache('all_desserts_admin', list);
         callback(list);
       }, (err) => {
         console.warn('[DB] listenToAllDessertsForAdmin snapshot error:', err);
@@ -1453,6 +1466,8 @@ export class DbService {
           if (aEnded !== bEnded) return aEnded ? 1 : -1;
           return getSessionOrderTime(b) - getSessionOrderTime(a);
         });
+        const cacheKey = `paper_sessions_${examYear || 'all'}`;
+        this.setCache(cacheKey, result);
         callback(result);
       }, (err) => {
         console.warn('[DB] streamPaperSessions error:', err);
@@ -1647,6 +1662,10 @@ export class DbService {
     if (existing && (existing.status === 'submitted' || existing.isSubmitted === true || (existing.submissionPhotos && existing.submissionPhotos.length > 0))) {
       return existing; // DO NOT OVERWRITE SUBMITTED STATE!
     }
+    const isSlotChange = existing && (existing.selectedSlot || existing.slotId) && (existing.selectedSlot !== slotId && existing.slotId !== slotId);
+    const prevSlot = existing ? (existing.selectedSlot || existing.slotId || 'slot1') : null;
+    const isNewReg = !existing;
+
     const regData = {
       paperId,
       studentId,
@@ -1662,14 +1681,26 @@ export class DbService {
       await callBackend('papers/register-slot', { paperId, slotId });
     } catch (error) {
       console.warn('[DB] Backend paper registration notice, saving direct record:', error);
-      try {
-        await setDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`), regData, { merge: true });
-      } catch (directErr) {
-        console.warn('[DB] Direct registration write error:', directErr);
+    }
+
+    try {
+      await setDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`), regData, { merge: true });
+      // Real-time counter synchronization on the paper_sessions document
+      const sessionRef = doc(db, 'paper_sessions', paperId);
+      if (isNewReg) {
+        const fieldName = slotId === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
+        await updateDoc(sessionRef, { [fieldName]: increment(1) }).catch(() => {});
+      } else if (isSlotChange) {
+        const decField = prevSlot === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
+        const incField = slotId === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
+        await updateDoc(sessionRef, { [decField]: increment(-1), [incField]: increment(1) }).catch(() => {});
       }
+    } catch (directErr) {
+      console.warn('[DB] Direct registration write error:', directErr);
     }
     const cacheKey = `paper_reg_${paperId}_${studentId}`;
     this.setCache(cacheKey, regData);
+    this.clearCache('paper_sessions');
     return regData;
   }
 
@@ -2432,7 +2463,7 @@ export class DbService {
     const fetchAndNotify = async () => {
       if (!active) return;
       try {
-        const list = await this.getLeaderboard(batch);
+        const list = await this.getLeaderboard(batch, { forceRefresh: true });
         if (active) callback(list);
       } catch (err) {
         console.warn('[DB] streamLeaderboard error:', err);
@@ -2714,6 +2745,28 @@ export class DbService {
       .map((attempt) => ({ id: attempt.id, ...attempt.data() }))
       .sort((a, b) => Number(b.score || 0) - Number(a.score || 0)
         || Number(a.timeTakenSeconds || 0) - Number(b.timeTakenSeconds || 0));
+  }
+
+  streamSprintAttempts(date, callback) {
+    try {
+      const q = query(
+        collection(db, 'sprint_attempts'),
+        where('date', '==', date),
+        limit(200)
+      );
+      return onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs
+          .map((attempt) => ({ id: attempt.id, ...attempt.data() }))
+          .sort((a, b) => Number(b.score || 0) - Number(a.score || 0)
+            || Number(a.timeTakenSeconds || 0) - Number(b.timeTakenSeconds || 0));
+        callback(list);
+      }, (e) => {
+        console.warn('[DB] streamSprintAttempts error:', e);
+      });
+    } catch (e) {
+      console.warn('[DB] streamSprintAttempts setup error:', e);
+      return () => {};
+    }
   }
 
   // ── 5. Daily Physics Insight (1:1 with DailyPhysicsInsightService & Model) ──

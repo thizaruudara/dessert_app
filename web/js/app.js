@@ -1287,12 +1287,12 @@ class AppController {
         <div class="hero-top">
           <div class="hero-title" style="display:inline-flex; align-items:center; gap:4px;">
             <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">bolt</span>
-            <span>${levelName}</span>
+            <span id="home-hero-level-title">${levelName}</span>
           </div>
-          <span class="hero-pts">${studentCredits} / ${targetXp} XP</span>
+          <span class="hero-pts" id="home-hero-pts">${studentCredits} / ${targetXp} XP</span>
         </div>
         <div class="progress-bar-bg">
-          <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
+          <div class="progress-bar-fill" id="home-hero-progress-fill" style="width: ${progressPercent}%;"></div>
         </div>
         <div class="mission-checkboxes-row">
           <div class="mission-check-pill completed" style="display:inline-flex; align-items:center; gap:4px;">
@@ -1305,7 +1305,7 @@ class AppController {
             <span class="mission-check-title">Review Tip</span>
             <span class="mission-check-xp">+20 XP</span>
           </div>
-          <div class="mission-check-pill ${hasApprovedHw ? 'completed' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
+          <div class="mission-check-pill ${hasApprovedHw ? 'completed' : ''}" id="home-mission-hw-pill" style="display:inline-flex; align-items:center; gap:4px;">
             ${hasApprovedHw
               ? '<span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#10B981;">Approved</span>'
               : hasSubmittedHw
@@ -1486,122 +1486,9 @@ class AppController {
       </div>
 
       <!-- 8. Real-Time Exam Room & Paper Session Showcase -->
-      ${featuredSession ? (() => {
-        const statusInfo = dbService.computeSessionStatus(featuredSession);
-        let badgeText = 'SCHEDULED EVALUATION';
-        let badgeDot = '<div class="eval-dot"></div>';
-        let badgeStyle = '';
-        let subText = `${featuredSession.subject || 'A/L Physics'} • ${this._safeFormatDate(featuredSession.date)} • Timed Slots`;
-        let pillExtra = `<span class="material-symbols-rounded" style="font-size:14px;">schedule</span><span>${this._safeFormatTime(featuredSession.slot1?.startTime, '08:30 AM')}</span>`;
-        let btnText = 'View Exam Room & Select Slot';
-        let btnStyle = 'background:#0F172A;';
-
-        if (statusInfo.isLive || statusInfo.isPackageOpening || statusInfo.isWriting || statusInfo.isTimeUp) {
-          badgeText = 'LIVE EXAM SESSION';
-          badgeDot = '<div class="eval-dot" style="background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>';
-          badgeStyle = 'background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.3); color:#15803D;';
-          subText = `${featuredSession.subject || 'A/L Physics'} • විභාගය ක්‍රියාත්මකයි (Exam Live In Progress)`;
-          pillExtra = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#22C55E;">sensors</span><span style="color:#15803D; font-weight:700;">Live Now</span>';
-          btnText = 'Enter Live Exam Room';
-          btnStyle = 'background:#16A34A;';
-        } else if (statusInfo.isWaiting) {
-          badgeText = 'WAITING ROOM OPEN';
-          badgeDot = '<div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>';
-          badgeStyle = 'background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;';
-          subText = `${featuredSession.subject || 'A/L Physics'} • පොරොත්තු ශාලාව විවෘතයි (Waiting Room)`;
-          pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">meeting_room</span><span style="color:#4F46E5; font-weight:700;">Waiting</span>';
-          btnText = 'Enter Waiting Room';
-          btnStyle = 'background:#6366F1;';
-        } else if (statusInfo.isEnded) {
-          badgeText = 'EVALUATION CONCLUDED';
-          badgeDot = '<span style="width:7px; height:7px; border-radius:50%; background:#64748B; display:inline-block;"></span>';
-          badgeStyle = 'background:rgba(100,116,139,0.12); border-color:rgba(100,116,139,0.3); color:#475569;';
-          subText = `${featuredSession.subject || 'A/L Physics'} • විභාග සැසිය නිල වශයෙන් අවසන් විය (Session Ended)`;
-          pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">check_circle</span><span style="color:#64748B; font-weight:600;">Ended</span>';
-          btnText = 'View Completed Papers & Details';
-          btnStyle = 'background:#475569;';
-        }
-
-        const durationMinutes = featuredSession.durationMinutes || 120;
-        const durationText = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60 ? (durationMinutes % 60) + 'm' : ''} Duration` : `${durationMinutes}m Duration`;
-        const paperTypeLabel = featuredSession.paperType === 'mcq' ? `MCQ (${featuredSession.mcqCount || 50} Qs)` : (featuredSession.paperType === 'mcq_essay' ? 'MCQ + Essays' : 'Essay');
-
-        return `
-          <div class="evaluation-card" style="${statusInfo.isEnded ? 'border-color:#E2E8F0; background:#F8FAFC;' : (statusInfo.isLive ? 'border-color:rgba(34,197,94,0.4); box-shadow:0 8px 24px rgba(34,197,94,0.12);' : '')}">
-            <div class="evaluation-top">
-              <div class="evaluation-badge" style="${badgeStyle}">
-                ${badgeDot}
-                <span class="eval-badge-text" style="${statusInfo.isEnded ? 'color:#475569;' : ''}">${badgeText}</span>
-              </div>
-              <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px; ${statusInfo.isLive ? 'color:#15803D; font-weight:700;' : ''}">
-                <span>${statusInfo.isEnded ? 'Past Session' : 'Live Proctoring'}</span>
-                <span class="material-symbols-rounded ${statusInfo.isLive ? 'filled' : ''}" style="font-size:14px; ${statusInfo.isLive ? 'color:#22C55E;' : ''}">${statusInfo.isEnded ? 'task_alt' : 'videocam'}</span>
-              </span>
-            </div>
-            <div class="evaluation-title" style="${statusInfo.isEnded ? 'color:#1E293B;' : ''}">${featuredSession.title || 'Physics Examination Paper'}</div>
-            <div class="evaluation-sub">${subText}</div>
-            <div class="evaluation-pills-row">
-              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-                <span>${durationText}</span>
-              </div>
-              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
-                <span>${paperTypeLabel}</span>
-              </div>
-              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-                ${pillExtra}
-              </div>
-            </div>
-            <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; ${btnStyle}">
-              <span>${btnText}</span>
-              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-            </button>
-          </div>
-        `;
-      })() : featuredUpcoming ? `
-        <div class="evaluation-card">
-          <div class="evaluation-top">
-            <div class="evaluation-badge" style="background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;">
-              <div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>
-              <span class="eval-badge-text" style="color:#4F46E5;">UPCOMING EVALUATION</span>
-            </div>
-            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
-              <span>Scope & Hints</span>
-              <span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">lightbulb</span>
-            </span>
-          </div>
-          <div class="evaluation-title">${featuredUpcoming.title}</div>
-          <div class="evaluation-sub">${featuredUpcoming.subject || 'A/L Physics'} • ${featuredUpcoming.paperStructure || 'Scheduled Examination'}</div>
-          <div class="evaluation-pills-row">
-            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-              <span>${featuredUpcoming.durationMinutes || 150}m Duration</span>
-            </div>
-            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
-              <span>${this._safeFormatDate(featuredUpcoming.scheduledDate)}</span>
-            </div>
-            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">lightbulb</span>
-              <span>Hints Available</span>
-            </div>
-          </div>
-          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#6366F1;">
-            <span>View Upcoming Paper & Scope</span>
-            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-          </button>
-        </div>
-      ` : `
-        <div class="evaluation-card" style="border-color:#E2E8F0; background:#F8FAFC; text-align:center; padding:20px;">
-          <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:4px;">නව විභාග සැසි සූදානම් වෙමින් පවතී</div>
-          <div style="font-size:11.5px; color:#94A3B8; margin-bottom:12px;">ඔබගේ කණ්ඩායම (${activeTargetYear}) සඳහා ඉදිරි විභාග සැසි පිළිබඳව ඉක්මනින් දැනුම් දෙනු ලැබේ.</div>
-          <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : null" style="width:auto; padding:8px 18px; margin:0 auto; font-size:12px; background:#475569; display:inline-flex; align-items:center; gap:6px;">
-            <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
-            <span>View Exam Sessions</span>
-          </button>
-        </div>
-      `}
+      <div id="home-featured-evaluation-container">
+        ${this._buildHomeFeaturedSessionHTML(featuredSession, featuredUpcoming, activeTargetYear)}
+      </div>
 
       <!-- 9. High-Yield Physics Concept & Formula Vault (Bilingual) -->
       <div class="insight-vault-card">
@@ -1726,10 +1613,7 @@ class AppController {
       this.openSubmitGuideModal();
     });
     document.getElementById('act-ranks')?.addEventListener('click', () => this.switchTab('ranks'));
-    document.getElementById('btn-enter-eval-room')?.addEventListener('click', () => {
-      if (!this.checkSubscriptionAccess('Paper Evaluation & Exam Sessions')) return;
-      this.switchTab('papers');
-    });
+    this._bindHomeFeaturedSessionActions(container);
     document.getElementById('btn-header-avatar')?.addEventListener('click', () => this.switchTab('profile'));
 
     container.querySelectorAll('.inquiry-item-btn').forEach(btn => {
@@ -1737,6 +1621,205 @@ class AppController {
         this.openAiTutorDialog(btn.dataset.topic);
       });
     });
+
+    // ── Live Stream 1: Real-time Paper Sessions on Home Screen (No Refresh Needed) ──
+    if (this._homePaperUnsub) { try { this._homePaperUnsub(); } catch (_) {} }
+    this._homePaperUnsub = dbService.streamPaperSessions(activeTargetYear, (liveSessions) => {
+      if (!container.isConnected || renderToken !== this._tabTokens['home']) return;
+      this._cachedPaperSessions = liveSessions;
+      const liveSession = liveSessions.find(s => {
+        const st = dbService.computeSessionStatus(s);
+        return st.isLive || st.isPackageOpening || st.isWriting || st.isTimeUp;
+      });
+      const waitingSession = liveSessions.find(s => dbService.computeSessionStatus(s).isWaiting);
+      const scheduledSession = liveSessions.find(s => !dbService.computeSessionStatus(s).isEnded);
+      const pastEndedSession = (liveSessions && liveSessions.length > 0) ? liveSessions[0] : null;
+      const featured = liveSession || waitingSession || scheduledSession || pastEndedSession;
+
+      const evalContainer = container.querySelector('#home-featured-evaluation-container');
+      if (evalContainer) {
+        evalContainer.innerHTML = this._buildHomeFeaturedSessionHTML(featured, null, activeTargetYear);
+        this._bindHomeFeaturedSessionActions(evalContainer);
+      }
+    });
+
+    // ── Live Stream 2: Real-time Homework Submissions on Home Screen (No Refresh Needed) ──
+    if (this._homeDessertsUnsub) { try { this._homeDessertsUnsub(); } catch (_) {} }
+    this._homeDessertsUnsub = dbService.listenToStudentDesserts(user.studentId || user.uid || user.id, user.phone, (liveDesserts) => {
+      if (!container.isConnected || renderToken !== this._tabTokens['home']) return;
+      this._cachedDesserts = liveDesserts;
+      const hasApproved = liveDesserts.some(d => d.status === 'approved');
+      const hasSubmitted = liveDesserts.length > 0;
+      const pill = container.querySelector('#home-mission-hw-pill');
+      if (pill) {
+        if (hasApproved) {
+          pill.className = 'mission-check-pill completed';
+          pill.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#10B981;">Approved</span>';
+        } else if (hasSubmitted) {
+          pill.className = 'mission-check-pill';
+          pill.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; color:#3B82F6;">hourglass_top</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#3B82F6;">Pending</span>';
+        } else {
+          pill.className = 'mission-check-pill';
+          pill.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp">+100 XP</span>';
+        }
+      }
+    }, studentName);
+
+    // ── Live Stream 3: Real-time Student XP & Level Progress (No Refresh Needed) ──
+    if (this._homeCreditsHandler) {
+      window.removeEventListener('edupeak:credits-updated', this._homeCreditsHandler);
+    }
+    this._homeCreditsHandler = (e) => {
+      if (!container.isConnected || renderToken !== this._tabTokens['home']) return;
+      const freshCredits = Number(e?.detail?.credits) || 0;
+      if (freshCredits <= 0) return;
+      let lvl = 'Level 1 Novice';
+      let tgt = 100;
+      let base = 0;
+      if (freshCredits >= 500) { lvl = 'Level 4 Master'; tgt = 1000; base = 500; }
+      else if (freshCredits >= 250) { lvl = 'Level 3 Scholar'; tgt = 500; base = 250; }
+      else if (freshCredits >= 100) { lvl = 'Level 2 Cadet'; tgt = 250; base = 100; }
+      const pct = Math.min(100, Math.max(8, Math.round(((freshCredits - base) / Math.max(1, tgt - base)) * 100)));
+
+      const titleEl = container.querySelector('#home-hero-level-title');
+      if (titleEl) titleEl.textContent = lvl;
+      const ptsEl = container.querySelector('#home-hero-pts');
+      if (ptsEl) ptsEl.textContent = `${freshCredits} / ${tgt} XP`;
+      const fillEl = container.querySelector('#home-hero-progress-fill');
+      if (fillEl) fillEl.style.width = `${pct}%`;
+    };
+    window.addEventListener('edupeak:credits-updated', this._homeCreditsHandler);
+  }
+
+  _bindHomeFeaturedSessionActions(container) {
+    if (!container) return;
+    container.querySelector('#btn-enter-eval-room')?.addEventListener('click', () => {
+      if (!this.checkSubscriptionAccess('Paper Evaluation & Exam Sessions')) return;
+      this.switchTab('papers');
+    });
+  }
+
+  _buildHomeFeaturedSessionHTML(featuredSession, featuredUpcoming, activeTargetYear) {
+    if (featuredSession) {
+      const statusInfo = dbService.computeSessionStatus(featuredSession);
+      let badgeText = 'SCHEDULED EVALUATION';
+      let badgeDot = '<div class="eval-dot"></div>';
+      let badgeStyle = '';
+      let subText = `${featuredSession.subject || 'A/L Physics'} • ${this._safeFormatDate(featuredSession.date)} • Timed Slots`;
+      let pillExtra = `<span class="material-symbols-rounded" style="font-size:14px;">schedule</span><span>${this._safeFormatTime(featuredSession.slot1?.startTime, '08:30 AM')}</span>`;
+      let btnText = 'View Exam Room & Select Slot';
+      let btnStyle = 'background:#0F172A;';
+
+      if (statusInfo.isLive || statusInfo.isPackageOpening || statusInfo.isWriting || statusInfo.isTimeUp) {
+        badgeText = 'LIVE EXAM SESSION';
+        badgeDot = '<div class="eval-dot" style="background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>';
+        badgeStyle = 'background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.3); color:#15803D;';
+        subText = `${featuredSession.subject || 'A/L Physics'} • විභාගය ක්‍රියාත්මකයි (Exam Live In Progress)`;
+        pillExtra = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#22C55E;">sensors</span><span style="color:#15803D; font-weight:700;">Live Now</span>';
+        btnText = 'Enter Live Exam Room';
+        btnStyle = 'background:#16A34A;';
+      } else if (statusInfo.isWaiting) {
+        badgeText = 'WAITING ROOM OPEN';
+        badgeDot = '<div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>';
+        badgeStyle = 'background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;';
+        subText = `${featuredSession.subject || 'A/L Physics'} • පොරොත්තු ශාලාව විවෘතයි (Waiting Room)`;
+        pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">meeting_room</span><span style="color:#4F46E5; font-weight:700;">Waiting</span>';
+        btnText = 'Enter Waiting Room';
+        btnStyle = 'background:#6366F1;';
+      } else if (statusInfo.isEnded) {
+        badgeText = 'EVALUATION CONCLUDED';
+        badgeDot = '<span style="width:7px; height:7px; border-radius:50%; background:#64748B; display:inline-block;"></span>';
+        badgeStyle = 'background:rgba(100,116,139,0.12); border-color:rgba(100,116,139,0.3); color:#475569;';
+        subText = `${featuredSession.subject || 'A/L Physics'} • විභාග සැසිය නිල වශයෙන් අවසන් විය (Session Ended)`;
+        pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">check_circle</span><span style="color:#64748B; font-weight:600;">Ended</span>';
+        btnText = 'View Completed Papers & Details';
+        btnStyle = 'background:#475569;';
+      }
+
+      const durationMinutes = featuredSession.durationMinutes || 120;
+      const durationText = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60 ? (durationMinutes % 60) + 'm' : ''} Duration` : `${durationMinutes}m Duration`;
+      const paperTypeLabel = featuredSession.paperType === 'mcq' ? `MCQ (${featuredSession.mcqCount || 50} Qs)` : (featuredSession.paperType === 'mcq_essay' ? 'MCQ + Essays' : 'Essay');
+
+      return `
+        <div class="evaluation-card" style="${statusInfo.isEnded ? 'border-color:#E2E8F0; background:#F8FAFC;' : (statusInfo.isLive ? 'border-color:rgba(34,197,94,0.4); box-shadow:0 8px 24px rgba(34,197,94,0.12);' : '')}">
+          <div class="evaluation-top">
+            <div class="evaluation-badge" style="${badgeStyle}">
+              ${badgeDot}
+              <span class="eval-badge-text" style="${statusInfo.isEnded ? 'color:#475569;' : ''}">${badgeText}</span>
+            </div>
+            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px; ${statusInfo.isLive ? 'color:#15803D; font-weight:700;' : ''}">
+              <span>${statusInfo.isEnded ? 'Past Session' : 'Live Proctoring'}</span>
+              <span class="material-symbols-rounded ${statusInfo.isLive ? 'filled' : ''}" style="font-size:14px; ${statusInfo.isLive ? 'color:#22C55E;' : ''}">${statusInfo.isEnded ? 'task_alt' : 'videocam'}</span>
+            </span>
+          </div>
+          <div class="evaluation-title" style="${statusInfo.isEnded ? 'color:#1E293B;' : ''}">${featuredSession.title || 'Physics Examination Paper'}</div>
+          <div class="evaluation-sub">${subText}</div>
+          <div class="evaluation-pills-row">
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>${durationText}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
+              <span>${paperTypeLabel}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              ${pillExtra}
+            </div>
+          </div>
+          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; ${btnStyle}">
+            <span>${btnText}</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+          </button>
+        </div>
+      `;
+    }
+    if (featuredUpcoming) {
+      return `
+        <div class="evaluation-card">
+          <div class="evaluation-top">
+            <div class="evaluation-badge" style="background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;">
+              <div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>
+              <span class="eval-badge-text" style="color:#4F46E5;">UPCOMING EVALUATION</span>
+            </div>
+            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
+              <span>Scope & Hints</span>
+              <span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">lightbulb</span>
+            </span>
+          </div>
+          <div class="evaluation-title">${featuredUpcoming.title}</div>
+          <div class="evaluation-sub">${featuredUpcoming.subject || 'A/L Physics'} • ${featuredUpcoming.paperStructure || 'Scheduled Examination'}</div>
+          <div class="evaluation-pills-row">
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>${featuredUpcoming.durationMinutes || 150}m Duration</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
+              <span>${this._safeFormatDate(featuredUpcoming.scheduledDate)}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">lightbulb</span>
+              <span>Hints Available</span>
+            </div>
+          </div>
+          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#6366F1;">
+            <span>View Upcoming Paper & Scope</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+          </button>
+        </div>
+      `;
+    }
+    return `
+      <div class="evaluation-card" style="border-color:#E2E8F0; background:#F8FAFC; text-align:center; padding:20px;">
+        <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:4px;">නව විභාග සැසි සූදානම් වෙමින් පවතී</div>
+        <div style="font-size:11.5px; color:#94A3B8; margin-bottom:12px;">ඔබගේ කණ්ඩායම (${activeTargetYear}) සඳහා ඉදිරි විභාග සැසි පිළිබඳව ඉක්මනින් දැනුම් දෙනු ලැබේ.</div>
+        <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : null" style="width:auto; padding:8px 18px; margin:0 auto; font-size:12px; background:#475569; display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
+          <span>View Exam Sessions</span>
+        </button>
+      </div>
+    `;
   }
 
   // ── 2. Papers Tab (Exam Sessions & Upcoming Hints - 1:1 Android Parity) ──
@@ -2319,6 +2402,10 @@ class AppController {
     if (this._upcomingPapersUnsub) {
       try { this._upcomingPapersUnsub(); } catch (_) {}
       this._upcomingPapersUnsub = null;
+    }
+    if (this._paperHintsUnsub) {
+      try { this._paperHintsUnsub(); } catch (_) {}
+      this._paperHintsUnsub = null;
     }
 
     try {
@@ -3445,18 +3532,20 @@ class AppController {
     if (this.ranksBoardType === 0) {
       this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : undefined, (liveLeaders) => {
         if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
-        const currentSummary = leaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
+        const currentSummary = (this._cachedLeaders || leaders || []).map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
         const liveSummary = liveLeaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
         if (currentSummary !== liveSummary) {
+          this._cachedLeaders = liveLeaders;
           this.renderRanksScreen(container);
         }
       });
     } else {
       this._ranksUnsub = dbService.streamPaperLeaderboards((livePaperBoards) => {
         if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
-        const currentSummary = paperBoards.map(b => `${b.id}_${b.entries?.length}_${b.totalMarks}`).join('|');
-        const liveSummary = livePaperBoards.map(b => `${b.id}_${b.entries?.length}_${b.totalMarks}`).join('|');
+        const currentSummary = (this._cachedPaperBoards || paperBoards || []).map(b => `${b.id}_${(b.entries || []).map(e => `${e.studentId}:${e.marks}:${e.rank}`).join(',')}`).join('|');
+        const liveSummary = livePaperBoards.map(b => `${b.id}_${(b.entries || []).map(e => `${e.studentId}:${e.marks}:${e.rank}`).join(',')}`).join('|');
         if (currentSummary !== liveSummary) {
+          this._cachedPaperBoards = livePaperBoards;
           this.renderRanksScreen(container);
         }
       });
@@ -5474,7 +5563,7 @@ class AppController {
   // ═════════════════════════════════════════════════════════════════════════
   // ── 1. SCREEN 1: ADMIN HOME SCREEN (admin_home_screen.dart) ──────────────
   // ═════════════════════════════════════════════════════════════════════════
-  async renderAdminDashboardScreen(container) {
+  async renderAdminDashboardScreen(container, preloadedDesserts = null) {
     let cloudUsage = {
       supabase: { storageUsedMb: 0.1, storageLimitMb: 1000, storagePct: 0.1, storageStatus: 'healthy', dbUsedMb: 0.5, dbLimitMb: 500, dbPct: 0.1, submissionsCount: 0, profilesCount: 0 },
       agora: { minutesUsed: 0, minutesLimit: 10000, minutesPct: 0, minutesStatus: 'healthy', daysUntilReset: 30, resetDate: 'Next Month' }
@@ -5485,7 +5574,7 @@ class AppController {
     this.adminFilterTab = this.adminFilterTab ?? 'pending'; // 'pending', 'approved', 'rejected'
     this.adminSearchQuery = this.adminSearchQuery ?? '';
 
-    const allDesserts = await this.safePromise(dbService.getAllDessertsForAdmin(), 2500, this._cachedAllDesserts || []);
+    const allDesserts = preloadedDesserts || await this.safePromise(dbService.getAllDessertsForAdmin(), 2500, this._cachedAllDesserts || []);
     if (allDesserts && allDesserts.length) this._cachedAllDesserts = allDesserts;
     const pending = allDesserts.filter(d => (d.status || '').toLowerCase() === 'pending');
     const approved = allDesserts.filter(d => (d.status || '').toLowerCase() === 'approved');
@@ -5884,9 +5973,10 @@ class AppController {
         }
         return;
       }
-      // Re-render admin dashboard only if no review modal is currently open
+      this._cachedAllDesserts = allList;
+      // Re-render admin dashboard instantly with live preloaded data if no review modal is currently open
       if (!document.querySelector('.app-modal')) {
-        this.renderAdminDashboardScreen(container);
+        this.renderAdminDashboardScreen(container, allList);
       }
     });
   }
@@ -6222,6 +6312,9 @@ class AppController {
     if (this.adminPaperTab === 2) {
       this._bindAdminLeaderboardActions(container, adminPaperBoards);
     }
+    if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
+    if (this._adminHintsUnsub) { try { this._adminHintsUnsub(); } catch (_) {} this._adminHintsUnsub = null; }
+    if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
 
     this._adminPapersUnsub = dbService.streamPaperSessions(null, (livePapers) => {
       if (!container.isConnected) return;
@@ -7623,6 +7716,21 @@ class AppController {
     document.getElementById('btn-fab-create-sprint')?.addEventListener('click', () => {
       this.openCreateSprintSheet();
     });
+
+    // Real-time live listener for MCQ sprint attempts (Live Leaderboard tab)
+    if (this._adminSprintAttemptsUnsub) {
+      try { this._adminSprintAttemptsUnsub(); } catch (_) {}
+      this._adminSprintAttemptsUnsub = null;
+    }
+    if (this.adminSprintTab === 1) {
+      this._adminSprintAttemptsUnsub = dbService.streamSprintAttempts(dateStr, (liveAttempts) => {
+        if (!container.isConnected || this.adminSprintTab !== 1) return;
+        const contentEl = container.querySelector('#admin-sprint-content');
+        if (contentEl) {
+          contentEl.innerHTML = this._buildAdminSprintLeaderboardHTML(dateStr, liveAttempts, false);
+        }
+      });
+    }
   }
 
   _buildAdminSprintsTabHTML(dateStr, sprints, loadError = false) {
@@ -7935,6 +8043,19 @@ class AppController {
       if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
       await this.renderAdminStudentsScreen(container);
     });
+
+    if (this._adminStudentsCreditsHandler) {
+      window.removeEventListener('edupeak:credits-updated', this._adminStudentsCreditsHandler);
+      window.removeEventListener('edupeak:dessert-reviewed', this._adminStudentsCreditsHandler);
+    }
+    this._adminStudentsCreditsHandler = () => {
+      if (!container.isConnected || this.adminTab !== 'students') return;
+      this._adminStudentsListCache = null;
+      dbService.clearCache('all_admin_students');
+      this.renderAdminStudentsScreen(container);
+    };
+    window.addEventListener('edupeak:credits-updated', this._adminStudentsCreditsHandler);
+    window.addEventListener('edupeak:dessert-reviewed', this._adminStudentsCreditsHandler);
   }
 
   // 5. Admin Broadcasts Screen (admin_announcements_screen.dart)

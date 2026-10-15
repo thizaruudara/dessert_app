@@ -89389,7 +89389,10 @@ var DbService = class {
     return list;
   }
   // Real-time listener for student's homework status
-  listenToStudentDesserts(studentId, studentPhone, callback, studentName) {
+  listenToStudentDesserts(studentId, studentPhone, arg3, arg4) {
+    const callback = typeof arg3 === "function" ? arg3 : typeof arg4 === "function" ? arg4 : () => {
+    };
+    const studentName = typeof arg3 === "string" ? arg3 : typeof arg4 === "string" ? arg4 : "";
     const cleanId = String(studentId || "").trim();
     const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
     const cleanName = String(studentName || "").trim().toLowerCase();
@@ -89434,6 +89437,8 @@ var DbService = class {
         } catch (_) {
         }
         list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
+        const cacheKey = `student_desserts_${cleanId}_${cleanPhone}_${cleanName}`;
+        this.setCache(cacheKey, list);
         callback(list);
       }, (err) => {
         console.warn("[DB] Desserts snapshot listener error:", err);
@@ -89914,12 +89919,19 @@ var DbService = class {
           localList = JSON.parse(localStorage.getItem("edupeak_local_desserts") || "[]");
         } catch (_) {
         }
+        for (let i2 = 0; i2 < list.length; i2++) {
+          const matchingLocal = localList.find((loc) => loc.id === list[i2].id || loc.submittedAt && loc.submittedAt === list[i2].submittedAt);
+          if (matchingLocal && (matchingLocal.reviewedAt || matchingLocal.status !== "pending")) {
+            list[i2] = { ...list[i2], ...matchingLocal };
+          }
+        }
         for (const loc of localList) {
           if (!list.some((d) => d.id === loc.id || d.submittedAt && d.submittedAt === loc.submittedAt)) {
             list.push(loc);
           }
         }
         list.sort((a, b2) => new Date(b2.submittedAt || 0) - new Date(a.submittedAt || 0));
+        this.setCache("all_desserts_admin", list);
         callback(list);
       }, (err) => {
         console.warn("[DB] listenToAllDessertsForAdmin snapshot error:", err);
@@ -90440,6 +90452,8 @@ var DbService = class {
           if (aEnded !== bEnded) return aEnded ? 1 : -1;
           return getSessionOrderTime(b2) - getSessionOrderTime(a);
         });
+        const cacheKey = `paper_sessions_${examYear || "all"}`;
+        this.setCache(cacheKey, result);
         callback(result);
       }, (err) => {
         console.warn("[DB] streamPaperSessions error:", err);
@@ -90640,6 +90654,9 @@ var DbService = class {
     if (existing && (existing.status === "submitted" || existing.isSubmitted === true || existing.submissionPhotos && existing.submissionPhotos.length > 0)) {
       return existing;
     }
+    const isSlotChange = existing && (existing.selectedSlot || existing.slotId) && (existing.selectedSlot !== slotId && existing.slotId !== slotId);
+    const prevSlot = existing ? existing.selectedSlot || existing.slotId || "slot1" : null;
+    const isNewReg = !existing;
     const regData = {
       paperId,
       studentId,
@@ -90655,14 +90672,26 @@ var DbService = class {
       await callBackend("papers/register-slot", { paperId, slotId });
     } catch (error) {
       console.warn("[DB] Backend paper registration notice, saving direct record:", error);
-      try {
-        await setDoc(doc(db, "paper_registrations", `${paperId}_${studentId}`), regData, { merge: true });
-      } catch (directErr) {
-        console.warn("[DB] Direct registration write error:", directErr);
+    }
+    try {
+      await setDoc(doc(db, "paper_registrations", `${paperId}_${studentId}`), regData, { merge: true });
+      const sessionRef = doc(db, "paper_sessions", paperId);
+      if (isNewReg) {
+        const fieldName = slotId === "slot2" ? "slot2.registeredCount" : "slot1.registeredCount";
+        await updateDoc(sessionRef, { [fieldName]: increment(1) }).catch(() => {
+        });
+      } else if (isSlotChange) {
+        const decField = prevSlot === "slot2" ? "slot2.registeredCount" : "slot1.registeredCount";
+        const incField = slotId === "slot2" ? "slot2.registeredCount" : "slot1.registeredCount";
+        await updateDoc(sessionRef, { [decField]: increment(-1), [incField]: increment(1) }).catch(() => {
+        });
       }
+    } catch (directErr) {
+      console.warn("[DB] Direct registration write error:", directErr);
     }
     const cacheKey = `paper_reg_${paperId}_${studentId}`;
     this.setCache(cacheKey, regData);
+    this.clearCache("paper_sessions");
     return regData;
   }
   async getStudentRegistration(paperId, studentId, { forceRefresh = false } = {}) {
@@ -91372,7 +91401,7 @@ var DbService = class {
     const fetchAndNotify = async () => {
       if (!active) return;
       try {
-        const list = await this.getLeaderboard(batch);
+        const list = await this.getLeaderboard(batch, { forceRefresh: true });
         if (active) callback(list);
       } catch (err) {
         console.warn("[DB] streamLeaderboard error:", err);
@@ -91639,6 +91668,25 @@ var DbService = class {
       limit(200)
     ));
     return snapshot.docs.map((attempt) => ({ id: attempt.id, ...attempt.data() })).sort((a, b2) => Number(b2.score || 0) - Number(a.score || 0) || Number(a.timeTakenSeconds || 0) - Number(b2.timeTakenSeconds || 0));
+  }
+  streamSprintAttempts(date, callback) {
+    try {
+      const q = query(
+        collection(db, "sprint_attempts"),
+        where("date", "==", date),
+        limit(200)
+      );
+      return onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs.map((attempt) => ({ id: attempt.id, ...attempt.data() })).sort((a, b2) => Number(b2.score || 0) - Number(a.score || 0) || Number(a.timeTakenSeconds || 0) - Number(b2.timeTakenSeconds || 0));
+        callback(list);
+      }, (e2) => {
+        console.warn("[DB] streamSprintAttempts error:", e2);
+      });
+    } catch (e2) {
+      console.warn("[DB] streamSprintAttempts setup error:", e2);
+      return () => {
+      };
+    }
   }
   // ── 5. Daily Physics Insight (1:1 with DailyPhysicsInsightService & Model) ──
   getPresetPhysicsInsights() {
@@ -94551,12 +94599,12 @@ var AppController = class {
         <div class="hero-top">
           <div class="hero-title" style="display:inline-flex; align-items:center; gap:4px;">
             <span class="material-symbols-rounded filled" style="font-size:16px; color:#F59E0B;">bolt</span>
-            <span>${levelName}</span>
+            <span id="home-hero-level-title">${levelName}</span>
           </div>
-          <span class="hero-pts">${studentCredits} / ${targetXp} XP</span>
+          <span class="hero-pts" id="home-hero-pts">${studentCredits} / ${targetXp} XP</span>
         </div>
         <div class="progress-bar-bg">
-          <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
+          <div class="progress-bar-fill" id="home-hero-progress-fill" style="width: ${progressPercent}%;"></div>
         </div>
         <div class="mission-checkboxes-row">
           <div class="mission-check-pill completed" style="display:inline-flex; align-items:center; gap:4px;">
@@ -94569,7 +94617,7 @@ var AppController = class {
             <span class="mission-check-title">Review Tip</span>
             <span class="mission-check-xp">+20 XP</span>
           </div>
-          <div class="mission-check-pill ${hasApprovedHw ? "completed" : ""}" style="display:inline-flex; align-items:center; gap:4px;">
+          <div class="mission-check-pill ${hasApprovedHw ? "completed" : ""}" id="home-mission-hw-pill" style="display:inline-flex; align-items:center; gap:4px;">
             ${hasApprovedHw ? '<span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#10B981;">Approved</span>' : hasSubmittedHw ? '<span class="material-symbols-rounded" style="font-size:14px; color:#3B82F6;">hourglass_top</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#3B82F6;">Pending</span>' : '<span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp">+100 XP</span>'}
           </div>
         </div>
@@ -94745,119 +94793,9 @@ var AppController = class {
       </div>
 
       <!-- 8. Real-Time Exam Room & Paper Session Showcase -->
-      ${featuredSession ? (() => {
-      const statusInfo = dbService.computeSessionStatus(featuredSession);
-      let badgeText = "SCHEDULED EVALUATION";
-      let badgeDot = '<div class="eval-dot"></div>';
-      let badgeStyle = "";
-      let subText = `${featuredSession.subject || "A/L Physics"} \u2022 ${this._safeFormatDate(featuredSession.date)} \u2022 Timed Slots`;
-      let pillExtra = `<span class="material-symbols-rounded" style="font-size:14px;">schedule</span><span>${this._safeFormatTime(featuredSession.slot1?.startTime, "08:30 AM")}</span>`;
-      let btnText = "View Exam Room & Select Slot";
-      let btnStyle = "background:#0F172A;";
-      if (statusInfo.isLive || statusInfo.isPackageOpening || statusInfo.isWriting || statusInfo.isTimeUp) {
-        badgeText = "LIVE EXAM SESSION";
-        badgeDot = '<div class="eval-dot" style="background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>';
-        badgeStyle = "background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.3); color:#15803D;";
-        subText = `${featuredSession.subject || "A/L Physics"} \u2022 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D9A\u0DCA\u200D\u0DBB\u0DD2\u0DBA\u0DCF\u0DAD\u0DCA\u0DB8\u0D9A\u0DBA\u0DD2 (Exam Live In Progress)`;
-        pillExtra = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#22C55E;">sensors</span><span style="color:#15803D; font-weight:700;">Live Now</span>';
-        btnText = "Enter Live Exam Room";
-        btnStyle = "background:#16A34A;";
-      } else if (statusInfo.isWaiting) {
-        badgeText = "WAITING ROOM OPEN";
-        badgeDot = '<div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>';
-        badgeStyle = "background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;";
-        subText = `${featuredSession.subject || "A/L Physics"} \u2022 \u0DB4\u0DDC\u0DBB\u0DDC\u0DAD\u0DCA\u0DAD\u0DD4 \u0DC1\u0DCF\u0DBD\u0DCF\u0DC0 \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD\u0DBA\u0DD2 (Waiting Room)`;
-        pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">meeting_room</span><span style="color:#4F46E5; font-weight:700;">Waiting</span>';
-        btnText = "Enter Waiting Room";
-        btnStyle = "background:#6366F1;";
-      } else if (statusInfo.isEnded) {
-        badgeText = "EVALUATION CONCLUDED";
-        badgeDot = '<span style="width:7px; height:7px; border-radius:50%; background:#64748B; display:inline-block;"></span>';
-        badgeStyle = "background:rgba(100,116,139,0.12); border-color:rgba(100,116,139,0.3); color:#475569;";
-        subText = `${featuredSession.subject || "A/L Physics"} \u2022 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DB1\u0DD2\u0DBD \u0DC0\u0DC1\u0DBA\u0DD9\u0DB1\u0DCA \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0DC0\u0DD2\u0DBA (Session Ended)`;
-        pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">check_circle</span><span style="color:#64748B; font-weight:600;">Ended</span>';
-        btnText = "View Completed Papers & Details";
-        btnStyle = "background:#475569;";
-      }
-      const durationMinutes = featuredSession.durationMinutes || 120;
-      const durationText = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60 ? durationMinutes % 60 + "m" : ""} Duration` : `${durationMinutes}m Duration`;
-      const paperTypeLabel = featuredSession.paperType === "mcq" ? `MCQ (${featuredSession.mcqCount || 50} Qs)` : featuredSession.paperType === "mcq_essay" ? "MCQ + Essays" : "Essay";
-      return `
-          <div class="evaluation-card" style="${statusInfo.isEnded ? "border-color:#E2E8F0; background:#F8FAFC;" : statusInfo.isLive ? "border-color:rgba(34,197,94,0.4); box-shadow:0 8px 24px rgba(34,197,94,0.12);" : ""}">
-            <div class="evaluation-top">
-              <div class="evaluation-badge" style="${badgeStyle}">
-                ${badgeDot}
-                <span class="eval-badge-text" style="${statusInfo.isEnded ? "color:#475569;" : ""}">${badgeText}</span>
-              </div>
-              <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px; ${statusInfo.isLive ? "color:#15803D; font-weight:700;" : ""}">
-                <span>${statusInfo.isEnded ? "Past Session" : "Live Proctoring"}</span>
-                <span class="material-symbols-rounded ${statusInfo.isLive ? "filled" : ""}" style="font-size:14px; ${statusInfo.isLive ? "color:#22C55E;" : ""}">${statusInfo.isEnded ? "task_alt" : "videocam"}</span>
-              </span>
-            </div>
-            <div class="evaluation-title" style="${statusInfo.isEnded ? "color:#1E293B;" : ""}">${featuredSession.title || "Physics Examination Paper"}</div>
-            <div class="evaluation-sub">${subText}</div>
-            <div class="evaluation-pills-row">
-              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-                <span>${durationText}</span>
-              </div>
-              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
-                <span>${paperTypeLabel}</span>
-              </div>
-              <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-                ${pillExtra}
-              </div>
-            </div>
-            <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; ${btnStyle}">
-              <span>${btnText}</span>
-              <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-            </button>
-          </div>
-        `;
-    })() : featuredUpcoming ? `
-        <div class="evaluation-card">
-          <div class="evaluation-top">
-            <div class="evaluation-badge" style="background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;">
-              <div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>
-              <span class="eval-badge-text" style="color:#4F46E5;">UPCOMING EVALUATION</span>
-            </div>
-            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
-              <span>Scope & Hints</span>
-              <span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">lightbulb</span>
-            </span>
-          </div>
-          <div class="evaluation-title">${featuredUpcoming.title}</div>
-          <div class="evaluation-sub">${featuredUpcoming.subject || "A/L Physics"} \u2022 ${featuredUpcoming.paperStructure || "Scheduled Examination"}</div>
-          <div class="evaluation-pills-row">
-            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
-              <span>${featuredUpcoming.durationMinutes || 150}m Duration</span>
-            </div>
-            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
-              <span>${this._safeFormatDate(featuredUpcoming.scheduledDate)}</span>
-            </div>
-            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded" style="font-size:14px;">lightbulb</span>
-              <span>Hints Available</span>
-            </div>
-          </div>
-          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#6366F1;">
-            <span>View Upcoming Paper & Scope</span>
-            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
-          </button>
-        </div>
-      ` : `
-        <div class="evaluation-card" style="border-color:#E2E8F0; background:#F8FAFC; text-align:center; padding:20px;">
-          <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:4px;">\u0DB1\u0DC0 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0DC0\u0DD9\u0DB8\u0DD2\u0DB1\u0DCA \u0DB4\u0DC0\u0DAD\u0DD3</div>
-          <div style="font-size:11.5px; color:#94A3B8; margin-bottom:12px;">\u0D94\u0DB6\u0D9C\u0DDA \u0D9A\u0DAB\u0DCA\u0DA9\u0DCF\u0DBA\u0DB8 (${activeTargetYear}) \u0DC3\u0DB3\u0DC4\u0DCF \u0D89\u0DAF\u0DD2\u0DBB\u0DD2 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DB4\u0DD2\u0DC5\u0DD2\u0DB6\u0DB3\u0DC0 \u0D89\u0D9A\u0DCA\u0DB8\u0DB1\u0DD2\u0DB1\u0DCA \u0DAF\u0DD0\u0DB1\u0DD4\u0DB8\u0DCA \u0DAF\u0DD9\u0DB1\u0DD4 \u0DBD\u0DD0\u0DB6\u0DDA.</div>
-          <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : null" style="width:auto; padding:8px 18px; margin:0 auto; font-size:12px; background:#475569; display:inline-flex; align-items:center; gap:6px;">
-            <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
-            <span>View Exam Sessions</span>
-          </button>
-        </div>
-      `}
+      <div id="home-featured-evaluation-container">
+        ${this._buildHomeFeaturedSessionHTML(featuredSession, featuredUpcoming, activeTargetYear)}
+      </div>
 
       <!-- 9. High-Yield Physics Concept & Formula Vault (Bilingual) -->
       <div class="insight-vault-card">
@@ -94976,16 +94914,219 @@ var AppController = class {
       this.openSubmitGuideModal();
     });
     document.getElementById("act-ranks")?.addEventListener("click", () => this.switchTab("ranks"));
-    document.getElementById("btn-enter-eval-room")?.addEventListener("click", () => {
-      if (!this.checkSubscriptionAccess("Paper Evaluation & Exam Sessions")) return;
-      this.switchTab("papers");
-    });
+    this._bindHomeFeaturedSessionActions(container);
     document.getElementById("btn-header-avatar")?.addEventListener("click", () => this.switchTab("profile"));
     container.querySelectorAll(".inquiry-item-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         this.openAiTutorDialog(btn.dataset.topic);
       });
     });
+    if (this._homePaperUnsub) {
+      try {
+        this._homePaperUnsub();
+      } catch (_) {
+      }
+    }
+    this._homePaperUnsub = dbService.streamPaperSessions(activeTargetYear, (liveSessions) => {
+      if (!container.isConnected || renderToken !== this._tabTokens["home"]) return;
+      this._cachedPaperSessions = liveSessions;
+      const liveSession2 = liveSessions.find((s2) => {
+        const st2 = dbService.computeSessionStatus(s2);
+        return st2.isLive || st2.isPackageOpening || st2.isWriting || st2.isTimeUp;
+      });
+      const waitingSession2 = liveSessions.find((s2) => dbService.computeSessionStatus(s2).isWaiting);
+      const scheduledSession2 = liveSessions.find((s2) => !dbService.computeSessionStatus(s2).isEnded);
+      const pastEndedSession2 = liveSessions && liveSessions.length > 0 ? liveSessions[0] : null;
+      const featured = liveSession2 || waitingSession2 || scheduledSession2 || pastEndedSession2;
+      const evalContainer = container.querySelector("#home-featured-evaluation-container");
+      if (evalContainer) {
+        evalContainer.innerHTML = this._buildHomeFeaturedSessionHTML(featured, null, activeTargetYear);
+        this._bindHomeFeaturedSessionActions(evalContainer);
+      }
+    });
+    if (this._homeDessertsUnsub) {
+      try {
+        this._homeDessertsUnsub();
+      } catch (_) {
+      }
+    }
+    this._homeDessertsUnsub = dbService.listenToStudentDesserts(user.studentId || user.uid || user.id, user.phone, (liveDesserts) => {
+      if (!container.isConnected || renderToken !== this._tabTokens["home"]) return;
+      this._cachedDesserts = liveDesserts;
+      const hasApproved = liveDesserts.some((d) => d.status === "approved");
+      const hasSubmitted = liveDesserts.length > 0;
+      const pill = container.querySelector("#home-mission-hw-pill");
+      if (pill) {
+        if (hasApproved) {
+          pill.className = "mission-check-pill completed";
+          pill.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#10B981;">check_circle</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#10B981;">Approved</span>';
+        } else if (hasSubmitted) {
+          pill.className = "mission-check-pill";
+          pill.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; color:#3B82F6;">hourglass_top</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp" style="color:#3B82F6;">Pending</span>';
+        } else {
+          pill.className = "mission-check-pill";
+          pill.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; color:#94A3B8;">radio_button_unchecked</span> <span class="mission-check-title">Homework</span> <span class="mission-check-xp">+100 XP</span>';
+        }
+      }
+    }, studentName);
+    if (this._homeCreditsHandler) {
+      window.removeEventListener("edupeak:credits-updated", this._homeCreditsHandler);
+    }
+    this._homeCreditsHandler = (e2) => {
+      if (!container.isConnected || renderToken !== this._tabTokens["home"]) return;
+      const freshCredits = Number(e2?.detail?.credits) || 0;
+      if (freshCredits <= 0) return;
+      let lvl = "Level 1 Novice";
+      let tgt = 100;
+      let base = 0;
+      if (freshCredits >= 500) {
+        lvl = "Level 4 Master";
+        tgt = 1e3;
+        base = 500;
+      } else if (freshCredits >= 250) {
+        lvl = "Level 3 Scholar";
+        tgt = 500;
+        base = 250;
+      } else if (freshCredits >= 100) {
+        lvl = "Level 2 Cadet";
+        tgt = 250;
+        base = 100;
+      }
+      const pct = Math.min(100, Math.max(8, Math.round((freshCredits - base) / Math.max(1, tgt - base) * 100)));
+      const titleEl = container.querySelector("#home-hero-level-title");
+      if (titleEl) titleEl.textContent = lvl;
+      const ptsEl = container.querySelector("#home-hero-pts");
+      if (ptsEl) ptsEl.textContent = `${freshCredits} / ${tgt} XP`;
+      const fillEl = container.querySelector("#home-hero-progress-fill");
+      if (fillEl) fillEl.style.width = `${pct}%`;
+    };
+    window.addEventListener("edupeak:credits-updated", this._homeCreditsHandler);
+  }
+  _bindHomeFeaturedSessionActions(container) {
+    if (!container) return;
+    container.querySelector("#btn-enter-eval-room")?.addEventListener("click", () => {
+      if (!this.checkSubscriptionAccess("Paper Evaluation & Exam Sessions")) return;
+      this.switchTab("papers");
+    });
+  }
+  _buildHomeFeaturedSessionHTML(featuredSession, featuredUpcoming, activeTargetYear) {
+    if (featuredSession) {
+      const statusInfo = dbService.computeSessionStatus(featuredSession);
+      let badgeText = "SCHEDULED EVALUATION";
+      let badgeDot = '<div class="eval-dot"></div>';
+      let badgeStyle = "";
+      let subText = `${featuredSession.subject || "A/L Physics"} \u2022 ${this._safeFormatDate(featuredSession.date)} \u2022 Timed Slots`;
+      let pillExtra = `<span class="material-symbols-rounded" style="font-size:14px;">schedule</span><span>${this._safeFormatTime(featuredSession.slot1?.startTime, "08:30 AM")}</span>`;
+      let btnText = "View Exam Room & Select Slot";
+      let btnStyle = "background:#0F172A;";
+      if (statusInfo.isLive || statusInfo.isPackageOpening || statusInfo.isWriting || statusInfo.isTimeUp) {
+        badgeText = "LIVE EXAM SESSION";
+        badgeDot = '<div class="eval-dot" style="background:#22C55E; box-shadow:0 0 8px #22C55E;"></div>';
+        badgeStyle = "background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.3); color:#15803D;";
+        subText = `${featuredSession.subject || "A/L Physics"} \u2022 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D9A\u0DCA\u200D\u0DBB\u0DD2\u0DBA\u0DCF\u0DAD\u0DCA\u0DB8\u0D9A\u0DBA\u0DD2 (Exam Live In Progress)`;
+        pillExtra = '<span class="material-symbols-rounded filled" style="font-size:14px; color:#22C55E;">sensors</span><span style="color:#15803D; font-weight:700;">Live Now</span>';
+        btnText = "Enter Live Exam Room";
+        btnStyle = "background:#16A34A;";
+      } else if (statusInfo.isWaiting) {
+        badgeText = "WAITING ROOM OPEN";
+        badgeDot = '<div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>';
+        badgeStyle = "background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;";
+        subText = `${featuredSession.subject || "A/L Physics"} \u2022 \u0DB4\u0DDC\u0DBB\u0DDC\u0DAD\u0DCA\u0DAD\u0DD4 \u0DC1\u0DCF\u0DBD\u0DCF\u0DC0 \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD\u0DBA\u0DD2 (Waiting Room)`;
+        pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">meeting_room</span><span style="color:#4F46E5; font-weight:700;">Waiting</span>';
+        btnText = "Enter Waiting Room";
+        btnStyle = "background:#6366F1;";
+      } else if (statusInfo.isEnded) {
+        badgeText = "EVALUATION CONCLUDED";
+        badgeDot = '<span style="width:7px; height:7px; border-radius:50%; background:#64748B; display:inline-block;"></span>';
+        badgeStyle = "background:rgba(100,116,139,0.12); border-color:rgba(100,116,139,0.3); color:#475569;";
+        subText = `${featuredSession.subject || "A/L Physics"} \u2022 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DB1\u0DD2\u0DBD \u0DC0\u0DC1\u0DBA\u0DD9\u0DB1\u0DCA \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0DC0\u0DD2\u0DBA (Session Ended)`;
+        pillExtra = '<span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">check_circle</span><span style="color:#64748B; font-weight:600;">Ended</span>';
+        btnText = "View Completed Papers & Details";
+        btnStyle = "background:#475569;";
+      }
+      const durationMinutes = featuredSession.durationMinutes || 120;
+      const durationText = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60 ? durationMinutes % 60 + "m" : ""} Duration` : `${durationMinutes}m Duration`;
+      const paperTypeLabel = featuredSession.paperType === "mcq" ? `MCQ (${featuredSession.mcqCount || 50} Qs)` : featuredSession.paperType === "mcq_essay" ? "MCQ + Essays" : "Essay";
+      return `
+        <div class="evaluation-card" style="${statusInfo.isEnded ? "border-color:#E2E8F0; background:#F8FAFC;" : statusInfo.isLive ? "border-color:rgba(34,197,94,0.4); box-shadow:0 8px 24px rgba(34,197,94,0.12);" : ""}">
+          <div class="evaluation-top">
+            <div class="evaluation-badge" style="${badgeStyle}">
+              ${badgeDot}
+              <span class="eval-badge-text" style="${statusInfo.isEnded ? "color:#475569;" : ""}">${badgeText}</span>
+            </div>
+            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px; ${statusInfo.isLive ? "color:#15803D; font-weight:700;" : ""}">
+              <span>${statusInfo.isEnded ? "Past Session" : "Live Proctoring"}</span>
+              <span class="material-symbols-rounded ${statusInfo.isLive ? "filled" : ""}" style="font-size:14px; ${statusInfo.isLive ? "color:#22C55E;" : ""}">${statusInfo.isEnded ? "task_alt" : "videocam"}</span>
+            </span>
+          </div>
+          <div class="evaluation-title" style="${statusInfo.isEnded ? "color:#1E293B;" : ""}">${featuredSession.title || "Physics Examination Paper"}</div>
+          <div class="evaluation-sub">${subText}</div>
+          <div class="evaluation-pills-row">
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>${durationText}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">assignment</span>
+              <span>${paperTypeLabel}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              ${pillExtra}
+            </div>
+          </div>
+          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; ${btnStyle}">
+            <span>${btnText}</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+          </button>
+        </div>
+      `;
+    }
+    if (featuredUpcoming) {
+      return `
+        <div class="evaluation-card">
+          <div class="evaluation-top">
+            <div class="evaluation-badge" style="background:rgba(99,102,241,0.12); border-color:rgba(99,102,241,0.3); color:#4F46E5;">
+              <div class="eval-dot" style="background:#6366F1; box-shadow:0 0 8px #6366F1;"></div>
+              <span class="eval-badge-text" style="color:#4F46E5;">UPCOMING EVALUATION</span>
+            </div>
+            <span class="evaluation-proctor-label" style="display:inline-flex; align-items:center; gap:4px;">
+              <span>Scope & Hints</span>
+              <span class="material-symbols-rounded" style="font-size:14px; color:#6366F1;">lightbulb</span>
+            </span>
+          </div>
+          <div class="evaluation-title">${featuredUpcoming.title}</div>
+          <div class="evaluation-sub">${featuredUpcoming.subject || "A/L Physics"} \u2022 ${featuredUpcoming.paperStructure || "Scheduled Examination"}</div>
+          <div class="evaluation-pills-row">
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">timer</span>
+              <span>${featuredUpcoming.durationMinutes || 150}m Duration</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">calendar_today</span>
+              <span>${this._safeFormatDate(featuredUpcoming.scheduledDate)}</span>
+            </div>
+            <div class="eval-pill" style="display:inline-flex; align-items:center; gap:4px;">
+              <span class="material-symbols-rounded" style="font-size:14px;">lightbulb</span>
+              <span>Hints Available</span>
+            </div>
+          </div>
+          <button class="btn-view-exam-room" id="btn-enter-eval-room" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#6366F1;">
+            <span>View Upcoming Paper & Scope</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
+          </button>
+        </div>
+      `;
+    }
+    return `
+      <div class="evaluation-card" style="border-color:#E2E8F0; background:#F8FAFC; text-align:center; padding:20px;">
+        <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:4px;">\u0DB1\u0DC0 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0DC0\u0DD9\u0DB8\u0DD2\u0DB1\u0DCA \u0DB4\u0DC0\u0DAD\u0DD3</div>
+        <div style="font-size:11.5px; color:#94A3B8; margin-bottom:12px;">\u0D94\u0DB6\u0D9C\u0DDA \u0D9A\u0DAB\u0DCA\u0DA9\u0DCF\u0DBA\u0DB8 (${activeTargetYear}) \u0DC3\u0DB3\u0DC4\u0DCF \u0D89\u0DAF\u0DD2\u0DBB\u0DD2 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2 \u0DB4\u0DD2\u0DC5\u0DD2\u0DB6\u0DB3\u0DC0 \u0D89\u0D9A\u0DCA\u0DB8\u0DB1\u0DD2\u0DB1\u0DCA \u0DAF\u0DD0\u0DB1\u0DD4\u0DB8\u0DCA \u0DAF\u0DD9\u0DB1\u0DD4 \u0DBD\u0DD0\u0DB6\u0DDA.</div>
+        <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers') : null" style="width:auto; padding:8px 18px; margin:0 auto; font-size:12px; background:#475569; display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">assignment</span>
+          <span>View Exam Sessions</span>
+        </button>
+      </div>
+    `;
   }
   // ── 2. Papers Tab (Exam Sessions & Upcoming Hints - 1:1 Android Parity) ──
   _safeFormatTime(isoString, fallback = "08:30 AM") {
@@ -95541,6 +95682,13 @@ var AppController = class {
       } catch (_) {
       }
       this._upcomingPapersUnsub = null;
+    }
+    if (this._paperHintsUnsub) {
+      try {
+        this._paperHintsUnsub();
+      } catch (_) {
+      }
+      this._paperHintsUnsub = null;
     }
     try {
       const user = this.currentUser || { name: "Student", phone: "", examYear: "2027 A/L" };
@@ -96595,18 +96743,20 @@ var AppController = class {
     if (this.ranksBoardType === 0) {
       this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : void 0, (liveLeaders) => {
         if (!container.isConnected || renderToken !== this._tabTokens["ranks"]) return;
-        const currentSummary = leaders.map((l2) => `${l2.id}_${l2.credits}_${l2.name}`).join("|");
+        const currentSummary = (this._cachedLeaders || leaders || []).map((l2) => `${l2.id}_${l2.credits}_${l2.name}`).join("|");
         const liveSummary = liveLeaders.map((l2) => `${l2.id}_${l2.credits}_${l2.name}`).join("|");
         if (currentSummary !== liveSummary) {
+          this._cachedLeaders = liveLeaders;
           this.renderRanksScreen(container);
         }
       });
     } else {
       this._ranksUnsub = dbService.streamPaperLeaderboards((livePaperBoards) => {
         if (!container.isConnected || renderToken !== this._tabTokens["ranks"]) return;
-        const currentSummary = paperBoards.map((b2) => `${b2.id}_${b2.entries?.length}_${b2.totalMarks}`).join("|");
-        const liveSummary = livePaperBoards.map((b2) => `${b2.id}_${b2.entries?.length}_${b2.totalMarks}`).join("|");
+        const currentSummary = (this._cachedPaperBoards || paperBoards || []).map((b2) => `${b2.id}_${(b2.entries || []).map((e2) => `${e2.studentId}:${e2.marks}:${e2.rank}`).join(",")}`).join("|");
+        const liveSummary = livePaperBoards.map((b2) => `${b2.id}_${(b2.entries || []).map((e2) => `${e2.studentId}:${e2.marks}:${e2.rank}`).join(",")}`).join("|");
         if (currentSummary !== liveSummary) {
+          this._cachedPaperBoards = livePaperBoards;
           this.renderRanksScreen(container);
         }
       });
@@ -98448,7 +98598,7 @@ var AppController = class {
   // ═════════════════════════════════════════════════════════════════════════
   // ── 1. SCREEN 1: ADMIN HOME SCREEN (admin_home_screen.dart) ──────────────
   // ═════════════════════════════════════════════════════════════════════════
-  async renderAdminDashboardScreen(container) {
+  async renderAdminDashboardScreen(container, preloadedDesserts = null) {
     let cloudUsage = {
       supabase: { storageUsedMb: 0.1, storageLimitMb: 1e3, storagePct: 0.1, storageStatus: "healthy", dbUsedMb: 0.5, dbLimitMb: 500, dbPct: 0.1, submissionsCount: 0, profilesCount: 0 },
       agora: { minutesUsed: 0, minutesLimit: 1e4, minutesPct: 0, minutesStatus: "healthy", daysUntilReset: 30, resetDate: "Next Month" }
@@ -98459,7 +98609,7 @@ var AppController = class {
     }
     this.adminFilterTab = this.adminFilterTab ?? "pending";
     this.adminSearchQuery = this.adminSearchQuery ?? "";
-    const allDesserts = await this.safePromise(dbService.getAllDessertsForAdmin(), 2500, this._cachedAllDesserts || []);
+    const allDesserts = preloadedDesserts || await this.safePromise(dbService.getAllDessertsForAdmin(), 2500, this._cachedAllDesserts || []);
     if (allDesserts && allDesserts.length) this._cachedAllDesserts = allDesserts;
     const pending = allDesserts.filter((d) => (d.status || "").toLowerCase() === "pending");
     const approved = allDesserts.filter((d) => (d.status || "").toLowerCase() === "approved");
@@ -98833,8 +98983,9 @@ var AppController = class {
         }
         return;
       }
+      this._cachedAllDesserts = allList;
       if (!document.querySelector(".app-modal")) {
-        this.renderAdminDashboardScreen(container);
+        this.renderAdminDashboardScreen(container, allList);
       }
     });
   }
@@ -99146,6 +99297,27 @@ var AppController = class {
     }
     if (this.adminPaperTab === 2) {
       this._bindAdminLeaderboardActions(container, adminPaperBoards);
+    }
+    if (this._adminPapersUnsub) {
+      try {
+        this._adminPapersUnsub();
+      } catch (_) {
+      }
+      this._adminPapersUnsub = null;
+    }
+    if (this._adminHintsUnsub) {
+      try {
+        this._adminHintsUnsub();
+      } catch (_) {
+      }
+      this._adminHintsUnsub = null;
+    }
+    if (this._adminBoardsUnsub) {
+      try {
+        this._adminBoardsUnsub();
+      } catch (_) {
+      }
+      this._adminBoardsUnsub = null;
     }
     this._adminPapersUnsub = dbService.streamPaperSessions(null, (livePapers) => {
       if (!container.isConnected) return;
@@ -100459,6 +100631,22 @@ var AppController = class {
     document.getElementById("btn-fab-create-sprint")?.addEventListener("click", () => {
       this.openCreateSprintSheet();
     });
+    if (this._adminSprintAttemptsUnsub) {
+      try {
+        this._adminSprintAttemptsUnsub();
+      } catch (_) {
+      }
+      this._adminSprintAttemptsUnsub = null;
+    }
+    if (this.adminSprintTab === 1) {
+      this._adminSprintAttemptsUnsub = dbService.streamSprintAttempts(dateStr, (liveAttempts) => {
+        if (!container.isConnected || this.adminSprintTab !== 1) return;
+        const contentEl = container.querySelector("#admin-sprint-content");
+        if (contentEl) {
+          contentEl.innerHTML = this._buildAdminSprintLeaderboardHTML(dateStr, liveAttempts, false);
+        }
+      });
+    }
   }
   _buildAdminSprintsTabHTML(dateStr, sprints, loadError = false) {
     if (loadError) return `
@@ -100743,6 +100931,18 @@ var AppController = class {
       if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
       await this.renderAdminStudentsScreen(container);
     });
+    if (this._adminStudentsCreditsHandler) {
+      window.removeEventListener("edupeak:credits-updated", this._adminStudentsCreditsHandler);
+      window.removeEventListener("edupeak:dessert-reviewed", this._adminStudentsCreditsHandler);
+    }
+    this._adminStudentsCreditsHandler = () => {
+      if (!container.isConnected || this.adminTab !== "students") return;
+      this._adminStudentsListCache = null;
+      dbService.clearCache("all_admin_students");
+      this.renderAdminStudentsScreen(container);
+    };
+    window.addEventListener("edupeak:credits-updated", this._adminStudentsCreditsHandler);
+    window.addEventListener("edupeak:dessert-reviewed", this._adminStudentsCreditsHandler);
   }
   // 5. Admin Broadcasts Screen (admin_announcements_screen.dart)
   renderAdminBroadcastsScreen(container) {
