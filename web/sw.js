@@ -1,5 +1,5 @@
 // EduPeak Service Worker - PWA & Web Push Notification Handler
-const CACHE_NAME = 'edupeak-pwa-v1.5.2';
+const CACHE_NAME = 'edupeak-pwa-v1.6.0';
 const OFFLINE_URLS = [
   './',
   './index.html',

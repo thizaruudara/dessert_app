@@ -88139,7 +88139,7 @@ var DbService = class {
     const id = String(u2.id || u2.uid || u2.studentId || "").toLowerCase().trim();
     if (u2.isAdmin === true || u2.isTeacher === true || u2.isStaff === true) return true;
     if (role === "admin" || role === "teacher" || role === "staff" || role === "instructor") return true;
-    if (name5.includes("admin") || name5.includes("teacher") || name5.includes("prof.") || name5.includes("professor") || name5.includes("senanayake") || name5.includes("staff") || name5.includes("instructor")) {
+    if (name5.includes("admin") || name5.includes("teacher") || name5.includes("prof.") || name5.includes("professor") || name5.includes("instructor") || name5.includes("senanayake") && (role === "admin" || role === "teacher" || role === "staff" || u2.isTeacher || u2.isAdmin || phone.endsWith("770557769")) || name5 === "staff") {
       return true;
     }
     if (id.includes("admin") || id.includes("teacher") || id.includes("staff")) return true;
@@ -91537,6 +91537,15 @@ var AgoraAdminAudience = class {
 };
 
 // js/app.js
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
 var AppController = class {
   constructor() {
     this.currentTab = "home";
@@ -92464,10 +92473,10 @@ var AppController = class {
           <div class="header-info">
             <span class="greeting-text">Good Evening</span>
             <div class="student-name-row">
-              <span class="student-name">${studentName}</span>
+              <span class="student-name">${escapeHTML(studentName)}</span>
               <span class="material-symbols-rounded filled" style="font-size:16px; color:#2563EB;">verified</span>
             </div>
-            <span class="candidate-tag">${activeTargetYear} Candidate</span>
+            <span class="candidate-tag">${escapeHTML(activeTargetYear)} Candidate</span>
           </div>
         </div>
         <div class="streak-pill" style="display:inline-flex; align-items:center; gap:4px;">
@@ -93267,7 +93276,7 @@ var AppController = class {
     });
   }
   _buildStudentPaperHintsHTML(hints, activeTargetYear, currentYear) {
-    const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
     const formatDate = (value) => {
       try {
         const d = new Date(value);
@@ -93283,7 +93292,7 @@ var AppController = class {
             <span class="material-symbols-rounded filled" style="font-size:46px; color:#10B981;">checklist</span>
           </div>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">\u0DAD\u0DC0\u0DB8 Paper Scope \u0DB4\u0DC5 \u0D9A\u0DBB \u0DB1\u0DDC\u0DB8\u0DD0\u0DAD</div>
-          <div style="font-size:13px; line-height:1.5; color:#64748B;">\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0DC0\u0DD3\u0DB8\u0DA7 \u0DB4\u0DD9\u0DBB \u0D94\u0DB6\u0DDA \u0D9A\u0DAB\u0DCA\u0DA9\u0DCF\u0DBA\u0DB8 (${escapeHTML(currentYear)}) \u0DC3\u0DB3\u0DC4\u0DCF \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DB1 \u0DC0\u0DD2\u0DC2\u0DBA \u0D9A\u0DDC\u0DA7\u0DC3\u0DCA (Target Concepts / Scope) \u0DB8\u0DD9\u0DC4\u0DD2 \u0DAF\u0DD2\u0DC3\u0DCA\u0DC0\u0DB1\u0DD4 \u0D87\u0DAD.</div>
+          <div style="font-size:13px; line-height:1.5; color:#64748B;">\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0DC0\u0DD3\u0DB8\u0DA7 \u0DB4\u0DD9\u0DBB \u0D94\u0DB6\u0DDA \u0D9A\u0DAB\u0DCA\u0DA9\u0DCF\u0DBA\u0DB8 (${escapeHTML2(currentYear)}) \u0DC3\u0DB3\u0DC4\u0DCF \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DB1 \u0DC0\u0DD2\u0DC2\u0DBA \u0D9A\u0DDC\u0DA7\u0DC3\u0DCA (Target Concepts / Scope) \u0DB8\u0DD9\u0DC4\u0DD2 \u0DAF\u0DD2\u0DC3\u0DCA\u0DC0\u0DB1\u0DD4 \u0D87\u0DAD.</div>
         </div>
       `;
     }
@@ -93296,22 +93305,22 @@ var AppController = class {
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="background:rgba(16,185,129,0.15); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:13px;">checklist</span>
-                  <span>${escapeHTML(hint.subject || "A/L Physics")}</span>
+                  <span>${escapeHTML2(hint.subject || "A/L Physics")}</span>
                 </span>
                 <span style="background:#FFFFFF; color:#475569; border:1px solid #CBD5E1; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
-                  ${escapeHTML(hint.examYear || currentYear)}
+                  ${escapeHTML2(hint.examYear || currentYear)}
                 </span>
-                ${hint.paperName ? `<span style="background:#EFF6FF; color:#1D4ED8; padding:3px 8px; border-radius:8px; font-size:10.5px; font-weight:700;">${escapeHTML(hint.paperName)}</span>` : ""}
+                ${hint.paperName ? `<span style="background:#EFF6FF; color:#1D4ED8; padding:3px 8px; border-radius:8px; font-size:10.5px; font-weight:700;">${escapeHTML2(hint.paperName)}</span>` : ""}
               </div>
               <div style="font-size:11.5px; color:#64748B; display:flex; align-items:center; gap:4px;">
                 <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
-                <span>${escapeHTML(formatDate(hint.publishedAt))}</span>
+                <span>${escapeHTML2(formatDate(hint.publishedAt))}</span>
               </div>
             </div>
 
             <!-- Card Body -->
             <div style="padding:16px; display:flex; flex-direction:column; gap:12px; background:#FFFFFF;">
-              <div class="paper-title" style="font-size:17px; font-weight:800; color:#0F172A;">${escapeHTML(hint.title)}</div>
+              <div class="paper-title" style="font-size:17px; font-weight:800; color:#0F172A;">${escapeHTML2(hint.title)}</div>
 
               <!-- Target Concepts / Scope Only -->
               <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px;">
@@ -93324,7 +93333,7 @@ var AppController = class {
                     ${hint.scope.map((topic) => `
                       <div class="upcoming-topic-chip" style="background:#F0FDF4; border:1px solid #BBF7D0; color:#15803D; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
                         <span class="material-symbols-rounded filled" style="font-size:14px; color:#16A34A;">check_circle</span>
-                        <span>${escapeHTML(topic)}</span>
+                        <span>${escapeHTML2(topic)}</span>
                       </div>
                     `).join("")}
                   </div>
@@ -93356,7 +93365,7 @@ var AppController = class {
     });
   }
   _buildStudentPaperLeaderboardHTML(allBoards, activeTargetYear) {
-    const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
     const selectedBatch = (activeTargetYear || "2027 A/L").replace(/\s+/g, "").toUpperCase();
     const boards = (allBoards || []).filter((b2) => !b2.examYear || ["ALL", "ALLBATCHES"].includes(b2.examYear.replace(/\s+/g, "").toUpperCase()) || b2.examYear.replace(/\s+/g, "").toUpperCase() === selectedBatch);
     if (!boards.length) {
@@ -93364,7 +93373,7 @@ var AppController = class {
         <div style="padding:44px 20px; text-align:center; color:#64748B; background:#FFFFFF; border-radius:18px; border:1px solid #E2E8F0; margin:6px 0;">
           <span class="material-symbols-rounded" style="font-size:46px; color:#94A3B8; margin-bottom:10px;">military_tech</span>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:4px;">\u0DAD\u0DC0\u0DB8 \u0DB4\u0DCA\u200D\u0DBB\u0DAD\u0DD2\u0DB5\u0DBD \u0DB4\u0DC5 \u0D9A\u0DBB \u0DB1\u0DDC\u0DB8\u0DD0\u0DAD</div>
-          <div style="font-size:12.5px; color:#64748B;">Published evaluations & rankings for ${escapeHTML(activeTargetYear)} will appear here.</div>
+          <div style="font-size:12.5px; color:#64748B;">Published evaluations & rankings for ${escapeHTML2(activeTargetYear)} will appear here.</div>
         </div>
       `;
     }
@@ -93378,17 +93387,17 @@ var AppController = class {
               <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">
-                    ${escapeHTML(board.subject || "A/L Physics")}
+                    ${escapeHTML2(board.subject || "A/L Physics")}
                   </span>
                   <span style="background:#F1F5F9; color:#475569; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
-                    ${escapeHTML(board.examYear || activeTargetYear)}
+                    ${escapeHTML2(board.examYear || activeTargetYear)}
                   </span>
                   ${idx === 0 ? '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:800;">LATEST</span>' : ""}
                 </div>
-                <div style="font-size:11.5px; color:#94A3B8;">${escapeHTML(published)}</div>
+                <div style="font-size:11.5px; color:#94A3B8;">${escapeHTML2(published)}</div>
               </div>
 
-              <div style="font-size:16px; font-weight:800; color:#0F172A;">${escapeHTML(board.paperTitle)}</div>
+              <div style="font-size:16px; font-weight:800; color:#0F172A;">${escapeHTML2(board.paperTitle)}</div>
 
               <div style="display:flex; align-items:center; gap:12px; font-size:12px; color:#64748B;">
                 <span>Total Marks: <strong>${board.totalMarks}</strong></span>
@@ -93401,8 +93410,8 @@ var AppController = class {
                   <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:${e2.rank === 1 ? "#FEF9C3" : e2.rank === 2 ? "#F1F5F9" : e2.rank === 3 ? "#FFEDD5" : "#FAFAFA"}; border-radius:10px; border:1px solid #E2E8F0;">
                     <div style="display:flex; align-items:center; gap:8px;">
                       <span style="font-weight:800; font-size:12px; width:22px; text-align:center; color:${e2.rank === 1 ? "#CA8A04" : e2.rank === 2 ? "#64748B" : e2.rank === 3 ? "#EA580C" : "#94A3B8"};">#${e2.rank}</span>
-                      <span style="font-weight:700; font-size:13px; color:#0F172A;">${escapeHTML(e2.studentName)}</span>
-                      <span style="padding:1px 6px; border-radius:6px; font-size:10px; font-weight:800; background:#E0F2FE; color:#0369A1;">${escapeHTML(e2.grade || "A")}</span>
+                      <span style="font-weight:700; font-size:13px; color:#0F172A;">${escapeHTML2(e2.studentName)}</span>
+                      <span style="padding:1px 6px; border-radius:6px; font-size:10px; font-weight:800; background:#E0F2FE; color:#0369A1;">${escapeHTML2(e2.grade || "A")}</span>
                     </div>
                     <div style="font-weight:800; font-size:13px; color:#0F172A;">${e2.marks} <span style="font-size:10px; color:#64748B;">/ ${board.totalMarks}</span></div>
                   </div>
@@ -94039,7 +94048,7 @@ var AppController = class {
       { name: "Bronze", icon: "military_tech" }
     ];
     const normalizeBatch = (value) => String(value || "").replace(/\s+/g, "").toUpperCase();
-    const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",
@@ -94094,20 +94103,20 @@ var AppController = class {
           <button class="leaderboard-retry-btn" id="btn-ranks-retry" type="button">Retry</button>
         </div>` : filtered.length === 0 ? `<div class="leaderboard-state" role="status">
             <span class="material-symbols-rounded">emoji_events</span>
-            <strong>${!emptyBatchLabel ? "No students ranked yet" : `No students ranked in ${escapeHTML(emptyBatchLabel)} yet`}</strong>
+            <strong>${!emptyBatchLabel ? "No students ranked yet" : `No students ranked in ${escapeHTML2(emptyBatchLabel)} yet`}</strong>
             <span>Rankings appear here when student XP records are available.</span>
           </div>` : `<div class="ranks-list">
             ${visibleRankRows.map((student) => `
               <div class="rank-list-item ${isMe(student) ? "is-current-user" : ""}">
                 <div class="rank-item-left">
                   <span class="rank-index ${student.rank <= 3 ? `top-rank-${student.rank}` : ""}">#${student.rank}</span>
-                  <div class="rank-avatar">${escapeHTML(String(student.name || "S").charAt(0).toUpperCase())}</div>
+                  <div class="rank-avatar">${escapeHTML2(String(student.name || "S").charAt(0).toUpperCase())}</div>
                   <div class="rank-name-box">
                     <div class="rank-student-name">
-                      <span>${escapeHTML(student.name)}</span>
+                      <span>${escapeHTML2(student.name)}</span>
                       ${isMe(student) ? '<span class="rank-you-tag">You</span>' : ""}
                     </div>
-                    <div class="rank-batch-tag">${escapeHTML(student.examYear || "General Batch")}</div>
+                    <div class="rank-batch-tag">${escapeHTML2(student.examYear || "General Batch")}</div>
                   </div>
                 </div>
                 <span class="rank-xp-pill">${student.credits} XP</span>
@@ -94119,7 +94128,7 @@ var AppController = class {
               <div class="my-rank-info">
                 <span class="my-rank-num">#${currentUserRank}</span>
                 <div>
-                  <div class="my-rank-name">${escapeHTML(currentUserEntry.name)} (You)</div>
+                  <div class="my-rank-name">${escapeHTML2(currentUserEntry.name)} (You)</div>
                   <div class="my-rank-next">${nextRankEntry ? `Next rank: +${xpToNextRank} XP needed` : "You are ranked #1!"}</div>
                 </div>
               </div>
@@ -94134,7 +94143,7 @@ var AppController = class {
           <button class="leaderboard-retry-btn" id="btn-ranks-retry" type="button">Retry</button>
         </div>` : visiblePaperBoards.length === 0 ? `<div class="leaderboard-state" role="status">
             <span class="material-symbols-rounded">assignment</span>
-            <strong>No Paper Leaderboards for ${escapeHTML(paperBatchFilter || "your batch")}</strong>
+            <strong>No Paper Leaderboards for ${escapeHTML2(paperBatchFilter || "your batch")}</strong>
             <span>Official rankings and marks will appear here after an evaluation is published.</span>
           </div>` : `<div class="paper-results-list">
             ${visiblePaperBoards.map((board, boardIndex) => {
@@ -94149,14 +94158,14 @@ var AppController = class {
       const avgScore = entries.length ? (entries.reduce((sum, e2) => sum + (Number(e2.marks) || 0), 0) / entries.length).toFixed(1) : "\u2014";
       return `
                 <article class="paper-board-card ${boardIndex === 0 ? "is-latest" : ""}">
-                  <button class="paper-board-header" type="button" data-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}">
+                  <button class="paper-board-header" type="button" data-paper-board="${escapeHTML2(board.id)}" aria-expanded="${expanded}">
                     <div class="paper-board-heading-content">
                       <div class="pb-badges-row">
-                        <span class="paper-board-tag">${escapeHTML(board.subject)} \xB7 ${escapeHTML(board.examYear)}</span>
+                        <span class="paper-board-tag">${escapeHTML2(board.subject)} \xB7 ${escapeHTML2(board.examYear)}</span>
                         ${boardIndex === 0 ? '<span class="paper-latest-tag">LATEST</span>' : ""}
-                        <span class="paper-board-date">${escapeHTML(publishedDate)}</span>
+                        <span class="paper-board-date">${escapeHTML2(publishedDate)}</span>
                       </div>
-                      <h3 class="paper-board-title">${escapeHTML(board.paperTitle)}</h3>
+                      <h3 class="paper-board-title">${escapeHTML2(board.paperTitle)}</h3>
                       <div class="paper-board-stats">
                         <span class="pb-stat-pill">Max: ${totalMarks} marks</span>
                         <span>\xB7</span>
@@ -94192,12 +94201,12 @@ var AppController = class {
                             <span class="material-symbols-rounded" style="color:#16A34A; font-size:20px;">verified</span>
                             <div>
                               <div class="srb-title">Your Result</div>
-                              <div class="srb-sub">${escapeHTML(myEntry.studentName)}</div>
+                              <div class="srb-sub">${escapeHTML2(myEntry.studentName)}</div>
                             </div>
                           </div>
                           <div class="srb-right">
                             <span class="srb-metric">Rank <strong>#${myEntry.rank}</strong></span>
-                            <span class="grade-pill grade-${escapeHTML(myEntry.grade)}">${escapeHTML(myEntry.grade)}</span>
+                            <span class="grade-pill grade-${escapeHTML2(myEntry.grade)}">${escapeHTML2(myEntry.grade)}</span>
                             <span class="srb-score"><strong>${myEntry.marks}</strong> <small style="color:#64748B;">/ ${totalMarks}</small></span>
                           </div>
                         </div>
@@ -94221,19 +94230,19 @@ var AppController = class {
                                 </div>
                                 <div class="ptr-student">
                                   <div class="ptr-name-line">
-                                    <span class="ptr-name">${escapeHTML(entry.studentName)}</span>
+                                    <span class="ptr-name">${escapeHTML2(entry.studentName)}</span>
                                     ${isMe2 ? '<span class="ptr-you-badge">You</span>' : ""}
                                   </div>
                                   ${entry.indexNumber || entry.remarks ? `
                                     <div class="ptr-meta">
-                                      ${entry.indexNumber ? `<span>ID: ${escapeHTML(entry.indexNumber)}</span>` : ""}
+                                      ${entry.indexNumber ? `<span>ID: ${escapeHTML2(entry.indexNumber)}</span>` : ""}
                                       ${entry.indexNumber && entry.remarks ? " \xB7 " : ""}
-                                      ${entry.remarks ? `<span>${escapeHTML(entry.remarks)}</span>` : ""}
+                                      ${entry.remarks ? `<span>${escapeHTML2(entry.remarks)}</span>` : ""}
                                     </div>
                                   ` : ""}
                                 </div>
                                 <div class="ptr-grade">
-                                  <span class="grade-pill grade-${escapeHTML(entry.grade)}">${escapeHTML(entry.grade)}</span>
+                                  <span class="grade-pill grade-${escapeHTML2(entry.grade)}">${escapeHTML2(entry.grade)}</span>
                                 </div>
                                 <div class="ptr-marks">
                                   <span class="ptr-marks-value">${entry.marks}</span>
@@ -94292,7 +94301,7 @@ var AppController = class {
           </div>
         ` : `
           <div class="leaderboard-batch-banner">
-            <strong>${escapeHTML(studentBatch || "General Batch")} Standings</strong>
+            <strong>${escapeHTML2(studentBatch || "General Batch")} Standings</strong>
             <span>Showing rankings for your exam year</span>
           </div>
         `}
@@ -94325,7 +94334,7 @@ var AppController = class {
         ` : `
           <div class="leaderboard-batch-banner paper-batch-banner">
             <div class="lbb-content">
-              <strong>${escapeHTML(studentBatch || "General Batch")} Paper Results</strong>
+              <strong>${escapeHTML2(studentBatch || "General Batch")} Paper Results</strong>
               <span>Official examination marks & batch standings</span>
             </div>
             <span class="lbb-verified-tag">Official</span>
@@ -94591,7 +94600,7 @@ var AppController = class {
 
                     ${d.adminFeedback ? `
                       <div style="margin-top:10px; padding:10px; background:#EFF6FF; border-left:3px solid #2563EB; border-radius:8px; font-size:11.5px; color:#1E3A8A; line-height:1.4;">
-                        <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">school</span> Teacher Feedback:</strong> ${d.adminFeedback}
+                        <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">school</span> Teacher Feedback:</strong> ${escapeHTML(d.adminFeedback)}
                       </div>
                     ` : ""}
                   </div>
@@ -95269,7 +95278,7 @@ var AppController = class {
         ${d.adminFeedback ? `
           <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:12px; margin-bottom:12px;">
             <div style="font-size:11px; font-weight:800; color:#1D4ED8;">TEACHER EVALUATION & FEEDBACK:</div>
-            <div style="font-size:12.5px; color:#1E3A8A; margin-top:2px; line-height:1.45;">${d.adminFeedback}</div>
+            <div style="font-size:12.5px; color:#1E3A8A; margin-top:2px; line-height:1.45;">${escapeHTML(d.adminFeedback)}</div>
           </div>
         ` : ""}
 
@@ -95885,6 +95894,7 @@ var AppController = class {
   }
   handleExamTabSwitch() {
     this.antiCheatViolations++;
+    document.querySelectorAll(".anti-cheat-modal").forEach((m2) => m2.remove());
     const modal = document.createElement("div");
     modal.className = "anti-cheat-modal";
     modal.innerHTML = `
@@ -97720,7 +97730,7 @@ var AppController = class {
     this.renderAdminPapersScreen(container);
   }
   _buildAdminPaperHintsHTML(hints, loadError = false, selectedBatch = "All Batches") {
-    const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
     const formatDate = (value) => {
       try {
         const d = new Date(value);
@@ -97749,7 +97759,7 @@ var AppController = class {
             <span>Batch Filter:</span>
           </div>
           <select id="select-admin-paper-hints-batch" style="border:1px solid #CBD5E1; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:700; color:#0F172A; background:#F8FAFC; outline:none; cursor:pointer;">
-            ${batches.map((b2) => `<option value="${escapeHTML(b2)}" ${b2 === selectedBatch ? "selected" : ""}>${escapeHTML(b2)}</option>`).join("")}
+            ${batches.map((b2) => `<option value="${escapeHTML2(b2)}" ${b2 === selectedBatch ? "selected" : ""}>${escapeHTML2(b2)}</option>`).join("")}
           </select>
         </div>
 
@@ -97761,7 +97771,7 @@ var AppController = class {
               </div>
             </div>
             <strong style="font-size:16px; color:#0F172A; display:block; margin-bottom:6px;">\u0DAD\u0DC0\u0DB8 Paper Scope \u0DB4\u0DC5 \u0D9A\u0DBB \u0DB1\u0DDC\u0DB8\u0DD0\u0DAD</strong>
-            <span style="font-size:13px; color:#64748B; display:block; max-width:320px; margin:0 auto 16px auto; line-height:1.5;">${escapeHTML(selectedBatch)} \u0DC3\u0DB3\u0DC4\u0DCF \u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA\u0DA7 \u0DB4\u0DD9\u0DBB \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DB1 \u0DC0\u0DD2\u0DC2\u0DBA \u0D9A\u0DDC\u0DA7\u0DC3\u0DCA (Target Concepts / Scope) \u0DB4\u0DC5 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.</span>
+            <span style="font-size:13px; color:#64748B; display:block; max-width:320px; margin:0 auto 16px auto; line-height:1.5;">${escapeHTML2(selectedBatch)} \u0DC3\u0DB3\u0DC4\u0DCF \u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA\u0DA7 \u0DB4\u0DD9\u0DBB \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DB1 \u0DC0\u0DD2\u0DC2\u0DBA \u0D9A\u0DDC\u0DA7\u0DC3\u0DCA (Target Concepts / Scope) \u0DB4\u0DC5 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1.</span>
             <button class="apk-btn-primary" id="btn-empty-create-hint" type="button" style="padding:10px 20px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; margin:0 auto;">
               <span class="material-symbols-rounded" style="font-size:18px;">add</span>
               <span>Create Paper Scope</span>
@@ -97775,20 +97785,20 @@ var AppController = class {
                   <div style="display:flex; align-items:center; gap:6px;">
                     <span style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
                       <span class="material-symbols-rounded filled" style="font-size:13px;">checklist</span>
-                      <span>${escapeHTML(hint.subject || "A/L Physics")}</span>
+                      <span>${escapeHTML2(hint.subject || "A/L Physics")}</span>
                     </span>
                     <span style="background:#F1F5F9; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:700;">
-                      ${escapeHTML(hint.examYear || "All Batches")}
+                      ${escapeHTML2(hint.examYear || "All Batches")}
                     </span>
-                    ${hint.paperName ? `<span style="background:#EFF6FF; color:#1D4ED8; padding:3px 8px; border-radius:8px; font-size:10.5px; font-weight:700;">${escapeHTML(hint.paperName)}</span>` : ""}
+                    ${hint.paperName ? `<span style="background:#EFF6FF; color:#1D4ED8; padding:3px 8px; border-radius:8px; font-size:10.5px; font-weight:700;">${escapeHTML2(hint.paperName)}</span>` : ""}
                   </div>
                   <div style="font-size:11.5px; color:#94A3B8; display:flex; align-items:center; gap:4px;">
                     <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
-                    <span>${escapeHTML(formatDate(hint.publishedAt))}</span>
+                    <span>${escapeHTML2(formatDate(hint.publishedAt))}</span>
                   </div>
                 </div>
 
-                <h3 style="font-size:16px; font-weight:800; color:#0F172A; margin:0;">${escapeHTML(hint.title)}</h3>
+                <h3 style="font-size:16px; font-weight:800; color:#0F172A; margin:0;">${escapeHTML2(hint.title)}</h3>
 
                 <!-- Target Concepts / Scope -->
                 <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:14px;">
@@ -97798,7 +97808,7 @@ var AppController = class {
                   </div>
                   ${hint.scope && hint.scope.length ? `
                     <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
-                      ${hint.scope.map((t2) => `<span style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded filled" style="font-size:14px; color:#16A34A;">check_circle</span><span>${escapeHTML(t2)}</span></span>`).join("")}
+                      ${hint.scope.map((t2) => `<span style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded filled" style="font-size:14px; color:#16A34A;">check_circle</span><span>${escapeHTML2(t2)}</span></span>`).join("")}
                     </div>
                   ` : `
                     <div style="font-size:12.5px; color:#94A3B8; font-style:italic;">\u0DC0\u0DD2\u0DC2\u0DBA \u0D9A\u0DDC\u0DA7\u0DC3\u0DCA \u0DC3\u0DB3\u0DC4\u0DB1\u0DCA \u0D9A\u0DBB \u0DB1\u0DDC\u0DB8\u0DD0\u0DAD (No concepts specified)</div>
@@ -97807,15 +97817,15 @@ var AppController = class {
 
                 <!-- Card Footer Actions -->
                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:8px; border-top:1px solid #F1F5F9;">
-                  <button class="apk-icon-action-btn" type="button" data-broadcast-hint="${escapeHTML(hint.id)}" data-hint-title="${escapeHTML(hint.title)}" data-hint-batch="${escapeHTML(hint.examYear)}" title="Broadcast Push Alert to Students" style="color:#D97706; background:#FEF3C7; border:1px solid #FDE68A; width:auto; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
+                  <button class="apk-icon-action-btn" type="button" data-broadcast-hint="${escapeHTML2(hint.id)}" data-hint-title="${escapeHTML2(hint.title)}" data-hint-batch="${escapeHTML2(hint.examYear)}" title="Broadcast Push Alert to Students" style="color:#D97706; background:#FEF3C7; border:1px solid #FDE68A; width:auto; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
                     <span class="material-symbols-rounded" style="font-size:15px;">notifications_active</span>
                     <span>Send Push Alert</span>
                   </button>
-                  <button class="apk-icon-action-btn" type="button" data-edit-hint="${escapeHTML(hint.id)}" title="Edit Hint" style="color:#2563EB; background:#EFF6FF; border:1px solid #DBEAFE; width:auto; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
+                  <button class="apk-icon-action-btn" type="button" data-edit-hint="${escapeHTML2(hint.id)}" title="Edit Hint" style="color:#2563EB; background:#EFF6FF; border:1px solid #DBEAFE; width:auto; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
                     <span class="material-symbols-rounded" style="font-size:15px;">edit</span>
                     <span>Edit</span>
                   </button>
-                  <button class="apk-icon-action-btn" type="button" data-delete-hint="${escapeHTML(hint.id)}" title="Delete Hint" style="color:#DC2626; background:#FEF2F2; border:1px solid #FECACA; width:34px; height:34px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+                  <button class="apk-icon-action-btn" type="button" data-delete-hint="${escapeHTML2(hint.id)}" title="Delete Hint" style="color:#DC2626; background:#FEF2F2; border:1px solid #FECACA; width:34px; height:34px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
                     <span class="material-symbols-rounded" style="font-size:17px;">delete</span>
                   </button>
                 </div>
@@ -97997,7 +98007,7 @@ var AppController = class {
     });
   }
   _buildAdminPaperLeaderboardHTML(boards, loadError, selectedBatch) {
-    const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",
@@ -98014,7 +98024,7 @@ var AppController = class {
     if (!boards.length) return `
       <div class="leaderboard-state" role="status">
         <span class="material-symbols-rounded">military_tech</span>
-        <strong>No published paper results for ${escapeHTML(selectedBatch)}</strong>
+        <strong>No published paper results for ${escapeHTML2(selectedBatch)}</strong>
         <span>Published evaluations will appear here.</span>
         <button class="apk-btn-primary" id="btn-empty-create-leaderboard" type="button" style="margin-top:14px; padding:10px 20px; border-radius:12px; display:inline-flex; align-items:center; gap:8px;">
           <span class="material-symbols-rounded" style="font-size:18px;">add</span> Create Paper Leaderboard
@@ -98034,17 +98044,17 @@ var AppController = class {
       const avgScore = entries.length ? (entries.reduce((sum, e2) => sum + (Number(e2.marks) || 0), 0) / entries.length).toFixed(1) : "\u2014";
       return `<article class="paper-board-card ${index === 0 ? "is-latest" : ""}" style="box-shadow:0 3px 12px rgba(15,23,42,0.04); border-radius:16px; overflow:hidden; background:#FFFFFF; border:1px solid #E2E8F0;">
           <div style="display:flex; align-items:center; justify-content:space-between; padding-right:12px; background:#FFFFFF;">
-            <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML(board.id)}" aria-expanded="${expanded}" style="flex:1; border:none; background:transparent; padding:14px 16px; cursor:pointer; text-align:left;">
+            <button class="paper-board-header" type="button" data-admin-paper-board="${escapeHTML2(board.id)}" aria-expanded="${expanded}" style="flex:1; border:none; background:transparent; padding:14px 16px; cursor:pointer; text-align:left;">
               <div class="paper-board-heading-content" style="display:flex; flex-direction:column; gap:6px;">
                 <div class="pb-badges-row" style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
-                  <span class="paper-board-tag" style="background:#F1F5F9; color:#334155; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">${escapeHTML(board.subject)} \xB7 ${escapeHTML(board.examYear)}</span>
+                  <span class="paper-board-tag" style="background:#F1F5F9; color:#334155; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700;">${escapeHTML2(board.subject)} \xB7 ${escapeHTML2(board.examYear)}</span>
                   ${index === 0 ? '<span class="paper-latest-tag" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; padding:3px 8px; border-radius:6px; font-size:10.5px; font-weight:800;">LATEST</span>' : ""}
                   <span class="paper-board-date" style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:#64748B;">
                     <span class="material-symbols-rounded" style="font-size:14px;">schedule</span>
-                    <span>${escapeHTML(published)}</span>
+                    <span>${escapeHTML2(published)}</span>
                   </span>
                 </div>
-                <h3 class="paper-board-title" style="font-size:16px; font-weight:800; color:#0F172A; margin:2px 0;">${escapeHTML(board.paperTitle)}</h3>
+                <h3 class="paper-board-title" style="font-size:16px; font-weight:800; color:#0F172A; margin:2px 0;">${escapeHTML2(board.paperTitle)}</h3>
                 <div class="paper-board-stats" style="display:flex; align-items:center; gap:8px; font-size:12px; color:#64748B;">
                   <span class="pb-stat-pill" style="display:inline-flex; align-items:center; gap:4px;">
                     <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">grade</span>
@@ -98056,16 +98066,16 @@ var AppController = class {
                     <span>${entries.length} candidates</span>
                   </span>
                 </div>
-                ${!expanded && entries[0] ? `<span class="paper-winner-snippet" style="font-size:11.5px; color:#475569; background:#F8FAFC; padding:4px 8px; border-radius:6px; display:inline-block; margin-top:2px; border:1px solid #E2E8F0;">Rank 1: <strong>${escapeHTML(entries[0].studentName)}</strong> (${entries[0].marks} marks \xB7 ${escapeHTML(entries[0].grade)})</span>` : ""}
+                ${!expanded && entries[0] ? `<span class="paper-winner-snippet" style="font-size:11.5px; color:#475569; background:#F8FAFC; padding:4px 8px; border-radius:6px; display:inline-block; margin-top:2px; border:1px solid #E2E8F0;">Rank 1: <strong>${escapeHTML2(entries[0].studentName)}</strong> (${entries[0].marks} marks \xB7 ${escapeHTML2(entries[0].grade)})</span>` : ""}
               </div>
               <div class="paper-expand-circle" style="width:30px; height:30px; border-radius:8px; background:#F1F5F9; color:#475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-left:8px;">
                 <span class="material-symbols-rounded paper-expand-icon" style="font-size:20px;">${expanded ? "expand_less" : "expand_more"}</span>
               </div>
             <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-              <button class="apk-icon-action-btn" type="button" data-edit-paper-board="${escapeHTML(board.id)}" title="Edit Leaderboard (\u0DC0\u0DD9\u0DB1\u0DC3\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8)" style="color:#2563EB; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #BFDBFE; background:#EFF6FF; border-radius:10px; cursor:pointer; flex-shrink:0;">
+              <button class="apk-icon-action-btn" type="button" data-edit-paper-board="${escapeHTML2(board.id)}" title="Edit Leaderboard (\u0DC0\u0DD9\u0DB1\u0DC3\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8)" style="color:#2563EB; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #BFDBFE; background:#EFF6FF; border-radius:10px; cursor:pointer; flex-shrink:0;">
                 <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
               </button>
-              <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML(board.id)}" title="Delete Leaderboard (\u0DB8\u0D9A\u0DCF \u0DAF\u0DD0\u0DB8\u0DD3\u0DB8)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
+              <button class="apk-icon-action-btn" type="button" data-delete-paper-board="${escapeHTML2(board.id)}" title="Delete Leaderboard (\u0DB8\u0D9A\u0DCF \u0DAF\u0DD0\u0DB8\u0DD3\u0DB8)" style="color:#DC2626; font-size:16px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #FECACA; background:#FEF2F2; border-radius:10px; cursor:pointer; flex-shrink:0;">
                 <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
               </button>
             </div>
@@ -98102,10 +98112,10 @@ var AppController = class {
                       <span class="rank-num" style="font-size:12px; font-weight:800; width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; ${entry.rank === 1 ? "background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;" : entry.rank === 2 ? "background:#F1F5F9; color:#475569; border:1px solid #E2E8F0;" : entry.rank === 3 ? "background:#FFEDD5; color:#C2410C; border:1px solid #FED7AA;" : "background:#F8FAFC; color:#64748B; border:1px solid #E2E8F0;"}">#${entry.rank}</span>
                     </div>
                     <div class="ptr-student" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
-                      <span class="ptr-name" style="font-size:13.5px; font-weight:700; color:#0F172A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(entry.studentName)}</span>
+                      <span class="ptr-name" style="font-size:13.5px; font-weight:700; color:#0F172A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML2(entry.studentName)}</span>
                     </div>
                     <div class="ptr-grade" style="width:50px; display:flex; align-items:center; justify-content:center;">
-                      <span class="grade-pill" style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; ${entry.grade === "A" ? "background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0;" : entry.grade === "B" ? "background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;" : entry.grade === "C" ? "background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;" : "background:#F1F5F9; color:#475569; border:1px solid #E2E8F0;"}">${escapeHTML(entry.grade || "A")}</span>
+                      <span class="grade-pill" style="font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; ${entry.grade === "A" ? "background:#DCFCE7; color:#15803D; border:1px solid #BBF7D0;" : entry.grade === "B" ? "background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;" : entry.grade === "C" ? "background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;" : "background:#F1F5F9; color:#475569; border:1px solid #E2E8F0;"}">${escapeHTML2(entry.grade || "A")}</span>
                     </div>
                     <div class="ptr-marks" style="width:80px; text-align:right; font-size:13px; font-weight:800; color:#0F172A;">
                       <span>${entry.marks}</span> <small style="color:#94A3B8; font-weight:600;">/ ${totalMarks}</small>
@@ -98428,17 +98438,17 @@ var AppController = class {
               <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
                 <div style="display:flex; align-items:center; gap:12px;">
                   <div style="width:42px; height:42px; border-radius:50%; background:${getAvatarGrad(st2.name || st2.id)}; color:#FFFFFF; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.12); flex-shrink:0;">
-                    ${(st2.name || "S").charAt(0).toUpperCase()}
+                    ${escapeHTML((st2.name || "S").charAt(0).toUpperCase())}
                   </div>
                   <div>
                     <div style="font-size:14px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                      <span>${st2.name || "Student"}</span>
+                      <span>${escapeHTML(st2.name || "Student")}</span>
                       ${isDup ? '<span style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:1px 6px; border-radius:6px; font-size:10px; font-weight:700;">\u26A0\uFE0F Duplicate Phone</span>' : ""}
                     </div>
                     <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
-                      ${st2.phone || "No phone"} \u2022 <span style="color:#2563EB; font-weight:700;">${st2.examYear || "2026 A/L"}</span>
+                      ${escapeHTML(st2.phone || "No phone")} \u2022 <span style="color:#2563EB; font-weight:700;">${escapeHTML(st2.examYear || "2026 A/L")}</span>
                       <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">\u26A1 ${st2.credits || 0} XP</span>
-                      ${st2.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${st2.studentId}</span>` : ""}
+                      ${st2.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${escapeHTML(st2.studentId)}</span>` : ""}
                     </div>
                   </div>
                 </div>
@@ -99810,7 +99820,7 @@ var AppController = class {
       if (m2 >= 35) return "S";
       return "F";
     };
-    const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",
@@ -99823,10 +99833,10 @@ var AppController = class {
       listEl.innerHTML = entries.map((entry, idx) => `
         <div class="lb-candidate-row" style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr 36px; gap:8px; align-items:center; background:#F8FAFC; border:1px solid #E2E8F0; padding:8px 10px; border-radius:10px;">
           <div>
-            <input type="text" class="form-textarea lb-entry-name" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Student Name" value="${escapeHTML(entry.studentName)}" />
+            <input type="text" class="form-textarea lb-entry-name" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Student Name" value="${escapeHTML2(entry.studentName)}" />
           </div>
           <div>
-            <input type="text" class="form-textarea lb-entry-index" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Index / Phone" value="${escapeHTML(entry.indexNumber)}" />
+            <input type="text" class="form-textarea lb-entry-index" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Index / Phone" value="${escapeHTML2(entry.indexNumber)}" />
           </div>
           <div>
             <input type="number" class="form-textarea lb-entry-marks" data-idx="${idx}" style="height:34px; padding:4px 8px; font-size:12px;" placeholder="Marks" value="${entry.marks}" min="0" max="100" />
@@ -100082,7 +100092,7 @@ var AppController = class {
         <div class="modal-header">
           <div>
             <div style="font-size:15px; font-weight:800; color:#0F172A;">Send Custom Message</div>
-            <div style="font-size:11.5px; color:#64748B;">To: ${student.name} (${student.phone})</div>
+            <div style="font-size:11.5px; color:#64748B;">To: ${escapeHTML(student.name)} (${escapeHTML(student.phone)})</div>
           </div>
           <button class="modal-close-btn" id="btn-close-msg-dialog">
             <span class="material-symbols-rounded">close</span>
@@ -101529,7 +101539,7 @@ ${!times.isWaiting ? `
               <video class="proctor-video-feed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
               <!-- Candidate details pill -->
               <div style="position:absolute; top:16px; left:16px; background:rgba(15,23,42,0.85); backdrop-filter:blur(6px); border:1px solid #334155; border-radius:10px; padding:6px 12px; display:flex; align-items:center; gap:8px; z-index:10;">
-                <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${student.name}</span>
+                <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${escapeHTML(student.name)}</span>
                 <span style="font-size:10px; background:#047857; color:#A7F3D0; padding:2px 6px; border-radius:6px; font-weight:800;">720p HD</span>
               </div>
             </div>
@@ -102677,11 +102687,11 @@ ${!times.isWaiting ? `
             </div>
             <div>
               <div style="font-size:15px; font-weight:700; color:#FFFFFF;">\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0D9A \u0DB4\u0DAB\u0DD2\u0DC0\u0DD2\u0DA9\u0DBA</div>
-              <div style="font-size:11px; color:#94A3B8;">From: ${alert2.senderName || "Faculty Proctor"}</div>
+              <div style="font-size:11px; color:#94A3B8;">From: ${escapeHTML(alert2.senderName || "Faculty Proctor")}</div>
             </div>
           </div>
           <div style="background:#0F172A; border-radius:10px; border:1px solid #F59E0B; padding:12px; font-size:13px; color:#E2E8F0; line-height:1.5; margin-bottom:18px;">
-            ${alert2.message}
+            ${escapeHTML(alert2.message)}
           </div>
           <button id="btn-ack-alert" style="width:100%; background:#6366F1; color:#FFFFFF; border:none; padding:12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;">
             \u0DAD\u0DDA\u0DBB\u0DD4\u0DB8\u0DCA \u0D9C\u0DAD\u0DD2\u0DB8\u0DD2 (Acknowledge)
@@ -102890,6 +102900,9 @@ window.addEventListener("DOMContentLoaded", () => {
   window.app = app2;
   app2.init();
 });
+export {
+  escapeHTML
+};
 /*! Bundled license information:
 
 @firebase/util/dist/index.esm.js:

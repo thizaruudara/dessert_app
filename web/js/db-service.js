@@ -834,9 +834,9 @@ export class DbService {
       name.includes('teacher') ||
       name.includes('prof.') ||
       name.includes('professor') ||
-      name.includes('senanayake') ||
-      name.includes('staff') ||
-      name.includes('instructor')
+      name.includes('instructor') ||
+      (name.includes('senanayake') && (role === 'admin' || role === 'teacher' || role === 'staff' || u.isTeacher || u.isAdmin || phone.endsWith('770557769'))) ||
+      name === 'staff'
     ) {
       return true;
     }

@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
   const filePath = path.join(ROOT, reqPath);
 
   // Security check: ensure within ROOT
-  if (!filePath.startsWith(ROOT)) {
+  if (!filePath.toLowerCase().startsWith(ROOT.toLowerCase())) {
     res.writeHead(403);
     res.end('Forbidden');
     return;

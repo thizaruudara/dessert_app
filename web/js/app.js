@@ -8,6 +8,16 @@ import { storageService } from './storage-service.js';
 import { PwaGatekeeper } from './pwa-gatekeeper.js';
 import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid } from './agora-service.js';
 
+export function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
 class AppController {
   constructor() {
     this.currentTab = 'home';
@@ -1053,10 +1063,10 @@ class AppController {
           <div class="header-info">
             <span class="greeting-text">Good Evening</span>
             <div class="student-name-row">
-              <span class="student-name">${studentName}</span>
+              <span class="student-name">${escapeHTML(studentName)}</span>
               <span class="material-symbols-rounded filled" style="font-size:16px; color:#2563EB;">verified</span>
             </div>
-            <span class="candidate-tag">${activeTargetYear} Candidate</span>
+            <span class="candidate-tag">${escapeHTML(activeTargetYear)} Candidate</span>
           </div>
         </div>
         <div class="streak-pill" style="display:inline-flex; align-items:center; gap:4px;">
@@ -3291,7 +3301,7 @@ class AppController {
 
                     ${d.adminFeedback ? `
                       <div style="margin-top:10px; padding:10px; background:#EFF6FF; border-left:3px solid #2563EB; border-radius:8px; font-size:11.5px; color:#1E3A8A; line-height:1.4;">
-                        <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">school</span> Teacher Feedback:</strong> ${d.adminFeedback}
+                        <strong style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px;">school</span> Teacher Feedback:</strong> ${escapeHTML(d.adminFeedback)}
                       </div>
                     ` : ''}
                   </div>
@@ -4031,7 +4041,7 @@ class AppController {
         ${d.adminFeedback ? `
           <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; padding:12px; margin-bottom:12px;">
             <div style="font-size:11px; font-weight:800; color:#1D4ED8;">TEACHER EVALUATION & FEEDBACK:</div>
-            <div style="font-size:12.5px; color:#1E3A8A; margin-top:2px; line-height:1.45;">${d.adminFeedback}</div>
+            <div style="font-size:12.5px; color:#1E3A8A; margin-top:2px; line-height:1.45;">${escapeHTML(d.adminFeedback)}</div>
           </div>
         ` : ''}
 
@@ -4705,6 +4715,7 @@ class AppController {
 
   handleExamTabSwitch() {
     this.antiCheatViolations++;
+    document.querySelectorAll('.anti-cheat-modal').forEach(m => m.remove());
     const modal = document.createElement('div');
     modal.className = 'anti-cheat-modal';
     modal.innerHTML = `
@@ -7443,17 +7454,17 @@ class AppController {
               <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
                 <div style="display:flex; align-items:center; gap:12px;">
                   <div style="width:42px; height:42px; border-radius:50%; background:${getAvatarGrad(st.name || st.id)}; color:#FFFFFF; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.12); flex-shrink:0;">
-                    ${(st.name || 'S').charAt(0).toUpperCase()}
+                    ${escapeHTML((st.name || 'S').charAt(0).toUpperCase())}
                   </div>
                   <div>
                     <div style="font-size:14px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                      <span>${st.name || 'Student'}</span>
+                      <span>${escapeHTML(st.name || 'Student')}</span>
                       ${isDup ? '<span style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:1px 6px; border-radius:6px; font-size:10px; font-weight:700;">⚠️ Duplicate Phone</span>' : ''}
                     </div>
                     <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
-                      ${st.phone || 'No phone'} • <span style="color:#2563EB; font-weight:700;">${st.examYear || '2026 A/L'}</span>
+                      ${escapeHTML(st.phone || 'No phone')} • <span style="color:#2563EB; font-weight:700;">${escapeHTML(st.examYear || '2026 A/L')}</span>
                       <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">⚡ ${st.credits || 0} XP</span>
-                      ${st.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${st.studentId}</span>` : ''}
+                      ${st.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${escapeHTML(st.studentId)}</span>` : ''}
                     </div>
                   </div>
                 </div>
@@ -9239,7 +9250,7 @@ class AppController {
         <div class="modal-header">
           <div>
             <div style="font-size:15px; font-weight:800; color:#0F172A;">Send Custom Message</div>
-            <div style="font-size:11.5px; color:#64748B;">To: ${student.name} (${student.phone})</div>
+            <div style="font-size:11.5px; color:#64748B;">To: ${escapeHTML(student.name)} (${escapeHTML(student.phone)})</div>
           </div>
           <button class="modal-close-btn" id="btn-close-msg-dialog">
             <span class="material-symbols-rounded">close</span>
@@ -10801,7 +10812,7 @@ ${!times.isWaiting ? `
               <video class="proctor-video-feed" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
               <!-- Candidate details pill -->
               <div style="position:absolute; top:16px; left:16px; background:rgba(15,23,42,0.85); backdrop-filter:blur(6px); border:1px solid #334155; border-radius:10px; padding:6px 12px; display:flex; align-items:center; gap:8px; z-index:10;">
-                <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${student.name}</span>
+                <span style="font-size:11.5px; font-weight:700; color:#38BDF8;">Candidate: ${escapeHTML(student.name)}</span>
                 <span style="font-size:10px; background:#047857; color:#A7F3D0; padding:2px 6px; border-radius:6px; font-weight:800;">720p HD</span>
               </div>
             </div>
@@ -12053,11 +12064,11 @@ ${!times.isWaiting ? `
             </div>
             <div>
               <div style="font-size:15px; font-weight:700; color:#FFFFFF;">විභාග පරීක්ෂක පණිවිඩය</div>
-              <div style="font-size:11px; color:#94A3B8;">From: ${alert.senderName || 'Faculty Proctor'}</div>
+              <div style="font-size:11px; color:#94A3B8;">From: ${escapeHTML(alert.senderName || 'Faculty Proctor')}</div>
             </div>
           </div>
           <div style="background:#0F172A; border-radius:10px; border:1px solid #F59E0B; padding:12px; font-size:13px; color:#E2E8F0; line-height:1.5; margin-bottom:18px;">
-            ${alert.message}
+            ${escapeHTML(alert.message)}
           </div>
           <button id="btn-ack-alert" style="width:100%; background:#6366F1; color:#FFFFFF; border:none; padding:12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;">
             තේරුම් ගතිමි (Acknowledge)
