@@ -89188,16 +89188,86 @@ var DbService = class {
     } catch (_) {
     }
     this._memCache = /* @__PURE__ */ new Map();
+    this._revalidating = /* @__PURE__ */ new Set();
   }
-  getCached(key, maxAgeMs = 3e4) {
+  _isAdminActive() {
+    try {
+      if (typeof window !== "undefined" && window.app && window.app.currentUser) {
+        if (window.app.currentUser.role === "admin" || window.app.currentMode === "admin") return true;
+      }
+      if (typeof localStorage !== "undefined") {
+        const raw = localStorage.getItem("edupeak_cached_user") || localStorage.getItem("edupeak_auth_user");
+        if (raw) {
+          const u2 = JSON.parse(raw);
+          if (u2 && (u2.role === "admin" || u2.role === "teacher")) return true;
+        }
+      }
+    } catch (_) {
+    }
+    return false;
+  }
+  getPersistentCache(key) {
+    if (this._isAdminActive()) return null;
+    try {
+      if (typeof localStorage !== "undefined") {
+        const stored = localStorage.getItem(`edupeak_swr_${key}`) || localStorage.getItem(`edupeak_cached_${key}`);
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      }
+    } catch (_) {
+    }
+    return null;
+  }
+  setPersistentCache(key, data) {
+    if (this._isAdminActive()) return;
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(`edupeak_swr_${key}`, JSON.stringify(data));
+      }
+    } catch (_) {
+    }
+  }
+  getCached(key, maxAgeMs = 12e4) {
+    if (this._isAdminActive()) return null;
     const item = this._memCache.get(key);
     if (item && Date.now() - item.time < maxAgeMs) {
       return item.data;
     }
+    const persistent = this.getPersistentCache(key);
+    if (persistent) {
+      this._memCache.set(key, { data: persistent, time: Date.now() });
+      return persistent;
+    }
     return null;
   }
   setCache(key, data) {
+    if (this._isAdminActive()) return;
     this._memCache.set(key, { data, time: Date.now() });
+    this.setPersistentCache(key, data);
+  }
+  hasCacheForTab(tabName, user = null) {
+    if (this._isAdminActive()) return false;
+    const year = user?.examYear || "2027 A/L";
+    const sId = user?.studentId || user?.uid || user?.id || "";
+    const sPhone = user?.phone || "";
+    const sName = user?.name || "";
+    if (tabName === "home") {
+      return !!(this.getCached(`paper_sessions_${year}`) || this.getCached("daily_physics_insight"));
+    }
+    if (tabName === "papers") {
+      return !!(this.getCached(`paper_sessions_${year}`) || this.getCached(`paper_hints_${year}`));
+    }
+    if (tabName === "ranks") {
+      return !!(this.getCached(`leaderboard_${year}`) || this.getCached("leaderboard_all") || this.getCached("paper_leaderboards"));
+    }
+    if (tabName === "desserts") {
+      return !!(this.getCached(`desserts_${sId}_${sPhone}_${sName}`) || localStorage.getItem("edupeak_local_desserts"));
+    }
+    if (tabName === "profile") {
+      return !!(localStorage.getItem("edupeak_cached_user") || localStorage.getItem("edupeak_auth_user"));
+    }
+    return false;
   }
   clearCache(prefix) {
     if (!prefix) {
@@ -89211,9 +89281,24 @@ var DbService = class {
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
   async getStudentDesserts(studentId, studentPhone, studentName, { forceRefresh = false } = {}) {
     const cacheKey = `desserts_${studentId || ""}_${studentPhone || ""}_${studentName || ""}`;
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 2e4);
-      if (cached) return cached;
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getStudentDesserts(studentId, studentPhone, studentName, { forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "desserts", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 400);
+        }
+        return cached;
+      }
     }
     let localList = [];
     try {
@@ -89428,9 +89513,27 @@ var DbService = class {
   // Get student accumulated credits from local cache, submissions, and leaderboard
   async getStudentCredits(studentId, studentPhone, studentIndex, studentName, { forceRefresh = false } = {}) {
     const cacheKey = `credits_${studentId || ""}_${studentPhone || ""}_${studentIndex || ""}_${studentName || ""}`;
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 1e4);
-      if (cached !== null && cached !== void 0) return cached;
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached !== null && cached !== void 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getStudentCredits(studentId, studentPhone, studentIndex, studentName, { forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh !== void 0 && fresh !== cached) {
+                if (window.app && window.app.currentUser) {
+                  window.app.currentUser.credits = fresh;
+                }
+                window.dispatchEvent(new CustomEvent("edupeak:credits-updated", { detail: { credits: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 400);
+        }
+        return cached;
+      }
     }
     const cleanPhone = String(studentPhone || "").replace(/\D/g, "");
     const cleanName = String(studentName || "").toLowerCase().trim();
@@ -90213,19 +90316,23 @@ var DbService = class {
   }
   async getPaperSessions(examYear, { forceRefresh = false } = {}) {
     const cacheKey = `paper_sessions_${examYear || "all"}`;
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 3e4);
-      if (cached) return cached;
-      try {
-        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            this.setCache(cacheKey, parsed);
-            return parsed;
-          }
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getPaperSessions(examYear, { forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "papers", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 300);
         }
-      } catch (_) {
+        return cached;
       }
     }
     try {
@@ -90345,19 +90452,23 @@ var DbService = class {
   }
   async getUpcomingPapers(examYear, { forceRefresh = false } = {}) {
     const cacheKey = `upcoming_papers_${examYear || "all"}`;
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 3e4);
-      if (cached) return cached;
-      try {
-        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            this.setCache(cacheKey, parsed);
-            return parsed;
-          }
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getUpcomingPapers(examYear, { forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "upcoming", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 400);
         }
-      } catch (_) {
+        return cached;
       }
     }
     try {
@@ -90410,19 +90521,23 @@ var DbService = class {
   }
   async getPaperHints(examYear, { forceRefresh = false } = {}) {
     const cacheKey = `paper_hints_${examYear || "all"}`;
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 3e4);
-      if (cached) return cached;
-      try {
-        const stored = localStorage.getItem(`edupeak_cached_${cacheKey}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            this.setCache(cacheKey, parsed);
-            return parsed;
-          }
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getPaperHints(examYear, { forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "hints", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 400);
         }
-      } catch (_) {
+        return cached;
       }
     }
     try {
@@ -91086,9 +91201,24 @@ var DbService = class {
   }
   async getLeaderboard(batch, { forceRefresh = false } = {}) {
     const cacheKey = `leaderboard_${batch || "all"}`;
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 3e4);
-      if (cached) return cached;
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getLeaderboard(batch, { forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "ranks", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 300);
+        }
+        return cached;
+      }
     }
     try {
       let supabaseList = [];
@@ -91412,9 +91542,24 @@ var DbService = class {
   }
   async getPaperLeaderboards({ forceRefresh = false } = {}) {
     const cacheKey = "paper_leaderboards";
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 3e4);
-      if (cached) return cached;
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getPaperLeaderboards({ forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "paper_leaderboards", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 300);
+        }
+        return cached;
+      }
     }
     try {
       const ref2 = collection(db, "paper_leaderboards");
@@ -91612,19 +91757,23 @@ var DbService = class {
   }
   async getDailyInsight({ forceRefresh = false } = {}) {
     const cacheKey = "daily_physics_insight";
-    if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 36e5);
-      if (cached) return cached;
-      try {
-        const stored = localStorage.getItem("edupeak_cached_daily_insight");
-        if (stored) {
-          const item = JSON.parse(stored);
-          if (item && item.concept) {
-            this.setCache(cacheKey, item);
-            return item;
-          }
+    if (!forceRefresh && !this._isAdminActive()) {
+      const cached = this.getCached(cacheKey);
+      if (cached && cached.concept) {
+        if (!this._revalidating.has(cacheKey)) {
+          this._revalidating.add(cacheKey);
+          setTimeout(() => {
+            this.getDailyInsight({ forceRefresh: true }).then((fresh) => {
+              this._revalidating.delete(cacheKey);
+              if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+                window.dispatchEvent(new CustomEvent("edupeak:swr-updated", { detail: { type: "insight", data: fresh } }));
+              }
+            }).catch(() => {
+              this._revalidating.delete(cacheKey);
+            });
+          }, 500);
         }
-      } catch (_) {
+        return cached;
       }
     }
     try {
@@ -93334,6 +93483,26 @@ var AppController = class {
     window.addEventListener("edupeak:credits-updated", () => {
       refreshStudentViews();
     });
+    window.addEventListener("edupeak:swr-updated", (e2) => {
+      if (this.currentMode === "student") {
+        const detail = e2.detail || {};
+        const activeTab = this.currentTab || "home";
+        const vp = this.getTabViewport(activeTab);
+        if (!vp) return;
+        if (detail.type === "papers" && (activeTab === "home" || activeTab === "papers")) {
+          if (activeTab === "home") this.renderHomeScreen(vp);
+          else this.renderPapersScreen(vp);
+        } else if ((detail.type === "ranks" || detail.type === "paper_leaderboards") && activeTab === "ranks") {
+          this.renderRanksScreen(vp);
+        } else if (detail.type === "desserts" && (activeTab === "home" || activeTab === "desserts" || activeTab === "profile")) {
+          if (activeTab === "home") this.renderHomeScreen(vp);
+          else if (activeTab === "desserts") this.renderDessertsScreen(vp);
+          else if (activeTab === "profile") this.renderProfileScreen(vp);
+        } else if (detail.type === "insight" && activeTab === "home") {
+          this.renderHomeScreen(vp);
+        }
+      }
+    });
     window.addEventListener("edupeak:dessert-reviewed", (e2) => {
       const detail = e2.detail;
       const user = this.currentUser || {};
@@ -94212,12 +94381,15 @@ var AppController = class {
     if (this._renderedTabs.has(tabName) && !forceRefresh && targetViewport.children.length > 0 && !targetViewport.innerHTML.includes("Loading your page")) {
       return;
     }
-    targetViewport.innerHTML = `
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
-        <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
-        <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page\u2026</div>
-      </div>
-    `;
+    const hasCached = dbService.hasCacheForTab(tabName, this.currentUser);
+    if (!hasCached && targetViewport.children.length === 0) {
+      targetViewport.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
+          <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+          <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page\u2026</div>
+        </div>
+      `;
+    }
     const markRendered = () => {
       if (targetViewport.isConnected && !targetViewport.innerHTML.includes("Loading your page")) {
         this._renderedTabs.add(tabName);

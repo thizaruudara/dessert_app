@@ -83,6 +83,28 @@ class AppController {
       refreshStudentViews();
     });
 
+    window.addEventListener('edupeak:swr-updated', (e) => {
+      if (this.currentMode === 'student') {
+        const detail = e.detail || {};
+        const activeTab = this.currentTab || 'home';
+        const vp = this.getTabViewport(activeTab);
+        if (!vp) return;
+
+        if (detail.type === 'papers' && (activeTab === 'home' || activeTab === 'papers')) {
+          if (activeTab === 'home') this.renderHomeScreen(vp);
+          else this.renderPapersScreen(vp);
+        } else if ((detail.type === 'ranks' || detail.type === 'paper_leaderboards') && activeTab === 'ranks') {
+          this.renderRanksScreen(vp);
+        } else if (detail.type === 'desserts' && (activeTab === 'home' || activeTab === 'desserts' || activeTab === 'profile')) {
+          if (activeTab === 'home') this.renderHomeScreen(vp);
+          else if (activeTab === 'desserts') this.renderDessertsScreen(vp);
+          else if (activeTab === 'profile') this.renderProfileScreen(vp);
+        } else if (detail.type === 'insight' && activeTab === 'home') {
+          this.renderHomeScreen(vp);
+        }
+      }
+    });
+
     window.addEventListener('edupeak:dessert-reviewed', (e) => {
       const detail = e.detail;
       const user = this.currentUser || {};
@@ -1074,13 +1096,16 @@ class AppController {
       return;
     }
 
-    // 4. Initial load spinner for this tab on first open only
-    targetViewport.innerHTML = `
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
-        <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
-        <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page…</div>
-      </div>
-    `;
+    // 4. Initial load spinner for this tab on first open only (skipped if cached data is available for instant load)
+    const hasCached = dbService.hasCacheForTab(tabName, this.currentUser);
+    if (!hasCached && targetViewport.children.length === 0) {
+      targetViewport.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:55vh; gap:14px;">
+          <div style="width:38px; height:38px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+          <div style="font-size:12px; font-weight:700; color:#64748B;">Loading your page…</div>
+        </div>
+      `;
+    }
 
     const markRendered = () => {
       if (targetViewport.isConnected && !targetViewport.innerHTML.includes('Loading your page')) {
