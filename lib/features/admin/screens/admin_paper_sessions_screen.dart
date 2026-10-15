@@ -730,6 +730,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
     ];
 
     final durationCtrl = TextEditingController(text: '180');
+    final pdfUrlCtrl = TextEditingController();
 
     int slotCount = 1; // Default: 1 Slot
     DateTime selectedDate = DateTime.now();
@@ -879,7 +880,30 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Physical paper note (no PDF)
+                // Paper PDF / Google Cloud link (optional)
+                TextField(
+                  controller: pdfUrlCtrl,
+                  keyboardType: TextInputType.url,
+                  style: GoogleFonts.poppins(fontSize: 12.5, color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Paper PDF / Cloud Link (Optional)',
+                    hintText: 'https://storage.googleapis.com/... or Google Drive link',
+                    hintStyle: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
+                    labelStyle: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Icons.picture_as_pdf_outlined, color: AppColors.primary, size: 20),
+                    helperText: 'සිසුන්ට විභාගය අතරතුර In-App හරහා පමණක් ආරක්ෂිතව නැරඹීමට PDF Link එකක් අමුණන්න (Cannot share/download).',
+                    helperMaxLines: 2,
+                    helperStyle: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+                    filled: true,
+                    fillColor: AppColors.backgroundSoft,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Physical paper note
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -1183,7 +1207,7 @@ class _AdminPaperSessionsScreenState extends State<AdminPaperSessionsScreen> {
                           examYear: selectedExamYear,
                           date: dateStr,
                           durationMinutes: int.tryParse(durationCtrl.text) ?? 180,
-                          pdfUrl: null, // Physical paper package sent home, no PDF
+                          pdfUrl: pdfUrlCtrl.text.trim().isNotEmpty ? pdfUrlCtrl.text.trim() : null,
                           status: initialStatus,
                           currentPhase: initialPhase,
                           slot1: PaperSlot(

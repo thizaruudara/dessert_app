@@ -1274,6 +1274,8 @@ export class DbService {
       paperType: raw.paperType || 'essay',
       mcqCount: Math.min(100, Math.max(1, Number(raw.mcqCount) || 50)),
       mcqAnswerKey: raw.mcqAnswerKey || {},
+      paperPdfUrl: raw.paperPdfUrl || raw.pdfUrl || null,
+      pdfUrl: raw.pdfUrl || raw.paperPdfUrl || null,
       examYear: raw.examYear || 'All Batches',
       date: raw.date || todayIso,
       durationMinutes: duration,

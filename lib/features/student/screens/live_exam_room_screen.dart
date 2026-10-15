@@ -1135,12 +1135,20 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                       ),
                     ),
 
+                    // 2.5 Floating Paper PDF Button during Writing Phase
+                    if (isWriting && session.pdfUrl != null && session.pdfUrl!.trim().isNotEmpty)
+                      Positioned(
+                        right: 16,
+                        bottom: 96,
+                        child: _buildFloatingPaperButton(session),
+                      ),
+
                     // 3. Bottom Submission Bar
                     Positioned(
                       left: 16,
                       right: 16,
                       bottom: 24,
-                      child: _buildBottomExamControlBar(isEnded, isTimeUp),
+                      child: _buildBottomExamControlBar(isEnded, isTimeUp, session: session, isWriting: isWriting),
                     ),
                   ],
                 ),
@@ -2034,7 +2042,9 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
     );
   }
 
-  Widget _buildBottomExamControlBar(bool isEnded, bool isTimeUp) {
+  Widget _buildBottomExamControlBar(bool isEnded, bool isTimeUp, {PaperSession? session, bool isWriting = false}) {
+    final bool hasPaperPdf = isWriting && session?.pdfUrl != null && session!.pdfUrl!.trim().isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -2092,6 +2102,26 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               ],
             ),
           ),
+          if (hasPaperPdf) ...[
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onPressed: () => _showSecurePaperPdfDialog(session!),
+              icon: const Icon(Icons.menu_book, size: 16, color: Colors.white),
+              label: Text(
+                'Paper',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: isEnded
@@ -2121,6 +2151,235 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFloatingPaperButton(PaperSession session) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showSecurePaperPdfDialog(session),
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2563EB).withOpacity(0.5),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.menu_book, color: Color(0xFF93C5FD), size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'ප්‍රශ්න පත්‍රය (Paper)',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSecurePaperPdfDialog(PaperSession session) {
+    final String pdfUrl = session.pdfUrl ?? '';
+    if (pdfUrl.isEmpty) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog.fullscreen(
+          backgroundColor: const Color(0xFF0B0F19),
+          child: Stack(
+            children: [
+              // 1. Content Area with Interactive Zoom & Pan
+              Positioned.fill(
+                top: 60,
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4.0,
+                  boundaryMargin: const EdgeInsets.all(20),
+                  child: Center(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF334155)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.lock, color: Color(0xFF4ADE80), size: 16),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Secure Proctored Exam Paper • In-App Viewing Only',
+                                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Document Render Card
+                            Container(
+                              constraints: const BoxConstraints(maxWidth: 800),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  pdfUrl,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Padding(
+                                    padding: const EdgeInsets.all(32.0),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.picture_as_pdf, color: Color(0xFF2563EB), size: 48),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          session.title,
+                                          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'ප්‍රශ්න පත්‍රය ආරක්ෂිතව In-App පූරණය වී ඇත.\nZoom හෝ Scroll කර ප්‍රශ්න පත්‍රය බලන්න.',
+                                          style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF475569)),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 2. Anti-Leak Diagonal Watermark Overlay
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.12,
+                    child: Transform.rotate(
+                      angle: -0.38,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: List.generate(
+                            8,
+                            (index) => Text(
+                              '${widget.studentName} • ${widget.studentPhone}\nEDUPEAK LIVE EXAM • CONFIDENTIAL • DO NOT SHARE',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.robotoMono(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFFDC2626),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. Top Control AppBar
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 60,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withOpacity(0.96),
+                    border: const Border(bottom: BorderSide(color: Color(0xFF334155))),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.description, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          session.title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                        label: Text(
+                          'Return to Exam',
+                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

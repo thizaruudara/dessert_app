@@ -150,7 +150,7 @@ class PaperSession {
       examYear: data['examYear']?.toString() ?? '2027 A/L',
       date: data['date']?.toString() ?? now.toIso8601String().split('T')[0],
       durationMinutes: parsedDuration,
-      pdfUrl: data['pdfUrl']?.toString(),
+      pdfUrl: data['pdfUrl']?.toString() ?? data['paperPdfUrl']?.toString(),
       paperImageUrl: data['paperImageUrl']?.toString(),
       status: rawStatus,
       currentPhase: parsedPhase,
@@ -181,6 +181,7 @@ class PaperSession {
     }
     if (pdfUrl != null && pdfUrl!.trim().isNotEmpty) {
       map['pdfUrl'] = pdfUrl!.trim();
+      map['paperPdfUrl'] = pdfUrl!.trim();
     }
     if (paperImageUrl != null && paperImageUrl!.trim().isNotEmpty) {
       map['paperImageUrl'] = paperImageUrl!.trim();

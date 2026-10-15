@@ -90543,6 +90543,8 @@ var DbService = class {
       paperType: raw.paperType || "essay",
       mcqCount: Math.min(100, Math.max(1, Number(raw.mcqCount) || 50)),
       mcqAnswerKey: raw.mcqAnswerKey || {},
+      paperPdfUrl: raw.paperPdfUrl || raw.pdfUrl || null,
+      pdfUrl: raw.pdfUrl || raw.paperPdfUrl || null,
       examYear: raw.examYear || "All Batches",
       date: raw.date || todayIso,
       durationMinutes: duration,
@@ -100105,6 +100107,15 @@ var AppController = class {
             </label>
           </div>
 
+          <!-- Paper PDF / Google Cloud Link Edit -->
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:10px 12px;">
+            <div class="form-label" style="font-size:11px; display:flex; align-items:center; gap:4px; margin-bottom:4px; color:#1E293B; font-weight:700;">
+              <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">picture_as_pdf</span>
+              Paper PDF / Cloud Link (Google Cloud / Drive):
+            </div>
+            <input type="url" id="edit-paper-pdf-url" class="form-textarea" style="height:38px; font-size:12px; width:100%; box-sizing:border-box;" value="${session.paperPdfUrl || session.pdfUrl || ""}" placeholder="https://storage.googleapis.com/... or Google Drive link" />
+          </div>
+
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="apk-btn-primary" id="btn-cancel-edit-times" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
               Cancel
@@ -100172,11 +100183,14 @@ var AppController = class {
       }
       const notifyStudents = document.getElementById("edit-paper-notify-scheduled")?.checked !== false;
       const notifyOnStart = document.getElementById("edit-paper-notify-start")?.checked !== false;
-      await dbService.updateSlotTimes(session.id, {
+      const newPdfUrl = document.getElementById("edit-paper-pdf-url")?.value?.trim() || null;
+      await dbService.updatePaperSession(session.id, {
         slot1: updatedSlot1,
         slot2: updatedSlot2,
         notifyStudents,
-        notifyOnStart
+        notifyOnStart,
+        paperPdfUrl: newPdfUrl,
+        pdfUrl: newPdfUrl
       });
       notificationService.showInAppBanner("Times Updated", "Session Times Updated Successfully!", "success");
       modal.remove();
@@ -102133,6 +102147,18 @@ var AppController = class {
             </div>
           </div>
 
+          <!-- Paper PDF / Google Cloud Link Attachment -->
+          <div style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:12px; padding:12px; width:100%; box-sizing:border-box;">
+            <div class="form-label" style="display:flex; align-items:center; gap:6px; color:#1E293B; font-weight:700;">
+              <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">picture_as_pdf</span>
+              <span>Paper PDF / Cloud Link (Optional):</span>
+            </div>
+            <input type="url" id="new-paper-pdf-url" class="form-textarea" style="height:40px; width:100%; min-width:0; box-sizing:border-box; font-size:12px; margin-top:4px;" placeholder="https://storage.googleapis.com/... or Google Drive link" />
+            <div style="font-size:10.5px; color:#64748B; margin-top:5px; line-height:1.45;">
+              \u{1F4A1} <strong>Paper PDF:</strong> \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D85\u0DAD\u0DBB\u0DAD\u0DD4\u0DBB \u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DB1\u0DD0\u0DBB\u0DB9\u0DD3\u0DB8\u0DA7 Google Cloud Storage \u0DC4\u0DDD Google Drive \u0DBD\u0DD2\u0DB1\u0DCA\u0D9A\u0DCA \u0D91\u0D9A\u0D9A\u0DCA \u0D87\u0DAD\u0DD4\u0DC5\u0DAD\u0DCA \u0D9A\u0DC5 \u0DC4\u0DD0\u0D9A. \u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DB8\u0DD9\u0DBA In-App \u0D86\u0DBB\u0D9A\u0DCA\u0DC2\u0DD2\u0DAD\u0DC0 \u0DB4\u0DB8\u0DAB\u0D9A\u0DCA zoom & scroll \u0D9A\u0DBB \u0DB1\u0DD0\u0DBB\u0DB9\u0DD2\u0DBA \u0DC4\u0DD0\u0D9A\u0DD2 \u0D85\u0DAD\u0DBB Share \u0DC4\u0DDD Download \u0D9A\u0DC5 \u0DB1\u0DDC\u0DC4\u0DD0\u0D9A.
+            </div>
+          </div>
+
           <!-- Physical Paper Delivery Note matching Flutter -->
           <div style="background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.2); border-radius:10px; padding:10px; display:flex; gap:8px; width:100%; box-sizing:border-box;">
             <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB; flex-shrink:0;">inventory_2</span>
@@ -102524,6 +102550,7 @@ var AppController = class {
       }
       const notifyScheduled = modal.querySelector("#new-paper-notify-scheduled")?.checked !== false;
       const notifyOnStart = modal.querySelector("#new-paper-notify-start")?.checked !== false;
+      const paperPdfUrl = modal.querySelector("#new-paper-pdf-url")?.value?.trim() || null;
       try {
         await dbService.savePaperSession({
           title,
@@ -102532,6 +102559,8 @@ var AppController = class {
           paperType,
           mcqCount,
           mcqAnswerKey: cleanAnswerKey,
+          paperPdfUrl,
+          pdfUrl: paperPdfUrl,
           date: examDate,
           durationMinutes: duration,
           totalMarks: marks,
@@ -104358,6 +104387,15 @@ ${!times.isWaiting ? `
                   </div>
                 </div>
               ` : times.isWriting ? `
+                ${session.paperPdfUrl || session.pdfUrl ? `
+                  <div style="margin-bottom:10px; display:flex; justify-content:center; width:100%;">
+                    <button id="btn-open-paper-pdf-hud" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.4); border-radius:14px; padding:10px 18px; font-size:13px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 6px 18px rgba(37,99,235,0.45); letter-spacing:0.3px; width:100%; max-width:420px; justify-content:center; transition:transform 0.15s ease;">
+                      <span class="material-symbols-rounded filled" style="font-size:20px; color:#93C5FD;">menu_book</span>
+                      <span>\u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB\u0DBA \u0DB6\u0DBD\u0DB1\u0DCA\u0DB1 (View Exam Paper)</span>
+                      <span style="background:rgba(255,255,255,0.25); border-radius:6px; font-size:9.5px; padding:2px 6px; font-weight:800;">PDF</span>
+                    </button>
+                  </div>
+                ` : ""}
                 <!-- Giant High-Contrast Digital Digits HUD -->
                 ${isBigTimerMinimized ? `
                   <div style="background:rgba(15,23,42,0.92); border:1.5px solid ${times.writingSecsLeft < 900 ? "#EF4444" : "#22C55E"}; border-radius:14px; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 6px 20px rgba(0,0,0,0.5);">
@@ -104434,26 +104472,42 @@ ${!times.isWaiting ? `
               ` : ""}
             </div>
 
+            <!-- Floating Paper Button during Writing Phase -->
+            ${times.isWriting && (session.paperPdfUrl || session.pdfUrl) ? `
+              <div id="btn-floating-view-paper" style="position:fixed; top:70px; right:14px; z-index:35; background:linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.4); border-radius:30px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 6px 18px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
+                <span class="material-symbols-rounded filled" style="font-size:18px; color:#60A5FA;">menu_book</span>
+                <span style="white-space:nowrap;">\u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB\u0DBA (Paper)</span>
+              </div>
+            ` : ""}
+
             <!-- Bottom Exam Control Bar (_buildBottomExamControlBar) -->
             <div style="position:absolute; bottom:20px; left:16px; right:16px; z-index:20; max-width:680px; margin:0 auto;">
-              <div style="background:rgba(30,41,59,0.92); border:1px solid ${times.isTimeUp ? "#EF4444" : "#334155"}; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <div style="width:36px; height:36px; border-radius:50%; background:${times.isTimeUp ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.2)"}; display:flex; align-items:center; justify-content:center; color:${times.isTimeUp ? "#EF4444" : "#4ADE80"}; font-size:18px;">
+              <div style="background:rgba(30,41,59,0.92); border:1px solid ${times.isTimeUp ? "#EF4444" : "#334155"}; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 24px rgba(0,0,0,0.5); gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                  <div style="width:36px; height:36px; border-radius:50%; background:${times.isTimeUp ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.2)"}; display:flex; align-items:center; justify-content:center; color:${times.isTimeUp ? "#EF4444" : "#4ADE80"}; font-size:18px; flex-shrink:0;">
                     <span class="material-symbols-rounded filled" style="font-size:20px;">${times.isTimeUp ? "alarm" : "shield"}</span>
                   </div>
-                  <div>
-                    <div style="font-size:11px; font-weight:600; color:${times.isTimeUp ? "#FCA5A5" : "#FFFFFF"};">
+                  <div style="min-width:0;">
+                    <div style="font-size:11px; font-weight:600; color:${times.isTimeUp ? "#FCA5A5" : "#FFFFFF"}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                       ${times.isTimeUp ? "\u0DC0\u0DDA\u0DBD\u0DCF\u0DC0 \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0D9A\u0DBB \u0D87\u0DAD" : "\u0D9A\u0DD0\u0DB8\u0DBB\u0DCF \u0D85\u0DB0\u0DD3\u0D9A\u0DCA\u0DC2\u0DAB\u0DBA \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA\u0DBA\u0DD2"}
                     </div>
-                    <div style="font-size:10px; color:#94A3B8;">
+                    <div style="font-size:10px; color:#94A3B8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                       ${times.isTimeUp ? "\u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0DB4\u0DAD\u0DCA\u200D\u0DBB Submit \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1" : "\u0D9C\u0DD4\u0DBB\u0DD4\u0DB7\u0DC0\u0DAD\u0DD4\u0DB1\u0DCA \u0DC3\u0DA2\u0DD3\u0DC0\u0DD3\u0DC0 \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB\u0DBA\u0DD2"}
                     </div>
                   </div>
                 </div>
-                <button id="btn-bottom-submit" style="background:${times.isEnded ? "#334155" : times.isTimeUp ? "#22C55E" : "#6366F1"}; color:#FFFFFF; border:none; padding:10px 16px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
-                  <span class="material-symbols-rounded filled" style="font-size:16px;">${session.paperType === "mcq" ? "fact_check" : session.paperType === "mcq_essay" ? "auto_stories" : times.isTimeUp ? "description" : "upload"}</span>
-                  <span>${session.paperType === "mcq" ? "Submit MCQ Answers" : session.paperType === "mcq_essay" ? "Submit Answers" : times.isTimeUp ? "Scan & Submit" : "Submit Paper"}</span>
-                </button>
+                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                  ${times.isWriting && (session.paperPdfUrl || session.pdfUrl) ? `
+                    <button id="btn-bottom-view-paper" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; border:1px solid rgba(255,255,255,0.3); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(37,99,235,0.35);">
+                      <span class="material-symbols-rounded filled" style="font-size:16px; color:#93C5FD;">menu_book</span>
+                      <span style="white-space:nowrap;">Exam Paper</span>
+                    </button>
+                  ` : ""}
+                  <button id="btn-bottom-submit" style="background:${times.isEnded ? "#334155" : times.isTimeUp ? "#22C55E" : "#6366F1"}; color:#FFFFFF; border:none; padding:10px 16px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                    <span class="material-symbols-rounded filled" style="font-size:16px;">${session.paperType === "mcq" ? "fact_check" : session.paperType === "mcq_essay" ? "auto_stories" : times.isTimeUp ? "description" : "upload"}</span>
+                    <span style="white-space:nowrap;">${session.paperType === "mcq" ? "Submit MCQ Answers" : session.paperType === "mcq_essay" ? "Submit Answers" : times.isTimeUp ? "Scan & Submit" : "Submit Paper"}</span>
+                  </button>
+                </div>
               </div>
             </div>
           `}
@@ -104490,6 +104544,17 @@ ${!times.isWaiting ? `
         isBigTimerMinimized = !isBigTimerMinimized;
         renderRoom();
       });
+      const handleOpenPaperPdf = () => {
+        const targetPdf = session.paperPdfUrl || session.pdfUrl;
+        if (!targetPdf) {
+          alert("\u0DB8\u0DD9\u0DB8 \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DB3\u0DC4\u0DCF \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB\u0DBA\u0D9A\u0DCA \u0D85\u0DB8\u0DD4\u0DAB\u0DCF \u0DB1\u0DD0\u0DAD (No paper attached).");
+          return;
+        }
+        this.openSecurePaperPdfModal(targetPdf, session, student, cameraStream);
+      };
+      roomContainer.querySelector("#btn-open-paper-pdf-hud")?.addEventListener("click", handleOpenPaperPdf);
+      roomContainer.querySelector("#btn-bottom-view-paper")?.addEventListener("click", handleOpenPaperPdf);
+      roomContainer.querySelector("#btn-floating-view-paper")?.addEventListener("click", handleOpenPaperPdf);
       const handleStudentSubmitClick = () => {
         if (times.isEnded) {
           alert("\u0DB8\u0DD9\u0DB8 \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0D9A\u0DBB \u0D87\u0DAD (Session ended).");
@@ -105628,6 +105693,162 @@ ${!times.isWaiting ? `
         if (minTime) minTime.textContent = times.isOvertime ? `+${m2}:${s2}` : `${h}:${m2}:${s2}`;
       }
     }, 1e3);
+  }
+  formatPdfViewerUrl(url) {
+    if (!url) return "";
+    const cleanUrl = String(url).trim();
+    if (!cleanUrl) return "";
+    if (cleanUrl.includes("drive.google.com")) {
+      const matchD = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const matchId = cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const fileId = matchD ? matchD[1] : matchId ? matchId[1] : null;
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
+    if (cleanUrl.includes("docs.google.com/viewer") || cleanUrl.includes("/preview")) {
+      return cleanUrl;
+    }
+    if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
+      return `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`;
+    }
+    return cleanUrl;
+  }
+  openSecurePaperPdfModal(pdfUrl, session = {}, student = {}, cameraStream = null) {
+    const rawPdf = pdfUrl || session.paperPdfUrl || session.pdfUrl;
+    if (!rawPdf) {
+      alert("\u0DB8\u0DD9\u0DB8 \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DB3\u0DC4\u0DCF \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB PDF \u0D91\u0D9A\u0D9A\u0DCA \u0D85\u0DB8\u0DD4\u0DAB\u0DCF \u0DB1\u0DD0\u0DAD (No Paper PDF attached).");
+      return;
+    }
+    const embedUrl = this.formatPdfViewerUrl(rawPdf);
+    const escapeHTML2 = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+    const studentName = student.name || student.displayName || "EduPeak Student";
+    const studentPhone = student.phone || student.phoneNumber || student.studentId || "";
+    const paperTitle = session.title || "Examination Question Paper";
+    const modal = document.createElement("div");
+    modal.id = "secure-paper-pdf-modal";
+    modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 9999999;
+      background: #0B0F19; display: flex; flex-direction: column;
+      color: #F8FAFC; font-family: 'Poppins', sans-serif;
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+      overflow: hidden;
+    `;
+    modal.addEventListener("contextmenu", (e2) => {
+      e2.preventDefault();
+      return false;
+    });
+    modal.addEventListener("dragstart", (e2) => {
+      e2.preventDefault();
+      return false;
+    });
+    const handleKeyDown = (e2) => {
+      if ((e2.ctrlKey || e2.metaKey) && ["p", "s", "c", "u"].includes(e2.key.toLowerCase())) {
+        e2.preventDefault();
+        return false;
+      }
+      if (e2.key === "F12" || e2.ctrlKey && e2.shiftKey && ["i", "j", "c"].includes(e2.key.toLowerCase())) {
+        e2.preventDefault();
+        return false;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    let currentZoom = 1;
+    modal.innerHTML = `
+      <!-- Secure Header Bar -->
+      <div style="background: rgba(15, 23, 42, 0.96); border-bottom: 1px solid #334155; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 50; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #2563EB, #1D4ED8); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(37,99,235,0.4);">
+            <span class="material-symbols-rounded filled" style="font-size: 20px; color: #FFFFFF;">description</span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: min(340px, 45vw);">
+              ${escapeHTML2(paperTitle)}
+            </div>
+            <div style="font-size: 10px; color: #94A3B8; display: flex; align-items: center; gap: 6px;">
+              <span style="color: #4ADE80; font-weight: 600;">\u25CF Secure Proctored View</span>
+              <span style="opacity: 0.6;">\u2022 Zoom & Scroll Enabled</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zoom & Viewport Controls -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; border-radius: 10px; padding: 2px 4px;">
+            <button id="btn-paper-zoom-out" title="Zoom Out" style="background: transparent; border: none; color: #E2E8F0; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
+              <span class="material-symbols-rounded" style="font-size: 19px;">remove</span>
+            </button>
+            <span id="lbl-paper-zoom-val" style="font-size: 12px; font-weight: 700; color: #60A5FA; min-width: 48px; text-align: center; font-family: monospace;">100%</span>
+            <button id="btn-paper-zoom-in" title="Zoom In" style="background: transparent; border: none; color: #E2E8F0; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
+              <span class="material-symbols-rounded" style="font-size: 19px;">add</span>
+            </button>
+          </div>
+
+          <button id="btn-paper-zoom-reset" title="Reset Zoom" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #94A3B8; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            <span class="material-symbols-rounded" style="font-size: 16px;">restart_alt</span>
+            <span style="white-space:nowrap;">100%</span>
+          </button>
+
+          <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
+            <span class="material-symbols-rounded" style="font-size: 17px;">close</span>
+            <span style="white-space: nowrap;">Return to Exam</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Document Viewport & Scroll Area -->
+      <div id="secure-paper-scroll-container" style="flex: 1; width: 100%; height: 100%; overflow: auto; position: relative; background: #0F172A; display: flex; justify-content: center; align-items: flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom;">
+        <!-- Scalable Paper Content Wrapper -->
+        <div id="secure-paper-zoom-target" style="width: 100%; min-height: 100%; display: flex; flex-direction: column; align-items: center; transform-origin: top center; transition: transform 0.15s ease-out; position: relative;">
+          <iframe id="secure-paper-iframe" src="${embedUrl}#toolbar=0&navpanes=0&scrollbar=1" style="width: 100%; height: calc(100vh - 58px); min-height: 600px; border: none; background: #FFFFFF; display: block;" sandbox="allow-scripts allow-same-origin allow-forms" loading="eager"></iframe>
+        </div>
+
+        <!-- Indelible Security Watermark Diagonal Overlay -->
+        <div id="secure-watermark-overlay" style="position: absolute; inset: 0; pointer-events: none; z-index: 20; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 80px 40px; transform: rotate(-24deg) scale(1.4); opacity: 0.13; user-select: none;">
+          ${Array.from({ length: 36 }).map(() => `
+            <div style="text-align: center; line-height: 1.45; font-family: monospace; font-weight: 800; color: #DC2626; font-size: 12.5px;">
+              <div>${escapeHTML2(studentName)}</div>
+              <div style="font-size: 11px; color: #1E293B;">${escapeHTML2(studentPhone)}</div>
+              <div style="font-size: 9px; letter-spacing: 1px; color: #64748B;">EDUPEAK EXAM \u2022 CONFIDENTIAL \u2022 DO NOT SHARE</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- Small Proctored Live Camera PiP Feed -->
+      <div id="secure-paper-pip-box" style="position: fixed; bottom: 20px; right: 20px; z-index: 60; width: 140px; height: 105px; border-radius: 12px; overflow: hidden; border: 2px solid #22C55E; box-shadow: 0 8px 24px rgba(0,0,0,0.6); background: #000000; display: flex; flex-direction: column;">
+        <video id="secure-paper-pip-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #1E293B;"></video>
+        <div style="position: absolute; top: 4px; left: 6px; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.7); border-radius: 4px; padding: 2px 5px; font-size: 9px; color: #4ADE80; font-weight: 700;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #22C55E; display: inline-block;"></span>
+          <span>PROCTORED</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const pipVideo = modal.querySelector("#secure-paper-pip-video");
+    if (cameraStream && pipVideo) {
+      pipVideo.srcObject = cameraStream;
+      pipVideo.play().catch(() => {
+      });
+    }
+    const zoomTarget = modal.querySelector("#secure-paper-zoom-target");
+    const zoomLabel = modal.querySelector("#lbl-paper-zoom-val");
+    const setZoom = (val) => {
+      currentZoom = Math.max(0.6, Math.min(2.5, Math.round(val * 100) / 100));
+      zoomLabel.textContent = `${Math.round(currentZoom * 100)}%`;
+      if (zoomTarget) {
+        zoomTarget.style.transform = `scale(${currentZoom})`;
+        zoomTarget.style.width = currentZoom > 1 ? `${currentZoom * 100}%` : "100%";
+      }
+    };
+    modal.querySelector("#btn-paper-zoom-in")?.addEventListener("click", () => setZoom(currentZoom + 0.15));
+    modal.querySelector("#btn-paper-zoom-out")?.addEventListener("click", () => setZoom(currentZoom - 0.15));
+    modal.querySelector("#btn-paper-zoom-reset")?.addEventListener("click", () => setZoom(1));
+    const closeSecureModal = () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      modal.remove();
+    };
+    modal.querySelector("#btn-close-secure-paper")?.addEventListener("click", closeSecureModal);
   }
   openCloudLimitsModal(cloudUsage) {
     const modal = document.createElement("div");
