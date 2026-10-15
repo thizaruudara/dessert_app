@@ -95479,7 +95479,7 @@ var AppController = class {
                   ${registeredSlotId ? "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DB3\u0DC4\u0DCF \u0DBD\u0DD2\u0DBA\u0DCF\u0DB4\u0DAF\u0DD2\u0D82\u0DA0\u0DD2 \u0DC0\u0DD3 \u0D87\u0DAD (Registered)" : "\u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DD0\u0DBD\u0DC3\u0DD4\u0DB8\u0DCA \u0D9A\u0DBB \u0D87\u0DAD (Registration Open)"}
                 </div>
                 <div style="font-size:11px; color:${registeredSlotId ? "#166534" : "#3B82F6"}; margin-top:2px;">
-                  ${registeredSlotId ? `\u0D94\u0DB6 ${registeredSlotId === "slot2" ? "Slot 2 (Evening)" : "Slot 1 (Morning)"} \u0DC3\u0DB3\u0DC4\u0DCF \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 \u0DBD\u0DD2\u0DBA\u0DCF\u0DB4\u0DAF\u0DD2\u0D82\u0DA0\u0DD2 \u0DC0\u0DD3 \u0D87\u0DAD. Admin \u0DC0\u0DD2\u0DC3\u0DD2\u0DB1\u0DCA \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Start \u0D9A\u0DBB\u0DB1 \u0DAD\u0DD9\u0D9A\u0DCA \u0DBB\u0DD0\u0DB3\u0DD3 \u0DC3\u0DD2\u0DA7\u0DD2\u0DB1\u0DCA\u0DB1.` : '\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0D89\u0DC4\u0DAD \u0D87\u0DAD\u0DD2 Slot \u0D91\u0D9A\u0D9A\u0DCA \u0DAD\u0DDD\u0DBB\u0DCF \u0DB4\u0DC4\u0DAD "Register" \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DB1\u0DCA\u0DB1.'}
+                  ${registeredSlotId ? `\u0D94\u0DB6 ${registeredSlotId === "slot2" ? "Slot 2 (Evening)" : "Slot 1 (Morning)"} \u0DC3\u0DB3\u0DC4\u0DCF \u0DBD\u0DD2\u0DBA\u0DCF\u0DB4\u0DAF\u0DD2\u0D82\u0DA0\u0DD2 \u0DC0\u0DD3 \u0D87\u0DAD. \u0DAF\u0DD0\u0DB1\u0DCA \u0DB4\u0DDC\u0DBB\u0DDC\u0DAD\u0DCA\u0DAD\u0DD4 \u0DC1\u0DCF\u0DBD\u0DCF\u0DC0\u0DA7 \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3 \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0DCF \u0D9A\u0DBB \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA\u0DC0 \u0DC3\u0DD2\u0DA7\u0DD2\u0DB1\u0DCA\u0DB1.` : '\u0D9A\u0DBB\u0DD4\u0DAB\u0DCF\u0D9A\u0DBB \u0D89\u0DC4\u0DAD \u0D87\u0DAD\u0DD2 Slot \u0D91\u0D9A\u0D9A\u0DCA \u0DAD\u0DDD\u0DBB\u0DCF \u0DB4\u0DC4\u0DAD "Register" \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DB1\u0DCA\u0DB1.'}
                 </div>
               </div>
             </div>
@@ -95529,15 +95529,23 @@ var AppController = class {
                 <span class="material-symbols-rounded" style="font-size:19px;">how_to_reg</span>
                 <span>Register for ${selectedSlotId === "slot2" ? "Evening Session (Slot 2)" : "Morning Session (Slot 1)"}</span>
               </button>
-            ` : selectedSlotId !== registeredSlotId ? `
-              <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #4F46E5 0%, #3730A3 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(79,70,229,0.3); border:none; cursor:pointer;">
-                <span class="material-symbols-rounded" style="font-size:19px;">swap_horiz</span>
-                <span>Switch Registration to ${selectedSlotId === "slot2" ? "Evening Session (Slot 2)" : "Morning Session (Slot 1)"}</span>
-              </button>
             ` : `
-              <div style="background:#F1F5F9; border:1.5px solid #CBD5E1; color:#334155; padding:12px 14px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">check_circle</span>
-                <span>Registered for ${registeredSlotId === "slot2" ? "Slot 2 (Evening)" : "Slot 1 (Morning)"} \u2022 Waiting for Start</span>
+              <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+                <button type="button" class="btn-primary" style="background:linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); color:#FFFFFF; padding:13px; border-radius:14px; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; border:none; cursor:pointer; box-shadow:0 4px 14px rgba(79,70,229,0.35);" data-enter-exam="${session.id}">
+                  <span class="material-symbols-rounded" style="font-size:20px;">meeting_room</span>
+                  <span>Enter Waiting Room (\u0DB4\u0DDC\u0DBB\u0DDC\u0DAD\u0DCA\u0DAD\u0DD4 \u0DC1\u0DCF\u0DBD\u0DCF\u0DC0\u0DA7 \u0DB4\u0DD2\u0DC0\u0DD2\u0DC3\u0DD9\u0DB1\u0DCA\u0DB1)</span>
+                </button>
+                ${selectedSlotId !== registeredSlotId ? `
+                  <button type="button" class="btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:#F1F5F9; border:1px solid #CBD5E1; color:#334155; padding:8px 12px; border-radius:10px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:16px;">swap_horiz</span>
+                    <span>Switch Registration to ${selectedSlotId === "slot2" ? "Slot 2 (Evening)" : "Slot 1 (Morning)"}</span>
+                  </button>
+                ` : `
+                  <div style="font-size:11.5px; font-weight:700; color:#15803D; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
+                    <span class="material-symbols-rounded filled" style="font-size:15px; color:#22C55E;">check_circle</span>
+                    <span>Registered for ${registeredSlotId === "slot2" ? "Slot 2 (Evening)" : "Slot 1 (Morning)"} \u2022 Ready to Enter</span>
+                  </div>
+                `}
               </div>
             ` : isWaiting ? `
             <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">

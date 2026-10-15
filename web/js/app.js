@@ -2067,7 +2067,7 @@ class AppController {
                 </div>
                 <div style="font-size:11px; color:${registeredSlotId ? '#166534' : '#3B82F6'}; margin-top:2px;">
                   ${registeredSlotId
-                    ? `ඔබ ${registeredSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} සඳහා සාර්ථකව ලියාපදිංචි වී ඇත. Admin විසින් සැසිය Start කරන තෙක් රැඳී සිටින්න.`
+                    ? `ඔබ ${registeredSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} සඳහා ලියාපදිංචි වී ඇත. දැන් පොරොත්තු ශාලාවට පිවිස කැමරාව පරීක්ෂා කර සූදානම්ව සිටින්න.`
                     : 'කරුණාකර ඉහත ඇති Slot එකක් තෝරා පහත "Register" බොත්තම ඔබන්න.'}
                 </div>
               </div>
@@ -2119,17 +2119,25 @@ class AppController {
                 <span class="material-symbols-rounded" style="font-size:19px;">how_to_reg</span>
                 <span>Register for ${selectedSlotId === 'slot2' ? 'Evening Session (Slot 2)' : 'Morning Session (Slot 1)'}</span>
               </button>
-            ` : (selectedSlotId !== registeredSlotId ? `
-              <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #4F46E5 0%, #3730A3 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(79,70,229,0.3); border:none; cursor:pointer;">
-                <span class="material-symbols-rounded" style="font-size:19px;">swap_horiz</span>
-                <span>Switch Registration to ${selectedSlotId === 'slot2' ? 'Evening Session (Slot 2)' : 'Morning Session (Slot 1)'}</span>
-              </button>
             ` : `
-              <div style="background:#F1F5F9; border:1.5px solid #CBD5E1; color:#334155; padding:12px 14px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
-                <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">check_circle</span>
-                <span>Registered for ${registeredSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} • Waiting for Start</span>
+              <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+                <button type="button" class="btn-primary" style="background:linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); color:#FFFFFF; padding:13px; border-radius:14px; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; border:none; cursor:pointer; box-shadow:0 4px 14px rgba(79,70,229,0.35);" data-enter-exam="${session.id}">
+                  <span class="material-symbols-rounded" style="font-size:20px;">meeting_room</span>
+                  <span>Enter Waiting Room (පොරොත්තු ශාලාවට පිවිසෙන්න)</span>
+                </button>
+                ${selectedSlotId !== registeredSlotId ? `
+                  <button type="button" class="btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:#F1F5F9; border:1px solid #CBD5E1; color:#334155; padding:8px 12px; border-radius:10px; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:16px;">swap_horiz</span>
+                    <span>Switch Registration to ${selectedSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'}</span>
+                  </button>
+                ` : `
+                  <div style="font-size:11.5px; font-weight:700; color:#15803D; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;">
+                    <span class="material-symbols-rounded filled" style="font-size:15px; color:#22C55E;">check_circle</span>
+                    <span>Registered for ${registeredSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} • Ready to Enter</span>
+                  </div>
+                `}
               </div>
-            `)
+            `
           ) : isWaiting ? `
             <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
               <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
