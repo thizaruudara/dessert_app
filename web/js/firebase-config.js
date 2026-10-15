@@ -21,6 +21,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDVaNNyALnsrqrqTj371nGn8gbeBWL7fGc",
@@ -64,5 +65,8 @@ export {
   signInWithCustomToken,
   signOut,
   updateProfile,
-  getIdTokenResult
+  getIdTokenResult,
+  getMessaging,
+  getToken,
+  isSupported
 };

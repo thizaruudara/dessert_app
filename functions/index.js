@@ -434,33 +434,104 @@ async function downloadMediaToStorage(mediaId, mediaType, studentId) {
 // ── Firestore Trigger: On Dessert Reviewed ────────────────────────
 exports.onDessertReviewed = functions.firestore
   .onDocumentUpdated("desserts/{dessertId}", async (event) => {
-    const before = event.data.before.data();
-    const after = event.data.after.data();
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
 
     // Only act when status changes from pending to something
-    if (before.status !== "pending" || after.status === "pending") return;
+    if (!before || !after || before.status !== "pending" || after.status === "pending") return;
 
     const studentId = after.studentId;
     const isApproved = after.status === "approved";
 
-    // Get student FCM token
+    // Get student profile
     const studentDoc = await db.collection("users").doc(studentId).get();
     if (!studentDoc.exists) return;
-    const student = studentDoc.data();
-    if (!student.fcmToken) return;
+    const student = studentDoc.data() || {};
+
+    // Collect all valid FCM registration tokens
+    const tokens = new Set();
+    if (typeof student.fcmToken === "string" && !student.fcmToken.startsWith("web_token_") && !student.fcmToken.startsWith("{")) {
+      tokens.add(student.fcmToken);
+    }
+    if (Array.isArray(student.fcmTokens)) {
+      student.fcmTokens.forEach((t) => {
+        if (typeof t === "string" && !t.startsWith("web_token_") && !t.startsWith("{")) {
+          tokens.add(t);
+        }
+      });
+    }
+
+    if (tokens.size === 0) {
+      console.log(`No registered push token found for student ${studentId}`);
+      return;
+    }
 
     const title = isApproved
       ? "🎉 Dessert Approved!"
       : "📝 Dessert Reviewed";
     const body = isApproved
-      ? `You earned +${after.creditsAwarded} credits!`
+      ? `You earned +${after.creditsAwarded || 0} credits!`
       : "Your teacher left feedback. Tap to view.";
 
-    await admin.messaging().send({
-      token: student.fcmToken,
+    const messages = Array.from(tokens).map((token) => ({
+      token,
       notification: { title, body },
       data: {
         route: "/student/dessert/" + event.params.dessertId,
+        dessertId: event.params.dessertId,
+        type: "dessert_review",
       },
-    });
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: "./icons/icon-192.png",
+          badge: "./icons/icon-192.png",
+          vibrate: [200, 100, 200],
+          requireInteraction: true,
+        },
+        fcmOptions: {
+          link: "./index.html",
+        },
+      },
+    }));
+
+    try {
+      if (admin.messaging().sendEach) {
+        await admin.messaging().sendEach(messages);
+      } else {
+        await Promise.all(messages.map((m) => admin.messaging().send(m)));
+      }
+      console.log(`Sent dessert review push notification to ${messages.length} device(s) of student ${studentId}`);
+    } catch (err) {
+      console.warn("Failed to send review push notification:", err.message);
+    }
   });
+
+// ── Firestore Trigger: Auto-Subscribe Student Push Tokens to Topics ──
+// Ensures students receive background push notifications even when the web app is closed.
+exports.onStudentTokenUpdated = functions.firestore
+  .onDocumentWritten("users/{uid}", async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    const data = after.data() || {};
+    if (data.role && data.role !== "student") return;
+
+    const token = data.fcmToken;
+    if (!token || typeof token !== "string" || token.startsWith("web_token_") || token.startsWith("{")) {
+      return;
+    }
+
+    const before = event.data?.before;
+    const prevToken = before?.exists ? before.data()?.fcmToken : null;
+    if (token === prevToken) return;
+
+    try {
+      await admin.messaging().subscribeToTopic(token, "announcements");
+      await admin.messaging().subscribeToTopic(token, "paper_sessions");
+      console.log(`Subscribed student ${event.params.uid} push token to topics announcements & paper_sessions`);
+    } catch (err) {
+      console.warn("Could not subscribe token to topics:", err.message);
+    }
+  });
+

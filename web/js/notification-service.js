@@ -1,11 +1,25 @@
 // EduPeak Notification Service
-// Handles iOS 16.4+ Web Push, FCM Token Registration & In-App Alerts
-import { db, doc, updateDoc, arrayUnion, serverTimestamp } from './firebase-config.js';
+// Handles iOS 16.4+ Web Push, FCM Token Registration & System Push Notifications
+import { 
+  app,
+  db, 
+  doc, 
+  updateDoc, 
+  arrayUnion, 
+  serverTimestamp,
+  getMessaging,
+  getToken,
+  isSupported
+} from './firebase-config.js';
+
+// Official Firebase Web Push standard uncompressed P-256 public key (65 bytes / 87 chars base64url)
+export const VAPID_PUBLIC_KEY = 'BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4';
 
 export class NotificationService {
   constructor() {
     this.swRegistration = null;
     this.fcmToken = null;
+    this.pushSubscription = null;
     this.isSupported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
     this.permission = this.isSupported ? Notification.permission : 'denied';
   }
@@ -33,7 +47,7 @@ export class NotificationService {
   async requestPermission(user = null) {
     if (!('Notification' in window)) {
       if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-        alert('Push notifications require an iOS device running iOS 16.4+ added to your Home Screen.');
+        alert('Push notifications require iOS 16.4+. Tap the Share icon and select "Add to Home Screen" to enable notifications.');
       } else {
         alert('Push notifications are not supported on this browser.');
       }
@@ -45,14 +59,16 @@ export class NotificationService {
       this.permission = permission;
 
       if (permission === 'granted') {
+        let token = null;
+        if (user) {
+          token = await this.syncTokenWithUser(user);
+        }
+
         this.showLocalNotification('Notifications Active! 🔔', {
-          body: 'You will receive real-time alerts for live exams, homework reviews, and announcements.',
+          body: 'You will receive real-time alerts for live exams, homework reviews, and announcements even when this app is closed.',
           tag: 'welcome-notification'
         });
 
-        if (user) {
-          await this.syncTokenWithUser(user);
-        }
         return true;
       } else {
         console.warn('[Notification] Permission denied or dismissed:', permission);
@@ -65,38 +81,85 @@ export class NotificationService {
   }
 
   async syncTokenWithUser(user) {
-    if (!user || !user.uid) return;
+    if (!user || !user.uid) return null;
 
     try {
-      // 1. Try subscribing to native push manager
+      let fcmToken = null;
+      let subscription = null;
+
+      // 1. Ensure service worker is active
+      if (!this.swRegistration && 'serviceWorker' in navigator) {
+        this.swRegistration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+        await navigator.serviceWorker.ready;
+      }
+
+      // 2. Try obtaining a native PushSubscription with the verified 65-byte VAPID key
       if (this.swRegistration && this.swRegistration.pushManager) {
-        let subscription = await this.swRegistration.pushManager.getSubscription();
-        if (!subscription) {
-          // Attempt subscription with dummy or server key
-          try {
+        try {
+          subscription = await this.swRegistration.pushManager.getSubscription();
+          if (!subscription) {
             subscription = await this.swRegistration.pushManager.subscribe({
               userVisibleOnly: true,
-              applicationServerKey: this.urlBase64ToUint8Array('BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkRXZJjSgSnfckjBVM3whx1pnU')
-            }).catch(() => null);
-          } catch (_) {}
+              applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
+          }
+          this.pushSubscription = subscription;
+          console.log('[Notification] Native push subscription active:', subscription.endpoint);
+        } catch (subErr) {
+          console.warn('[Notification] pushManager subscribe notice:', subErr.message);
         }
-
-        const token = subscription ? JSON.stringify(subscription) : `web_token_${user.uid}_${Date.now()}`;
-        this.fcmToken = token;
-
-        // Save to Firestore under user document
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
-          fcmTokens: arrayUnion(token),
-          lastTokenUpdate: serverTimestamp()
-        }).catch(err => {
-          console.warn('[Notification] Non-critical: Could not write token to user doc:', err);
-        });
-
-        console.log('[Notification] User token registered successfully:', token);
       }
+
+      // 3. Try obtaining official Firebase Cloud Messaging (FCM) registration token
+      try {
+        const supported = await isSupported().catch(() => false);
+        if (supported && this.swRegistration) {
+          const messaging = getMessaging(app);
+          fcmToken = await getToken(messaging, {
+            serviceWorkerRegistration: this.swRegistration,
+            vapidKey: VAPID_PUBLIC_KEY
+          });
+          if (fcmToken) {
+            console.log('[Notification] Firebase FCM token acquired successfully');
+          }
+        }
+      } catch (fcmErr) {
+        console.warn('[Notification] Firebase getToken notice:', fcmErr.message);
+      }
+
+      // 4. Fallback: if FCM token was not generated, use subscription serialized endpoint
+      const primaryToken = fcmToken || (subscription ? JSON.stringify(subscription) : null);
+      if (!primaryToken) {
+        console.warn('[Notification] Could not generate push token for user');
+        return null;
+      }
+
+      this.fcmToken = primaryToken;
+
+      // 5. Persist to Firestore user document (both fcmToken and fcmTokens for backend parity)
+      const userRef = doc(db, 'users', user.uid);
+      const updatePayload = {
+        fcmToken: primaryToken,
+        fcmTokens: arrayUnion(primaryToken),
+        lastTokenUpdate: serverTimestamp()
+      };
+      if (subscription) {
+        updatePayload.webPushSubscription = JSON.stringify(subscription);
+      }
+
+      await updateDoc(userRef, updatePayload).catch(err => {
+        console.warn('[Notification] Non-critical: Could not write token to user doc:', err);
+      });
+
+      try {
+        localStorage.setItem('edupeak_fcm_token', primaryToken);
+      } catch (_) {}
+
+      console.log('[Notification] User push token registered successfully in Firestore');
+      return primaryToken;
     } catch (e) {
-      console.warn('[Notification] Token sync warning:', e);
+      console.warn('[Notification] Token sync error:', e);
+      return null;
     }
   }
 
@@ -112,6 +175,9 @@ export class NotificationService {
       icon: './icons/icon-192.png',
       badge: './icons/icon-192.png',
       vibrate: [200, 100, 200],
+      tag: 'edupeak-alert',
+      renotify: true,
+      requireInteraction: true,
       data: { url: './index.html' }
     };
 
@@ -119,10 +185,10 @@ export class NotificationService {
 
     if (this.swRegistration && this.swRegistration.showNotification) {
       this.swRegistration.showNotification(title, finalOptions).catch(() => {
-        new Notification(title, finalOptions);
+        try { new Notification(title, finalOptions); } catch (_) {}
       });
     } else {
-      new Notification(title, finalOptions);
+      try { new Notification(title, finalOptions); } catch (_) {}
     }
   }
 
@@ -137,7 +203,6 @@ export class NotificationService {
     return null;
   }
 
-  // In-app animated banner toast removed - only push notifications kept
   showInAppBanner(title, message, type = 'info') {
     const existing = document.getElementById('in-app-toast-container');
     if (existing) existing.remove();

@@ -1,5 +1,5 @@
 // EduPeak Service Worker - PWA & Web Push Notification Handler
-const CACHE_NAME = 'edupeak-pwa-v1.6.0';
+const CACHE_NAME = 'edupeak-pwa-v1.6.1';
 const OFFLINE_URLS = [
   './',
   './index.html',
@@ -104,6 +104,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ── Web Push Notification Event Listener (iOS 16.4+ / Android / Desktop) ──
+// Receives notifications even when the web app / browser tab is completely closed.
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification event received');
   let data = {
@@ -111,18 +112,27 @@ self.addEventListener('push', (event) => {
     body: 'You have a new update from your Physics tutor!',
     icon: './icons/icon-192.png',
     badge: './icons/icon-192.png',
+    image: null,
     data: { url: './index.html' }
   };
 
   if (event.data) {
     try {
       const payload = event.data.json();
-      data.title = payload.title || payload.notification?.title || data.title;
-      data.body = payload.body || payload.notification?.body || data.body;
-      if (payload.icon) data.icon = payload.icon;
-      if (payload.data) data.data = payload.data;
+      const notif = payload.notification || {};
+      const dataPayload = payload.data || {};
+      const webpush = payload.webpush?.notification || {};
+
+      data.title = notif.title || webpush.title || dataPayload.title || payload.title || data.title;
+      data.body = notif.body || webpush.body || dataPayload.body || dataPayload.message || payload.body || data.body;
+      data.icon = notif.icon || webpush.icon || dataPayload.icon || payload.icon || data.icon;
+      data.image = notif.image || webpush.image || dataPayload.image || payload.image || null;
+
+      const targetUrl = dataPayload.route || dataPayload.url || payload.fcmOptions?.link || notif.click_action || './index.html';
+      data.data = { url: targetUrl, ...dataPayload };
     } catch (e) {
-      data.body = event.data.text() || data.body;
+      const text = event.data.text();
+      if (text) data.body = text;
     }
   }
 
@@ -130,8 +140,11 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: data.icon,
     badge: data.badge,
-    vibrate: [100, 50, 100],
+    image: data.image || undefined,
+    vibrate: [200, 100, 200, 100, 200],
     data: data.data,
+    tag: data.data?.tag || `edupeak-${Date.now()}`,
+    renotify: true,
     requireInteraction: true,
     actions: [
       { action: 'open_app', title: 'Open EduPeak' },
@@ -145,6 +158,7 @@ self.addEventListener('push', (event) => {
 });
 
 // ── Notification Click Event Listener ──
+// Re-opens and focuses the app when user taps the notification while webapp was closed.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -156,13 +170,19 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it
+      // If a window is already open, focus it and notify client
       for (const client of clientList) {
-        if (client.url.includes('index.html') && 'focus' in client) {
+        if ('focus' in client) {
+          try {
+            client.postMessage({
+              type: 'NOTIFICATION_CLICKED',
+              data: event.notification.data
+            });
+          } catch (_) {}
           return client.focus();
         }
       }
-      // Otherwise open a new window
+      // If the app was completely closed, open a new window to the target URL
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
