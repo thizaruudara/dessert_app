@@ -923,11 +923,19 @@ export class DbService {
         payload.createdAt = new Date().toISOString();
         payload.scheduledAt = session.scheduledAt || new Date().toISOString();
         const docRef = await addDoc(ref, payload);
-        return { id: docRef.id, ...payload };
+        const res = { id: docRef.id, ...payload };
+        if (payload.notifyStudents !== false) {
+          this.broadcastSessionAlert(docRef.id, 'scheduled').catch(() => {});
+        }
+        return res;
       } else {
         const docRef = doc(db, 'paper_sessions', session.id);
         await setDoc(docRef, payload, { merge: true });
-        return { id: session.id, ...payload };
+        const res = { id: session.id, ...payload };
+        if (payload.notifyStudents !== false && payload.status === 'scheduled') {
+          this.broadcastSessionAlert(session.id, 'scheduled').catch(() => {});
+        }
+        return res;
       }
     } catch (e) {
       console.warn('[DB] Saved paper locally:', e);
@@ -1923,6 +1931,16 @@ export class DbService {
       updates.isLive = true;
       if (forceResetTimer) {
         updates.writingStartedAt = nowIso;
+      } else {
+        try {
+          const currentSnap = await getDoc(doc(db, 'paper_sessions', paperId));
+          const currentData = currentSnap.data() || {};
+          if (!currentData.writingStartedAt) {
+            updates.writingStartedAt = nowIso;
+          }
+        } catch (_) {
+          updates.writingStartedAt = nowIso;
+        }
       }
       updates.packageOpeningEndedAt = nowIso;
       alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
@@ -1962,6 +1980,12 @@ export class DbService {
         message: alertMessage,
         type: alertType
       }).catch(() => {});
+    }
+
+    if (phase === 'package_opening' || phase === 'writing') {
+      this.broadcastSessionAlert(paperId, 'live').catch(() => {});
+    } else if (phase === 'time_up') {
+      this.broadcastSessionAlert(paperId, 'time_up').catch(() => {});
     }
   }
 
@@ -2038,6 +2062,28 @@ export class DbService {
       message: '📦 විභාග සැසිය ආරම්භ විය! කැමරාව ඉදිරියේ ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කරන්න. (Exam is Live)',
       type: 'urgent'
     }).catch(() => {});
+    if (notifyStudents !== false) {
+      this.broadcastSessionAlert(paperId, 'live').catch(() => {});
+    }
+  }
+
+  async broadcastSessionAlert(paperId, action = 'live', { title = null, message = null } = {}) {
+    if (!paperId) return;
+    try {
+      const sess = await this.getPaperSession(paperId);
+      const examYear = sess?.examYear || 'All Batches';
+      const paperTitle = title || sess?.title || 'Physics Examination Paper';
+      await callBackend('papers/broadcast', {
+        paperId,
+        action,
+        examYear,
+        title: paperTitle,
+        message
+      });
+      console.log(`[DB] Broadcast triggered for paper ${paperId} (${action})`);
+    } catch (err) {
+      console.warn('[DB] broadcastSessionAlert notice:', err.message);
+    }
   }
 
   async reopenPaperSession(paperId) {

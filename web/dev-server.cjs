@@ -17,9 +17,11 @@ const apiHandlers = new Map([
   ['/api/auth/ensure-admin', require('./api/auth/ensure-admin')],
   ['/api/auth/ensure-profile', require('./api/auth/ensure-profile')],
   ['/api/papers/register-slot', require('./api/papers/register-slot')],
+  ['/api/papers/broadcast', require('./api/papers/broadcast')],
   ['/api/sprints/submit-attempt', require('./api/sprints/submit-attempt')],
   ['/api/agora/token', require('./api/agora/token')],
 ]);
+
 
 const esbuild = path.join(root, 'node_modules', 'esbuild', 'bin', 'esbuild');
 execFileSync(process.execPath, [esbuild, 'js/app.js', '--bundle', '--platform=browser', '--format=esm', '--outfile=js/app.bundle.js'], {

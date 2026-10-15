@@ -535,3 +535,293 @@ exports.onStudentTokenUpdated = functions.firestore
     }
   });
 
+// ── Helper: Broadcast FCM push message to student devices & topic ──
+async function broadcastPushNotification({
+  title,
+  body,
+  tag,
+  url = "./index.html?tab=papers",
+  dataPayload = {},
+  examYear = "All Batches"
+}) {
+  const safeData = {
+    title: String(title),
+    body: String(body),
+    url: String(url),
+    route: String(url),
+    tag: String(tag || `edupeak-${Date.now()}`),
+    ...dataPayload
+  };
+
+  // 1. Topic multicast (reaches all subscribed devices)
+  try {
+    await admin.messaging().send({
+      topic: "paper_sessions",
+      notification: { title, body },
+      data: safeData,
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "edupeak_high_importance_channel",
+          priority: "high",
+          sound: "default"
+        }
+      },
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: "./icons/icon-192.png",
+          badge: "./icons/icon-192.png",
+          vibrate: [300, 100, 300, 100, 300],
+          requireInteraction: true,
+          tag: safeData.tag
+        },
+        fcmOptions: {
+          link: url
+        }
+      }
+    });
+    console.log(`[FCM] Topic broadcast sent: ${title}`);
+  } catch (topicErr) {
+    console.warn("[FCM] Topic broadcast notice:", topicErr.message);
+  }
+
+  // 2. Direct device multicast for guaranteed background delivery
+  try {
+    let query = db.collection("users").where("role", "==", "student");
+    const snap = await query.get();
+    const tokens = new Set();
+
+    snap.forEach((docSnap) => {
+      const u = docSnap.data() || {};
+      const studentYear = String(u.examYear || "");
+      if (
+        examYear &&
+        examYear !== "All" &&
+        examYear !== "All Batches" &&
+        studentYear &&
+        !studentYear.includes(examYear.replace(/\s*A\/L/i, "").trim())
+      ) {
+        return; // Filter by student batch
+      }
+
+      if (typeof u.fcmToken === "string" && !u.fcmToken.startsWith("web_token_") && !u.fcmToken.startsWith("{")) {
+        tokens.add(u.fcmToken);
+      }
+      if (Array.isArray(u.fcmTokens)) {
+        u.fcmTokens.forEach((t) => {
+          if (typeof t === "string" && !t.startsWith("web_token_") && !t.startsWith("{")) {
+            tokens.add(t);
+          }
+        });
+      }
+    });
+
+    if (tokens.size > 0) {
+      const messages = Array.from(tokens).map((token) => ({
+        token,
+        notification: { title, body },
+        data: safeData,
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "edupeak_high_importance_channel",
+            priority: "high",
+            sound: "default"
+          }
+        },
+        webpush: {
+          notification: {
+            title,
+            body,
+            icon: "./icons/icon-192.png",
+            badge: "./icons/icon-192.png",
+            vibrate: [300, 100, 300, 100, 300],
+            requireInteraction: true,
+            tag: safeData.tag
+          },
+          fcmOptions: {
+            link: url
+          }
+        }
+      }));
+
+      for (let i = 0; i < messages.length; i += 500) {
+        const batch = messages.slice(i, i + 500);
+        if (admin.messaging().sendEach) {
+          await admin.messaging().sendEach(batch);
+        } else {
+          await Promise.all(batch.map((m) => admin.messaging().send(m)));
+        }
+      }
+      console.log(`[FCM] Direct push delivered to ${tokens.size} student device(s)`);
+    }
+  } catch (directErr) {
+    console.warn("[FCM] Direct device multicast notice:", directErr.message);
+  }
+}
+
+// ── Firestore Trigger: On Paper Session Created or Updated ────────
+// Sends push notifications even when the webapp / browser tab is completely closed.
+exports.onPaperSessionWritten = functions.firestore
+  .onDocumentWritten("paper_sessions/{paperId}", async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    const paperId = event.params.paperId;
+
+    if (!after) return; // Document deleted
+    if (after.notifyStudents === false) return;
+
+    const title = after.title || "Physics Examination Paper";
+    const examYear = after.examYear || "All Batches";
+
+    const isNewlyCreated = !before;
+    const wasLive = before && (before.isLive || before.status === "active" || before.currentPhase === "package_opening" || before.currentPhase === "writing");
+    const isNowLive = after.isLive || after.status === "active" || after.currentPhase === "package_opening" || after.currentPhase === "writing";
+    const justWentLive = !wasLive && isNowLive;
+
+    const wasTimeUp = before && (before.isTimeUp || before.currentPhase === "time_up");
+    const isNowTimeUp = after.isTimeUp || after.currentPhase === "time_up";
+    const justTimeUp = !wasTimeUp && isNowTimeUp;
+
+    if (justWentLive) {
+      if (after.notifyOnStart === false) return;
+      await broadcastPushNotification({
+        title: "🔴 Live Exam Started!",
+        body: `"${title}" (${examYear}) is now LIVE! Tap to enter exam room.`,
+        tag: `live-exam-${paperId}`,
+        url: "./index.html?tab=papers",
+        dataPayload: { paperId, type: "live_exam", examYear },
+        examYear
+      });
+    } else if (justTimeUp) {
+      await broadcastPushNotification({
+        title: "⏰ Exam Time Is Up!",
+        body: `Writing time has ended for "${title}". Scan & submit your answer sheets now!`,
+        tag: `timeup-exam-${paperId}`,
+        url: "./index.html?tab=papers",
+        dataPayload: { paperId, type: "time_up", examYear },
+        examYear
+      });
+    } else if (isNewlyCreated || (before.status !== "scheduled" && after.status === "scheduled")) {
+      await broadcastPushNotification({
+        title: "📅 New Paper Session Scheduled!",
+        body: `"${title}" (${examYear}) is scheduled. Tap to register your exam slot!`,
+        tag: `paper-scheduled-${paperId}`,
+        url: "./index.html?tab=papers",
+        dataPayload: { paperId, type: "paper_scheduled", examYear },
+        examYear
+      });
+    }
+  });
+
+// ── Firestore Trigger: On Paper Hint Published ────────────────────
+exports.onPaperHintWritten = functions.firestore
+  .onDocumentWritten("paper_hints/{hintId}", async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!after) return;
+    if (after.notifyStudents === false) return;
+    if (before && before.title === after.title) return; // Prevent duplicate notifications on minor edits
+
+    const title = after.title || after.paperName || "Model Paper";
+    const examYear = after.examYear || "All Batches";
+
+    await broadcastPushNotification({
+      title: "💡 New Paper Hint & Scope Published!",
+      body: `Exclusive formulas & guidance published for "${title}" (${examYear}). Review now!`,
+      tag: `paper-hint-${event.params.hintId}`,
+      url: "./index.html?tab=papers",
+      dataPayload: { hintId: event.params.hintId, type: "paper_hint", examYear },
+      examYear
+    });
+  });
+
+// ── Firestore Trigger: On Paper Leaderboard Published ─────────────
+exports.onPaperLeaderboardWritten = functions.firestore
+  .onDocumentWritten("paper_leaderboards/{boardId}", async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!after || before) return; // Only notify on initial publish
+    if (after.notifyStudents === false) return;
+
+    const title = after.paperTitle || after.title || "Physics Paper";
+    const examYear = after.examYear || "All Batches";
+
+    await broadcastPushNotification({
+      title: "🏆 Leaderboard Published!",
+      body: `Rankings & marks for "${title}" (${examYear}) are now available. Tap to check your rank!`,
+      tag: `leaderboard-${event.params.boardId}`,
+      url: "./index.html?tab=ranks",
+      dataPayload: { boardId: event.params.boardId, type: "leaderboard", examYear },
+      examYear
+    });
+  });
+
+// ── Firestore Trigger: On Invigilator / Proctor Alert ─────────────
+exports.onProctorAlertCreated = functions.firestore
+  .onDocumentCreated("proctor_alerts/{alertId}", async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const studentId = data.studentId;
+    if (!studentId || studentId === "all") return; // Targeted alerts only
+
+    const userSnap = await db.collection("users").doc(studentId).get();
+    if (!userSnap.exists) return;
+    const user = userSnap.data() || {};
+
+    const tokens = new Set();
+    if (typeof user.fcmToken === "string" && !user.fcmToken.startsWith("web_token_") && !user.fcmToken.startsWith("{")) {
+      tokens.add(user.fcmToken);
+    }
+    if (Array.isArray(user.fcmTokens)) {
+      user.fcmTokens.forEach((t) => {
+        if (typeof t === "string" && !t.startsWith("web_token_") && !t.startsWith("{")) {
+          tokens.add(t);
+        }
+      });
+    }
+
+    if (tokens.size === 0) return;
+
+    const title = "⚠️ Invigilator Proctor Alert";
+    const body = data.message || "Please check your exam camera and desk area.";
+
+    const messages = Array.from(tokens).map((token) => ({
+      token,
+      notification: { title, body },
+      data: {
+        route: "./index.html?tab=papers",
+        type: "proctor_alert",
+        alertId: event.params.alertId
+      },
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: "./icons/icon-192.png",
+          badge: "./icons/icon-192.png",
+          vibrate: [400, 150, 400],
+          requireInteraction: true,
+          tag: `proctor-alert-${event.params.alertId}`
+        },
+        fcmOptions: {
+          link: "./index.html?tab=papers"
+        }
+      }
+    }));
+
+    try {
+      if (admin.messaging().sendEach) {
+        await admin.messaging().sendEach(messages);
+      } else {
+        await Promise.all(messages.map((m) => admin.messaging().send(m)));
+      }
+    } catch (err) {
+      console.warn("Proctor alert direct push error:", err.message);
+    }
+  });
+
+

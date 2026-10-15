@@ -1,6 +1,7 @@
 const { cert, getApps, initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
+const { getMessaging } = require('firebase-admin/messaging');
 
 function getAdminApp() {
   const existing = getApps()[0];
@@ -37,7 +38,9 @@ function getAdmin() {
   return {
     auth: () => getAuth(app),
     firestore,
+    messaging: () => getMessaging(app),
   };
 }
 
 module.exports = { getAdmin };
+

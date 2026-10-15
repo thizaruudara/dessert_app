@@ -89962,11 +89962,21 @@ var DbService = class {
         payload.createdAt = (/* @__PURE__ */ new Date()).toISOString();
         payload.scheduledAt = session.scheduledAt || (/* @__PURE__ */ new Date()).toISOString();
         const docRef = await addDoc(ref2, payload);
-        return { id: docRef.id, ...payload };
+        const res = { id: docRef.id, ...payload };
+        if (payload.notifyStudents !== false) {
+          this.broadcastSessionAlert(docRef.id, "scheduled").catch(() => {
+          });
+        }
+        return res;
       } else {
         const docRef = doc(db, "paper_sessions", session.id);
         await setDoc(docRef, payload, { merge: true });
-        return { id: session.id, ...payload };
+        const res = { id: session.id, ...payload };
+        if (payload.notifyStudents !== false && payload.status === "scheduled") {
+          this.broadcastSessionAlert(session.id, "scheduled").catch(() => {
+          });
+        }
+        return res;
       }
     } catch (e2) {
       console.warn("[DB] Saved paper locally:", e2);
@@ -90908,6 +90918,16 @@ var DbService = class {
       updates.isLive = true;
       if (forceResetTimer) {
         updates.writingStartedAt = nowIso;
+      } else {
+        try {
+          const currentSnap = await getDoc(doc(db, "paper_sessions", paperId));
+          const currentData = currentSnap.data() || {};
+          if (!currentData.writingStartedAt) {
+            updates.writingStartedAt = nowIso;
+          }
+        } catch (_) {
+          updates.writingStartedAt = nowIso;
+        }
       }
       updates.packageOpeningEndedAt = nowIso;
       alertMessage = "\u270D\uFE0F \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0DC0\u0DD2\u0DBA! \u0DAF\u0DD0\u0DB1\u0DCA \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0DBD\u0DD2\u0DC0\u0DD3\u0DB8 \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1. (Exam Writing has started!)";
@@ -90945,6 +90965,13 @@ var DbService = class {
         message: alertMessage,
         type: alertType
       }).catch(() => {
+      });
+    }
+    if (phase === "package_opening" || phase === "writing") {
+      this.broadcastSessionAlert(paperId, "live").catch(() => {
+      });
+    } else if (phase === "time_up") {
+      this.broadcastSessionAlert(paperId, "time_up").catch(() => {
       });
     }
   }
@@ -91022,6 +91049,28 @@ var DbService = class {
       type: "urgent"
     }).catch(() => {
     });
+    if (notifyStudents !== false) {
+      this.broadcastSessionAlert(paperId, "live").catch(() => {
+      });
+    }
+  }
+  async broadcastSessionAlert(paperId, action = "live", { title = null, message = null } = {}) {
+    if (!paperId) return;
+    try {
+      const sess = await this.getPaperSession(paperId);
+      const examYear = sess?.examYear || "All Batches";
+      const paperTitle = title || sess?.title || "Physics Examination Paper";
+      await callBackend("papers/broadcast", {
+        paperId,
+        action,
+        examYear,
+        title: paperTitle,
+        message
+      });
+      console.log(`[DB] Broadcast triggered for paper ${paperId} (${action})`);
+    } catch (err) {
+      console.warn("[DB] broadcastSessionAlert notice:", err.message);
+    }
   }
   async reopenPaperSession(paperId) {
     if (!paperId) return;
@@ -92609,6 +92658,36 @@ var StorageService = class {
       } catch (sbErr) {
         console.warn("[Storage] Supabase storage exception:", sbErr);
       }
+    }
+    try {
+      const tgBotToken = "8837234143:AAEFLrgpMuTa4bxwIxl-SDqAuOy4P_o7vtI";
+      const tgChatId = "6516172480";
+      const tgFormData = new FormData();
+      tgFormData.append("chat_id", tgChatId);
+      tgFormData.append("caption", `Exam Paper: ${filePrefix} | Student: ${cleanStudentId} | Page: ${pageIndex}`);
+      tgFormData.append("document", blob, `${filePrefix}_${timestamp}_p${pageIndex}.jpg`);
+      const tgSendRes = await fetch(`https://api.telegram.org/bot${tgBotToken}/sendDocument`, {
+        method: "POST",
+        body: tgFormData
+      });
+      if (tgSendRes.ok) {
+        const tgData = await tgSendRes.json();
+        const fileId = tgData?.result?.document?.file_id;
+        if (fileId) {
+          const tgGetFileRes = await fetch(`https://api.telegram.org/bot${tgBotToken}/getFile?file_id=${fileId}`);
+          if (tgGetFileRes.ok) {
+            const getFileData = await tgGetFileRes.json();
+            const filePath = getFileData?.result?.file_path;
+            if (filePath) {
+              const tgUrl = `https://api.telegram.org/file/bot${tgBotToken}/${filePath}`;
+              console.log("[Storage] Uploaded to Telegram CDN:", tgUrl);
+              return tgUrl;
+            }
+          }
+        }
+      }
+    } catch (tgErr) {
+      console.warn("[Storage] Telegram CDN upload note:", tgErr);
     }
     return compressedDataUrl;
   }
@@ -103547,13 +103626,16 @@ This will purge all associated submissions and records.`)) {
       });
       return;
     }
-    await dbService.registerStudentSlot({
-      paperId,
-      studentId,
-      studentName,
-      studentPhone,
-      slotId: slotId || "slot1"
-    });
+    const finalSlotId = slotId || existingReg?.selectedSlot || existingReg?.slotId || "slot1";
+    if (!existingReg) {
+      await dbService.registerStudentSlot({
+        paperId,
+        studentId,
+        studentName,
+        studentPhone,
+        slotId: finalSlotId
+      });
+    }
     let session = await dbService.getPaperSession(paperId);
     if (!session) {
       session = {
@@ -105104,7 +105186,14 @@ ${!times.isWaiting ? `
             `;
             document.body.appendChild(overlay);
             try {
-              const photoUrls = scannedPages.map((p2) => p2.dataUrl);
+              let photoUrls = [];
+              if (scannedPages.length > 0) {
+                const rawImgs = scannedPages.map((p2) => p2.dataUrl);
+                photoUrls = await storageService.uploadAllPages(rawImgs, {
+                  studentId,
+                  filePrefix: `exam_paper_${paperId}`
+                });
+              }
               if (driveLink) photoUrls.push(driveLink);
               await dbService.updateCameraHeartbeat({
                 paperId,

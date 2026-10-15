@@ -10877,14 +10877,18 @@ class AppController {
       return;
     }
 
-    // Auto-register student if not yet registered (matching _ensureStudentRegistered)
-    await dbService.registerStudentSlot({
-      paperId,
-      studentId,
-      studentName,
-      studentPhone,
-      slotId: slotId || 'slot1'
-    });
+    // Auto-register student if not yet registered without overwriting an existing slot
+    const finalSlotId = slotId || existingReg?.selectedSlot || existingReg?.slotId || 'slot1';
+    if (!existingReg) {
+      await dbService.registerStudentSlot({
+        paperId,
+        studentId,
+        studentName,
+        studentPhone,
+        slotId: finalSlotId
+      });
+    }
+
 
     // 2. Fetch session from Firestore
     let session = await dbService.getPaperSession(paperId);
@@ -12562,13 +12566,23 @@ ${!times.isWaiting ? `
             document.body.appendChild(overlay);
 
             try {
-              const photoUrls = scannedPages.map(p => p.dataUrl);
+              // Upload scanned pages using storageService so clean HTTPS URLs are saved (preventing 1MB document limit error)
+              let photoUrls = [];
+              if (scannedPages.length > 0) {
+                const rawImgs = scannedPages.map(p => p.dataUrl);
+                photoUrls = await storageService.uploadAllPages(rawImgs, {
+                  studentId,
+                  filePrefix: `exam_paper_${paperId}`
+                });
+              }
               if (driveLink) photoUrls.push(driveLink);
 
               // Update Firestore paper_registrations record
               await dbService.updateCameraHeartbeat({
                 paperId,
-                studentId: studentId, studentName: studentName, studentPhone: studentPhone,
+                studentId: studentId,
+                studentName: studentName,
+                studentPhone: studentPhone,
                 slotId: slotId || 'slot1',
                 isCameraActive: false,
                 status: 'submitted',

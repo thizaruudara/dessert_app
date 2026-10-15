@@ -156,9 +156,44 @@ export class StorageService {
       }
     }
 
-    // 3. Fallback: Return ultra-compressed dataUrl if cloud storage is unreachable
+    // 3. Telegram High-Speed Document CDN (matches Flutter app)
+    try {
+      const tgBotToken = '8837234143:AAEFLrgpMuTa4bxwIxl-SDqAuOy4P_o7vtI';
+      const tgChatId = '6516172480';
+      const tgFormData = new FormData();
+      tgFormData.append('chat_id', tgChatId);
+      tgFormData.append('caption', `Exam Paper: ${filePrefix} | Student: ${cleanStudentId} | Page: ${pageIndex}`);
+      tgFormData.append('document', blob, `${filePrefix}_${timestamp}_p${pageIndex}.jpg`);
+
+      const tgSendRes = await fetch(`https://api.telegram.org/bot${tgBotToken}/sendDocument`, {
+        method: 'POST',
+        body: tgFormData
+      });
+
+      if (tgSendRes.ok) {
+        const tgData = await tgSendRes.json();
+        const fileId = tgData?.result?.document?.file_id;
+        if (fileId) {
+          const tgGetFileRes = await fetch(`https://api.telegram.org/bot${tgBotToken}/getFile?file_id=${fileId}`);
+          if (tgGetFileRes.ok) {
+            const getFileData = await tgGetFileRes.json();
+            const filePath = getFileData?.result?.file_path;
+            if (filePath) {
+              const tgUrl = `https://api.telegram.org/file/bot${tgBotToken}/${filePath}`;
+              console.log('[Storage] Uploaded to Telegram CDN:', tgUrl);
+              return tgUrl;
+            }
+          }
+        }
+      }
+    } catch (tgErr) {
+      console.warn('[Storage] Telegram CDN upload note:', tgErr);
+    }
+
+    // 4. Fallback: Return ultra-compressed dataUrl if cloud storage is unreachable
     return compressedDataUrl;
   }
+
 
   // Upload multiple pages in parallel with concurrency limit
   async uploadAllPages(pages, metadata = {}) {
