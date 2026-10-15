@@ -103,7 +103,7 @@ export class NotificationService {
   // Display a system level push notification via Service Worker
   showLocalNotification(title, options = {}) {
     if (!this.isSupported || Notification.permission !== 'granted') {
-      this.showInAppBanner(title, options.body || '');
+      console.log('[Push Notification Not Granted / Unsupported]', title, options.body);
       return;
     }
 
@@ -128,127 +128,20 @@ export class NotificationService {
 
   // Toast notification helpers matching Flutter SnackBar
   showInAppToast(message, type = 'info') {
-    return this.showInAppBanner('EduPeak', message, type);
+    console.log('[In-App Toast Suppressed]', message, type);
+    return null;
   }
 
   showLocalToast(message, type = 'info') {
-    return this.showInAppBanner('EduPeak', message, type);
+    console.log('[Local Toast Suppressed]', message, type);
+    return null;
   }
 
-  // In-app animated banner toast matching Flutter floating SnackBar
+  // In-app animated banner toast removed - only push notifications kept
   showInAppBanner(title, message, type = 'info') {
-    let container = document.getElementById('in-app-toast-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'in-app-toast-container';
-      container.className = 'in-app-toast-container';
-      container.style.cssText = `
-        position: fixed;
-        top: max(72px, calc(env(safe-area-inset-top, 0px) + 18px));
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 99999999;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        max-width: 420px;
-        width: calc(100% - 32px);
-        pointer-events: none;
-      `;
-      document.body.appendChild(container);
-    }
-
-    const toast = document.createElement('div');
-    const isUrgent = type === 'urgent' || type === 'error';
-    const isSuccess = type === 'success';
-    const isWarning = type === 'warning';
-
-    const bgBadge = isSuccess
-      ? '#22C55E'
-      : isUrgent
-      ? '#EF4444'
-      : isWarning
-      ? '#F59E0B'
-      : '#3B82F6';
-
-    const iconSymbol = isSuccess ? '✓' : isUrgent ? '⚠️' : isWarning ? '⏱️' : '🔔';
-
-    toast.style.cssText = `
-      background: rgba(15, 23, 42, 0.95);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid ${bgBadge}60;
-      border-left: 4px solid ${bgBadge};
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25);
-      border-radius: 16px;
-      padding: 12px 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: #FFFFFF;
-      font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      pointer-events: auto;
-      transform: translateY(-20px);
-      opacity: 0;
-      transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-    `;
-
-    toast.innerHTML = `
-      <div style="width:34px; height:34px; border-radius:50%; background:${bgBadge}25; display:flex; align-items:center; justify-content:center; color:${bgBadge}; font-size:16px; font-weight:bold; flex-shrink:0;">
-        ${iconSymbol}
-      </div>
-      <div style="flex:1; min-width:0;">
-        <div style="font-size:12.5px; font-weight:700; color:#FFFFFF; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-          ${title}
-        </div>
-        <div style="font-size:11.5px; color:#CBD5E1; line-height:1.4;">
-          ${message}
-        </div>
-      </div>
-      <button type="button" class="toast-close-btn" style="background:transparent; border:none; color:#94A3B8; font-size:16px; cursor:pointer; padding:6px 8px; border-radius:8px; line-height:1; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;" aria-label="Close notification">
-        ✕
-      </button>
-    `;
-
-    container.appendChild(toast);
-
-    // Trigger enter animation (drops down into place below status bar)
-    requestAnimationFrame(() => {
-      toast.style.transform = 'translateY(0)';
-      toast.style.opacity = '1';
-    });
-
-    // Audio chime
-    this.playChime();
-
-    let isDismissed = false;
-    const dismiss = () => {
-      if (isDismissed) return;
-      isDismissed = true;
-      toast.style.transform = 'translateY(-20px)';
-      toast.style.opacity = '0';
-      setTimeout(() => {
-        toast.remove();
-        if (container && container.children.length === 0) {
-          container.remove();
-        }
-      }, 280);
-    };
-
-    const closeBtn = toast.querySelector('.toast-close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dismiss();
-      });
-      closeBtn.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-        dismiss();
-      }, { passive: true });
-    }
-
-    // Auto dismiss after 4.5s
-    setTimeout(dismiss, 4500);
+    const existing = document.getElementById('in-app-toast-container');
+    if (existing) existing.remove();
+    console.log('[Notification]', title, message);
   }
 
   playChime() {

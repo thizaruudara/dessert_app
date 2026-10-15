@@ -1277,11 +1277,12 @@ body {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.55);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  backdrop-filter: blur(8px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   overflow-x: hidden;
   overflow-y: hidden;
   overscroll-behavior: contain;
@@ -1301,10 +1302,10 @@ body {
   width: 100%;
   max-width: 440px;
   background: #FFFFFF;
-  border-top-left-radius: 28px;
-  border-top-right-radius: 28px;
-  padding: 24px 16px calc(var(--safe-bottom) + 24px);
-  max-height: 88vh;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 22px 16px calc(var(--safe-bottom) + 24px);
+  max-height: 90vh;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -1398,9 +1399,11 @@ body {
 }
 
 input[type="time"], input[type="date"], input[type="number"] {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
 }
 
 .time-slot-input {
@@ -1408,18 +1411,27 @@ input[type="time"], input[type="date"], input[type="number"] {
   min-width: 0 !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  padding: 6px 6px !important;
-  font-size: 13px !important;
+  padding: 8px 6px !important;
+  font-size: 13.5px !important;
   font-weight: 700 !important;
   text-align: center !important;
-  height: 40px !important;
+  height: 42px !important;
   border-radius: 10px !important;
   background: #FFFFFF !important;
   border: 1.5px solid #CBD5E1 !important;
   color: #0F172A !important;
   outline: none !important;
   display: block !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
   transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.time-slot-input::-webkit-date-and-time-value {
+  text-align: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: normal !important;
 }
 
 .time-slot-input:focus {
@@ -1504,27 +1516,15 @@ button:active {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ── In-App Toast & Notification Safe Area Layout ── */
+/* ── In-App Toast & Notification (Removed: Only Native Push Notifications Active) ── */
 #in-app-toast-container,
 .in-app-toast-container {
-  position: fixed !important;
-  top: max(72px, calc(env(safe-area-inset-top, 0px) + 18px)) !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  z-index: 99999999 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 10px !important;
-  max-width: 420px !important;
-  width: calc(100% - 32px) !important;
+  display: none !important;
   pointer-events: none !important;
-}
-
-@media (min-width: 769px) {
-  #in-app-toast-container,
-  .in-app-toast-container {
-    top: 24px !important;
-  }
+  opacity: 0 !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  width: 0 !important;
 }
 
 /* ── UIUX Accessibility, Touch Targets & Motion Enhancements ── */

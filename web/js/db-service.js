@@ -1533,7 +1533,17 @@ export class DbService {
     if (existing && (existing.status === 'submitted' || existing.isSubmitted === true || (existing.submissionPhotos && existing.submissionPhotos.length > 0))) {
       return existing; // DO NOT OVERWRITE SUBMITTED STATE!
     }
-    const regData = { paperId, studentId, studentName, studentPhone, selectedSlot: slotId, status: 'registered', isCameraActive: false, registeredAt: new Date().toISOString() };
+    const regData = {
+      paperId,
+      studentId,
+      studentName,
+      studentPhone,
+      selectedSlot: slotId,
+      slotId: slotId,
+      status: 'registered',
+      isCameraActive: false,
+      registeredAt: new Date().toISOString()
+    };
     try {
       await callBackend('papers/register-slot', { paperId, slotId });
     } catch (error) {
@@ -1544,6 +1554,8 @@ export class DbService {
         console.warn('[DB] Direct registration write error:', directErr);
       }
     }
+    const cacheKey = `paper_reg_${paperId}_${studentId}`;
+    this.setCache(cacheKey, regData);
     return regData;
   }
 

@@ -555,7 +555,7 @@ class AppController {
     const overlay = document.createElement('div');
     overlay.id = 'edupeak-sub-modal';
     overlay.className = 'app-dialog-overlay';
-    overlay.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(11,18,32,0.85); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px;';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(11,18,32,0.85); display:flex; align-items:center; justify-content:center; padding:20px;';
     overlay.innerHTML = `
       <div style="width:100%; max-width:400px; background:#FFFFFF; border-radius:24px; padding:28px 24px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.3); border:1px solid #E2E8F0;">
         <div style="width:64px; height:64px; border-radius:20px; background:#FEF3C7; border:1px solid #FDE68A; margin:0 auto 16px; display:flex; align-items:center; justify-content:center;">
@@ -1769,7 +1769,9 @@ class AppController {
       const uId = user.uid || user.id || 's_default';
       const localSub = localStorage.getItem(`paper_submitted_${session.id}_${uId}`) === 'true' || localStorage.getItem(`paper_submitted_${session.id}`) === 'true';
       const isSubmitted = localSub || reg?.status === 'submitted' || reg?.isSubmitted === true || (reg?.submissionPhotos && reg.submissionPhotos.length > 0);
-      const selectedSlotId = reg?.selectedSlot || 'slot1';
+      const registeredSlotId = reg?.selectedSlot || reg?.slotId || null;
+      this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
+      const selectedSlotId = this._studentSelectedSlotMap.get(session.id) || registeredSlotId || 'slot1';
 
       const slot1 = session.slot1 || {
         id: 'slot1',
@@ -1860,13 +1862,13 @@ class AppController {
             ${isEnded ? 'විභාග සැසි වේලාව (Session Slot Time - Completed):' : (slot2 ? 'කරුණාකර ඔබගේ විභාග සැසිය (Slot) තෝරන්න:' : 'විභාග සැසිය (Exam Session):')}
           </div>
           <div class="slots-container" style="${isEnded ? 'pointer-events:none; opacity:0.85;' : ''}">
-            <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1">
+            <div class="slot-selection-box ${selectedSlotId === 'slot1' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot1" style="border:2px solid ${selectedSlotId === 'slot1' ? '#2563EB' : '#E2E8F0'}; background:${selectedSlotId === 'slot1' ? '#EFF6FF' : '#FFFFFF'};">
               <div class="slot-name">
                 <span style="display:inline-flex; align-items:center; gap:5px;">
                   <span class="material-symbols-rounded" style="font-size:16px; color:#F59E0B;">wb_sunny</span>
                   <span>${slot1.name || 'Slot 1 (Morning)'}</span>
                 </span>
-                <span class="material-symbols-rounded ${selectedSlotId === 'slot1' ? 'filled' : ''}" style="font-size:18px; color:#6366F1;">
+                <span class="material-symbols-rounded ${selectedSlotId === 'slot1' ? 'filled' : ''}" style="font-size:18px; color:${selectedSlotId === 'slot1' ? '#2563EB' : '#94A3B8'};">
                   ${selectedSlotId === 'slot1' ? 'check_circle' : 'radio_button_unchecked'}
                 </span>
               </div>
@@ -1880,13 +1882,13 @@ class AppController {
             </div>
 
             ${slot2 ? `
-              <div class="slot-selection-box ${selectedSlotId === 'slot2' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot2">
+              <div class="slot-selection-box ${selectedSlotId === 'slot2' ? 'selected' : ''}" data-paper-id="${session.id}" data-slot-id="slot2" style="border:2px solid ${selectedSlotId === 'slot2' ? '#2563EB' : '#E2E8F0'}; background:${selectedSlotId === 'slot2' ? '#EFF6FF' : '#FFFFFF'};">
                 <div class="slot-name">
                   <span style="display:inline-flex; align-items:center; gap:5px;">
                     <span class="material-symbols-rounded" style="font-size:16px; color:#2563EB;">bedtime</span>
                     <span>${slot2.name || 'Slot 2 (Evening)'}</span>
                   </span>
-                  <span class="material-symbols-rounded ${selectedSlotId === 'slot2' ? 'filled' : ''}" style="font-size:18px; color:#6366F1;">
+                  <span class="material-symbols-rounded ${selectedSlotId === 'slot2' ? 'filled' : ''}" style="font-size:18px; color:${selectedSlotId === 'slot2' ? '#2563EB' : '#94A3B8'};">
                     ${selectedSlotId === 'slot2' ? 'check_circle' : 'radio_button_unchecked'}
                   </span>
                 </div>
@@ -1947,12 +1949,18 @@ class AppController {
               </div>
             </div>
           ` : (isScheduled && !isLive && !isEnded) ? `
-            <div class="phase-status-banner-box scheduled" style="background:#EFF6FF; border:1px solid #BFDBFE; padding:13px 15px; border-radius:14px; display:flex; align-items:center; gap:12px;">
-              <span class="material-symbols-rounded" style="font-size:26px; color:#2563EB;">how_to_reg</span>
+            <div class="phase-status-banner-box scheduled" style="background:${registeredSlotId ? '#F0FDF4' : '#EFF6FF'}; border:1px solid ${registeredSlotId ? '#86EFAC' : '#BFDBFE'}; padding:12px 14px; border-radius:14px; display:flex; align-items:center; gap:12px;">
+              <span class="material-symbols-rounded ${registeredSlotId ? 'filled' : ''}" style="font-size:24px; color:${registeredSlotId ? '#16A34A' : '#2563EB'};">
+                ${registeredSlotId ? 'verified' : 'how_to_reg'}
+              </span>
               <div>
-                <div style="font-size:12px; font-weight:800; color:#1E40AF;">විභාග සැසිය සැලසුම් කර ඇත (Session Scheduled - Registration Open)</div>
-                <div style="font-size:11.5px; color:#3B82F6; margin-top:2px;">
-                  ${reg ? `ඔබ ${reg.slotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} සඳහා සාර්ථකව ලියාපදිංචි වී ඇත. Admin විසින් සැසිය Start කරන තෙක් රැඳී සිටින්න.` : 'කරුණාකර ඉහත ඇති Slot එකක් තෝරා ඔබගේ ආසනය වෙන්කරවා ගන්න.'}
+                <div style="font-size:12px; font-weight:800; color:${registeredSlotId ? '#15803D' : '#1E40AF'};">
+                  ${registeredSlotId ? 'විභාග සැසිය සඳහා ලියාපදිංචි වී ඇත (Registered)' : 'විභාග සැසිය සැලසුම් කර ඇත (Registration Open)'}
+                </div>
+                <div style="font-size:11px; color:${registeredSlotId ? '#166534' : '#3B82F6'}; margin-top:2px;">
+                  ${registeredSlotId
+                    ? `ඔබ ${registeredSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} සඳහා සාර්ථකව ලියාපදිංචි වී ඇත. Admin විසින් සැසිය Start කරන තෙක් රැඳී සිටින්න.`
+                    : 'කරුණාකර ඉහත ඇති Slot එකක් තෝරා පහත "Register" බොත්තම ඔබන්න.'}
                 </div>
               </div>
             </div>
@@ -1997,17 +2005,24 @@ class AppController {
               <span class="material-symbols-rounded" style="font-size:18px;">document_scanner</span>
               <span>Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)</span>
             </button>
-          ` : (isScheduled && !isLive && !isEnded) ? (reg ? `
-            <div style="background:#F1F5F9; border:1.5px solid #CBD5E1; color:#334155; padding:12px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
-              <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">how_to_reg</span>
-              <span>✓ Registered for ${selectedSlotId === 'slot2' ? 'Slot 2' : 'Slot 1'} • Waiting for Session Start</span>
-            </div>
-          ` : `
-            <button class="btn-primary" style="background:#2563EB; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="this.closest('.paper-session-card').querySelector('.slot-selection-box').click()">
-              <span class="material-symbols-rounded" style="font-size:18px;">how_to_reg</span>
-              <span>Select a Slot Above to Register (කරුණාකර Slot එකක් තෝරන්න)</span>
-            </button>
-          `) : isWaiting ? `
+          ` : (isScheduled && !isLive && !isEnded) ? (
+            !registeredSlotId ? `
+              <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(37,99,235,0.3); border:none; cursor:pointer;">
+                <span class="material-symbols-rounded" style="font-size:19px;">how_to_reg</span>
+                <span>Register for ${selectedSlotId === 'slot2' ? 'Evening Session (Slot 2)' : 'Morning Session (Slot 1)'}</span>
+              </button>
+            ` : (selectedSlotId !== registeredSlotId ? `
+              <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #4F46E5 0%, #3730A3 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(79,70,229,0.3); border:none; cursor:pointer;">
+                <span class="material-symbols-rounded" style="font-size:19px;">swap_horiz</span>
+                <span>Switch Registration to ${selectedSlotId === 'slot2' ? 'Evening Session (Slot 2)' : 'Morning Session (Slot 1)'}</span>
+              </button>
+            ` : `
+              <div style="background:#F1F5F9; border:1.5px solid #CBD5E1; color:#334155; padding:12px 14px; border-radius:12px; font-size:13px; font-weight:700; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">check_circle</span>
+                <span>Registered for ${registeredSlotId === 'slot2' ? 'Slot 2 (Evening)' : 'Slot 1 (Morning)'} • Waiting for Start</span>
+              </div>
+            `)
+          ) : isWaiting ? `
             <button class="btn-primary" style="background:#6366F1; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
               <span class="material-symbols-rounded" style="font-size:18px;">meeting_room</span>
               <span>Enter Waiting Room (පොරොත්තු ශාලාව)</span>
@@ -2024,29 +2039,61 @@ class AppController {
   }
 
   _bindStudentLiveSessionActions(container, sessions, registrations, user) {
-    // Slot Selection
+    // Slot Selection - purely local card selection toggle, NO auto registration, NO toast!
     container.querySelectorAll('.slot-selection-box').forEach(box => {
-      box.addEventListener('click', async () => {
-        if (!this.checkSubscriptionAccess('Paper Slot Registration')) return;
+      box.addEventListener('click', () => {
         const pId = box.dataset.paperId;
         const sId = box.dataset.slotId;
-        await dbService.registerStudentSlot({
-          paperId: pId,
-          studentId: user.uid || user.id || "s_default",
-          studentName: user.name || "Student",
-          studentPhone: user.phone || '',
-          slotId: sId
-        });
-        notificationService.showLocalToast(`${sId === 'slot1' ? 'Slot 1 (Morning)' : 'Slot 2 (Evening)'} සාර්ථකව වෙන්කර ගන්නා ලදී!`);
-        const studentId = user.uid || user.id || 's_default';
-        const updatedReg = await dbService.getStudentRegistration(pId, studentId);
-        registrations.set(pId, updatedReg);
+        this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
+        this._studentSelectedSlotMap.set(pId, sId);
+
         const liveTab = container.querySelector('#papers-tab-live-content');
         if (liveTab) {
-          const subSpan = container.querySelector('#tab-papers-live-sub');
-          if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(sessions);
           liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, user.examYear || '2027 A/L', user.examYear || '2027 A/L');
           this._bindStudentLiveSessionActions(container, sessions, registrations, user);
+        }
+      });
+    });
+
+    // Explicit Register / Switch Button Click
+    container.querySelectorAll('.btn-register-session-slot').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!this.checkSubscriptionAccess('Paper Slot Registration')) return;
+        const pId = btn.dataset.paperId;
+        const sId = btn.dataset.slotId;
+
+        btn.disabled = true;
+        btn.innerHTML = `
+          <span class="material-symbols-rounded" style="font-size:18px; animation:spin 1s linear infinite;">progress_activity</span>
+          <span>Registering...</span>
+        `;
+
+        try {
+          const regRes = await dbService.registerStudentSlot({
+            paperId: pId,
+            studentId: user.uid || user.id || "s_default",
+            studentName: user.name || "Student",
+            studentPhone: user.phone || '',
+            slotId: sId
+          });
+          const studentId = user.uid || user.id || 's_default';
+          const updatedReg = await dbService.getStudentRegistration(pId, studentId, { forceRefresh: true });
+          registrations.set(pId, updatedReg || regRes);
+          this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
+          this._studentSelectedSlotMap.set(pId, sId);
+
+          const liveTab = container.querySelector('#papers-tab-live-content');
+          if (liveTab) {
+            const subSpan = container.querySelector('#tab-papers-live-sub');
+            if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(sessions);
+            liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, user.examYear || '2027 A/L', user.examYear || '2027 A/L');
+            this._bindStudentLiveSessionActions(container, sessions, registrations, user);
+          }
+        } catch (err) {
+          console.error('[Registration] Failed to register slot:', err);
+          btn.disabled = false;
+          btn.textContent = 'Retry Registration';
         }
       });
     });
