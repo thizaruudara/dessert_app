@@ -35065,6 +35065,232 @@ var init_firebase_config = __esm({
   }
 });
 
+// js/notification-service.js
+var notification_service_exports = {};
+__export(notification_service_exports, {
+  NotificationService: () => NotificationService,
+  VAPID_PUBLIC_KEY: () => VAPID_PUBLIC_KEY,
+  notificationService: () => notificationService
+});
+var VAPID_PUBLIC_KEY, NotificationService, notificationService;
+var init_notification_service = __esm({
+  "js/notification-service.js"() {
+    init_firebase_config();
+    VAPID_PUBLIC_KEY = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4";
+    NotificationService = class {
+      constructor() {
+        this.swRegistration = null;
+        this.fcmToken = null;
+        this.pushSubscription = null;
+        this.isSupported = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
+        this.permission = this.isSupported ? Notification.permission : "denied";
+      }
+      async init(user = null) {
+        try {
+          if ("serviceWorker" in navigator && window.isSecureContext) {
+            this.swRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+            await navigator.serviceWorker.ready;
+          }
+          if (!this.isSupported || !this.swRegistration) {
+            console.warn("[Notification] Push notifications not supported on this browser/platform");
+            return;
+          }
+          console.log("[Notification] Service Worker Ready for Push Notifications");
+          if (this.permission === "granted" && user) {
+            await this.syncTokenWithUser(user);
+          }
+        } catch (err) {
+          console.error("[Notification] Error initializing notification service:", err);
+        }
+      }
+      async requestPermission(user = null) {
+        if (!("Notification" in window)) {
+          if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+            alert('Push notifications require iOS 16.4+. Tap the Share icon and select "Add to Home Screen" to enable notifications.');
+          } else {
+            alert("Push notifications are not supported on this browser.");
+          }
+          return false;
+        }
+        try {
+          const permission = await Notification.requestPermission();
+          this.permission = permission;
+          if (permission === "granted") {
+            let token = null;
+            if (user) {
+              token = await this.syncTokenWithUser(user);
+            }
+            this.showLocalNotification("Notifications Active! \u{1F514}", {
+              body: "You will receive real-time alerts for live exams, homework reviews, and announcements even when this app is closed.",
+              tag: "welcome-notification"
+            });
+            return true;
+          } else {
+            console.warn("[Notification] Permission denied or dismissed:", permission);
+            return false;
+          }
+        } catch (err) {
+          console.error("[Notification] Error requesting notification permission:", err);
+          return false;
+        }
+      }
+      async syncTokenWithUser(user) {
+        if (!user || !user.uid) return null;
+        try {
+          let fcmToken = null;
+          let subscription = null;
+          if (!this.swRegistration && "serviceWorker" in navigator) {
+            this.swRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+            await navigator.serviceWorker.ready;
+          }
+          if (this.swRegistration && this.swRegistration.pushManager) {
+            try {
+              subscription = await this.swRegistration.pushManager.getSubscription();
+              if (!subscription) {
+                subscription = await this.swRegistration.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+              }
+              this.pushSubscription = subscription;
+              console.log("[Notification] Native push subscription active:", subscription.endpoint);
+            } catch (subErr) {
+              console.warn("[Notification] pushManager subscribe notice:", subErr.message);
+            }
+          }
+          try {
+            const supported = await isWindowSupported().catch(() => false);
+            if (supported && this.swRegistration) {
+              const messaging = getMessagingInWindow(app);
+              fcmToken = await getToken2(messaging, {
+                serviceWorkerRegistration: this.swRegistration,
+                vapidKey: VAPID_PUBLIC_KEY
+              });
+              if (fcmToken) {
+                console.log("[Notification] Firebase FCM token acquired successfully");
+              }
+            }
+          } catch (fcmErr) {
+            console.warn("[Notification] Firebase getToken notice:", fcmErr.message);
+          }
+          const primaryToken = fcmToken || (subscription ? JSON.stringify(subscription) : null);
+          if (!primaryToken) {
+            console.warn("[Notification] Could not generate push token for user");
+            return null;
+          }
+          this.fcmToken = primaryToken;
+          const userRef = doc(db, "users", user.uid);
+          const updatePayload = {
+            fcmToken: primaryToken,
+            fcmTokens: arrayUnion(primaryToken),
+            lastTokenUpdate: serverTimestamp()
+          };
+          if (subscription) {
+            updatePayload.webPushSubscription = JSON.stringify(subscription);
+          }
+          await updateDoc(userRef, updatePayload).catch((err) => {
+            console.warn("[Notification] Non-critical: Could not write token to user doc:", err);
+          });
+          try {
+            localStorage.setItem("edupeak_fcm_token", primaryToken);
+          } catch (_) {
+          }
+          console.log("[Notification] User push token registered successfully in Firestore");
+          return primaryToken;
+        } catch (e2) {
+          console.warn("[Notification] Token sync error:", e2);
+          return null;
+        }
+      }
+      // Display a system level push notification via Service Worker
+      showLocalNotification(title, options = {}) {
+        if (!this.isSupported || Notification.permission !== "granted") {
+          console.log("[Push Notification Not Granted / Unsupported]", title, options.body);
+          return;
+        }
+        const defaultOptions = {
+          body: "",
+          icon: "./icons/icon-192.png",
+          badge: "./icons/icon-192.png",
+          vibrate: [200, 100, 200],
+          tag: "edupeak-alert",
+          renotify: true,
+          requireInteraction: true,
+          data: { url: "./index.html" }
+        };
+        const finalOptions = { ...defaultOptions, ...options };
+        if (this.swRegistration && this.swRegistration.showNotification) {
+          this.swRegistration.showNotification(title, finalOptions).catch(() => {
+            try {
+              new Notification(title, finalOptions);
+            } catch (_) {
+            }
+          });
+        } else {
+          try {
+            new Notification(title, finalOptions);
+          } catch (_) {
+          }
+        }
+      }
+      // Toast notification helpers matching Flutter SnackBar
+      showInAppToast(message, type = "info") {
+        console.log("[In-App Toast Suppressed]", message, type);
+        return null;
+      }
+      showLocalToast(message, type = "info") {
+        console.log("[Local Toast Suppressed]", message, type);
+        return null;
+      }
+      showInAppBanner(title, message, type = "info") {
+        const existing = document.getElementById("in-app-toast-container");
+        if (existing) existing.remove();
+        console.log("[Notification]", title, message);
+      }
+      playChime() {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.3);
+        } catch (_) {
+        }
+      }
+      notifyPaperHintPublished(hintTitle, batch = "All Batches") {
+        this.playChime();
+        this.showInAppBanner(
+          "\u{1F4A1} New Paper Hint Published!",
+          `"${hintTitle}" (${batch}) hints are now live. Review formulas & guidance!`,
+          "info"
+        );
+        this.showLocalNotification("\u{1F4A1} New Paper Hint Published!", {
+          body: `"${hintTitle}" (${batch}) hints and guidance are now available for your exam preparation.`,
+          tag: "paper-hint-alert"
+        });
+      }
+      urlBase64ToUint8Array(base64String) {
+        const padding = "=".repeat((4 - base64String.length % 4) % 4);
+        const base642 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+        const rawData = window.atob(base642);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i2 = 0; i2 < rawData.length; ++i2) {
+          outputArray[i2] = rawData.charCodeAt(i2);
+        }
+        return outputArray;
+      }
+    };
+    notificationService = new NotificationService();
+  }
+});
+
 // node_modules/agora-rtc-sdk-ng/AgoraRTC_N-production.js
 var require_AgoraRTC_N_production = __commonJS({
   "node_modules/agora-rtc-sdk-ng/AgoraRTC_N-production.js"(exports, module) {
@@ -88849,18 +89075,19 @@ var AuthService = class {
   async initSession() {
     try {
       const hash = window.location.hash || "";
+      const search = window.location.search || "";
       let ssoTokens = null;
-      if (hash.includes("access_token=") || hash.includes("refresh_token=")) {
-        const params = new URLSearchParams(hash.replace(/^#/, ""));
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
-        if (accessToken) {
-          ssoTokens = { accessToken, refreshToken };
-          try {
-            const cleanUrl = window.location.pathname + window.location.search;
-            window.history.replaceState(null, document.title, cleanUrl);
-          } catch (_) {
-          }
+      const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+      const searchParams = new URLSearchParams(search);
+      const accessToken = hashParams.get("access_token") || searchParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token") || searchParams.get("refresh_token");
+      const ssoError = hashParams.get("error_description") || searchParams.get("error_description") || hashParams.get("error") || searchParams.get("error");
+      if (accessToken) {
+        ssoTokens = { accessToken, refreshToken };
+        try {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState(null, document.title, cleanUrl);
+        } catch (_) {
         }
       }
       if (ssoTokens) {
@@ -88871,10 +89098,21 @@ var AuthService = class {
         });
         if (sessionErr) {
           console.error("[Auth] Failed to set Supabase session from tokens:", sessionErr);
+          try {
+            const { notificationService: notificationService2 } = await Promise.resolve().then(() => (init_notification_service(), notification_service_exports));
+            notificationService2.showLocalToast("\u26A0\uFE0F EduPeak SSO session was expired or invalid. Please sign in below.");
+          } catch (_) {
+          }
         } else if (sessionData?.user) {
           localStorage.removeItem("edupeak_is_logged_out");
           await this.syncProfileFromAuthUser(sessionData.user);
           return;
+        }
+      } else if (ssoError) {
+        try {
+          const { notificationService: notificationService2 } = await Promise.resolve().then(() => (init_notification_service(), notification_service_exports));
+          notificationService2.showLocalToast(`\u26A0\uFE0F EduPeak login: ${decodeURIComponent(ssoError)}`);
+        } catch (_) {
         }
       }
       const { data: { session }, error: getSessionErr } = await supabase.auth.getSession();
@@ -88981,11 +89219,57 @@ var AuthService = class {
     this.listeners.forEach((listener) => listener(this.currentUser));
   }
   /**
+   * Direct Sign In using EduPeak Email or Phone + Password
+   */
+  async loginWithIdentifierAndPassword(identifier, password) {
+    if (!identifier || !password) {
+      return { success: false, error: "Please enter your email or phone number and password." };
+    }
+    try {
+      this.loading = true;
+      let emailToUse = identifier.trim();
+      if (!emailToUse.includes("@")) {
+        const profile = await getStudentProfile(emailToUse);
+        if (profile?.email) {
+          emailToUse = profile.email;
+        } else {
+          return {
+            success: false,
+            error: `Could not find an EduPeak student account registered with "${identifier}". Please use your registered email address.`
+          };
+        }
+      }
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password: String(password)
+      });
+      if (error) {
+        throw error;
+      }
+      if (!data?.user) {
+        throw new Error("No user data returned from authentication service.");
+      }
+      localStorage.removeItem("edupeak_is_logged_out");
+      await this.syncProfileFromAuthUser(data.user);
+      return { success: true, user: this.currentUser };
+    } catch (err) {
+      console.error("[Auth] Direct sign-in failed:", err);
+      let errMsg = err?.message || "Invalid email or password.";
+      if (errMsg.toLowerCase().includes("invalid login credentials")) {
+        errMsg = "Incorrect email or password. Please verify your EduPeak login credentials.";
+      }
+      return { success: false, error: errMsg };
+    } finally {
+      this.loading = false;
+      this.notify();
+    }
+  }
+  /**
    * Redirect to edupeak.lk single sign-on page
    */
-  redirectToEduPeakLogin() {
+  redirectToEduPeakLogin(forceLogin = true) {
     const returnUrl = window.location.origin + window.location.pathname;
-    const ssoUrl = `https://edupeak.lk/app-auth.html?redirect_uri=${encodeURIComponent(returnUrl)}`;
+    const ssoUrl = `https://edupeak.lk/app-auth.html?redirect_uri=${encodeURIComponent(returnUrl)}${forceLogin ? "&prompt=login" : ""}&_t=${Date.now()}`;
     window.location.href = ssoUrl;
   }
   /**
@@ -92132,220 +92416,8 @@ var DbService = class {
 };
 var dbService = new DbService();
 
-// js/notification-service.js
-init_firebase_config();
-var VAPID_PUBLIC_KEY = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4";
-var NotificationService = class {
-  constructor() {
-    this.swRegistration = null;
-    this.fcmToken = null;
-    this.pushSubscription = null;
-    this.isSupported = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
-    this.permission = this.isSupported ? Notification.permission : "denied";
-  }
-  async init(user = null) {
-    try {
-      if ("serviceWorker" in navigator && window.isSecureContext) {
-        this.swRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
-        await navigator.serviceWorker.ready;
-      }
-      if (!this.isSupported || !this.swRegistration) {
-        console.warn("[Notification] Push notifications not supported on this browser/platform");
-        return;
-      }
-      console.log("[Notification] Service Worker Ready for Push Notifications");
-      if (this.permission === "granted" && user) {
-        await this.syncTokenWithUser(user);
-      }
-    } catch (err) {
-      console.error("[Notification] Error initializing notification service:", err);
-    }
-  }
-  async requestPermission(user = null) {
-    if (!("Notification" in window)) {
-      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-        alert('Push notifications require iOS 16.4+. Tap the Share icon and select "Add to Home Screen" to enable notifications.');
-      } else {
-        alert("Push notifications are not supported on this browser.");
-      }
-      return false;
-    }
-    try {
-      const permission = await Notification.requestPermission();
-      this.permission = permission;
-      if (permission === "granted") {
-        let token = null;
-        if (user) {
-          token = await this.syncTokenWithUser(user);
-        }
-        this.showLocalNotification("Notifications Active! \u{1F514}", {
-          body: "You will receive real-time alerts for live exams, homework reviews, and announcements even when this app is closed.",
-          tag: "welcome-notification"
-        });
-        return true;
-      } else {
-        console.warn("[Notification] Permission denied or dismissed:", permission);
-        return false;
-      }
-    } catch (err) {
-      console.error("[Notification] Error requesting notification permission:", err);
-      return false;
-    }
-  }
-  async syncTokenWithUser(user) {
-    if (!user || !user.uid) return null;
-    try {
-      let fcmToken = null;
-      let subscription = null;
-      if (!this.swRegistration && "serviceWorker" in navigator) {
-        this.swRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
-        await navigator.serviceWorker.ready;
-      }
-      if (this.swRegistration && this.swRegistration.pushManager) {
-        try {
-          subscription = await this.swRegistration.pushManager.getSubscription();
-          if (!subscription) {
-            subscription = await this.swRegistration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: this.urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
-          }
-          this.pushSubscription = subscription;
-          console.log("[Notification] Native push subscription active:", subscription.endpoint);
-        } catch (subErr) {
-          console.warn("[Notification] pushManager subscribe notice:", subErr.message);
-        }
-      }
-      try {
-        const supported = await isWindowSupported().catch(() => false);
-        if (supported && this.swRegistration) {
-          const messaging = getMessagingInWindow(app);
-          fcmToken = await getToken2(messaging, {
-            serviceWorkerRegistration: this.swRegistration,
-            vapidKey: VAPID_PUBLIC_KEY
-          });
-          if (fcmToken) {
-            console.log("[Notification] Firebase FCM token acquired successfully");
-          }
-        }
-      } catch (fcmErr) {
-        console.warn("[Notification] Firebase getToken notice:", fcmErr.message);
-      }
-      const primaryToken = fcmToken || (subscription ? JSON.stringify(subscription) : null);
-      if (!primaryToken) {
-        console.warn("[Notification] Could not generate push token for user");
-        return null;
-      }
-      this.fcmToken = primaryToken;
-      const userRef = doc(db, "users", user.uid);
-      const updatePayload = {
-        fcmToken: primaryToken,
-        fcmTokens: arrayUnion(primaryToken),
-        lastTokenUpdate: serverTimestamp()
-      };
-      if (subscription) {
-        updatePayload.webPushSubscription = JSON.stringify(subscription);
-      }
-      await updateDoc(userRef, updatePayload).catch((err) => {
-        console.warn("[Notification] Non-critical: Could not write token to user doc:", err);
-      });
-      try {
-        localStorage.setItem("edupeak_fcm_token", primaryToken);
-      } catch (_) {
-      }
-      console.log("[Notification] User push token registered successfully in Firestore");
-      return primaryToken;
-    } catch (e2) {
-      console.warn("[Notification] Token sync error:", e2);
-      return null;
-    }
-  }
-  // Display a system level push notification via Service Worker
-  showLocalNotification(title, options = {}) {
-    if (!this.isSupported || Notification.permission !== "granted") {
-      console.log("[Push Notification Not Granted / Unsupported]", title, options.body);
-      return;
-    }
-    const defaultOptions = {
-      body: "",
-      icon: "./icons/icon-192.png",
-      badge: "./icons/icon-192.png",
-      vibrate: [200, 100, 200],
-      tag: "edupeak-alert",
-      renotify: true,
-      requireInteraction: true,
-      data: { url: "./index.html" }
-    };
-    const finalOptions = { ...defaultOptions, ...options };
-    if (this.swRegistration && this.swRegistration.showNotification) {
-      this.swRegistration.showNotification(title, finalOptions).catch(() => {
-        try {
-          new Notification(title, finalOptions);
-        } catch (_) {
-        }
-      });
-    } else {
-      try {
-        new Notification(title, finalOptions);
-      } catch (_) {
-      }
-    }
-  }
-  // Toast notification helpers matching Flutter SnackBar
-  showInAppToast(message, type = "info") {
-    console.log("[In-App Toast Suppressed]", message, type);
-    return null;
-  }
-  showLocalToast(message, type = "info") {
-    console.log("[Local Toast Suppressed]", message, type);
-    return null;
-  }
-  showInAppBanner(title, message, type = "info") {
-    const existing = document.getElementById("in-app-toast-container");
-    if (existing) existing.remove();
-    console.log("[Notification]", title, message);
-  }
-  playChime() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-    } catch (_) {
-    }
-  }
-  notifyPaperHintPublished(hintTitle, batch = "All Batches") {
-    this.playChime();
-    this.showInAppBanner(
-      "\u{1F4A1} New Paper Hint Published!",
-      `"${hintTitle}" (${batch}) hints are now live. Review formulas & guidance!`,
-      "info"
-    );
-    this.showLocalNotification("\u{1F4A1} New Paper Hint Published!", {
-      body: `"${hintTitle}" (${batch}) hints and guidance are now available for your exam preparation.`,
-      tag: "paper-hint-alert"
-    });
-  }
-  urlBase64ToUint8Array(base64String) {
-    const padding = "=".repeat((4 - base64String.length % 4) % 4);
-    const base642 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-    const rawData = window.atob(base642);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i2 = 0; i2 < rawData.length; ++i2) {
-      outputArray[i2] = rawData.charCodeAt(i2);
-    }
-    return outputArray;
-  }
-};
-var notificationService = new NotificationService();
+// js/app.js
+init_notification_service();
 
 // js/camera-service.js
 var CameraService = class {
@@ -93956,46 +94028,80 @@ var AppController = class {
     });
   }
   // ── 0. Dedicated Login & Register Screen (1:1 login_screen.dart replica) ──
-  // ── 0. Dedicated Login Screen: Single Sign-On via EduPeak (edupeak.lk) ──
+  // ── 0. Dedicated Login Screen: Direct EduPeak Sign-In & Single Sign-On ──
   renderAuthScreen() {
     const root = document.getElementById("app-root");
     if (!root) return;
     root.innerHTML = `
       <div class="auth-screen-container">
-        <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:12px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
-          <div class="auth-header" style="text-align:center; margin-bottom:20px;">
-            <div class="auth-brand-logo-wrap" style="margin:0 auto 10px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; box-shadow:none;">
-              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="height:52px; width:auto; max-width:160px; object-fit:contain; background:transparent;" onerror="this.src='./icons/edupeak_logo.png'" />
+        <div class="auth-scroll-content" style="max-width:440px; width:100%; height:100%; margin:auto; padding:16px 0; display:flex; flex-direction:column; align-items:center; justify-content:center; box-sizing:border-box;">
+          <div class="auth-header" style="text-align:center; margin-bottom:16px;">
+            <div class="auth-brand-logo-wrap" style="margin:0 auto 8px; display:inline-flex; align-items:center; justify-content:center; background:transparent; border:none; box-shadow:none;">
+              <img src="./icons/edupeak_logo.png" alt="EduPeak" class="auth-brand-logo-img" style="height:50px; width:auto; max-width:160px; object-fit:contain; background:transparent;" onerror="this.src='./icons/edupeak_logo.png'" />
             </div>
             <div class="auth-title" style="font-size:24px; font-weight:800; color:#0F172A; letter-spacing:-0.5px;">EduPeak</div>
-            <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; margin-top:6px;">
+            <div class="auth-brand-tag" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:3px 12px; border-radius:20px; margin-top:5px;">
               <span>A/L Pastry &amp; Dessert Institute \u{1F370}</span>
             </div>
           </div>
 
-          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:20px; padding:24px 20px; box-shadow:0 12px 36px rgba(15,23,42,0.06); text-align:center; box-sizing:border-box;">
-            <div style="font-size:19px; font-weight:800; color:#1E293B; margin-bottom:8px;">
+          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:20px; padding:22px 20px; box-shadow:0 12px 36px rgba(15,23,42,0.06); text-align:center; box-sizing:border-box;">
+            <div style="font-size:18px; font-weight:800; color:#1E293B; margin-bottom:6px;">
               Student &amp; Exam Portal
             </div>
-            <p style="font-size:13px; color:#64748B; line-height:1.5; margin:0 0 20px;">
-              Access your proctored paper sessions, homework dessert submissions, and batch rankings through your central EduPeak account.
+            <p style="font-size:12.5px; color:#64748B; line-height:1.45; margin:0 0 16px;">
+              Sign in with your EduPeak student account to access live paper sessions and homework desserts.
             </p>
 
-            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:50px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 20px rgba(37,99,235,0.3); transition:all 0.2s ease; touch-action:manipulation;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+            <div id="login-error-msg" style="display:none; background:#FEF2F2; border:1px solid #FCA5A5; color:#DC2626; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:600; text-align:left; margin-bottom:14px; line-height:1.4;"></div>
+
+            <form id="form-direct-login" style="display:flex; flex-direction:column; gap:12px; text-align:left; margin-bottom:14px;">
+              <div>
+                <label style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:5px;">Student Email or Phone</label>
+                <div style="position:relative; display:flex; align-items:center;">
+                  <span class="material-symbols-rounded" style="position:absolute; left:12px; color:#94A3B8; font-size:19px;">person</span>
+                  <input type="text" id="input-login-email" placeholder="student@gmail.com or 0771234567" required autocomplete="username" style="width:100%; height:44px; padding:0 12px 0 38px; border:1.5px solid #CBD5E1; border-radius:12px; font-size:13.5px; background:#F8FAFC; outline:none; box-sizing:border-box; transition:border 0.2s;" />
+                </div>
+              </div>
+
+              <div>
+                <label style="display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:5px;">Password</label>
+                <div style="position:relative; display:flex; align-items:center;">
+                  <span class="material-symbols-rounded" style="position:absolute; left:12px; color:#94A3B8; font-size:19px;">lock</span>
+                  <input type="password" id="input-login-password" placeholder="Enter your password" required autocomplete="current-password" style="width:100%; height:44px; padding:0 40px 0 38px; border:1.5px solid #CBD5E1; border-radius:12px; font-size:13.5px; background:#F8FAFC; outline:none; box-sizing:border-box; transition:border 0.2s;" />
+                  <button type="button" id="btn-toggle-login-pwd" style="position:absolute; right:10px; background:none; border:none; color:#94A3B8; cursor:pointer; padding:4px; display:flex; align-items:center;">
+                    <span class="material-symbols-rounded" id="icon-toggle-pwd" style="font-size:19px;">visibility</span>
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" id="btn-submit-login" class="auth-btn-submit" style="width:100%; height:46px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:12px; font-size:14.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; box-shadow:0 6px 18px rgba(37,99,235,0.25); margin-top:2px; transition:all 0.2s;">
+                <span>Sign In With EduPeak</span>
+                <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
+              </button>
+            </form>
+
+            <div style="display:flex; align-items:center; text-align:center; margin:14px 0 12px; color:#94A3B8; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+              <span style="flex:1; border-bottom:1px solid #E2E8F0; margin-right:8px;"></span>
+              <span>OR SINGLE SIGN-ON</span>
+              <span style="flex:1; border-bottom:1px solid #E2E8F0; margin-left:8px;"></span>
+            </div>
+
+            <button type="button" id="btn-login-edupeak" style="width:100%; height:42px; background:#F8FAFC; color:#1E293B; border:1.5px solid #CBD5E1; border-radius:12px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:all 0.2s;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
                 <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
                 <polyline points="10 17 15 12 10 7"></polyline>
                 <line x1="15" y1="12" x2="3" y2="12"></line>
               </svg>
-              <span>Login With EduPeak</span>
+              <span>Authorize via EduPeak.lk Website</span>
             </button>
 
-            <div style="margin-top:16px; padding-top:16px; border-top:1px solid #F1F5F9; font-size:12px; color:#64748B;">
+            <div style="margin-top:14px; padding-top:14px; border-top:1px solid #F1F5F9; font-size:12px; color:#64748B;">
               Don't have an account on edupeak.lk yet?
               <br>
-              <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; margin-top:6px;">
+              <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px; margin-top:5px;">
                 <span>Create an Account at edupeak.lk</span>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                   <polyline points="15 3 21 3 21 9"></polyline>
                   <line x1="10" y1="14" x2="21" y2="3"></line>
@@ -94004,7 +94110,7 @@ var AppController = class {
             </div>
           </div>
 
-          <div class="auth-secure-note" style="margin-top:16px; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:#64748B;">
+          <div class="auth-secure-note" style="margin-top:14px; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:#64748B;">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               <polyline points="9 12 11 14 15 10"></polyline>
@@ -94014,16 +94120,73 @@ var AppController = class {
         </div>
       </div>
     `;
+    document.getElementById("btn-toggle-login-pwd")?.addEventListener("click", () => {
+      const pwdInput = document.getElementById("input-login-password");
+      const icon = document.getElementById("icon-toggle-pwd");
+      if (pwdInput && icon) {
+        if (pwdInput.type === "password") {
+          pwdInput.type = "text";
+          icon.textContent = "visibility_off";
+        } else {
+          pwdInput.type = "password";
+          icon.textContent = "visibility";
+        }
+      }
+    });
+    document.getElementById("form-direct-login")?.addEventListener("submit", async (e2) => {
+      e2.preventDefault();
+      const identifier = document.getElementById("input-login-email")?.value?.trim();
+      const password = document.getElementById("input-login-password")?.value;
+      const btn = document.getElementById("btn-submit-login");
+      const errBox = document.getElementById("login-error-msg");
+      if (!identifier || !password) return;
+      if (errBox) errBox.style.display = "none";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `
+          <div style="width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
+          <span>Authenticating...</span>
+        `;
+      }
+      try {
+        const result = await authService.loginWithIdentifierAndPassword(identifier, password);
+        if (!result.success) {
+          if (errBox) {
+            errBox.textContent = result.error || "Authentication failed. Please verify your EduPeak email or password.";
+            errBox.style.display = "block";
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `
+              <span>Sign In With EduPeak</span>
+              <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
+            `;
+          }
+        }
+      } catch (err) {
+        if (errBox) {
+          errBox.textContent = err?.message || "Login request error. Please try again.";
+          errBox.style.display = "block";
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `
+            <span>Sign In With EduPeak</span>
+            <span class="material-symbols-rounded" style="font-size:18px;">arrow_forward</span>
+          `;
+        }
+      }
+    });
     document.getElementById("btn-login-edupeak")?.addEventListener("click", () => {
       const btn = document.getElementById("btn-login-edupeak");
       if (btn) {
         btn.disabled = true;
         btn.innerHTML = `
-          <div style="width:18px; height:18px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
-          <span>Connecting to EduPeak...</span>
+          <div style="width:16px; height:16px; border:2px solid rgba(37,99,235,0.3); border-top-color:#2563EB; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
+          <span>Opening EduPeak Login...</span>
         `;
       }
-      authService.redirectToEduPeakLogin();
+      authService.redirectToEduPeakLogin(true);
     });
   }
   // ── Logout In-App Confirmation Dialog (1:1 student_profile_screen.dart replica) ─

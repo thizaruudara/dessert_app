@@ -51,23 +51,24 @@ export class AuthService {
 
   async initSession() {
     try {
-      // 1. Detect tokens from SSO hash redirect (e.g., #access_token=...&refresh_token=...)
+      // 1. Detect tokens from SSO hash or query redirect (e.g., #access_token=...&refresh_token=... or ?access_token=...)
       const hash = window.location.hash || '';
+      const search = window.location.search || '';
       let ssoTokens = null;
 
-      if (hash.includes('access_token=') || hash.includes('refresh_token=')) {
-        const params = new URLSearchParams(hash.replace(/^#/, ''));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+      const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+      const searchParams = new URLSearchParams(search);
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+      const ssoError = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error') || searchParams.get('error');
 
-        if (accessToken) {
-          ssoTokens = { accessToken, refreshToken };
-          // Clean hash from browser address bar smoothly
-          try {
-            const cleanUrl = window.location.pathname + window.location.search;
-            window.history.replaceState(null, document.title, cleanUrl);
-          } catch (_) {}
-        }
+      if (accessToken) {
+        ssoTokens = { accessToken, refreshToken };
+        // Clean tokens from browser address bar smoothly
+        try {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState(null, document.title, cleanUrl);
+        } catch (_) {}
       }
 
       // If tokens were received from edupeak.lk SSO redirect, set session in Supabase
@@ -80,11 +81,20 @@ export class AuthService {
 
         if (sessionErr) {
           console.error('[Auth] Failed to set Supabase session from tokens:', sessionErr);
+          try {
+            const { notificationService } = await import('./notification-service.js');
+            notificationService.showLocalToast('⚠️ EduPeak SSO session was expired or invalid. Please sign in below.');
+          } catch (_) {}
         } else if (sessionData?.user) {
           localStorage.removeItem('edupeak_is_logged_out');
           await this.syncProfileFromAuthUser(sessionData.user);
           return;
         }
+      } else if (ssoError) {
+        try {
+          const { notificationService } = await import('./notification-service.js');
+          notificationService.showLocalToast(`⚠️ EduPeak login: ${decodeURIComponent(ssoError)}`);
+        } catch (_) {}
       }
 
       // 2. Check for active Supabase session in storage
@@ -210,11 +220,66 @@ export class AuthService {
   }
 
   /**
+   * Direct Sign In using EduPeak Email or Phone + Password
+   */
+  async loginWithIdentifierAndPassword(identifier, password) {
+    if (!identifier || !password) {
+      return { success: false, error: 'Please enter your email or phone number and password.' };
+    }
+
+    try {
+      this.loading = true;
+      let emailToUse = identifier.trim();
+
+      // If identifier is not an email (e.g. phone number like 077... or EP-2027-...), lookup profile
+      if (!emailToUse.includes('@')) {
+        const profile = await getStudentProfile(emailToUse);
+        if (profile?.email) {
+          emailToUse = profile.email;
+        } else {
+          // If no profile found by phone/ID, format as possible domain or report error
+          return {
+            success: false,
+            error: `Could not find an EduPeak student account registered with "${identifier}". Please use your registered email address.`
+          };
+        }
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password: String(password)
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.user) {
+        throw new Error('No user data returned from authentication service.');
+      }
+
+      localStorage.removeItem('edupeak_is_logged_out');
+      await this.syncProfileFromAuthUser(data.user);
+      return { success: true, user: this.currentUser };
+    } catch (err) {
+      console.error('[Auth] Direct sign-in failed:', err);
+      let errMsg = err?.message || 'Invalid email or password.';
+      if (errMsg.toLowerCase().includes('invalid login credentials')) {
+        errMsg = 'Incorrect email or password. Please verify your EduPeak login credentials.';
+      }
+      return { success: false, error: errMsg };
+    } finally {
+      this.loading = false;
+      this.notify();
+    }
+  }
+
+  /**
    * Redirect to edupeak.lk single sign-on page
    */
-  redirectToEduPeakLogin() {
+  redirectToEduPeakLogin(forceLogin = true) {
     const returnUrl = window.location.origin + window.location.pathname;
-    const ssoUrl = `https://edupeak.lk/app-auth.html?redirect_uri=${encodeURIComponent(returnUrl)}`;
+    const ssoUrl = `https://edupeak.lk/app-auth.html?redirect_uri=${encodeURIComponent(returnUrl)}${forceLogin ? '&prompt=login' : ''}&_t=${Date.now()}`;
     window.location.href = ssoUrl;
   }
 
