@@ -99480,11 +99480,21 @@ var AppController = class {
     const modal = document.createElement("div");
     modal.className = "app-modal";
     modal.style.display = "flex";
+    modal.style.overflowX = "hidden";
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    const closeModal = () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      modal.remove();
+    };
     let adminAnswerKey = {};
     let currentMcqCount = 50;
     let isAnswerKeyEnabled = false;
     modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
+      <div class="modal-sheet" style="max-height:90vh; overflow-y:auto; overflow-x:hidden; width:100%; max-width:min(440px, 100vw); box-sizing:border-box; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;">
         <div class="modal-header">
           <div style="font-size:16px; font-weight:800; color:#0F172A;">Create Paper Session</div>
           <button class="modal-close-btn" id="btn-close-new-paper">
@@ -99492,22 +99502,22 @@ var AppController = class {
           </button>
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
-          <div>
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px; width:100%; box-sizing:border-box;">
+          <div style="width:100%; box-sizing:border-box;">
             <div class="form-label">Paper Title:</div>
-            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px;" placeholder="e.g. 2027 A/L Speed Paper 01 (Mechanics)" />
+            <input type="text" id="new-paper-title" class="form-textarea" style="height:40px; width:100%; min-width:0; box-sizing:border-box;" placeholder="e.g. 2027 A/L Speed Paper 01 (Mechanics)" />
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div>
+          <div style="display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:10px; width:100%; box-sizing:border-box;">
+            <div style="min-width:0; width:100%; box-sizing:border-box;">
               <div class="form-label">Subject:</div>
-              <select id="new-paper-subject" class="form-textarea" style="height:40px; padding:8px;">
+              <select id="new-paper-subject" class="form-textarea" style="height:40px; padding:8px; width:100%; min-width:0; box-sizing:border-box;">
                 <option value="Physics" selected>Physics</option>
               </select>
             </div>
-            <div>
+            <div style="min-width:0; width:100%; box-sizing:border-box;">
               <div class="form-label">Exam Year / Batch:</div>
-              <select id="new-paper-year" class="form-textarea" style="height:40px; padding:8px;">
+              <select id="new-paper-year" class="form-textarea" style="height:40px; padding:8px; width:100%; min-width:0; box-sizing:border-box;">
                 <option value="2024 A/L">2024 A/L</option>
                 <option value="2025 A/L">2025 A/L</option>
                 <option value="2026 A/L">2026 A/L</option>
@@ -99520,47 +99530,47 @@ var AppController = class {
           </div>
 
           <!-- Paper Session Type Selection (MCQ, Essay, MCQ & Essay) -->
-          <div>
+          <div style="width:100%; box-sizing:border-box;">
             <div class="form-label" style="font-weight:700;">Paper Session Type (\u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DC0\u0DBB\u0DCA\u0D9C\u0DBA):</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:4px;">
-              <label id="label-type-mcq" style="display:flex; flex-direction:column; align-items:center; gap:4px; background:#EFF6FF; border:2px solid #2563EB; padding:10px 6px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer; text-align:center;">
+            <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; margin-top:4px; width:100%; box-sizing:border-box;">
+              <label id="label-type-mcq" style="min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; background:#EFF6FF; border:2px solid #2563EB; padding:8px 4px; border-radius:12px; font-size:10.5px; font-weight:700; cursor:pointer; text-align:center; box-sizing:border-box;">
                 <input type="radio" name="paper-type" value="mcq" id="radio-type-mcq" checked style="accent-color:#2563EB;" />
-                <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">check_circle</span>
-                <span style="color:#1E40AF;">MCQ (\u0DB6\u0DC4\u0DD4\u0DC0\u0DBB\u0DAB)</span>
+                <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">check_circle</span>
+                <span style="color:#1E40AF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">MCQ</span>
               </label>
-              <label id="label-type-essay" style="display:flex; flex-direction:column; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px 6px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer; text-align:center;">
+              <label id="label-type-essay" style="min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #E2E8F0; padding:8px 4px; border-radius:12px; font-size:10.5px; font-weight:700; cursor:pointer; text-align:center; box-sizing:border-box;">
                 <input type="radio" name="paper-type" value="essay" id="radio-type-essay" style="accent-color:#2563EB;" />
-                <span class="material-symbols-rounded" style="font-size:22px; color:#D97706;">edit_document</span>
-                <span style="color:#64748B;">Essay (\u0DBD\u0DD2\u0D9B\u0DD2\u0DAD)</span>
+                <span class="material-symbols-rounded" style="font-size:20px; color:#D97706;">edit_document</span>
+                <span style="color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">Essay</span>
               </label>
-              <label id="label-type-both" style="display:flex; flex-direction:column; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px 6px; border-radius:12px; font-size:11px; font-weight:700; cursor:pointer; text-align:center;">
+              <label id="label-type-both" style="min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; background:#F8FAFC; border:1px solid #E2E8F0; padding:8px 4px; border-radius:12px; font-size:10.5px; font-weight:700; cursor:pointer; text-align:center; box-sizing:border-box;">
                 <input type="radio" name="paper-type" value="mcq_essay" id="radio-type-both" style="accent-color:#2563EB;" />
-                <span class="material-symbols-rounded" style="font-size:22px; color:#7C3AED;">auto_stories</span>
-                <span style="color:#64748B;">MCQ & Essay</span>
+                <span class="material-symbols-rounded" style="font-size:20px; color:#7C3AED;">auto_stories</span>
+                <span style="color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">Both</span>
               </label>
             </div>
           </div>
 
           <!-- \u2500\u2500 NEW SECTION: Change MCQ Question Count (Shown for MCQ & MCQ & Essay) \u2500\u2500 -->
-          <div id="new-paper-mcq-count-section" style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <div id="new-paper-mcq-count-section" style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; width:100%; box-sizing:border-box;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; width:100%; box-sizing:border-box;">
               <div>
                 <div style="font-size:12.5px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
                   <span class="material-symbols-rounded filled" style="font-size:18px; color:#2563EB;">format_list_numbered</span>
-                  <span>MCQ Question Count (\u0DB6\u0DC4\u0DD4\u0DC0\u0DBB\u0DAB \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0D9C\u0DAB\u0DB1)</span>
+                  <span>MCQ Question Count</span>
                 </div>
                 <div style="font-size:10.5px; color:#64748B; margin-top:2px;">
                   \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 50 \u0DA7 \u0D85\u0DA9\u0DD4\u0DC0\u0DD9\u0DB1\u0DCA (\u0D8B\u0DAF\u0DCF: 20, 25, 30) \u0DC4\u0DDD \u0D9A\u0DD0\u0DB8\u0DAD\u0DD2 \u0DB4\u0DCA\u200D\u0DBB\u0DB8\u0DCF\u0DAB\u0DBA\u0D9A\u0DCA \u0DC3\u0D9A\u0DC3\u0DB1\u0DCA\u0DB1
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:6px;">
-                <input type="number" id="new-paper-mcq-count" min="1" max="100" value="50" class="form-textarea" style="height:34px; width:72px; text-align:center; font-weight:800; font-size:14px; padding:4px;" />
+                <input type="number" id="new-paper-mcq-count" min="1" max="100" value="50" class="form-textarea" style="height:34px; width:68px; text-align:center; font-weight:800; font-size:14px; padding:4px;" />
                 <span style="font-size:11px; font-weight:700; color:#475569;">Qs</span>
               </div>
             </div>
 
             <!-- Quick Preset Chips -->
-            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; width:100%; box-sizing:border-box;">
               <span style="font-size:10.5px; color:#64748B; font-weight:600;">Quick Select:</span>
               <button type="button" class="btn-mcq-quick-count" data-count="10" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">10 Qs</button>
               <button type="button" class="btn-mcq-quick-count" data-count="20" style="border:1px solid #CBD5E1; background:#FFFFFF; color:#475569; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">20 Qs</button>
@@ -99572,144 +99582,148 @@ var AppController = class {
           </div>
 
           <!-- \u2500\u2500 Pre-set MCQ Answer Key Box with Tick to Enable \u2500\u2500 -->
-          <div id="new-paper-mcq-box" style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; transition:all 0.2s ease;">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+          <div id="new-paper-mcq-box" style="background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; transition:all 0.2s ease; width:100%; box-sizing:border-box;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; width:100%; box-sizing:border-box;">
               <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; flex:1; min-width:0; user-select:none;">
-                <input type="checkbox" id="chk-enable-answer-key" style="width:19px; height:19px; margin-top:2px; accent-color:#16A34A; cursor:pointer;" />
-                <div>
-                  <div style="font-size:12.5px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="chk-enable-answer-key" style="width:19px; height:19px; margin-top:2px; accent-color:#16A34A; cursor:pointer; flex-shrink:0;" />
+                <div style="min-width:0;">
+                  <div style="font-size:12.5px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     <span class="material-symbols-rounded filled" id="ico-answer-key-status" style="font-size:18px; color:#64748B;">verified</span>
-                    <span>Pre-set MCQ Answer Key (\u0DB1\u0DD2\u0DC0\u0DD0\u0DBB\u0DAF\u0DD2 \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0D87\u0DAD\u0DD4\u0DC5\u0DAD\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8)</span>
+                    <span>Pre-set MCQ Answer Key</span>
                   </div>
                   <div id="desc-answer-key-status" style="font-size:10.5px; color:#64748B; margin-top:2px; line-height:1.4;">
                     Tick \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA (Enable) \u0D9A\u0DC5\u0DC4\u0DDC\u0DAD\u0DCA \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 <strong id="lbl-mcq-required-count">50</strong> \u0DA7\u0DB8 \u0D85\u0DB1\u0DD2\u0DC0\u0DCF\u0DBB\u0DCA\u0DBA\u0DBA\u0DD9\u0DB1\u0DCA\u0DB8 \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0DAD\u0DD2\u0DB6\u0DD2\u0DBA \u0DBA\u0DD4\u0DAD\u0DD4\u0DBA.
                   </div>
                 </div>
               </label>
-              <button type="button" id="btn-clear-admin-mcq" style="background:transparent; border:none; color:#DC2626; font-size:11px; font-weight:700; cursor:pointer; padding:4px 6px;">
+              <button type="button" id="btn-clear-admin-mcq" style="background:transparent; border:none; color:#DC2626; font-size:11px; font-weight:700; cursor:pointer; padding:4px 6px; flex-shrink:0;">
                 Clear All
               </button>
             </div>
 
             <!-- Answer Key interactive container -->
-            <div id="admin-mcq-key-container" style="display:none; flex-direction:column; gap:8px;">
-              <div style="display:flex; align-items:center; justify-content:space-between; background:#DCFCE7; border-radius:8px; padding:6px 10px; font-size:11px; color:#166534;">
+            <div id="admin-mcq-key-container" style="display:none; flex-direction:column; gap:8px; width:100%; box-sizing:border-box;">
+              <div style="display:flex; align-items:center; justify-content:space-between; background:#DCFCE7; border-radius:8px; padding:6px 10px; font-size:11px; color:#166534; width:100%; box-sizing:border-box;">
                 <span>Configured: <strong id="admin-ans-count-badge">0</strong> / <strong id="admin-ans-total-badge">50</strong> Questions</span>
                 <span id="admin-ans-status-badge" style="font-size:10.5px; font-weight:700; color:#DC2626;">\u26A0\uFE0F Answers Required</span>
               </div>
 
-              <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+              <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; overflow-x:hidden; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:6px; width:100%; box-sizing:border-box;"></div>
             </div>
 
             <!-- Hint shown when Answer Key tick is unchecked -->
-            <div id="admin-mcq-disabled-hint" style="padding:10px 12px; background:#F1F5F9; border:1px dashed #CBD5E1; border-radius:8px; font-size:11px; color:#64748B; line-height:1.45;">
+            <div id="admin-mcq-disabled-hint" style="padding:10px 12px; background:#F1F5F9; border:1px dashed #CBD5E1; border-radius:8px; font-size:11px; color:#64748B; line-height:1.45; width:100%; box-sizing:border-box;">
               <span style="font-weight:700; color:#334155;">\u{1F4A1} Answer Key Disabled:</span> \u0D94\u0DB6\u0DA7 \u0DAF\u0DD0\u0DB1\u0DA7 \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0D87\u0DAD\u0DD4\u0DC5\u0DAD\u0DCA \u0DB1\u0DDC\u0D9A\u0DBB \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DD1\u0DAF\u0DD2\u0DBA \u0DC4\u0DD0\u0D9A. (\u0DB4\u0DC3\u0DD4\u0DC0 Card \u0D91\u0D9A\u0DDA \u0D87\u0DAD\u0DD2 <strong style="color:#059669;">Key</strong> \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8\u0DD9\u0DB1\u0DCA \u0D95\u0DB1\u0DD1\u0DB8 \u0DC0\u0DDA\u0DBD\u0DCF\u0DC0\u0D9A \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0D87\u0DAD\u0DD4\u0DC5\u0DAD\u0DCA \u0D9A\u0DC5 \u0DC4\u0DD0\u0D9A).
             </div>
           </div>
 
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <div>
+          <div style="display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:10px; width:100%; box-sizing:border-box;">
+            <div style="min-width:0; width:100%; box-sizing:border-box;">
               <div class="form-label">Duration (Mins):</div>
-              <input type="number" id="new-paper-duration" class="form-textarea" style="height:40px;" value="180" />
+              <input type="number" id="new-paper-duration" class="form-textarea" style="height:40px; width:100%; min-width:0; box-sizing:border-box;" value="180" />
             </div>
-            <div>
+            <div style="min-width:0; width:100%; box-sizing:border-box;">
               <div class="form-label">Total Marks:</div>
-              <input type="number" id="new-paper-marks" class="form-textarea" style="height:40px;" value="100" />
+              <input type="number" id="new-paper-marks" class="form-textarea" style="height:40px; width:100%; min-width:0; box-sizing:border-box;" value="100" />
             </div>
           </div>
 
           <!-- Physical Paper Delivery Note matching Flutter -->
-          <div style="background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.2); border-radius:10px; padding:10px; display:flex; gap:8px;">
-            <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB;">inventory_2</span>
-            <div style="font-size:10.5px; color:#1E3A8A; line-height:1.45;">
+          <div style="background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.2); border-radius:10px; padding:10px; display:flex; gap:8px; width:100%; box-sizing:border-box;">
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB; flex-shrink:0;">inventory_2</span>
+            <div style="font-size:10.5px; color:#1E3A8A; line-height:1.45; min-width:0;">
               <strong>Physical Paper Delivery:</strong> \u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0D9C\u0DDA \u0DB1\u0DD2\u0DC0\u0DD9\u0DC3\u0DCA \u0DC0\u0DBD\u0DA7 \u0D9A\u0DD4\u0DBB\u0DD2\u0DBA\u0DBB\u0DCA \u0D9A\u0DBB \u0D87\u0DAD\u0DD2 \u0DB8\u0DD4\u0DAF\u0DCA\u200D\u0DBB\u0DD2\u0DAD \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB\u0DBA \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0DB4\u0DCA\u200D\u0DBB\u0DAE\u0DB8 \u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 10 \u0D9A \u0D9A\u0DCF\u0DBD\u0DBA\u0D9A\u0DCA \u0DC3\u0DCA\u0DC0\u0DBA\u0D82\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA\u0DC0 \u0DC4\u0DD2\u0DB8\u0DD2\u0DC0\u0DDA.
             </div>
           </div>
 
-          <div>
+          <div style="width:100%; box-sizing:border-box;">
             <div class="form-label" style="display:flex; align-items:center; gap:4px;">
               <span class="material-symbols-rounded" style="font-size:15px;">calendar_today</span> Examination Date:
             </div>
-            <input type="date" id="new-paper-date" class="form-textarea" style="height:40px;" value="${today}" />
+            <input type="date" id="new-paper-date" class="form-textarea" style="height:40px; width:100%; min-width:0; box-sizing:border-box;" value="${today}" />
           </div>
 
-          <div>
+          <div style="width:100%; box-sizing:border-box;">
             <div class="form-label">Number of Session Slots:</div>
-            <div style="display:flex; gap:10px; margin-top:4px;">
-              <label style="flex:1; display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer;">
-                <input type="radio" name="slot-count" value="1" id="radio-slot-1">
-                <span>1 Slot</span>
+            <div style="display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.4fr); gap:8px; margin-top:4px; width:100%; box-sizing:border-box;">
+              <label style="min-width:0; display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px 8px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; box-sizing:border-box;">
+                <input type="radio" name="slot-count" value="1" id="radio-slot-1" style="flex-shrink:0;">
+                <span style="white-space:nowrap;">1 Slot</span>
               </label>
-              <label style="flex:1; display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer;">
-                <input type="radio" name="slot-count" value="2" id="radio-slot-2" checked>
-                <span>2 Slots (Morning & Evening)</span>
+              <label style="min-width:0; display:flex; align-items:center; gap:6px; background:#F8FAFC; border:1px solid #E2E8F0; padding:10px 8px; border-radius:10px; font-size:11.5px; font-weight:600; cursor:pointer; box-sizing:border-box; line-height:1.2;">
+                <input type="radio" name="slot-count" value="2" id="radio-slot-2" checked style="flex-shrink:0;">
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">2 Slots (M & E)</span>
               </label>
             </div>
           </div>
 
           <!-- Slot Times Container -->
-          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px;">
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px; width:100%; box-sizing:border-box; overflow:hidden;">
             <div style="font-size:11.5px; font-weight:700; color:#D97706; margin-bottom:6px; display:flex; align-items:center; gap:4px;">
               <span class="material-symbols-rounded filled" style="font-size:15px; color:#D97706;">wb_sunny</span> Slot 1 (Morning Session):
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <div>
-                <span style="font-size:10.5px; color:#64748B;">Start:</span>
-                <input type="time" id="new-s1-start" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="08:30" />
+            <div style="display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:8px; width:100%; box-sizing:border-box;">
+              <div style="min-width:0; width:100%; box-sizing:border-box;">
+                <span style="font-size:10.5px; color:#64748B; font-weight:600; display:block; margin-bottom:3px;">Start:</span>
+                <input type="time" id="new-s1-start" class="time-slot-input" value="08:30" />
               </div>
-              <div>
-                <span style="font-size:10.5px; color:#64748B;">End:</span>
-                <input type="time" id="new-s1-end" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="11:40" />
+              <div style="min-width:0; width:100%; box-sizing:border-box;">
+                <span style="font-size:10.5px; color:#64748B; font-weight:600; display:block; margin-bottom:3px;">End:</span>
+                <input type="time" id="new-s1-end" class="time-slot-input" value="11:40" />
               </div>
             </div>
 
-            <div id="new-slot2-box" style="margin-top:10px;">
+            <div id="new-slot2-box" style="margin-top:10px; width:100%; box-sizing:border-box;">
               <div style="font-size:11.5px; font-weight:700; color:#2563EB; margin-bottom:6px; display:flex; align-items:center; gap:4px;">
                 <span class="material-symbols-rounded filled" style="font-size:15px; color:#2563EB;">bedtime</span> Slot 2 (Evening Session):
               </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <div>
-                  <span style="font-size:10.5px; color:#64748B;">Start:</span>
-                  <input type="time" id="new-s2-start" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="16:00" />
+              <div style="display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:8px; width:100%; box-sizing:border-box;">
+                <div style="min-width:0; width:100%; box-sizing:border-box;">
+                  <span style="font-size:10.5px; color:#64748B; font-weight:600; display:block; margin-bottom:3px;">Start:</span>
+                  <input type="time" id="new-s2-start" class="time-slot-input" value="16:00" />
                 </div>
-                <div>
-                  <span style="font-size:10.5px; color:#64748B;">End:</span>
-                  <input type="time" id="new-s2-end" class="form-textarea" style="height:38px; font-size:13px; font-weight:600; cursor:pointer;" value="19:10" />
+                <div style="min-width:0; width:100%; box-sizing:border-box;">
+                  <span style="font-size:10.5px; color:#64748B; font-weight:600; display:block; margin-bottom:3px;">End:</span>
+                  <input type="time" id="new-s2-end" class="time-slot-input" value="19:10" />
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Manual Session End Note matching Flutter -->
-          <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:10px; display:flex; gap:8px;">
-            <span class="material-symbols-rounded filled" style="font-size:18px; color:#D97706;">cancel</span>
-            <div style="font-size:10.5px; color:#92400E; line-height:1.45;">
+          <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:10px; display:flex; gap:8px; width:100%; box-sizing:border-box;">
+            <span class="material-symbols-rounded filled" style="font-size:18px; color:#D97706; flex-shrink:0;">cancel</span>
+            <div style="font-size:10.5px; color:#92400E; line-height:1.45; min-width:0;">
               <strong>Manual Session End:</strong> \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C \u0DC3\u0DD0\u0DC3\u0DD2\u0DBA \u0DC3\u0DCA\u0DC0\u0DBA\u0D82\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA\u0DC0 \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0DB1\u0DDC\u0DC0\u0DDA. \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0DC0\u0DD6 \u0DB4\u0DC3\u0DD4 Admin \u0DC0\u0DD2\u0DC3\u0DD2\u0DB1\u0DCA "End Session" \u0DB6\u0DDC\u0DAD\u0DCA\u0DAD\u0DB8 \u0D94\u0DB6\u0DCF \u0D91\u0DBA \u0D85\u0DC0\u0DC3\u0DB1\u0DCA \u0D9A\u0DC5 \u0DBA\u0DD4\u0DAD\u0DD4\u0DBA.
             </div>
           </div>
 
           <!-- Student Push Notification Settings -->
-          <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px; width:100%; box-sizing:border-box;">
             <div style="font-size:12px; font-weight:800; color:#1E40AF; display:flex; align-items:center; gap:6px;">
               <span class="material-symbols-rounded" style="font-size:18px; color:#2563EB;">notifications_active</span>
-              <span>Student Push Notifications (\u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DAF\u0DD0\u0DB1\u0DD4\u0DB8\u0DCA\u0DAF\u0DD3\u0DB8\u0DCA):</span>
+              <span>Student Push Notifications:</span>
             </div>
-            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
-              <input type="checkbox" id="new-paper-notify-scheduled" checked style="width:16px; height:16px; accent-color:#2563EB;" />
-              <span>Notify <strong id="lbl-target-batch-notif">2027 A/L</strong> students that this session is scheduled for registration \u{1F514}</span>
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer; line-height:1.4;">
+              <input type="checkbox" id="new-paper-notify-scheduled" checked style="width:16px; height:16px; accent-color:#2563EB; margin-top:2px; flex-shrink:0;" />
+              <span style="min-width:0;">Notify <strong id="lbl-target-batch-notif">2027 A/L</strong> students that this session is scheduled for registration \u{1F514}</span>
             </label>
-            <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer;">
-              <input type="checkbox" id="new-paper-notify-start" checked style="width:16px; height:16px; accent-color:#2563EB;" />
-              <span>Notify students immediately when Admin starts the session live \u{1F534}</span>
+            <label style="display:flex; align-items:flex-start; gap:8px; font-size:11.5px; font-weight:600; color:#1E293B; cursor:pointer; line-height:1.4;">
+              <input type="checkbox" id="new-paper-notify-start" checked style="width:16px; height:16px; accent-color:#2563EB; margin-top:2px; flex-shrink:0;" />
+              <span style="min-width:0;">Notify students immediately when Admin starts the session live \u{1F534}</span>
             </label>
           </div>
 
-          <div style="display:flex; gap:10px; margin-top:8px;">
-            <button class="apk-btn-primary" id="btn-cancel-create-paper" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
+          <div style="display:flex; gap:10px; margin-top:8px; width:100%; box-sizing:border-box; align-items:stretch;">
+            <button type="button" class="apk-btn-primary" id="btn-cancel-create-paper" style="flex:1; min-width:0; background:#F1F5F9; color:#475569; box-shadow:none; border:1px solid #CBD5E1; min-height:48px; border-radius:12px; font-size:13.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">
               Cancel
             </button>
-            <button class="apk-btn-primary" id="btn-save-new-paper" style="flex:1.5; background:#2563EB; padding:13px; font-size:13px;">
-              Schedule Session (\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Schedule \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)
+            <button type="button" class="apk-btn-primary" id="btn-save-new-paper" style="flex:1.8; min-width:0; background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; min-height:48px; border-radius:12px; padding:6px 10px; font-size:13px; font-weight:700; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; box-shadow:0 4px 14px rgba(37,99,235,0.3); border:none; text-align:center;">
+              <div style="display:flex; align-items:center; justify-content:center; gap:5px; width:100%;">
+                <span class="material-symbols-rounded" style="font-size:17px;">event_available</span>
+                <span style="white-space:nowrap;">Schedule Session</span>
+              </div>
+              <div style="font-size:10px; font-weight:500; opacity:0.88; white-space:nowrap;">\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Schedule \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1</div>
             </button>
           </div>
         </div>
@@ -99717,10 +99731,10 @@ var AppController = class {
     `;
     document.body.appendChild(modal);
     modal.addEventListener("click", (e2) => {
-      if (e2.target === modal) modal.remove();
+      if (e2.target === modal) closeModal();
     });
-    document.getElementById("btn-close-new-paper")?.addEventListener("click", () => modal.remove());
-    document.getElementById("btn-cancel-create-paper")?.addEventListener("click", () => modal.remove());
+    document.getElementById("btn-close-new-paper")?.addEventListener("click", closeModal);
+    document.getElementById("btn-cancel-create-paper")?.addEventListener("click", closeModal);
     const slot2Box = document.getElementById("new-slot2-box");
     document.getElementById("radio-slot-1")?.addEventListener("change", () => {
       if (slot2Box) slot2Box.style.display = "none";
@@ -99996,7 +100010,12 @@ var AppController = class {
       const saveBtn = document.getElementById("btn-save-new-paper");
       if (saveBtn) {
         saveBtn.disabled = true;
-        saveBtn.textContent = "Creating Session...";
+        saveBtn.innerHTML = `
+          <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:17px; animation:spin 1s linear infinite;">progress_activity</span>
+            <span>Scheduling...</span>
+          </div>
+        `;
       }
       const notifyScheduled = modal.querySelector("#new-paper-notify-scheduled")?.checked !== false;
       const notifyOnStart = modal.querySelector("#new-paper-notify-start")?.checked !== false;
@@ -100024,14 +100043,20 @@ var AppController = class {
           slot2
         });
         notificationService.showInAppBanner("Paper Scheduled!", "Paper Session \u0D91\u0D9A \u0DC3\u0DCF\u0DBB\u0DCA\u0DAE\u0D9A\u0DC0 Schedule \u0D9A\u0DBB\u0DB1 \u0DBD\u0DAF\u0DD3 (Registration Open).", "success");
-        modal.remove();
+        closeModal();
         this.refreshAdminTab("papers");
       } catch (err) {
         console.error("Failed to create paper session:", err);
         alert("Error creating paper session: " + err.message);
         if (saveBtn) {
           saveBtn.disabled = false;
-          saveBtn.textContent = "Schedule Session (\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Schedule \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1)";
+          saveBtn.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:center; gap:5px; width:100%;">
+              <span class="material-symbols-rounded" style="font-size:17px;">event_available</span>
+              <span style="white-space:nowrap;">Schedule Session</span>
+            </div>
+            <div style="font-size:10px; font-weight:500; opacity:0.88; white-space:nowrap;">\u0DC3\u0DD0\u0DC3\u0DD2\u0DBA Schedule \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1</div>
+          `;
         }
       }
     });
