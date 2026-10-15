@@ -94535,7 +94535,12 @@ var AppController = class {
       <div class="mandatory-notif-card" role="dialog" aria-modal="true" aria-labelledby="notif-title">
         <div class="notif-card-glow"></div>
         <div class="notif-bell-badge">
-          <span class="material-symbols-rounded filled notif-bell-icon">notifications_active</span>
+          <div class="notif-bell-icon">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+          </div>
           <div class="notif-bell-pulse"></div>
         </div>
 
@@ -94545,26 +94550,45 @@ var AppController = class {
         <div class="notif-modal-subtitle-si">\u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DA7 \u0DBA\u0DCF\u0DB8\u0DA7 Push Notifications \u0DC3\u0D9A\u0DCA\u200D\u0DBB\u0DD3\u0DBA \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1</div>
         
         <p class="notif-modal-desc">
-          EduPeak requires notifications for live examination countdowns, paper unlocks, and real-time homework approval. You cannot proceed to the student dashboard without enabling notifications.
+          EduPeak requires notifications for live examination countdowns, paper unlocks, and real-time homework approval. You must enable notifications to proceed.
         </p>
 
         <div class="notif-perks-list">
           <div class="notif-perk-item">
-            <span class="material-symbols-rounded filled" style="color:#22C55E;">timer</span>
+            <div class="perk-icon-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
             <div>
               <strong>Live Exam Room Alerts</strong>
               <span>Immediate ping when sealed exam papers open.</span>
             </div>
           </div>
           <div class="notif-perk-item">
-            <span class="material-symbols-rounded filled" style="color:#3B82F6;">assignment_turned_in</span>
+            <div class="perk-icon-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                <path d="m9 14 2 2 4-4"></path>
+              </svg>
+            </div>
             <div>
               <strong>Homework Approval & XP</strong>
               <span>Instant alerts when your teacher approves submissions.</span>
             </div>
           </div>
           <div class="notif-perk-item">
-            <span class="material-symbols-rounded filled" style="color:#F59E0B;">military_tech</span>
+            <div class="perk-icon-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                <path d="M4 22h16"></path>
+                <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34"></path>
+                <path d="M6 4h12v7a6 6 0 0 1-12 0V4z"></path>
+              </svg>
+            </div>
             <div>
               <strong>Island Rank Shifts</strong>
               <span>Real-time rank updates on the leaderboard.</span>
@@ -94574,7 +94598,10 @@ var AppController = class {
 
         <div id="notif-blocked-instructions" class="notif-blocked-box" style="display:none;">
           <div class="notif-blocked-header">
-            <span class="material-symbols-rounded" style="color:#EF4444;">block</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+            </svg>
             <strong>Notifications are blocked in your browser</strong>
           </div>
           <div class="notif-blocked-text">
@@ -94585,12 +94612,11 @@ var AppController = class {
         </div>
 
         <button class="notif-enable-btn" id="btn-mandatory-enable-notif" type="button">
-          <span class="material-symbols-rounded filled">notifications</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
           <span id="btn-mandatory-enable-text">Enable Notifications Now</span>
-        </button>
-
-        <button class="notif-skip-btn" id="btn-mandatory-skip-notif" type="button" style="background:transparent; border:none; color:#94A3B8; font-size:13px; font-weight:600; cursor:pointer; padding:10px 16px; margin-top:8px; border-radius:8px; width:100%; transition:all 0.2s;">
-          Skip for now / Continue to Dashboard \u2192
         </button>
       </div>
     `;
@@ -94598,7 +94624,6 @@ var AppController = class {
     const btn = overlay.querySelector("#btn-mandatory-enable-notif");
     const btnText = overlay.querySelector("#btn-mandatory-enable-text");
     const blockedBox = overlay.querySelector("#notif-blocked-instructions");
-    const skipBtn = overlay.querySelector("#btn-mandatory-skip-notif");
     const dismissOverlay = () => {
       btnText.textContent = "\u2705 Notifications Active! Entering...";
       btn.style.background = "#10B981";
@@ -94607,24 +94632,6 @@ var AppController = class {
         if (overlay.parentNode) overlay.remove();
       }, 400);
     };
-    if (skipBtn) {
-      skipBtn.addEventListener("click", () => {
-        sessionStorage.setItem("edupeak_notif_dismissed", "true");
-        overlay.classList.add("fade-out");
-        setTimeout(() => {
-          if (overlay.parentNode) overlay.remove();
-        }, 350);
-      });
-    }
-    overlay.addEventListener("click", (e2) => {
-      if (e2.target === overlay) {
-        sessionStorage.setItem("edupeak_notif_dismissed", "true");
-        overlay.classList.add("fade-out");
-        setTimeout(() => {
-          if (overlay.parentNode) overlay.remove();
-        }, 350);
-      }
-    });
     const updateState = () => {
       if (Notification.permission === "granted") {
         dismissOverlay();

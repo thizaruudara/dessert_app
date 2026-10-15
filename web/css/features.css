@@ -3973,10 +3973,10 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: rgba(5, 8, 17, 0.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   animation: notifFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -3996,16 +3996,16 @@ button:focus-visible {
   position: relative;
   width: 100%;
   max-width: 390px;
-  background: #0F172A;
-  border: 1px solid #1E293B;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
   border-radius: 24px;
   padding: 28px 22px 24px;
-  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.8), 0 0 40px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(226, 232, 240, 0.8);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  color: #F8FAFC;
+  color: #0F172A;
   overflow: hidden;
 }
 
@@ -4016,7 +4016,7 @@ button:focus-visible {
   transform: translateX(-50%);
   width: 220px;
   height: 220px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, transparent 70%);
   pointer-events: none;
   filter: blur(30px);
 }
@@ -4026,17 +4026,19 @@ button:focus-visible {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
-  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.35);
+  color: #FFFFFF;
 }
 
 .notif-bell-icon {
-  font-size: 34px !important;
-  color: #FFFFFF !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   animation: bellShake 2.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
 }
 
@@ -4051,7 +4053,7 @@ button:focus-visible {
   position: absolute;
   inset: -6px;
   border-radius: 50%;
-  border: 2px solid rgba(59, 130, 246, 0.6);
+  border: 2px solid rgba(37, 99, 235, 0.4);
   animation: pulsePing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
@@ -4065,9 +4067,9 @@ button:focus-visible {
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #F59E0B;
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #B45309;
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
   padding: 4px 12px;
   border-radius: 999px;
   margin-bottom: 12px;
@@ -4076,20 +4078,20 @@ button:focus-visible {
 .notif-modal-title {
   font-size: 20px;
   font-weight: 800;
-  color: #F8FAFC;
+  color: #0F172A;
   margin-bottom: 4px;
 }
 
 .notif-modal-subtitle-si {
   font-size: 13px;
   font-weight: 700;
-  color: #60A5FA;
+  color: #2563EB;
   margin-bottom: 12px;
 }
 
 .notif-modal-desc {
   font-size: 12px;
-  color: #94A3B8;
+  color: #64748B;
   line-height: 1.55;
   margin-bottom: 18px;
 }
@@ -4106,23 +4108,29 @@ button:focus-visible {
 .notif-perk-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  background: #1E293B;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  padding: 10px 12px;
+  gap: 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 11px 14px;
 }
 
-.notif-perk-item span.material-symbols-rounded {
-  font-size: 18px;
-  margin-top: 1px;
+.notif-perk-item .perk-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
 }
 
 .notif-perk-item strong {
   display: block;
   font-size: 12px;
-  color: #F8FAFC;
+  color: #0F172A;
   font-weight: 700;
   margin-bottom: 2px;
 }
@@ -4130,14 +4138,14 @@ button:focus-visible {
 .notif-perk-item span {
   display: block;
   font-size: 11px;
-  color: #94A3B8;
+  color: #64748B;
   line-height: 1.35;
 }
 
 .notif-blocked-box {
   width: 100%;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 16px;
@@ -4149,14 +4157,14 @@ button:focus-visible {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #F87171;
+  color: #DC2626;
   font-weight: 700;
   margin-bottom: 6px;
 }
 
 .notif-blocked-text {
   font-size: 11px;
-  color: #CBD5E1;
+  color: #991B1B;
   line-height: 1.5;
 }
 
@@ -4174,13 +4182,13 @@ button:focus-visible {
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45);
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.35);
   transition: all 0.2s ease;
 }
 
 .notif-enable-btn:hover {
   background: #1D4ED8;
-  box-shadow: 0 6px 22px rgba(37, 99, 235, 0.6);
+  box-shadow: 0 6px 22px rgba(37, 99, 235, 0.45);
   transform: translateY(-1px);
 }
 
