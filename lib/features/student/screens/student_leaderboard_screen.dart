@@ -19,7 +19,7 @@ class StudentLeaderboardScreen extends StatefulWidget {
 }
 
 class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
-  // 0: Dessert Leaderboard, 1: Paper Leaderboard
+  // 0: Paper Leaderboard, 1: Dessert Leaderboard
   int _selectedBoardType = 0;
   int _selectedLeagueIndex = 0;
 
@@ -75,7 +75,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
       backgroundColor: isDark ? const Color(0xFF0B0F19) : AppColors.background,
       appBar: AppBar(
         title: Text(
-          _selectedBoardType == 0 ? 'Dessert Leaderboard 🧁' : 'Paper Leaderboard 📝',
+          _selectedBoardType == 0 ? 'Paper Leaderboard 📝' : 'Dessert Leaderboard 🧁',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         elevation: 0,
@@ -83,7 +83,7 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
       ),
       body: Column(
         children: [
-          // ── Segmented Control: Dessert vs Paper ─────────────
+          // ── Segmented Control: Paper (Left) vs Dessert (Right) ─────────────
           Container(
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             padding: const EdgeInsets.all(4),
@@ -99,8 +99,8 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
                 Expanded(
                   child: _buildBoardTabButton(
                     index: 0,
-                    title: '🧁 Dessert Leaderboard',
-                    subtitle: 'XP & Activity Leagues',
+                    title: '📝 Paper Leaderboard',
+                    subtitle: 'Exam Marks & Ranks',
                     isSelected: _selectedBoardType == 0,
                     isDark: isDark,
                   ),
@@ -108,8 +108,8 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
                 Expanded(
                   child: _buildBoardTabButton(
                     index: 1,
-                    title: '📝 Paper Leaderboard',
-                    subtitle: 'Exam Marks & Ranks',
+                    title: '🧁 Dessert Leaderboard',
+                    subtitle: 'XP & Activity Leagues',
                     isSelected: _selectedBoardType == 1,
                     isDark: isDark,
                   ),
@@ -118,18 +118,18 @@ class _StudentLeaderboardScreenState extends State<StudentLeaderboardScreen> {
             ),
           ),
 
-          // ── Tab Body: Dessert Board or Paper Board ────────────
+          // ── Tab Body: Paper Board (0) or Dessert Board (1) ────────────
           Expanded(
             child: _selectedBoardType == 0
-                ? _buildDessertLeaderboard(
-                    currentUserId: currentUserId,
+                ? _buildPaperLeaderboard(
                     currentStudent: currentStudent,
+                    currentUserId: currentUserId,
                     isAdmin: isAdmin,
                     isDark: isDark,
                   )
-                : _buildPaperLeaderboard(
-                    currentStudent: currentStudent,
+                : _buildDessertLeaderboard(
                     currentUserId: currentUserId,
+                    currentStudent: currentStudent,
                     isAdmin: isAdmin,
                     isDark: isDark,
                   ),

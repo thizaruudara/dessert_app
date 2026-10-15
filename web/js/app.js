@@ -324,8 +324,8 @@ class AppController {
         return;
       }
 
-      const ranksDessertMode = e.target.closest('#btn-ranks-dessert-mode');
-      if (ranksDessertMode) {
+      const ranksPaperMode = e.target.closest('#btn-ranks-paper-mode');
+      if (ranksPaperMode) {
         e.preventDefault();
         this.ranksBoardType = 0;
         const vp = this.getTabViewport('ranks');
@@ -333,8 +333,8 @@ class AppController {
         return;
       }
 
-      const ranksPaperMode = e.target.closest('#btn-ranks-paper-mode');
-      if (ranksPaperMode) {
+      const ranksDessertMode = e.target.closest('#btn-ranks-dessert-mode');
+      if (ranksDessertMode) {
         e.preventDefault();
         this.ranksBoardType = 1;
         const vp = this.getTabViewport('ranks');
@@ -3029,7 +3029,7 @@ class AppController {
   async renderRanksScreen(container) {
     this._tabTokens = this._tabTokens || {};
     const renderToken = (this._tabTokens['ranks'] = (this._tabTokens['ranks'] || 0) + 1);
-    this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Dessert, 1: Paper
+    this.ranksBoardType = this.ranksBoardType ?? 0; // 0: Paper (Left), 1: Dessert (Right)
     this.selectedLeague = this.selectedLeague ?? 'All Scholars';
     const currentUser = this.currentUser || {};
     const isAdmin = currentUser.role === 'admin';
@@ -3047,16 +3047,16 @@ class AppController {
     let paperLeaderboardLoadError = false;
     try {
       if (this.ranksBoardType === 0) {
-        leaders = await this.safePromise(dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : undefined), 2500, this._cachedLeaders || []);
-        if (leaders && leaders.length) this._cachedLeaders = leaders;
-      } else {
         paperBoards = await this.safePromise(dbService.getPaperLeaderboards(), 2500, this._cachedPaperBoards || []);
         if (paperBoards && paperBoards.length) this._cachedPaperBoards = paperBoards;
+      } else {
+        leaders = await this.safePromise(dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : undefined), 2500, this._cachedLeaders || []);
+        if (leaders && leaders.length) this._cachedLeaders = leaders;
       }
     } catch (error) {
       console.warn('[Ranks] Board could not be loaded:', error?.code || 'unknown');
-      if (this.ranksBoardType === 0) leaderboardLoadError = leaders.length === 0;
-      else paperLeaderboardLoadError = paperBoards.length === 0;
+      if (this.ranksBoardType === 0) paperLeaderboardLoadError = paperBoards.length === 0;
+      else leaderboardLoadError = leaders.length === 0;
     }
     if (renderToken !== this._tabTokens['ranks'] || !container.isConnected) return;
     const leagues = [
@@ -3084,7 +3084,7 @@ class AppController {
       return !normalizedPaperBatch || normalizedPaperBatch === 'ALLBATCHES'
         || boardBatch === normalizedPaperBatch || boardBatch === 'ALLBATCHES' || boardBatch === 'ALL';
     });
-    if (this.ranksBoardType === 1 && !this.paperBoardsInitialized && visiblePaperBoards[0]) {
+    if (this.ranksBoardType === 0 && !this.paperBoardsInitialized && visiblePaperBoards[0]) {
       this.expandedPaperBoards.add(visiblePaperBoards[0].id);
       this.paperBoardsInitialized = true;
     }
@@ -3427,29 +3427,53 @@ class AppController {
       <!-- Screen Top Bar -->
       <div class="screen-appbar">
         <div class="appbar-left">
-          <div class="appbar-icon-box" style="background:#FEF3C7; color:#B45309;">
-            <span class="material-symbols-rounded filled">emoji_events</span>
+          <div class="appbar-icon-box" style="${this.ranksBoardType === 0 ? 'background:#EFF6FF; color:#2563EB;' : 'background:#FEF3C7; color:#B45309;'}">
+            <span class="material-symbols-rounded filled">${this.ranksBoardType === 0 ? 'assignment' : 'emoji_events'}</span>
           </div>
           <div>
-            <div class="appbar-title">${this.ranksBoardType === 0 ? 'Dessert Leaderboard' : 'Paper Leaderboard'}</div>
-            <div class="appbar-subtitle">${this.ranksBoardType === 0 ? 'XP Credits & Activity Leagues' : 'Exam Marks & Island Rankings'}</div>
+            <div class="appbar-title">${this.ranksBoardType === 0 ? 'Paper Leaderboard' : 'Dessert Leaderboard'}</div>
+            <div class="appbar-subtitle">${this.ranksBoardType === 0 ? 'Exam Marks & Island Rankings' : 'XP Credits & Activity Leagues'}</div>
           </div>
         </div>
       </div>
 
-      <!-- Segmented Switcher: Dessert vs Paper -->
+      <!-- Segmented Switcher: Paper (Left) vs Dessert (Right) -->
       <div class="sub-tabs-container">
-        <button class="sub-tab-btn ${this.ranksBoardType === 0 ? 'active' : ''}" id="btn-ranks-dessert-mode">
-          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded filled" style="font-size:16px;">emoji_events</span> Dessert Leaderboard</span>
-          <span class="tab-sub">XP & Activity Leagues</span>
-        </button>
-        <button class="sub-tab-btn ${this.ranksBoardType === 1 ? 'active' : ''}" id="btn-ranks-paper-mode">
+        <button class="sub-tab-btn ${this.ranksBoardType === 0 ? 'active' : ''}" id="btn-ranks-paper-mode">
           <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded" style="font-size:16px;">assignment</span> Paper Leaderboard</span>
           <span class="tab-sub">Exam Marks & Ranks</span>
+        </button>
+        <button class="sub-tab-btn ${this.ranksBoardType === 1 ? 'active' : ''}" id="btn-ranks-dessert-mode">
+          <span style="display:inline-flex; align-items:center; gap:6px;"><span class="material-symbols-rounded filled" style="font-size:16px;">emoji_events</span> Dessert Leaderboard</span>
+          <span class="tab-sub">XP & Activity Leagues</span>
         </button>
       </div>
 
       ${this.ranksBoardType === 0 ? `
+        ${isAdmin ? `
+          <div class="batch-filter-row paper-batch-filter">
+            <span>Batch Selection:</span>
+            <select class="batch-select" id="select-ranks-batch">
+              <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
+              <option value="2024 A/L" ${this.selectedRanksBatch === '2024 A/L' ? 'selected' : ''}>2024 A/L</option>
+              <option value="2025 A/L" ${this.selectedRanksBatch === '2025 A/L' ? 'selected' : ''}>2025 A/L</option>
+              <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
+              <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
+              <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
+              <option value="2029 A/L" ${this.selectedRanksBatch === '2029 A/L' ? 'selected' : ''}>2029 A/L</option>
+            </select>
+          </div>
+        ` : `
+          <div class="leaderboard-batch-banner paper-batch-banner">
+            <div class="lbb-content">
+              <strong>${escapeHTML(studentBatch || 'General Batch')} Paper Results</strong>
+              <span>Official examination marks & batch standings</span>
+            </div>
+            <span class="lbb-verified-tag">Official</span>
+          </div>
+        `}
+        ${paperViewContent}
+      ` : `
         ${isAdmin ? `
           <div class="batch-filter-row">
             <span>Batch Selection:</span>
@@ -3481,40 +3505,16 @@ class AppController {
         </div>
 
       ${rankingContent}
-      ` : `
-        ${isAdmin ? `
-          <div class="batch-filter-row paper-batch-filter">
-            <span>Batch Selection:</span>
-            <select class="batch-select" id="select-ranks-batch">
-              <option value="All Batches" ${this.selectedRanksBatch === 'All Batches' ? 'selected' : ''}>All Batches</option>
-              <option value="2024 A/L" ${this.selectedRanksBatch === '2024 A/L' ? 'selected' : ''}>2024 A/L</option>
-              <option value="2025 A/L" ${this.selectedRanksBatch === '2025 A/L' ? 'selected' : ''}>2025 A/L</option>
-              <option value="2026 A/L" ${this.selectedRanksBatch === '2026 A/L' ? 'selected' : ''}>2026 A/L</option>
-              <option value="2027 A/L" ${this.selectedRanksBatch === '2027 A/L' ? 'selected' : ''}>2027 A/L</option>
-              <option value="2028 A/L" ${this.selectedRanksBatch === '2028 A/L' ? 'selected' : ''}>2028 A/L</option>
-              <option value="2029 A/L" ${this.selectedRanksBatch === '2029 A/L' ? 'selected' : ''}>2029 A/L</option>
-            </select>
-          </div>
-        ` : `
-          <div class="leaderboard-batch-banner paper-batch-banner">
-            <div class="lbb-content">
-              <strong>${escapeHTML(studentBatch || 'General Batch')} Paper Results</strong>
-              <span>Official examination marks & batch standings</span>
-            </div>
-            <span class="lbb-verified-tag">Official</span>
-          </div>
-        `}
-        ${paperViewContent}
       `}
     `;
 
     // Event Listeners
-    document.getElementById('btn-ranks-dessert-mode')?.addEventListener('click', () => {
+    document.getElementById('btn-ranks-paper-mode')?.addEventListener('click', () => {
       this.ranksBoardType = 0;
       this.renderRanksScreen(container);
     });
 
-    document.getElementById('btn-ranks-paper-mode')?.addEventListener('click', () => {
+    document.getElementById('btn-ranks-dessert-mode')?.addEventListener('click', () => {
       this.ranksBoardType = 1;
       this.renderRanksScreen(container);
     });
@@ -3538,22 +3538,22 @@ class AppController {
     });
 
     if (this.ranksBoardType === 0) {
-      this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : undefined, (liveLeaders) => {
-        if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
-        const currentSummary = (this._cachedLeaders || leaders || []).map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
-        const liveSummary = liveLeaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
-        if (currentSummary !== liveSummary) {
-          this._cachedLeaders = liveLeaders;
-          this.renderRanksScreen(container);
-        }
-      });
-    } else {
       this._ranksUnsub = dbService.streamPaperLeaderboards((livePaperBoards) => {
         if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
         const currentSummary = (this._cachedPaperBoards || paperBoards || []).map(b => `${b.id}_${(b.entries || []).map(e => `${e.studentId}:${e.marks}:${e.rank}`).join(',')}`).join('|');
         const liveSummary = livePaperBoards.map(b => `${b.id}_${(b.entries || []).map(e => `${e.studentId}:${e.marks}:${e.rank}`).join(',')}`).join('|');
         if (currentSummary !== liveSummary) {
           this._cachedPaperBoards = livePaperBoards;
+          this.renderRanksScreen(container);
+        }
+      });
+    } else {
+      this._ranksUnsub = dbService.streamLeaderboard(isAdmin ? this.selectedRanksBatch : undefined, (liveLeaders) => {
+        if (!container.isConnected || renderToken !== this._tabTokens['ranks']) return;
+        const currentSummary = (this._cachedLeaders || leaders || []).map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
+        const liveSummary = liveLeaders.map(l => `${l.id}_${l.credits}_${l.name}`).join('|');
+        if (currentSummary !== liveSummary) {
+          this._cachedLeaders = liveLeaders;
           this.renderRanksScreen(container);
         }
       });
