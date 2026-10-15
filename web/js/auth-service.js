@@ -19,13 +19,33 @@ export class AuthService {
 
     this.currentUser = initialUser;
     this.listeners = [];
-    this.loading = true;
+    this.loading = !initialUser;
 
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
     });
 
-    // Handle SSO token callback or restore existing Supabase session
+    // Fast-path: if cached user is already present, unlock UI immediately without waiting for network
+    if (this.currentUser) {
+      setTimeout(() => {
+        if (this.resolveInitialAuth) {
+          this.resolveInitialAuth();
+          this.resolveInitialAuth = null;
+        }
+      }, 0);
+    } else {
+      // Safety fallback: if no cached user, never block longer than 2000ms
+      setTimeout(() => {
+        if (this.resolveInitialAuth) {
+          console.warn('[Auth] Safety timeout reached for initialAuthReady. Unblocking...');
+          this.loading = false;
+          this.resolveInitialAuth();
+          this.resolveInitialAuth = null;
+        }
+      }, 2000);
+    }
+
+    // Handle SSO token callback or restore existing Supabase session in background
     this.initSession();
   }
 

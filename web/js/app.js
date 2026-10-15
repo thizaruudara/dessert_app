@@ -67,12 +67,14 @@ class AppController {
 
     const refreshStudentViews = () => {
       if (this.currentMode === 'student') {
-        const vp = document.getElementById('main-viewport');
+        const activeTab = this.currentTab || 'home';
+        const vp = this.getTabViewport(activeTab);
         if (vp) {
-          if (this.currentTab === 'desserts') this.renderDessertsScreen(vp);
-          else if (this.currentTab === 'home') this.renderHomeScreen(vp);
-          else if (this.currentTab === 'ranks') this.renderRanksScreen(vp);
-          else if (this.currentTab === 'profile') this.renderProfileScreen(vp);
+          if (activeTab === 'desserts') this.renderDessertsScreen(vp);
+          else if (activeTab === 'home') this.renderHomeScreen(vp);
+          else if (activeTab === 'ranks') this.renderRanksScreen(vp);
+          else if (activeTab === 'profile') this.renderProfileScreen(vp);
+          else if (activeTab === 'papers') this.renderPapersScreen(vp);
         }
       }
     };
@@ -163,14 +165,15 @@ class AppController {
       this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : 'home', { historyMode: 'none' });
     });
 
-    // Delegated Re-check Subscription Handler for all tabs and modals
+    // Delegated Global Action & Navigation Handler (Guarantees buttons always respond regardless of DOM re-renders)
     document.addEventListener('click', async (e) => {
-      const target = e.target.closest('#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription');
-      if (target) {
+      // 1. Re-check subscription
+      const subTarget = e.target.closest('#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription');
+      if (subTarget) {
         e.preventDefault();
-        const origContent = target.innerHTML;
-        target.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; animation: spin 1s linear infinite;">sync</span> <span>Checking...</span>';
-        target.style.pointerEvents = 'none';
+        const origContent = subTarget.innerHTML;
+        subTarget.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; animation: spin 1s linear infinite;">sync</span> <span>Checking...</span>';
+        subTarget.style.pointerEvents = 'none';
         try {
           const res = await authService.refreshSubscription();
           if (res && res.isSubscribed) {
@@ -179,12 +182,142 @@ class AppController {
             notificationService.showLocalToast('⚠️ Course payment not found on edupeak.lk yet.');
           }
         } finally {
-          target.innerHTML = origContent;
-          target.style.pointerEvents = 'auto';
+          subTarget.innerHTML = origContent;
+          subTarget.style.pointerEvents = 'auto';
         }
         if (this.currentMode === 'student') {
           this.switchTab(this.currentTab || 'home', { historyMode: 'none' });
         }
+        return;
+      }
+
+      // 2. Navigation Actions
+      const dailyMcq = e.target.closest('#act-daily-mcq');
+      if (dailyMcq) {
+        e.preventDefault();
+        this.switchTab('home');
+        return;
+      }
+
+      const ranksAct = e.target.closest('#act-ranks');
+      if (ranksAct) {
+        e.preventDefault();
+        this.switchTab('ranks');
+        return;
+      }
+
+      const evalRoom = e.target.closest('#btn-enter-eval-room');
+      if (evalRoom) {
+        e.preventDefault();
+        if (!this.checkSubscriptionAccess('Paper Evaluation & Exam Sessions')) return;
+        this.switchTab('papers');
+        return;
+      }
+
+      const submitHw = e.target.closest('#act-submit-hw');
+      if (submitHw) {
+        e.preventDefault();
+        if (!this.checkSubscriptionAccess('Homework Dessert Submissions')) return;
+        this.openSubmitGuideModal();
+        return;
+      }
+
+      const sprintAct = e.target.closest('#btn-start-sprint-action');
+      if (sprintAct) {
+        e.preventDefault();
+        this.openSprintDialog();
+        return;
+      }
+
+      const aiTutor = e.target.closest('#act-ai-tutor');
+      if (aiTutor) {
+        e.preventDefault();
+        this.openAiTutorDialog();
+        return;
+      }
+
+      const askInsight = e.target.closest('#btn-ask-tutor-insight');
+      if (askInsight) {
+        e.preventDefault();
+        const topic = document.getElementById('home-vault-name')?.innerText || 'Physics Concept';
+        this.openAiTutorDialog(topic);
+        return;
+      }
+
+      const avatar = e.target.closest('#btn-header-avatar');
+      if (avatar) {
+        e.preventDefault();
+        this.switchTab('profile');
+        return;
+      }
+
+      const inqBtn = e.target.closest('.inquiry-item-btn');
+      if (inqBtn && inqBtn.dataset.topic) {
+        e.preventDefault();
+        this.openAiTutorDialog(inqBtn.dataset.topic);
+        return;
+      }
+
+      const papersLiveTab = e.target.closest('#tab-papers-live');
+      if (papersLiveTab) {
+        e.preventDefault();
+        this.papersTab = 0;
+        const vp = this.getTabViewport('papers');
+        if (vp) this.renderPapersScreen(vp);
+        return;
+      }
+
+      const papersHintsTab = e.target.closest('#tab-papers-hints');
+      if (papersHintsTab) {
+        e.preventDefault();
+        this.papersTab = 1;
+        const vp = this.getTabViewport('papers');
+        if (vp) this.renderPapersScreen(vp);
+        return;
+      }
+
+      const refreshPapersBtn = e.target.closest('#btn-refresh-papers');
+      if (refreshPapersBtn) {
+        e.preventDefault();
+        const vp = this.getTabViewport('papers');
+        if (vp) this.renderPapersScreen(vp);
+        return;
+      }
+
+      const dessertSubmitTab = e.target.closest('#tab-dessert-submit');
+      if (dessertSubmitTab) {
+        e.preventDefault();
+        this.dessertsTab = 0;
+        const vp = this.getTabViewport('desserts');
+        if (vp) this.renderDessertsScreen(vp);
+        return;
+      }
+
+      const dessertHistoryTab = e.target.closest('#tab-dessert-history');
+      if (dessertHistoryTab) {
+        e.preventDefault();
+        this.dessertsTab = 1;
+        const vp = this.getTabViewport('desserts');
+        if (vp) this.renderDessertsScreen(vp);
+        return;
+      }
+
+      const ranksDessertMode = e.target.closest('#btn-ranks-dessert-mode');
+      if (ranksDessertMode) {
+        e.preventDefault();
+        this.ranksBoardType = 0;
+        const vp = this.getTabViewport('ranks');
+        if (vp) this.renderRanksScreen(vp);
+        return;
+      }
+
+      const ranksPaperMode = e.target.closest('#btn-ranks-paper-mode');
+      if (ranksPaperMode) {
+        e.preventDefault();
+        this.ranksBoardType = 1;
+        const vp = this.getTabViewport('ranks');
+        if (vp) this.renderRanksScreen(vp);
+        return;
       }
     });
 
@@ -448,6 +581,9 @@ class AppController {
     `;
     document.body.appendChild(overlay);
 
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
     document.getElementById('btn-sub-modal-close')?.addEventListener('click', () => overlay.remove());
     document.getElementById('btn-sub-modal-check')?.addEventListener('click', async () => {
       const b = document.getElementById('btn-sub-modal-check');
@@ -699,6 +835,9 @@ class AppController {
     // Only enforce for students; admin console is exempt
     if (this.currentUser?.role === 'admin' && this.currentMode !== 'student') return;
 
+    // Check if dismissed in this session
+    if (sessionStorage.getItem('edupeak_notif_dismissed') === 'true') return;
+
     // Check browser Notification API support
     if (!('Notification' in window)) {
       console.warn('[Notification] Window.Notification API not supported on this platform/browser.');
@@ -775,6 +914,10 @@ class AppController {
           <span class="material-symbols-rounded filled">notifications</span>
           <span id="btn-mandatory-enable-text">Enable Notifications Now</span>
         </button>
+
+        <button class="notif-skip-btn" id="btn-mandatory-skip-notif" type="button" style="background:transparent; border:none; color:#94A3B8; font-size:13px; font-weight:600; cursor:pointer; padding:10px 16px; margin-top:8px; border-radius:8px; width:100%; transition:all 0.2s;">
+          Skip for now / Continue to Dashboard →
+        </button>
       </div>
     `;
 
@@ -783,6 +926,7 @@ class AppController {
     const btn = overlay.querySelector('#btn-mandatory-enable-notif');
     const btnText = overlay.querySelector('#btn-mandatory-enable-text');
     const blockedBox = overlay.querySelector('#notif-blocked-instructions');
+    const skipBtn = overlay.querySelector('#btn-mandatory-skip-notif');
 
     const dismissOverlay = () => {
       btnText.textContent = '✅ Notifications Active! Entering...';
@@ -792,6 +936,26 @@ class AppController {
         if (overlay.parentNode) overlay.remove();
       }, 400);
     };
+
+    if (skipBtn) {
+      skipBtn.addEventListener('click', () => {
+        sessionStorage.setItem('edupeak_notif_dismissed', 'true');
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+          if (overlay.parentNode) overlay.remove();
+        }, 350);
+      });
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        sessionStorage.setItem('edupeak_notif_dismissed', 'true');
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+          if (overlay.parentNode) overlay.remove();
+        }, 350);
+      }
+    });
 
     const updateState = () => {
       if (Notification.permission === 'granted') {
@@ -957,15 +1121,31 @@ class AppController {
     }
   }
 
+  safePromise(promise, timeoutMs = 2500, fallback = null) {
+    let timer;
+    const timeoutP = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(fallback), timeoutMs);
+    });
+    return Promise.race([
+      Promise.resolve(promise)
+        .then((val) => { clearTimeout(timer); return val ?? fallback; })
+        .catch((err) => { clearTimeout(timer); console.warn('[App] safePromise fallback:', err); return fallback; }),
+      timeoutP
+    ]);
+  }
+
   renderTabError(container, tabTitle, err) {
     if (!container || !container.isConnected) return;
     console.error(`[App] Error rendering ${tabTitle} tab:`, err);
+    if (this._renderedTabs && this.currentTab) {
+      this._renderedTabs.delete(this.currentTab);
+    }
     container.innerHTML = `
       <div style="padding:48px 20px; text-align:center; color:#DC2626;">
         <span class="material-symbols-rounded filled" style="font-size:44px; color:#DC2626; margin-bottom:8px;">sync_problem</span>
         <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#0F172A;">${tabTitle} පිටුව ලෝඩ් කිරීමේ ගැටලුවක් මතු විය</div>
         <div style="font-size:12px; color:#64748B; margin-bottom:18px;">${err?.message || 'Network latency. Please try again.'}</div>
-        <button class="btn-primary" onclick="window.app ? window.app.switchTab('${this.currentTab || 'home'}') : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">නැවත උත්සාහ කරන්න 🔄</button>
+        <button class="btn-primary" onclick="window.app ? window.app.switchTab('${this.currentTab || 'home'}', { forceRefresh: true }) : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">නැවත උත්සාහ කරන්න 🔄</button>
       </div>
     `;
   }
@@ -980,12 +1160,14 @@ class AppController {
     const activeTargetYear = user.examYear || '2027 A/L';
 
     const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
-      dbService.getDailyInsight().catch(() => ({})),
-      dbService.getPaperSessions(activeTargetYear).catch(() => []),
-      dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName).catch(() => 0),
-      dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
+      this.safePromise(dbService.getDailyInsight(), 2000, {}),
+      this.safePromise(dbService.getPaperSessions(activeTargetYear), 2000, this._cachedPaperSessions || []),
+      this.safePromise(dbService.getUpcomingPapers(activeTargetYear), 2000, []),
+      this.safePromise(dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName), 2000, user.credits || 0),
+      this.safePromise(dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName), 2000, this._cachedDesserts || [])
     ]);
+    if (sessions && sessions.length) this._cachedPaperSessions = sessions;
+    if (myDesserts && myDesserts.length) this._cachedDesserts = myDesserts;
     if (renderToken !== this._tabTokens['home'] || !container.isConnected) return;
 
     // Dynamic level calculation based on student's earned XP
@@ -2073,13 +2255,16 @@ class AppController {
       const activeTargetYear = currentYear;
 
       const [sessions, paperHints] = await Promise.all([
-        dbService.getPaperSessions(activeTargetYear).catch(() => []),
-        dbService.getPaperHints(activeTargetYear).catch(() => [])
+        this.safePromise(dbService.getPaperSessions(activeTargetYear), 2200, this._cachedPaperSessions || []),
+        this.safePromise(dbService.getPaperHints(activeTargetYear), 2200, this._cachedPaperHints || [])
       ]);
+      if (sessions && sessions.length) this._cachedPaperSessions = sessions;
+      if (paperHints && paperHints.length) this._cachedPaperHints = paperHints;
+
       const studentId = user.uid || user.id || 's_default';
       const registrations = new Map(await Promise.all(sessions.map(async session => [
         session.id,
-        await dbService.getStudentRegistration(session.id, studentId)
+        await this.safePromise(dbService.getStudentRegistration(session.id, studentId), 1500, null)
       ])));
       if (renderToken !== this._tabTokens['papers'] || !container.isConnected) return;
       if (this.papersTab > 1) this.papersTab = 0;
@@ -2212,7 +2397,7 @@ class AppController {
           <span class="material-symbols-rounded filled" style="font-size:48px; color:#EF4444; margin-bottom:12px;">error</span>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">Paper Sessions ලෝඩ් කිරීමේ ගැටළුවක්</div>
           <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${renderError.message || 'Unknown error occurred'}</div>
-          <button class="btn-primary" onclick="window.app ? window.app.renderPapersScreen(document.getElementById('main-viewport')) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto; display:inline-flex; align-items:center; gap:6px;">
+          <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers', { forceRefresh: true }) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto; display:inline-flex; align-items:center; gap:6px;">
             <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
             <span>නැවත උත්සාහ කරන්න (Retry)</span>
           </button>
@@ -2689,20 +2874,22 @@ class AppController {
     this.paperBoardsInitialized = this.paperBoardsInitialized ?? false;
     if (this._ranksUnsub) { try { this._ranksUnsub(); } catch (_) {} this._ranksUnsub = null; }
 
-    let leaders = [];
-    let paperBoards = [];
+    let leaders = this._cachedLeaders || [];
+    let paperBoards = this._cachedPaperBoards || [];
     let leaderboardLoadError = false;
     let paperLeaderboardLoadError = false;
     try {
       if (this.ranksBoardType === 0) {
-        leaders = await dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : undefined);
+        leaders = await this.safePromise(dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : undefined), 2500, this._cachedLeaders || []);
+        if (leaders && leaders.length) this._cachedLeaders = leaders;
       } else {
-        paperBoards = await dbService.getPaperLeaderboards();
+        paperBoards = await this.safePromise(dbService.getPaperLeaderboards(), 2500, this._cachedPaperBoards || []);
+        if (paperBoards && paperBoards.length) this._cachedPaperBoards = paperBoards;
       }
     } catch (error) {
       console.warn('[Ranks] Board could not be loaded:', error?.code || 'unknown');
-      if (this.ranksBoardType === 0) leaderboardLoadError = true;
-      else paperLeaderboardLoadError = true;
+      if (this.ranksBoardType === 0) leaderboardLoadError = leaders.length === 0;
+      else paperLeaderboardLoadError = paperBoards.length === 0;
     }
     if (renderToken !== this._tabTokens['ranks'] || !container.isConnected) return;
     const leagues = [
@@ -3100,8 +3287,8 @@ class AppController {
     const sId = user.studentId || user.uid || user.id || 'student';
     const sPhone = user.phone || '';
     const sName = user.name || '';
-    const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
-    this._cachedDesserts = desserts;
+    const desserts = await this.safePromise(dbService.getStudentDesserts(sId, sPhone, sName), 2500, this._cachedDesserts || []);
+    if (desserts && desserts.length) this._cachedDesserts = desserts;
     if (renderToken !== this._tabTokens['desserts'] || !container.isConnected) return;
 
     const topics = [
@@ -5047,25 +5234,40 @@ class AppController {
       }
     };
 
+    const handleAdminError = (tName, err) => {
+      console.error(`[Admin] Error rendering ${tName}:`, err);
+      if (this._renderedAdminTabs) this._renderedAdminTabs.delete(tName);
+      if (targetViewport.isConnected) {
+        targetViewport.innerHTML = `
+          <div style="padding:48px 20px; text-align:center; color:#DC2626;">
+            <span class="material-symbols-rounded filled" style="font-size:44px; color:#DC2626; margin-bottom:8px;">sync_problem</span>
+            <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#0F172A;">Admin ${tName} error</div>
+            <div style="font-size:12px; color:#64748B; margin-bottom:18px;">${err?.message || 'Network latency. Please try again.'}</div>
+            <button class="btn-primary" onclick="window.app ? window.app.switchAdminTab('${tabName}', { forceRefresh: true }) : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">Retry 🔄</button>
+          </div>
+        `;
+      }
+    };
+
     switch (tabName) {
       case 'dashboard':
-        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {});
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(err => handleAdminError('dashboard', err));
         break;
       case 'papers':
-        this.renderAdminPapersScreen(targetViewport).then(markRendered).catch(() => {});
+        this.renderAdminPapersScreen(targetViewport).then(markRendered).catch(err => handleAdminError('papers', err));
         break;
       case 'sprints':
-        this.renderAdminSprintsScreen(targetViewport).then(markRendered).catch(() => {});
+        this.renderAdminSprintsScreen(targetViewport).then(markRendered).catch(err => handleAdminError('sprints', err));
         break;
       case 'students':
-        this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch(() => {});
+        this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch(err => handleAdminError('students', err));
         break;
       case 'broadcasts':
         this.renderAdminBroadcastsScreen(targetViewport);
         markRendered();
         break;
       default:
-        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {});
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(err => handleAdminError('dashboard', err));
     }
 
     viewport.scrollTo({ top: 0, behavior: 'smooth' });
@@ -5085,7 +5287,8 @@ class AppController {
     this.adminFilterTab = this.adminFilterTab ?? 'pending'; // 'pending', 'approved', 'rejected'
     this.adminSearchQuery = this.adminSearchQuery ?? '';
 
-    const allDesserts = await dbService.getAllDessertsForAdmin();
+    const allDesserts = await this.safePromise(dbService.getAllDessertsForAdmin(), 2500, this._cachedAllDesserts || []);
+    if (allDesserts && allDesserts.length) this._cachedAllDesserts = allDesserts;
     const pending = allDesserts.filter(d => (d.status || '').toLowerCase() === 'pending');
     const approved = allDesserts.filter(d => (d.status || '').toLowerCase() === 'approved');
     const rejected = allDesserts.filter(d => (d.status || '').toLowerCase() === 'rejected');
@@ -7900,8 +8103,10 @@ class AppController {
             await dbService.saveCustomPhysicsInsight(data, this.currentUser?.name || 'Admin');
             notificationService.showInAppToast('Daily Physics Insight successfully pinned to all students!', 'success');
             closeModal();
-            const mainVp = document.getElementById('main-viewport') || document.getElementById('admin-main-viewport');
-            if (mainVp && this.renderHomeScreen) this.renderHomeScreen(mainVp);
+            if (this.currentMode === 'student') {
+              const homeVp = this.getTabViewport('home');
+              if (homeVp && this.renderHomeScreen) this.renderHomeScreen(homeVp);
+            }
           } catch (err) {
             notificationService.showInAppToast('Save error: ' + err.message, 'error');
             saveBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students';
@@ -7920,8 +8125,10 @@ class AppController {
             await dbService.setRandomPhysicsInsightMode(this.currentUser?.name || 'Admin');
             notificationService.showInAppToast('Successfully reverted to Automatic Daily Random Mode', 'success');
             closeModal();
-            const mainVp = document.getElementById('main-viewport') || document.getElementById('admin-main-viewport');
-            if (mainVp && this.renderHomeScreen) this.renderHomeScreen(mainVp);
+            if (this.currentMode === 'student') {
+              const homeVp = this.getTabViewport('home');
+              if (homeVp && this.renderHomeScreen) this.renderHomeScreen(homeVp);
+            }
           } catch (err) {
             notificationService.showInAppToast('Revert error: ' + err.message, 'error');
             revertBtn.disabled = false;
@@ -12294,11 +12501,19 @@ openCloudLimitsModal(cloudUsage) {
 
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+const startApp = () => {
+  if (window.app) return;
   const app = new AppController();
   window.app = app;
   app.init();
-});
+};
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}
+
 
 
   

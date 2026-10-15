@@ -87113,10 +87113,27 @@ var AuthService = class {
     }
     this.currentUser = initialUser;
     this.listeners = [];
-    this.loading = true;
+    this.loading = !initialUser;
     this.initialAuthReady = new Promise((resolve) => {
       this.resolveInitialAuth = resolve;
     });
+    if (this.currentUser) {
+      setTimeout(() => {
+        if (this.resolveInitialAuth) {
+          this.resolveInitialAuth();
+          this.resolveInitialAuth = null;
+        }
+      }, 0);
+    } else {
+      setTimeout(() => {
+        if (this.resolveInitialAuth) {
+          console.warn("[Auth] Safety timeout reached for initialAuthReady. Unblocking...");
+          this.loading = false;
+          this.resolveInitialAuth();
+          this.resolveInitialAuth = null;
+        }
+      }, 2e3);
+    }
     this.initSession();
   }
   async initSession() {
@@ -91595,12 +91612,14 @@ var AppController = class {
     });
     const refreshStudentViews = () => {
       if (this.currentMode === "student") {
-        const vp = document.getElementById("main-viewport");
+        const activeTab = this.currentTab || "home";
+        const vp = this.getTabViewport(activeTab);
         if (vp) {
-          if (this.currentTab === "desserts") this.renderDessertsScreen(vp);
-          else if (this.currentTab === "home") this.renderHomeScreen(vp);
-          else if (this.currentTab === "ranks") this.renderRanksScreen(vp);
-          else if (this.currentTab === "profile") this.renderProfileScreen(vp);
+          if (activeTab === "desserts") this.renderDessertsScreen(vp);
+          else if (activeTab === "home") this.renderHomeScreen(vp);
+          else if (activeTab === "ranks") this.renderRanksScreen(vp);
+          else if (activeTab === "profile") this.renderProfileScreen(vp);
+          else if (activeTab === "papers") this.renderPapersScreen(vp);
         }
       }
     };
@@ -91678,12 +91697,12 @@ var AppController = class {
       this.switchTab(allowedTabs.includes(requestedTab) ? requestedTab : "home", { historyMode: "none" });
     });
     document.addEventListener("click", async (e2) => {
-      const target = e2.target.closest("#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription");
-      if (target) {
+      const subTarget = e2.target.closest("#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription");
+      if (subTarget) {
         e2.preventDefault();
-        const origContent = target.innerHTML;
-        target.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; animation: spin 1s linear infinite;">sync</span> <span>Checking...</span>';
-        target.style.pointerEvents = "none";
+        const origContent = subTarget.innerHTML;
+        subTarget.innerHTML = '<span class="material-symbols-rounded" style="font-size:14px; animation: spin 1s linear infinite;">sync</span> <span>Checking...</span>';
+        subTarget.style.pointerEvents = "none";
         try {
           const res = await authService.refreshSubscription();
           if (res && res.isSubscribed) {
@@ -91692,12 +91711,125 @@ var AppController = class {
             notificationService.showLocalToast("\u26A0\uFE0F Course payment not found on edupeak.lk yet.");
           }
         } finally {
-          target.innerHTML = origContent;
-          target.style.pointerEvents = "auto";
+          subTarget.innerHTML = origContent;
+          subTarget.style.pointerEvents = "auto";
         }
         if (this.currentMode === "student") {
           this.switchTab(this.currentTab || "home", { historyMode: "none" });
         }
+        return;
+      }
+      const dailyMcq = e2.target.closest("#act-daily-mcq");
+      if (dailyMcq) {
+        e2.preventDefault();
+        this.switchTab("home");
+        return;
+      }
+      const ranksAct = e2.target.closest("#act-ranks");
+      if (ranksAct) {
+        e2.preventDefault();
+        this.switchTab("ranks");
+        return;
+      }
+      const evalRoom = e2.target.closest("#btn-enter-eval-room");
+      if (evalRoom) {
+        e2.preventDefault();
+        if (!this.checkSubscriptionAccess("Paper Evaluation & Exam Sessions")) return;
+        this.switchTab("papers");
+        return;
+      }
+      const submitHw = e2.target.closest("#act-submit-hw");
+      if (submitHw) {
+        e2.preventDefault();
+        if (!this.checkSubscriptionAccess("Homework Dessert Submissions")) return;
+        this.openSubmitGuideModal();
+        return;
+      }
+      const sprintAct = e2.target.closest("#btn-start-sprint-action");
+      if (sprintAct) {
+        e2.preventDefault();
+        this.openSprintDialog();
+        return;
+      }
+      const aiTutor = e2.target.closest("#act-ai-tutor");
+      if (aiTutor) {
+        e2.preventDefault();
+        this.openAiTutorDialog();
+        return;
+      }
+      const askInsight = e2.target.closest("#btn-ask-tutor-insight");
+      if (askInsight) {
+        e2.preventDefault();
+        const topic = document.getElementById("home-vault-name")?.innerText || "Physics Concept";
+        this.openAiTutorDialog(topic);
+        return;
+      }
+      const avatar = e2.target.closest("#btn-header-avatar");
+      if (avatar) {
+        e2.preventDefault();
+        this.switchTab("profile");
+        return;
+      }
+      const inqBtn = e2.target.closest(".inquiry-item-btn");
+      if (inqBtn && inqBtn.dataset.topic) {
+        e2.preventDefault();
+        this.openAiTutorDialog(inqBtn.dataset.topic);
+        return;
+      }
+      const papersLiveTab = e2.target.closest("#tab-papers-live");
+      if (papersLiveTab) {
+        e2.preventDefault();
+        this.papersTab = 0;
+        const vp = this.getTabViewport("papers");
+        if (vp) this.renderPapersScreen(vp);
+        return;
+      }
+      const papersHintsTab = e2.target.closest("#tab-papers-hints");
+      if (papersHintsTab) {
+        e2.preventDefault();
+        this.papersTab = 1;
+        const vp = this.getTabViewport("papers");
+        if (vp) this.renderPapersScreen(vp);
+        return;
+      }
+      const refreshPapersBtn = e2.target.closest("#btn-refresh-papers");
+      if (refreshPapersBtn) {
+        e2.preventDefault();
+        const vp = this.getTabViewport("papers");
+        if (vp) this.renderPapersScreen(vp);
+        return;
+      }
+      const dessertSubmitTab = e2.target.closest("#tab-dessert-submit");
+      if (dessertSubmitTab) {
+        e2.preventDefault();
+        this.dessertsTab = 0;
+        const vp = this.getTabViewport("desserts");
+        if (vp) this.renderDessertsScreen(vp);
+        return;
+      }
+      const dessertHistoryTab = e2.target.closest("#tab-dessert-history");
+      if (dessertHistoryTab) {
+        e2.preventDefault();
+        this.dessertsTab = 1;
+        const vp = this.getTabViewport("desserts");
+        if (vp) this.renderDessertsScreen(vp);
+        return;
+      }
+      const ranksDessertMode = e2.target.closest("#btn-ranks-dessert-mode");
+      if (ranksDessertMode) {
+        e2.preventDefault();
+        this.ranksBoardType = 0;
+        const vp = this.getTabViewport("ranks");
+        if (vp) this.renderRanksScreen(vp);
+        return;
+      }
+      const ranksPaperMode = e2.target.closest("#btn-ranks-paper-mode");
+      if (ranksPaperMode) {
+        e2.preventDefault();
+        this.ranksBoardType = 1;
+        const vp = this.getTabViewport("ranks");
+        if (vp) this.renderRanksScreen(vp);
+        return;
       }
     });
     const savedTheme = localStorage.getItem("edupeak_theme") || "light";
@@ -91931,6 +92063,9 @@ var AppController = class {
       </div>
     `;
     document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e2) => {
+      if (e2.target === overlay) overlay.remove();
+    });
     document.getElementById("btn-sub-modal-close")?.addEventListener("click", () => overlay.remove());
     document.getElementById("btn-sub-modal-check")?.addEventListener("click", async () => {
       const b2 = document.getElementById("btn-sub-modal-check");
@@ -92161,6 +92296,7 @@ var AppController = class {
   // ── Mandatory Student Push Notification Gatekeeper ────────────────────────
   enforceNotificationPermission() {
     if (this.currentUser?.role === "admin" && this.currentMode !== "student") return;
+    if (sessionStorage.getItem("edupeak_notif_dismissed") === "true") return;
     if (!("Notification" in window)) {
       console.warn("[Notification] Window.Notification API not supported on this platform/browser.");
       return;
@@ -92231,12 +92367,17 @@ var AppController = class {
           <span class="material-symbols-rounded filled">notifications</span>
           <span id="btn-mandatory-enable-text">Enable Notifications Now</span>
         </button>
+
+        <button class="notif-skip-btn" id="btn-mandatory-skip-notif" type="button" style="background:transparent; border:none; color:#94A3B8; font-size:13px; font-weight:600; cursor:pointer; padding:10px 16px; margin-top:8px; border-radius:8px; width:100%; transition:all 0.2s;">
+          Skip for now / Continue to Dashboard \u2192
+        </button>
       </div>
     `;
     document.body.appendChild(overlay);
     const btn = overlay.querySelector("#btn-mandatory-enable-notif");
     const btnText = overlay.querySelector("#btn-mandatory-enable-text");
     const blockedBox = overlay.querySelector("#notif-blocked-instructions");
+    const skipBtn = overlay.querySelector("#btn-mandatory-skip-notif");
     const dismissOverlay = () => {
       btnText.textContent = "\u2705 Notifications Active! Entering...";
       btn.style.background = "#10B981";
@@ -92245,6 +92386,24 @@ var AppController = class {
         if (overlay.parentNode) overlay.remove();
       }, 400);
     };
+    if (skipBtn) {
+      skipBtn.addEventListener("click", () => {
+        sessionStorage.setItem("edupeak_notif_dismissed", "true");
+        overlay.classList.add("fade-out");
+        setTimeout(() => {
+          if (overlay.parentNode) overlay.remove();
+        }, 350);
+      });
+    }
+    overlay.addEventListener("click", (e2) => {
+      if (e2.target === overlay) {
+        sessionStorage.setItem("edupeak_notif_dismissed", "true");
+        overlay.classList.add("fade-out");
+        setTimeout(() => {
+          if (overlay.parentNode) overlay.remove();
+        }, 350);
+      }
+    });
     const updateState = () => {
       if (Notification.permission === "granted") {
         dismissOverlay();
@@ -92376,15 +92535,35 @@ var AppController = class {
         this.renderHomeScreen(targetViewport).then(markRendered).catch((err) => this.renderTabError(targetViewport, "Home", err));
     }
   }
+  safePromise(promise, timeoutMs = 2500, fallback = null) {
+    let timer;
+    const timeoutP = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(fallback), timeoutMs);
+    });
+    return Promise.race([
+      Promise.resolve(promise).then((val) => {
+        clearTimeout(timer);
+        return val ?? fallback;
+      }).catch((err) => {
+        clearTimeout(timer);
+        console.warn("[App] safePromise fallback:", err);
+        return fallback;
+      }),
+      timeoutP
+    ]);
+  }
   renderTabError(container, tabTitle, err) {
     if (!container || !container.isConnected) return;
     console.error(`[App] Error rendering ${tabTitle} tab:`, err);
+    if (this._renderedTabs && this.currentTab) {
+      this._renderedTabs.delete(this.currentTab);
+    }
     container.innerHTML = `
       <div style="padding:48px 20px; text-align:center; color:#DC2626;">
         <span class="material-symbols-rounded filled" style="font-size:44px; color:#DC2626; margin-bottom:8px;">sync_problem</span>
         <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#0F172A;">${tabTitle} \u0DB4\u0DD2\u0DA7\u0DD4\u0DC0 \u0DBD\u0DDD\u0DA9\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA \u0D9C\u0DD0\u0DA7\u0DBD\u0DD4\u0DC0\u0D9A\u0DCA \u0DB8\u0DAD\u0DD4 \u0DC0\u0DD2\u0DBA</div>
         <div style="font-size:12px; color:#64748B; margin-bottom:18px;">${err?.message || "Network latency. Please try again."}</div>
-        <button class="btn-primary" onclick="window.app ? window.app.switchTab('${this.currentTab || "home"}') : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">\u0DB1\u0DD0\u0DC0\u0DAD \u0D8B\u0DAD\u0DCA\u0DC3\u0DCF\u0DC4 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u{1F504}</button>
+        <button class="btn-primary" onclick="window.app ? window.app.switchTab('${this.currentTab || "home"}', { forceRefresh: true }) : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">\u0DB1\u0DD0\u0DC0\u0DAD \u0D8B\u0DAD\u0DCA\u0DC3\u0DCF\u0DC4 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 \u{1F504}</button>
       </div>
     `;
   }
@@ -92397,12 +92576,14 @@ var AppController = class {
     const initial = studentName.charAt(0).toUpperCase();
     const activeTargetYear = user.examYear || "2027 A/L";
     const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
-      dbService.getDailyInsight().catch(() => ({})),
-      dbService.getPaperSessions(activeTargetYear).catch(() => []),
-      dbService.getUpcomingPapers(activeTargetYear).catch(() => []),
-      dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName).catch(() => 0),
-      dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName).catch(() => [])
+      this.safePromise(dbService.getDailyInsight(), 2e3, {}),
+      this.safePromise(dbService.getPaperSessions(activeTargetYear), 2e3, this._cachedPaperSessions || []),
+      this.safePromise(dbService.getUpcomingPapers(activeTargetYear), 2e3, []),
+      this.safePromise(dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName), 2e3, user.credits || 0),
+      this.safePromise(dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName), 2e3, this._cachedDesserts || [])
     ]);
+    if (sessions && sessions.length) this._cachedPaperSessions = sessions;
+    if (myDesserts && myDesserts.length) this._cachedDesserts = myDesserts;
     if (renderToken !== this._tabTokens["home"] || !container.isConnected) return;
     let levelName = "Level 1 Novice";
     let targetXp = 100;
@@ -93449,13 +93630,15 @@ var AppController = class {
       const currentYear = user.examYear || "2027 A/L";
       const activeTargetYear = currentYear;
       const [sessions, paperHints] = await Promise.all([
-        dbService.getPaperSessions(activeTargetYear).catch(() => []),
-        dbService.getPaperHints(activeTargetYear).catch(() => [])
+        this.safePromise(dbService.getPaperSessions(activeTargetYear), 2200, this._cachedPaperSessions || []),
+        this.safePromise(dbService.getPaperHints(activeTargetYear), 2200, this._cachedPaperHints || [])
       ]);
+      if (sessions && sessions.length) this._cachedPaperSessions = sessions;
+      if (paperHints && paperHints.length) this._cachedPaperHints = paperHints;
       const studentId = user.uid || user.id || "s_default";
       const registrations = new Map(await Promise.all(sessions.map(async (session) => [
         session.id,
-        await dbService.getStudentRegistration(session.id, studentId)
+        await this.safePromise(dbService.getStudentRegistration(session.id, studentId), 1500, null)
       ])));
       if (renderToken !== this._tabTokens["papers"] || !container.isConnected) return;
       if (this.papersTab > 1) this.papersTab = 0;
@@ -93577,7 +93760,7 @@ var AppController = class {
           <span class="material-symbols-rounded filled" style="font-size:48px; color:#EF4444; margin-bottom:12px;">error</span>
           <div style="font-size:16px; font-weight:800; color:#0F172A; margin-bottom:6px;">Paper Sessions \u0DBD\u0DDD\u0DA9\u0DCA \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA \u0D9C\u0DD0\u0DA7\u0DC5\u0DD4\u0DC0\u0D9A\u0DCA</div>
           <div style="font-size:12px; color:#64748B; margin-bottom:16px;">${renderError.message || "Unknown error occurred"}</div>
-          <button class="btn-primary" onclick="window.app ? window.app.renderPapersScreen(document.getElementById('main-viewport')) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto; display:inline-flex; align-items:center; gap:6px;">
+          <button class="btn-primary" onclick="window.app ? window.app.switchTab('papers', { forceRefresh: true }) : location.reload()" style="width:auto; padding:10px 20px; margin:0 auto; display:inline-flex; align-items:center; gap:6px;">
             <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
             <span>\u0DB1\u0DD0\u0DC0\u0DAD \u0D8B\u0DAD\u0DCA\u0DC3\u0DCF\u0DC4 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1 (Retry)</span>
           </button>
@@ -94024,20 +94207,22 @@ var AppController = class {
       }
       this._ranksUnsub = null;
     }
-    let leaders = [];
-    let paperBoards = [];
+    let leaders = this._cachedLeaders || [];
+    let paperBoards = this._cachedPaperBoards || [];
     let leaderboardLoadError = false;
     let paperLeaderboardLoadError = false;
     try {
       if (this.ranksBoardType === 0) {
-        leaders = await dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : void 0);
+        leaders = await this.safePromise(dbService.getLeaderboard(isAdmin ? this.selectedRanksBatch : void 0), 2500, this._cachedLeaders || []);
+        if (leaders && leaders.length) this._cachedLeaders = leaders;
       } else {
-        paperBoards = await dbService.getPaperLeaderboards();
+        paperBoards = await this.safePromise(dbService.getPaperLeaderboards(), 2500, this._cachedPaperBoards || []);
+        if (paperBoards && paperBoards.length) this._cachedPaperBoards = paperBoards;
       }
     } catch (error) {
       console.warn("[Ranks] Board could not be loaded:", error?.code || "unknown");
-      if (this.ranksBoardType === 0) leaderboardLoadError = true;
-      else paperLeaderboardLoadError = true;
+      if (this.ranksBoardType === 0) leaderboardLoadError = leaders.length === 0;
+      else paperLeaderboardLoadError = paperBoards.length === 0;
     }
     if (renderToken !== this._tabTokens["ranks"] || !container.isConnected) return;
     const leagues = [
@@ -94406,8 +94591,8 @@ var AppController = class {
     const sId = user.studentId || user.uid || user.id || "student";
     const sPhone = user.phone || "";
     const sName = user.name || "";
-    const desserts = await dbService.getStudentDesserts(sId, sPhone, sName);
-    this._cachedDesserts = desserts;
+    const desserts = await this.safePromise(dbService.getStudentDesserts(sId, sPhone, sName), 2500, this._cachedDesserts || []);
+    if (desserts && desserts.length) this._cachedDesserts = desserts;
     if (renderToken !== this._tabTokens["desserts"] || !container.isConnected) return;
     const topics = [
       "Mechanics",
@@ -96183,30 +96368,39 @@ var AppController = class {
         requestAnimationFrame(() => targetViewport.classList.add("active-tab"));
       }
     };
+    const handleAdminError = (tName, err) => {
+      console.error(`[Admin] Error rendering ${tName}:`, err);
+      if (this._renderedAdminTabs) this._renderedAdminTabs.delete(tName);
+      if (targetViewport.isConnected) {
+        targetViewport.innerHTML = `
+          <div style="padding:48px 20px; text-align:center; color:#DC2626;">
+            <span class="material-symbols-rounded filled" style="font-size:44px; color:#DC2626; margin-bottom:8px;">sync_problem</span>
+            <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#0F172A;">Admin ${tName} error</div>
+            <div style="font-size:12px; color:#64748B; margin-bottom:18px;">${err?.message || "Network latency. Please try again."}</div>
+            <button class="btn-primary" onclick="window.app ? window.app.switchAdminTab('${tabName}', { forceRefresh: true }) : location.reload()" style="width:auto; padding:10px 22px; margin:0 auto;">Retry \u{1F504}</button>
+          </div>
+        `;
+      }
+    };
     switch (tabName) {
       case "dashboard":
-        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {
-        });
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch((err) => handleAdminError("dashboard", err));
         break;
       case "papers":
-        this.renderAdminPapersScreen(targetViewport).then(markRendered).catch(() => {
-        });
+        this.renderAdminPapersScreen(targetViewport).then(markRendered).catch((err) => handleAdminError("papers", err));
         break;
       case "sprints":
-        this.renderAdminSprintsScreen(targetViewport).then(markRendered).catch(() => {
-        });
+        this.renderAdminSprintsScreen(targetViewport).then(markRendered).catch((err) => handleAdminError("sprints", err));
         break;
       case "students":
-        this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch(() => {
-        });
+        this.renderAdminStudentsScreen(targetViewport).then(markRendered).catch((err) => handleAdminError("students", err));
         break;
       case "broadcasts":
         this.renderAdminBroadcastsScreen(targetViewport);
         markRendered();
         break;
       default:
-        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(() => {
-        });
+        this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch((err) => handleAdminError("dashboard", err));
     }
     viewport.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -96224,7 +96418,8 @@ var AppController = class {
     }
     this.adminFilterTab = this.adminFilterTab ?? "pending";
     this.adminSearchQuery = this.adminSearchQuery ?? "";
-    const allDesserts = await dbService.getAllDessertsForAdmin();
+    const allDesserts = await this.safePromise(dbService.getAllDessertsForAdmin(), 2500, this._cachedAllDesserts || []);
+    if (allDesserts && allDesserts.length) this._cachedAllDesserts = allDesserts;
     const pending = allDesserts.filter((d) => (d.status || "").toLowerCase() === "pending");
     const approved = allDesserts.filter((d) => (d.status || "").toLowerCase() === "approved");
     const rejected = allDesserts.filter((d) => (d.status || "").toLowerCase() === "rejected");
@@ -98841,8 +99036,10 @@ var AppController = class {
             await dbService.saveCustomPhysicsInsight(data, this.currentUser?.name || "Admin");
             notificationService.showInAppToast("Daily Physics Insight successfully pinned to all students!", "success");
             closeModal();
-            const mainVp = document.getElementById("main-viewport") || document.getElementById("admin-main-viewport");
-            if (mainVp && this.renderHomeScreen) this.renderHomeScreen(mainVp);
+            if (this.currentMode === "student") {
+              const homeVp = this.getTabViewport("home");
+              if (homeVp && this.renderHomeScreen) this.renderHomeScreen(homeVp);
+            }
           } catch (err) {
             notificationService.showInAppToast("Save error: " + err.message, "error");
             saveBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">save</span> Save & Pin to Students';
@@ -98859,8 +99056,10 @@ var AppController = class {
             await dbService.setRandomPhysicsInsightMode(this.currentUser?.name || "Admin");
             notificationService.showInAppToast("Successfully reverted to Automatic Daily Random Mode", "success");
             closeModal();
-            const mainVp = document.getElementById("main-viewport") || document.getElementById("admin-main-viewport");
-            if (mainVp && this.renderHomeScreen) this.renderHomeScreen(mainVp);
+            if (this.currentMode === "student") {
+              const homeVp = this.getTabViewport("home");
+              if (homeVp && this.renderHomeScreen) this.renderHomeScreen(homeVp);
+            }
           } catch (err) {
             notificationService.showInAppToast("Revert error: " + err.message, "error");
             revertBtn.disabled = false;
@@ -102895,11 +103094,17 @@ ${!times.isWaiting ? `
     modal.querySelector("#btn-modal-close-done")?.addEventListener("click", () => modal.remove());
   }
 };
-window.addEventListener("DOMContentLoaded", () => {
+var startApp = () => {
+  if (window.app) return;
   const app2 = new AppController();
   window.app = app2;
   app2.init();
-});
+};
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", startApp);
+} else {
+  startApp();
+}
 export {
   escapeHTML
 };
