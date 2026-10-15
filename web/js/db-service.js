@@ -859,12 +859,23 @@ export class DbService {
   }
 
   // Admin: Get student roster - ONLY students who have logged into Dessert App
-  async getAllStudents() {
+  async getAllStudents({ forceRefresh = false } = {}) {
+    const cacheKey = 'all_admin_students';
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 30000);
+      if (cached && Array.isArray(cached)) return cached;
+    }
+
     const map = new Map();
 
-    // 1. Fetch registered students who have logged into Dessert App via Supabase RPC
+    // 1. Fetch registered students who have logged into Dessert App via Supabase RPC or dessert_app_logins
     try {
-      const { data: supaStudents, error: supaErr } = await supabase.rpc('get_all_students_for_admin');
+      const rpcPromise = supabase ? supabase.rpc('get_all_students_for_admin') : Promise.resolve({ data: null, error: true });
+      const { data: supaStudents, error: supaErr } = await Promise.race([
+        rpcPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]).catch(() => ({ data: null, error: true }));
+
       if (!supaErr && Array.isArray(supaStudents)) {
         for (const u of supaStudents) {
           if (this.isStaffOrAdmin(u)) continue;
@@ -884,15 +895,15 @@ export class DbService {
             loginCount: u.loginCount || 1,
             lastLoginAt: u.lastLoginAt || null,
             firstLoginAt: u.firstLoginAt || null,
-            credits: 0
+            credits: Number(u.credits) || 0
           });
         }
-      } else if (supaErr) {
-        console.warn('[DB] get_all_students_for_admin RPC error, querying dessert_app_logins table:', supaErr);
-        // Fallback: Query dessert_app_logins directly to ensure ONLY logged-in students are listed
+      } else {
+        // Fallback: Query dessert_app_logins directly with limit
         const { data: loginRows } = await supabase
           .from('dessert_app_logins')
-          .select('*');
+          .select('*')
+          .limit(300);
 
         if (loginRows && loginRows.length > 0) {
           for (const l of loginRows) {
@@ -926,7 +937,7 @@ export class DbService {
       const usersRef = collection(db, 'users');
       const snap = await Promise.race([
         getDocs(usersRef),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
       ]);
       if (snap && !snap.empty) {
         for (const d of snap.docs) {
@@ -948,18 +959,36 @@ export class DbService {
       }
     } catch (_) {}
 
-    // 4. Calculate accurate credits for each student
+    // 3. Fast In-Memory Batch Credit Resolution from cached leaderboard (Single query instead of N*5 individual requests)
     const students = Array.from(map.values()).filter(u => !this.isStaffOrAdmin(u));
-    await Promise.all(students.map(async (st) => {
-      const trueCredits = await this.getStudentCredits(
-        st.id,
-        st.phone,
-        st.studentId,
-        st.name
-      );
-      st.credits = trueCredits > 0 ? trueCredits : (Number(st.credits) || 0);
-    }));
+    try {
+      const lb = await this.getLeaderboard('all');
+      const creditMap = new Map();
+      if (Array.isArray(lb)) {
+        for (const item of lb) {
+          const c = Number(item.credits) || 0;
+          if (c > 0) {
+            if (item.id) creditMap.set(String(item.id).toLowerCase().trim(), c);
+            if (item.studentPhone) creditMap.set(String(item.studentPhone).replace(/\D/g, '').slice(-9), c);
+            if (item.name) creditMap.set(String(item.name).toLowerCase().trim(), c);
+          }
+        }
+      }
 
+      for (const st of students) {
+        if (!st.credits || st.credits <= 0) {
+          const idKey = st.studentId || st.id;
+          const phoneKey = String(st.phone || '').replace(/\D/g, '').slice(-9);
+          const nameKey = String(st.name || '').toLowerCase().trim();
+          st.credits = (idKey && creditMap.get(idKey.toLowerCase().trim())) ||
+                       (phoneKey && creditMap.get(phoneKey)) ||
+                       (nameKey && creditMap.get(nameKey)) ||
+                       0;
+        }
+      }
+    } catch (_) {}
+
+    this.setCache(cacheKey, students);
     return students;
   }
 

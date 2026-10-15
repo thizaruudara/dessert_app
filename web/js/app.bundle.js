@@ -88176,10 +88176,19 @@ var DbService = class {
     return false;
   }
   // Admin: Get student roster - ONLY students who have logged into Dessert App
-  async getAllStudents() {
+  async getAllStudents({ forceRefresh = false } = {}) {
+    const cacheKey = "all_admin_students";
+    if (!forceRefresh) {
+      const cached = this.getCached(cacheKey, 3e4);
+      if (cached && Array.isArray(cached)) return cached;
+    }
     const map = /* @__PURE__ */ new Map();
     try {
-      const { data: supaStudents, error: supaErr } = await supabase.rpc("get_all_students_for_admin");
+      const rpcPromise = supabase ? supabase.rpc("get_all_students_for_admin") : Promise.resolve({ data: null, error: true });
+      const { data: supaStudents, error: supaErr } = await Promise.race([
+        rpcPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2e3))
+      ]).catch(() => ({ data: null, error: true }));
       if (!supaErr && Array.isArray(supaStudents)) {
         for (const u2 of supaStudents) {
           if (this.isStaffOrAdmin(u2)) continue;
@@ -88199,12 +88208,11 @@ var DbService = class {
             loginCount: u2.loginCount || 1,
             lastLoginAt: u2.lastLoginAt || null,
             firstLoginAt: u2.firstLoginAt || null,
-            credits: 0
+            credits: Number(u2.credits) || 0
           });
         }
-      } else if (supaErr) {
-        console.warn("[DB] get_all_students_for_admin RPC error, querying dessert_app_logins table:", supaErr);
-        const { data: loginRows } = await supabase.from("dessert_app_logins").select("*");
+      } else {
+        const { data: loginRows } = await supabase.from("dessert_app_logins").select("*").limit(300);
         if (loginRows && loginRows.length > 0) {
           for (const l2 of loginRows) {
             const key = (l2.student_id || l2.phone || l2.email || l2.name).toLowerCase().trim();
@@ -88235,7 +88243,7 @@ var DbService = class {
       const usersRef = collection(db, "users");
       const snap = await Promise.race([
         getDocs(usersRef),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3e3))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2500))
       ]);
       if (snap && !snap.empty) {
         for (const d of snap.docs) {
@@ -88258,15 +88266,30 @@ var DbService = class {
     } catch (_) {
     }
     const students = Array.from(map.values()).filter((u2) => !this.isStaffOrAdmin(u2));
-    await Promise.all(students.map(async (st2) => {
-      const trueCredits = await this.getStudentCredits(
-        st2.id,
-        st2.phone,
-        st2.studentId,
-        st2.name
-      );
-      st2.credits = trueCredits > 0 ? trueCredits : Number(st2.credits) || 0;
-    }));
+    try {
+      const lb = await this.getLeaderboard("all");
+      const creditMap = /* @__PURE__ */ new Map();
+      if (Array.isArray(lb)) {
+        for (const item of lb) {
+          const c2 = Number(item.credits) || 0;
+          if (c2 > 0) {
+            if (item.id) creditMap.set(String(item.id).toLowerCase().trim(), c2);
+            if (item.studentPhone) creditMap.set(String(item.studentPhone).replace(/\D/g, "").slice(-9), c2);
+            if (item.name) creditMap.set(String(item.name).toLowerCase().trim(), c2);
+          }
+        }
+      }
+      for (const st2 of students) {
+        if (!st2.credits || st2.credits <= 0) {
+          const idKey = st2.studentId || st2.id;
+          const phoneKey = String(st2.phone || "").replace(/\D/g, "").slice(-9);
+          const nameKey = String(st2.name || "").toLowerCase().trim();
+          st2.credits = idKey && creditMap.get(idKey.toLowerCase().trim()) || phoneKey && creditMap.get(phoneKey) || nameKey && creditMap.get(nameKey) || 0;
+        }
+      }
+    } catch (_) {
+    }
+    this.setCache(cacheKey, students);
     return students;
   }
   // Admin: Delete student account and associated data
@@ -98515,7 +98538,7 @@ var AppController = class {
     this.adminStudentSearchQuery = this.adminStudentSearchQuery || "";
     let allStudents = this._adminStudentsListCache;
     if (!allStudents) {
-      const rawStudents = await dbService.getAllStudents();
+      const rawStudents = await this.safePromise(dbService.getAllStudents(), 3e3, []);
       allStudents = rawStudents.filter((s2) => !dbService.isStaffOrAdmin(s2));
       this._adminStudentsListCache = allStudents;
     }
@@ -98542,6 +98565,11 @@ var AppController = class {
             <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span> Registered Students
           </div>
           <div style="font-size:11px; color:#64748B;">Live Student Directory</div>
+        </div>
+        <div class="apk-appbar-right">
+          <button class="btn-vault-refresh" id="btn-refresh-admin-students" title="Refresh Directory" style="background:#F1F5F9; border:none; border-radius:10px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#475569;">
+            <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
+          </button>
         </div>
       </div>
 
@@ -98689,6 +98717,13 @@ var AppController = class {
         });
         renderRows();
       });
+    });
+    document.getElementById("btn-refresh-admin-students")?.addEventListener("click", async () => {
+      this._adminStudentsListCache = null;
+      dbService.clearCache("all_admin_students");
+      const btn = document.getElementById("btn-refresh-admin-students");
+      if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
+      await this.renderAdminStudentsScreen(container);
     });
   }
   // 5. Admin Broadcasts Screen (admin_announcements_screen.dart)

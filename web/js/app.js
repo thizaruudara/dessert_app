@@ -7528,7 +7528,7 @@ class AppController {
 
     let allStudents = this._adminStudentsListCache;
     if (!allStudents) {
-      const rawStudents = await dbService.getAllStudents();
+      const rawStudents = await this.safePromise(dbService.getAllStudents(), 3000, []);
       allStudents = rawStudents.filter(s => !dbService.isStaffOrAdmin(s));
       this._adminStudentsListCache = allStudents;
     }
@@ -7560,6 +7560,11 @@ class AppController {
             <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span> Registered Students
           </div>
           <div style="font-size:11px; color:#64748B;">Live Student Directory</div>
+        </div>
+        <div class="apk-appbar-right">
+          <button class="btn-vault-refresh" id="btn-refresh-admin-students" title="Refresh Directory" style="background:#F1F5F9; border:none; border-radius:10px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#475569;">
+            <span class="material-symbols-rounded" style="font-size:18px;">refresh</span>
+          </button>
         </div>
       </div>
 
@@ -7722,6 +7727,15 @@ class AppController {
         });
         renderRows();
       });
+    });
+
+    // Refresh Directory event
+    document.getElementById('btn-refresh-admin-students')?.addEventListener('click', async () => {
+      this._adminStudentsListCache = null;
+      dbService.clearCache('all_admin_students');
+      const btn = document.getElementById('btn-refresh-admin-students');
+      if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
+      await this.renderAdminStudentsScreen(container);
     });
   }
 
