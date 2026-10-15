@@ -1901,11 +1901,11 @@ class AppController {
       const isWaiting = statusInfo.isWaiting;
       const isScheduled = statusInfo.isScheduled || session.status === 'scheduled' || (!session.isStarted && !session.isLive);
 
-      let packageRemainingSecs = 600;
+      let packageRemainingSecs = 180;
       if (session.packageOpeningStartedAt) {
         const elapsed = Math.floor((Date.now() - new Date(session.packageOpeningStartedAt).getTime()) / 1000);
-        if (elapsed >= 0 && elapsed <= 600) {
-          packageRemainingSecs = 600 - elapsed;
+        if (elapsed >= 0 && elapsed <= 180) {
+          packageRemainingSecs = 180 - elapsed;
         }
       }
 
@@ -2576,7 +2576,7 @@ class AppController {
         const startIso = span.dataset.start;
         if (startIso) {
           const elapsed = Math.floor((now - new Date(startIso).getTime()) / 1000);
-          const remaining = Math.max(0, 600 - elapsed);
+          const remaining = Math.max(0, 180 - elapsed);
           const m = Math.floor(remaining / 60).toString().padStart(2, '0');
           const s = (remaining % 60).toString().padStart(2, '0');
           span.textContent = `${m}:${s}`;
@@ -10052,7 +10052,7 @@ class AppController {
       switch (phase) {
         case 'package_opening':
           phaseColor = '#F59E0B';
-          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">inventory_2</span>Package Opening (10 Mins Active)';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">inventory_2</span>Package Opening (3 Mins Active)';
           break;
         case 'writing':
           phaseColor = '#22C55E';
@@ -10139,7 +10139,7 @@ class AppController {
             <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
               ${phase === 'waiting' ? `
                 <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (10m)
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (3m)
                 </button>
                 <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #22C55E; color:#22C55E; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">play_arrow</span> Start Writing Direct
@@ -10148,8 +10148,8 @@ class AppController {
                 <button class="phase-action-btn" data-set-phase="writing" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">edit_note</span> Start Exam Writing (ලිවීම අරඹන්න)
                 </button>
-                <button class="phase-action-btn" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Restart 10m Timer
+                <button class="phase-action-btn" data-restart-3m="true" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Restart 3m Timer
                 </button>
                 <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
@@ -10447,12 +10447,16 @@ class AppController {
           if (targetPhase === 'package_opening') {
             this._confirmProctorAction({
               title: 'Start Package Opening? (පාර්සලය විවෘත කිරීම අරඹන්නද?)',
-              content: 'සිසුන්ට විනාඩි 10 ක කාලයක් ලබාදෙමින් ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට පටන් ගැනීමට අවශ්‍ය බව සහතිකද?',
+              content: 'සිසුන්ට විනාඩි 3 ක කාලයක් ලබාදෙමින් ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට පටන් ගැනීමට අවශ්‍ය බව සහතිකද?',
               confirmText: 'Start Package Opening (අරඹන්න)',
               confirmColor: '#F59E0B',
               onConfirm: async () => {
+                session.currentPhase = 'package_opening';
+                session.isLive = true;
+                session.packageOpeningStartedAt = new Date().toISOString();
+                render();
                 await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
-                notificationService.showInAppBanner('Package Opening', '10-minute package opening started.', 'info');
+                notificationService.showInAppBanner('Package Opening', '3-minute package opening started.', 'info');
               }
             });
           } else if (targetPhase === 'writing') {
@@ -10465,7 +10469,11 @@ class AppController {
               confirmText: isResume ? 'Resume Writing (ලිවීම අරඹන්න)' : 'Start Writing (ලිවීම අරඹන්න)',
               confirmColor: '#22C55E',
               onConfirm: async () => {
-                await dbService.setSessionPhase(session.id, 'writing');
+                session.currentPhase = 'writing';
+                session.isLive = true;
+                session.writingStartedAt = new Date().toISOString();
+                render();
+                await dbService.setSessionPhase(session.id, 'writing', { forceResetTimer: true });
                 notificationService.showInAppBanner('Exam Writing Live', 'Exam writing phase active for all students.', 'success');
               }
             });
@@ -10476,6 +10484,8 @@ class AppController {
               confirmText: 'Confirm',
               confirmColor: '#6366F1',
               onConfirm: async () => {
+                session.currentPhase = targetPhase;
+                render();
                 await dbService.setSessionPhase(session.id, targetPhase);
                 notificationService.showInAppBanner('Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
               }
@@ -10484,16 +10494,19 @@ class AppController {
         });
       });
 
-      modal.querySelectorAll('[data-restart-10m]').forEach(btn => {
+      modal.querySelectorAll('[data-restart-3m], [data-restart-10m]').forEach(btn => {
         btn.addEventListener('click', () => {
           this._confirmProctorAction({
-            title: 'Restart 10m Package Timer? (ටයිමරය නැවත අරඹන්නද?)',
-            content: 'පැකේජය විවෘත කිරීමේ විනාඩි 10 ක කාල ගණනය නැවත මුල සිට ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
+            title: 'Restart 3m Package Timer? (ටයිමරය නැවත අරඹන්නද?)',
+            content: 'පැකේජය විවෘත කිරීමේ විනාඩි 3 ක කාල ගණනය නැවත මුල සිට ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
             confirmText: 'Restart Timer (නැවත අරඹන්න)',
             confirmColor: '#F59E0B',
             onConfirm: async () => {
+              session.currentPhase = 'package_opening';
+              session.packageOpeningStartedAt = new Date().toISOString();
+              render();
               await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
-              notificationService.showInAppBanner('10m Timer Restarted', 'Package opening timer reset to 10:00', 'info');
+              notificationService.showInAppBanner('3m Timer Restarted', 'Package opening timer reset to 03:00', 'info');
             }
           });
         });
@@ -11072,8 +11085,8 @@ class AppController {
       const isPackageOpening = session.currentPhase === 'package_opening';
       const isWriting = session.currentPhase === 'writing' || (!isWaiting && !isPackageOpening && !isTimeUp && !isEnded);
 
-      // Package opening 10 mins countdown (600s)
-      let pkgSecsLeft = 600;
+      // Package opening 3 mins countdown (180s)
+      let pkgSecsLeft = 180;
       if (isPackageOpening) {
         let startTime = session.packageOpeningStartedAt ? new Date(session.packageOpeningStartedAt) : null;
         if (!startTime) {
@@ -11085,7 +11098,7 @@ class AppController {
           }
         }
         const elapsed = Math.max(0, Math.floor((new Date() - startTime) / 1000));
-        pkgSecsLeft = Math.max(0, 600 - elapsed);
+        pkgSecsLeft = Math.max(0, 180 - elapsed);
       }
 
       // Exam Writing countdown
@@ -11346,7 +11359,7 @@ ${!times.isWaiting ? `
                     </div>
                     <div>
                       <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">පාර්සලය විවෘත කිරීමට කතුරක්/බ්ලේඩයක් සූදානම් කරගන්න</div>
-                      <div style="font-size:10px; color:#94A3B8;">කැමරාව ඉදිරියේ පළමු මිනිත්තු 10 තුළ විවෘත කළ යුතුය.</div>
+                      <div style="font-size:10px; color:#94A3B8;">කැමරාව ඉදිරියේ පළමු මිනිත්තු 3 තුළ විවෘත කළ යුතුය.</div>
                     </div>
                   </div>
                   <div style="display:flex; gap:10px; align-items:flex-start;">
@@ -11392,7 +11405,7 @@ ${!times.isWaiting ? `
             <!-- Top Phase Notice Banner (_buildPhaseNoticeBanner) -->
             <div style="position:absolute; top:54px; left:16px; right:16px; z-index:20; max-width:680px; margin:0 auto;">
               ${times.isPackageOpening ? `
-                <!-- 10-Minute Package Opening Banner -->
+                <!-- 3-Minute Package Opening Banner -->
                 <div style="background:rgba(15,23,42,0.95); border:2px solid ${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'}; border-radius:16px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
                   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:10px;">
@@ -11401,7 +11414,7 @@ ${!times.isWaiting ? `
                       </div>
                       <div>
                         <div style="font-size:12px; font-weight:700; color:${times.pkgSecsLeft <= 0 ? '#EF4444' : '#F59E0B'};">
-                          ${times.pkgSecsLeft <= 0 ? 'විනාඩි 10 අවසන් (Time Stopped)' : 'ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)'}
+                          ${times.pkgSecsLeft <= 0 ? 'විනාඩි 3 අවසන් (Time Stopped)' : 'ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (3 Mins)'}
                         </div>
                         <div style="font-size:10px; color:#E2E8F0;">
                           ${times.pkgSecsLeft <= 0 ? 'පරීක්ෂකවරයා විභාගය ආරම්භ කරන තෙක් රැඳී සිටින්න' : 'කැමරාව ඉදිරියේ පමණක් පාර්සලය විවෘත කරන්න'}
@@ -12681,8 +12694,26 @@ ${!times.isWaiting ? `
     try {
       liveSessionUnsub = dbService.streamPaperSession(paperId, (s) => {
         if (s) {
-          const changed = session.currentPhase !== s.currentPhase || session.status !== s.status || session.isTimeUp !== s.isTimeUp || session.writingStartedAt !== s.writingStartedAt || session.packageOpeningStartedAt !== s.packageOpeningStartedAt;
+          const changed = session.currentPhase !== s.currentPhase || 
+                          session.status !== s.status || 
+                          session.isTimeUp !== s.isTimeUp || 
+                          session.writingStartedAt !== s.writingStartedAt || 
+                          session.packageOpeningStartedAt !== s.packageOpeningStartedAt;
+          const phaseChanged = session.currentPhase !== s.currentPhase;
           session = s;
+          if (phaseChanged) {
+            if (s.currentPhase === 'writing') {
+              localStorage.removeItem(`paper_pkg_start_${paperId}`);
+              if (s.writingStartedAt) {
+                localStorage.setItem(`paper_writing_start_${paperId}`, s.writingStartedAt);
+              }
+            } else if (s.currentPhase === 'package_opening') {
+              localStorage.removeItem(`paper_writing_start_${paperId}`);
+              if (s.packageOpeningStartedAt) {
+                localStorage.setItem(`paper_pkg_start_${paperId}`, s.packageOpeningStartedAt);
+              }
+            }
+          }
           if (changed) renderRoom();
         }
       });
@@ -12693,14 +12724,24 @@ ${!times.isWaiting ? `
       try {
         const s = await dbService.getPaperSession(paperId);
         if (s) {
-          const changed = session.currentPhase !== s.currentPhase || session.status !== s.status || session.isTimeUp !== s.isTimeUp;
+          const changed = session.currentPhase !== s.currentPhase || 
+                          session.status !== s.status || 
+                          session.isTimeUp !== s.isTimeUp ||
+                          session.writingStartedAt !== s.writingStartedAt;
+          const phaseChanged = session.currentPhase !== s.currentPhase;
           session = s;
+          if (phaseChanged && s.currentPhase === 'writing') {
+            localStorage.removeItem(`paper_pkg_start_${paperId}`);
+            if (s.writingStartedAt) {
+              localStorage.setItem(`paper_writing_start_${paperId}`, s.writingStartedAt);
+            }
+          }
           if (changed) renderRoom();
         }
       } catch (e) {
         console.warn('Session sync error:', e);
       }
-    }, 3000);
+    }, 2000);
 
     // 1-second Countdown Ticker (matching _examCountdownTimer)
     timerInterval = setInterval(() => {
@@ -12759,7 +12800,7 @@ ${!times.isWaiting ? `
         if (textEl) textEl.style.color = timerColor;
       }
 
-      // Update package opening 10-minute banner pill
+      // Update package opening 3-minute banner pill
       const pkgBannerPill = roomContainer.querySelector('#pkg-timer-banner-pill');
       if (pkgBannerPill && times.isPackageOpening) {
         const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');

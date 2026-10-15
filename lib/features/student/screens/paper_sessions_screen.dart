@@ -949,14 +949,14 @@ class _PaperSessionsScreenState extends State<PaperSessionsScreen> {
         final bool isLive = !isEnded && !isWaiting && (session.isActive || isPackageOpening || isWriting || isTimeUp);
         final bool isUpcoming = !isEnded && isWaiting;
 
-        // 10-Minute Package Opening Phase (directly synchronized with examiner trigger)
-        int packageRemainingSecs = 600;
+        // 3-Minute Package Opening Phase (directly synchronized with examiner trigger)
+        int packageRemainingSecs = 180;
         if (session.packageOpeningStartedAt != null) {
           final elapsed = _now.difference(session.packageOpeningStartedAt!).inSeconds;
-          if (elapsed >= 0 && elapsed <= 600) {
-            packageRemainingSecs = 600 - elapsed;
+          if (elapsed >= 0 && elapsed <= 180) {
+            packageRemainingSecs = 180 - elapsed;
           } else if (isPackageOpening) {
-            packageRemainingSecs = 600;
+            packageRemainingSecs = 180;
           }
         }
 

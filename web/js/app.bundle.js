@@ -90903,9 +90903,7 @@ var DbService = class {
       updates.isEnded = false;
       updates.endedAt = null;
       updates.isLive = true;
-      if (forceResetTimer) {
-        updates.packageOpeningStartedAt = nowIso;
-      }
+      updates.packageOpeningStartedAt = nowIso;
       alertMessage = "\u{1F4E6} \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1! (Open your exam parcel in front of the camera now!)";
       alertType = "urgent";
     } else if (phase === "writing") {
@@ -90916,19 +90914,7 @@ var DbService = class {
       updates.isEnded = false;
       updates.endedAt = null;
       updates.isLive = true;
-      if (forceResetTimer) {
-        updates.writingStartedAt = nowIso;
-      } else {
-        try {
-          const currentSnap = await getDoc(doc(db, "paper_sessions", paperId));
-          const currentData = currentSnap.data() || {};
-          if (!currentData.writingStartedAt) {
-            updates.writingStartedAt = nowIso;
-          }
-        } catch (_) {
-          updates.writingStartedAt = nowIso;
-        }
-      }
+      updates.writingStartedAt = nowIso;
       updates.packageOpeningEndedAt = nowIso;
       alertMessage = "\u270D\uFE0F \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0DC0\u0DD2\u0DBA! \u0DAF\u0DD0\u0DB1\u0DCA \u0DB4\u0DD2\u0DC5\u0DD2\u0DAD\u0DD4\u0DBB\u0DD4 \u0DBD\u0DD2\u0DC0\u0DD3\u0DB8 \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1. (Exam Writing has started!)";
       alertType = "info";
@@ -95279,11 +95265,11 @@ var AppController = class {
       const isLive = statusInfo.isLive;
       const isWaiting = statusInfo.isWaiting;
       const isScheduled = statusInfo.isScheduled || session.status === "scheduled" || !session.isStarted && !session.isLive;
-      let packageRemainingSecs = 600;
+      let packageRemainingSecs = 180;
       if (session.packageOpeningStartedAt) {
         const elapsed = Math.floor((Date.now() - new Date(session.packageOpeningStartedAt).getTime()) / 1e3);
-        if (elapsed >= 0 && elapsed <= 600) {
-          packageRemainingSecs = 600 - elapsed;
+        if (elapsed >= 0 && elapsed <= 180) {
+          packageRemainingSecs = 180 - elapsed;
         }
       }
       const pkgMin = Math.floor(packageRemainingSecs / 60).toString().padStart(2, "0");
@@ -95921,7 +95907,7 @@ var AppController = class {
         const startIso = span.dataset.start;
         if (startIso) {
           const elapsed = Math.floor((now - new Date(startIso).getTime()) / 1e3);
-          const remaining = Math.max(0, 600 - elapsed);
+          const remaining = Math.max(0, 180 - elapsed);
           const m2 = Math.floor(remaining / 60).toString().padStart(2, "0");
           const s2 = (remaining % 60).toString().padStart(2, "0");
           span.textContent = `${m2}:${s2}`;
@@ -102846,7 +102832,7 @@ This will purge all associated submissions and records.`)) {
       switch (phase) {
         case "package_opening":
           phaseColor = "#F59E0B";
-          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">inventory_2</span>Package Opening (10 Mins Active)';
+          phaseLabel = '<span class="material-symbols-rounded filled" style="font-size:16px; vertical-align:middle; margin-right:4px;">inventory_2</span>Package Opening (3 Mins Active)';
           break;
         case "writing":
           phaseColor = "#22C55E";
@@ -102931,7 +102917,7 @@ This will purge all associated submissions and records.`)) {
             <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
               ${phase === "waiting" ? `
                 <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (10m)
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (3m)
                 </button>
                 <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #22C55E; color:#22C55E; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">play_arrow</span> Start Writing Direct
@@ -102940,8 +102926,8 @@ This will purge all associated submissions and records.`)) {
                 <button class="phase-action-btn" data-set-phase="writing" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">edit_note</span> Start Exam Writing (\u0DBD\u0DD2\u0DC0\u0DD3\u0DB8 \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1)
                 </button>
-                <button class="phase-action-btn" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Restart 10m Timer
+                <button class="phase-action-btn" data-restart-3m="true" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Restart 3m Timer
                 </button>
                 <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
@@ -103233,12 +103219,16 @@ This will purge all associated submissions and records.`)) {
           if (targetPhase === "package_opening") {
             this._confirmProctorAction({
               title: "Start Package Opening? (\u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8 \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1\u0DAF?)",
-              content: "\u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 10 \u0D9A \u0D9A\u0DCF\u0DBD\u0DBA\u0D9A\u0DCA \u0DBD\u0DB6\u0DCF\u0DAF\u0DD9\u0DB8\u0DD2\u0DB1\u0DCA \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0DB4\u0DA7\u0DB1\u0DCA \u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA \u0DB6\u0DC0 \u0DC3\u0DC4\u0DAD\u0DD2\u0D9A\u0DAF?",
+              content: "\u0DC3\u0DD2\u0DC3\u0DD4\u0DB1\u0DCA\u0DA7 \u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 3 \u0D9A \u0D9A\u0DCF\u0DBD\u0DBA\u0D9A\u0DCA \u0DBD\u0DB6\u0DCF\u0DAF\u0DD9\u0DB8\u0DD2\u0DB1\u0DCA \u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0DB4\u0DA7\u0DB1\u0DCA \u0D9C\u0DD0\u0DB1\u0DD3\u0DB8\u0DA7 \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA \u0DB6\u0DC0 \u0DC3\u0DC4\u0DAD\u0DD2\u0D9A\u0DAF?",
               confirmText: "Start Package Opening (\u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1)",
               confirmColor: "#F59E0B",
               onConfirm: async () => {
+                session.currentPhase = "package_opening";
+                session.isLive = true;
+                session.packageOpeningStartedAt = (/* @__PURE__ */ new Date()).toISOString();
+                render();
                 await dbService.setSessionPhase(session.id, "package_opening", { forceResetTimer: true });
-                notificationService.showInAppBanner("Package Opening", "10-minute package opening started.", "info");
+                notificationService.showInAppBanner("Package Opening", "3-minute package opening started.", "info");
               }
             });
           } else if (targetPhase === "writing") {
@@ -103249,7 +103239,11 @@ This will purge all associated submissions and records.`)) {
               confirmText: isResume ? "Resume Writing (\u0DBD\u0DD2\u0DC0\u0DD3\u0DB8 \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1)" : "Start Writing (\u0DBD\u0DD2\u0DC0\u0DD3\u0DB8 \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1)",
               confirmColor: "#22C55E",
               onConfirm: async () => {
-                await dbService.setSessionPhase(session.id, "writing");
+                session.currentPhase = "writing";
+                session.isLive = true;
+                session.writingStartedAt = (/* @__PURE__ */ new Date()).toISOString();
+                render();
+                await dbService.setSessionPhase(session.id, "writing", { forceResetTimer: true });
                 notificationService.showInAppBanner("Exam Writing Live", "Exam writing phase active for all students.", "success");
               }
             });
@@ -103260,6 +103254,8 @@ This will purge all associated submissions and records.`)) {
               confirmText: "Confirm",
               confirmColor: "#6366F1",
               onConfirm: async () => {
+                session.currentPhase = targetPhase;
+                render();
                 await dbService.setSessionPhase(session.id, targetPhase);
                 notificationService.showInAppBanner("Phase Updated", `Transitioned to: ${targetPhase.toUpperCase()}`, "info");
               }
@@ -103267,16 +103263,19 @@ This will purge all associated submissions and records.`)) {
           }
         });
       });
-      modal.querySelectorAll("[data-restart-10m]").forEach((btn) => {
+      modal.querySelectorAll("[data-restart-3m], [data-restart-10m]").forEach((btn) => {
         btn.addEventListener("click", () => {
           this._confirmProctorAction({
-            title: "Restart 10m Package Timer? (\u0DA7\u0DBA\u0DD2\u0DB8\u0DBB\u0DBA \u0DB1\u0DD0\u0DC0\u0DAD \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1\u0DAF?)",
-            content: "\u0DB4\u0DD0\u0D9A\u0DDA\u0DA2\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA \u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 10 \u0D9A \u0D9A\u0DCF\u0DBD \u0D9C\u0DAB\u0DB1\u0DBA \u0DB1\u0DD0\u0DC0\u0DAD \u0DB8\u0DD4\u0DBD \u0DC3\u0DD2\u0DA7 \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA \u0DB6\u0DC0 \u0DC3\u0DC4\u0DAD\u0DD2\u0D9A\u0DAF?",
+            title: "Restart 3m Package Timer? (\u0DA7\u0DBA\u0DD2\u0DB8\u0DBB\u0DBA \u0DB1\u0DD0\u0DC0\u0DAD \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1\u0DAF?)",
+            content: "\u0DB4\u0DD0\u0D9A\u0DDA\u0DA2\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DDA \u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 3 \u0D9A \u0D9A\u0DCF\u0DBD \u0D9C\u0DAB\u0DB1\u0DBA \u0DB1\u0DD0\u0DC0\u0DAD \u0DB8\u0DD4\u0DBD \u0DC3\u0DD2\u0DA7 \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0D85\u0DC0\u0DC1\u0DCA\u200D\u0DBA \u0DB6\u0DC0 \u0DC3\u0DC4\u0DAD\u0DD2\u0D9A\u0DAF?",
             confirmText: "Restart Timer (\u0DB1\u0DD0\u0DC0\u0DAD \u0D85\u0DBB\u0DB9\u0DB1\u0DCA\u0DB1)",
             confirmColor: "#F59E0B",
             onConfirm: async () => {
+              session.currentPhase = "package_opening";
+              session.packageOpeningStartedAt = (/* @__PURE__ */ new Date()).toISOString();
+              render();
               await dbService.setSessionPhase(session.id, "package_opening", { forceResetTimer: true });
-              notificationService.showInAppBanner("10m Timer Restarted", "Package opening timer reset to 10:00", "info");
+              notificationService.showInAppBanner("3m Timer Restarted", "Package opening timer reset to 03:00", "info");
             }
           });
         });
@@ -103805,7 +103804,7 @@ This will purge all associated submissions and records.`)) {
       const isWaiting = session.currentPhase === "waiting" || session.status === "scheduled";
       const isPackageOpening = session.currentPhase === "package_opening";
       const isWriting = session.currentPhase === "writing" || !isWaiting && !isPackageOpening && !isTimeUp && !isEnded;
-      let pkgSecsLeft = 600;
+      let pkgSecsLeft = 180;
       if (isPackageOpening) {
         let startTime = session.packageOpeningStartedAt ? new Date(session.packageOpeningStartedAt) : null;
         if (!startTime) {
@@ -103817,7 +103816,7 @@ This will purge all associated submissions and records.`)) {
           }
         }
         const elapsed = Math.max(0, Math.floor((/* @__PURE__ */ new Date() - startTime) / 1e3));
-        pkgSecsLeft = Math.max(0, 600 - elapsed);
+        pkgSecsLeft = Math.max(0, 180 - elapsed);
       }
       const totalWritingSecs = (session.durationMinutes || 150) * 60;
       let writingSecsLeft = totalWritingSecs;
@@ -104060,7 +104059,7 @@ ${!times.isWaiting ? `
                     </div>
                     <div>
                       <div style="font-size:11.5px; font-weight:600; color:#FFFFFF;">\u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8\u0DA7 \u0D9A\u0DAD\u0DD4\u0DBB\u0D9A\u0DCA/\u0DB6\u0DCA\u0DBD\u0DDA\u0DA9\u0DBA\u0D9A\u0DCA \u0DC3\u0DD6\u0DAF\u0DCF\u0DB1\u0DB8\u0DCA \u0D9A\u0DBB\u0D9C\u0DB1\u0DCA\u0DB1</div>
-                      <div style="font-size:10px; color:#94A3B8;">\u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DB4\u0DC5\u0DB8\u0DD4 \u0DB8\u0DD2\u0DB1\u0DD2\u0DAD\u0DCA\u0DAD\u0DD4 10 \u0DAD\u0DD4\u0DC5 \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DC5 \u0DBA\u0DD4\u0DAD\u0DD4\u0DBA.</div>
+                      <div style="font-size:10px; color:#94A3B8;">\u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DB4\u0DC5\u0DB8\u0DD4 \u0DB8\u0DD2\u0DB1\u0DD2\u0DAD\u0DCA\u0DAD\u0DD4 3 \u0DAD\u0DD4\u0DC5 \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DC5 \u0DBA\u0DD4\u0DAD\u0DD4\u0DBA.</div>
                     </div>
                   </div>
                   <div style="display:flex; gap:10px; align-items:flex-start;">
@@ -104106,7 +104105,7 @@ ${!times.isWaiting ? `
             <!-- Top Phase Notice Banner (_buildPhaseNoticeBanner) -->
             <div style="position:absolute; top:54px; left:16px; right:16px; z-index:20; max-width:680px; margin:0 auto;">
               ${times.isPackageOpening ? `
-                <!-- 10-Minute Package Opening Banner -->
+                <!-- 3-Minute Package Opening Banner -->
                 <div style="background:rgba(15,23,42,0.95); border:2px solid ${times.pkgSecsLeft <= 0 ? "#EF4444" : "#F59E0B"}; border-radius:16px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
                   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:10px;">
@@ -104115,7 +104114,7 @@ ${!times.isWaiting ? `
                       </div>
                       <div>
                         <div style="font-size:12px; font-weight:700; color:${times.pkgSecsLeft <= 0 ? "#EF4444" : "#F59E0B"};">
-                          ${times.pkgSecsLeft <= 0 ? "\u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 10 \u0D85\u0DC0\u0DC3\u0DB1\u0DCA (Time Stopped)" : "\u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8 (10 Mins)"}
+                          ${times.pkgSecsLeft <= 0 ? "\u0DC0\u0DD2\u0DB1\u0DCF\u0DA9\u0DD2 3 \u0D85\u0DC0\u0DC3\u0DB1\u0DCA (Time Stopped)" : "\u0DB4\u0DCA\u200D\u0DBB\u0DC1\u0DCA\u0DB1 \u0DB4\u0DAD\u0DCA\u200D\u0DBB \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DD2\u0DBB\u0DD3\u0DB8 (3 Mins)"}
                         </div>
                         <div style="font-size:10px; color:#E2E8F0;">
                           ${times.pkgSecsLeft <= 0 ? "\u0DB4\u0DBB\u0DD3\u0D9A\u0DCA\u0DC2\u0D9A\u0DC0\u0DBB\u0DBA\u0DCF \u0DC0\u0DD2\u0DB7\u0DCF\u0D9C\u0DBA \u0D86\u0DBB\u0DB8\u0DCA\u0DB7 \u0D9A\u0DBB\u0DB1 \u0DAD\u0DD9\u0D9A\u0DCA \u0DBB\u0DD0\u0DB3\u0DD3 \u0DC3\u0DD2\u0DA7\u0DD2\u0DB1\u0DCA\u0DB1" : "\u0D9A\u0DD0\u0DB8\u0DBB\u0DCF\u0DC0 \u0D89\u0DAF\u0DD2\u0DBB\u0DD2\u0DBA\u0DDA \u0DB4\u0DB8\u0DAB\u0D9A\u0DCA \u0DB4\u0DCF\u0DBB\u0DCA\u0DC3\u0DBD\u0DBA \u0DC0\u0DD2\u0DC0\u0DD8\u0DAD \u0D9A\u0DBB\u0DB1\u0DCA\u0DB1"}
@@ -105283,7 +105282,21 @@ ${!times.isWaiting ? `
       liveSessionUnsub = dbService.streamPaperSession(paperId, (s2) => {
         if (s2) {
           const changed = session.currentPhase !== s2.currentPhase || session.status !== s2.status || session.isTimeUp !== s2.isTimeUp || session.writingStartedAt !== s2.writingStartedAt || session.packageOpeningStartedAt !== s2.packageOpeningStartedAt;
+          const phaseChanged = session.currentPhase !== s2.currentPhase;
           session = s2;
+          if (phaseChanged) {
+            if (s2.currentPhase === "writing") {
+              localStorage.removeItem(`paper_pkg_start_${paperId}`);
+              if (s2.writingStartedAt) {
+                localStorage.setItem(`paper_writing_start_${paperId}`, s2.writingStartedAt);
+              }
+            } else if (s2.currentPhase === "package_opening") {
+              localStorage.removeItem(`paper_writing_start_${paperId}`);
+              if (s2.packageOpeningStartedAt) {
+                localStorage.setItem(`paper_pkg_start_${paperId}`, s2.packageOpeningStartedAt);
+              }
+            }
+          }
           if (changed) renderRoom();
         }
       });
@@ -105293,14 +105306,21 @@ ${!times.isWaiting ? `
       try {
         const s2 = await dbService.getPaperSession(paperId);
         if (s2) {
-          const changed = session.currentPhase !== s2.currentPhase || session.status !== s2.status || session.isTimeUp !== s2.isTimeUp;
+          const changed = session.currentPhase !== s2.currentPhase || session.status !== s2.status || session.isTimeUp !== s2.isTimeUp || session.writingStartedAt !== s2.writingStartedAt;
+          const phaseChanged = session.currentPhase !== s2.currentPhase;
           session = s2;
+          if (phaseChanged && s2.currentPhase === "writing") {
+            localStorage.removeItem(`paper_pkg_start_${paperId}`);
+            if (s2.writingStartedAt) {
+              localStorage.setItem(`paper_writing_start_${paperId}`, s2.writingStartedAt);
+            }
+          }
           if (changed) renderRoom();
         }
       } catch (e2) {
         console.warn("Session sync error:", e2);
       }
-    }, 3e3);
+    }, 2e3);
     timerInterval = setInterval(() => {
       now = /* @__PURE__ */ new Date();
       const times = calculateTimes();

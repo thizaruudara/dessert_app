@@ -925,15 +925,15 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
           });
         }
 
-        // Package Opening Countdown (10 Minutes):
+        // Package Opening Countdown (3 Minutes):
         // Authoritative server timestamp synchronized + offline persistent cache.
-        int packageOpeningSecsLeft = 600;
+        int packageOpeningSecsLeft = 180;
         if (isPackageOpening) {
           final effectivePkgStart = _getEffectivePackageOpeningStartTime(session);
           if (effectivePkgStart != null) {
             final rawElapsed = _now.difference(effectivePkgStart).inSeconds;
             final elapsed = rawElapsed < 0 ? 0 : rawElapsed;
-            packageOpeningSecsLeft = (600 - elapsed).clamp(0, 600);
+            packageOpeningSecsLeft = (180 - elapsed).clamp(0, 180);
           }
         }
 
@@ -1449,7 +1449,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                 _buildWaitingChecklistRow(
                   icon: Icons.cut,
                   title: 'පාර්සලය විවෘත කිරීමට කතුරක්/බ්ලේඩයක් සූදානම් කරගන්න',
-                  subtitle: 'කැමරාව ඉදිරියේ පළමු මිනිත්තු 10 තුළ විවෘත කළ යුතුය.',
+                  subtitle: 'කැමරාව ඉදිරියේ පළමු මිනිත්තු 3 තුළ විවෘත කළ යුතුය.',
                   color: const Color(0xFF38BDF8),
                 ),
                 const SizedBox(height: 10),
@@ -1926,8 +1926,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                     children: [
                       Text(
                         isFrozenAtZero
-                            ? '⏱️ විනාඩි 10 අවසන් (Time Stopped)'
-                            : '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (10 Mins)',
+                            ? '⏱️ විනාඩි 3 අවසන් (Time Stopped)'
+                            : '📦 ප්‍රශ්න පත්‍ර පාර්සලය විවෘත කිරීම (3 Mins)',
                         style: GoogleFonts.poppins(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,

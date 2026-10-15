@@ -1916,9 +1916,7 @@ export class DbService {
       updates.isEnded = false;
       updates.endedAt = null;
       updates.isLive = true;
-      if (forceResetTimer) {
-        updates.packageOpeningStartedAt = nowIso;
-      }
+      updates.packageOpeningStartedAt = nowIso;
       alertMessage = '📦 ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කරන්න! (Open your exam parcel in front of the camera now!)';
       alertType = 'urgent';
     } else if (phase === 'writing') {
@@ -1929,19 +1927,7 @@ export class DbService {
       updates.isEnded = false;
       updates.endedAt = null;
       updates.isLive = true;
-      if (forceResetTimer) {
-        updates.writingStartedAt = nowIso;
-      } else {
-        try {
-          const currentSnap = await getDoc(doc(db, 'paper_sessions', paperId));
-          const currentData = currentSnap.data() || {};
-          if (!currentData.writingStartedAt) {
-            updates.writingStartedAt = nowIso;
-          }
-        } catch (_) {
-          updates.writingStartedAt = nowIso;
-        }
-      }
+      updates.writingStartedAt = nowIso;
       updates.packageOpeningEndedAt = nowIso;
       alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
       alertType = 'info';

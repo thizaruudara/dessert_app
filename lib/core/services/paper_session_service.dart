@@ -548,29 +548,13 @@ class PaperSessionService {
     } else if (phase == 'package_opening') {
       updates['status'] = 'active';
       updates['isTimeUp'] = false;
-      if (forceResetTimer) {
-        updates['packageOpeningStartedAt'] = nowTimestamp;
-      } else {
-        final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
-        final existing = docSnap.data()?['packageOpeningStartedAt'];
-        if (existing == null) {
-          updates['packageOpeningStartedAt'] = nowTimestamp;
-        }
-      }
+      updates['packageOpeningStartedAt'] = nowTimestamp;
       alertMessage = '📦 ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කරන්න! (Open your exam parcel in front of the camera now!)';
       alertType = 'urgent';
     } else if (phase == 'writing') {
       updates['status'] = 'active';
       updates['isTimeUp'] = false;
-      if (forceResetTimer) {
-        updates['writingStartedAt'] = nowTimestamp;
-      } else {
-        final docSnap = await _firestore.collection('paper_sessions').doc(paperId).get();
-        final existing = docSnap.data()?['writingStartedAt'];
-        if (existing == null) {
-          updates['writingStartedAt'] = nowTimestamp;
-        }
-      }
+      updates['writingStartedAt'] = nowTimestamp;
       updates['packageOpeningEndedAt'] = nowTimestamp;
       alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
       alertType = 'info';

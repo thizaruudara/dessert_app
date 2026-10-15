@@ -1301,7 +1301,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
     switch (phase) {
       case 'package_opening':
         phaseColor = const Color(0xFFF59E0B);
-        phaseLabel = '📦 Package Opening (10 Mins Active)';
+        phaseLabel = '📦 Package Opening (3 Mins Active)';
         phaseIcon = Icons.inventory_2_rounded;
         break;
       case 'writing':
@@ -1381,12 +1381,13 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                       session,
                       'package_opening',
                       'Start Package Opening (ප්‍රශ්න පත්‍ර විවෘත කිරීම)',
-                      'සිසුන්ට මුද්‍රා තැබූ ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට විනාඩි 10 ක කාලය ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
+                      'සිසුන්ට මුද්‍රා තැබූ ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට විනාඩි 3 ක කාලය ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
                       const Color(0xFFF59E0B),
+                      forceResetTimer: true,
                     ),
                     icon: const Icon(Icons.inventory_2, size: 14, color: Colors.black),
                     label: Text(
-                      'Start Package Opening (10m)',
+                      'Start Package Opening (3m)',
                       style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
                     ),
                   ),
@@ -1403,6 +1404,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                       'Directly Start Exam (විභාගය ආරම්භ කරන්න)',
                       'Package Opening අදියර මගහැර කෙලින්ම පිළිතුරු ලිවීමේ අදියර ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
                       const Color(0xFF22C55E),
+                      forceResetTimer: true,
                     ),
                     icon: const Icon(Icons.play_arrow_rounded, size: 16, color: Color(0xFF22C55E)),
                     label: Text(
@@ -1423,6 +1425,7 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                       'Start Exam Writing (ලිවීම අරඹන්න)',
                       'ප්‍රශ්න පත්‍ර පාර්සල් විවෘත කිරීම අවසන් කර සිසුන්ට පිළිතුරු ලිවීම ආරම්භ කිරීමට Alert එකක් යැවීමට අවශ්‍යද?',
                       const Color(0xFF22C55E),
+                      forceResetTimer: true,
                     ),
                     icon: const Icon(Icons.edit, size: 14, color: Colors.white),
                     label: Text(
@@ -1440,14 +1443,14 @@ class _AdminLiveProctorScreenState extends State<AdminLiveProctorScreen> with Si
                     onPressed: () => _confirmSetPhase(
                       session,
                       'package_opening',
-                      'Restart 10m Timer (කාලය නැවත අරඹන්න)',
-                      'ප්‍රශ්න පත්‍ර විවෘත කිරීමේ විනාඩි 10 ක කාලය නැවත 10:00 සිට ආරම්භ කිරීමට අවශ්‍යද?',
+                      'Restart 3m Timer (කාලය නැවත අරඹන්න)',
+                      'ප්‍රශ්න පත්‍ර විවෘත කිරීමේ විනාඩි 3 ක කාලය නැවත 03:00 සිට ආරම්භ කිරීමට අවශ්‍යද?',
                       const Color(0xFFF59E0B),
                       forceResetTimer: true,
                     ),
                     icon: const Icon(Icons.replay_rounded, size: 14, color: Colors.black),
                     label: Text(
-                      'Restart 10m Timer',
+                      'Restart 3m Timer',
                       style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black),
                     ),
                   ),
