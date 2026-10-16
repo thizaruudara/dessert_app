@@ -6,19 +6,21 @@
 
 import { supabase } from './supabase-client.js';
 
+export const DEFAULT_R2_URL = 'https://edupeak-r2-storage.thisaruudara69.workers.dev';
+
 export class StorageService {
   constructor() {
-    // Cloudflare R2 worker endpoint (if configured by admin or in localStorage)
-    this.r2Endpoint = (typeof window !== 'undefined' && (window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url'))) || null;
+    // Cloudflare R2 worker endpoint (defaults to live worker, overridable via window.EDUPEAK_R2_URL or localStorage)
+    this.r2Endpoint = (typeof window !== 'undefined' && (window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url'))) || DEFAULT_R2_URL;
     this.supabaseBucket = 'dessert_uploads';
   }
 
   // Get active Cloudflare R2 endpoint URL
   getR2Endpoint() {
     if (typeof window !== 'undefined') {
-      return window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url') || this.r2Endpoint || null;
+      return window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url') || this.r2Endpoint || DEFAULT_R2_URL;
     }
-    return this.r2Endpoint || null;
+    return this.r2Endpoint || DEFAULT_R2_URL;
   }
 
   // Save or update Cloudflare R2 worker endpoint URL
