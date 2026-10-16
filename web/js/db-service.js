@@ -19,7 +19,7 @@ import {
   increment
 } from './firebase-config.js';
 import { callBackend } from './backend-api.js';
-import { supabase } from './supabase-client.js';
+import { supabase, getSuperPaperBatchAccess } from './supabase-client.js';
 
 export function normalizePhone(rawPhone) {
   if (!rawPhone) return '';
@@ -1315,6 +1315,11 @@ export class DbService {
 
     this.setCache(cacheKey, students);
     return students;
+  }
+
+  // Admin: Resolve Super Paper Class access for students
+  async getSuperPaperAccessMap(students = []) {
+    return await getSuperPaperBatchAccess(students);
   }
 
   // Admin: Delete student account and associated data

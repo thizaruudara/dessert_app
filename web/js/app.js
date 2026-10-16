@@ -8340,12 +8340,25 @@ class AppController {
       this._adminStudentsListCache = allStudents;
     }
 
-    const batches = ['All', '2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
+    // Resolve Super Paper Class access map for real data display
+    let accessMap = this._adminStudentsAccessCache;
+    if (!accessMap) {
+      accessMap = await this.safePromise(dbService.getSuperPaperAccessMap(allStudents), 2500, new Map());
+      this._adminStudentsAccessCache = accessMap;
+    }
+
+    const batches = ['All', 'Full Access', 'No Access', '2024 A/L', '2025 A/L', '2026 A/L', '2027 A/L', '2028 A/L', '2029 A/L'];
 
     const getFilteredStudents = () => {
       let filtered = allStudents;
       if (this.adminStudentBatchFilter !== 'All') {
-        filtered = filtered.filter(s => (s.examYear || '').trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
+        if (this.adminStudentBatchFilter === 'Full Access') {
+          filtered = filtered.filter(s => (accessMap.get(s.id) || accessMap.get(s.studentId))?.hasFullAccess);
+        } else if (this.adminStudentBatchFilter === 'No Access') {
+          filtered = filtered.filter(s => !(accessMap.get(s.id) || accessMap.get(s.studentId))?.hasFullAccess);
+        } else {
+          filtered = filtered.filter(s => (s.examYear || '').trim().toLowerCase() === this.adminStudentBatchFilter.trim().toLowerCase());
+        }
       }
       if (this.adminStudentSearchQuery.trim()) {
         const q = this.adminStudentSearchQuery.toLowerCase();
@@ -8358,6 +8371,7 @@ class AppController {
       return filtered;
     };
     const initialFiltered = getFilteredStudents();
+    const fullAccessCount = allStudents.filter(s => (accessMap.get(s.id) || accessMap.get(s.studentId))?.hasFullAccess).length;
 
     container.innerHTML = `
       <!-- Screen AppBar -->
@@ -8377,19 +8391,26 @@ class AppController {
 
       <!-- Header Controls: Summary Cards, Search Bar, Batch Filter Chips -->
       <div style="padding:16px 16px 8px 16px; background:#FFFFFF; border-bottom:1px solid #E2E8F0; display:flex; flex-direction:column; gap:12px;">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div style="background:#F1F5F9; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:8px;">
             <span class="material-symbols-rounded filled" style="font-size:20px; color:#2563EB;">people</span>
             <div>
-              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Total Active</div>
-              <div style="font-size:16px; font-weight:800; color:#0F172A;">${allStudents.length}</div>
+              <div style="font-size:10px; color:#64748B; font-weight:600;">Total Active</div>
+              <div style="font-size:15px; font-weight:800; color:#0F172A;">${allStudents.length}</div>
             </div>
           </div>
-          <div style="background:#F1F5F9; border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;">
+          <div style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:8px;">
+            <span class="material-symbols-rounded filled" style="font-size:20px; color:#059669;">verified</span>
+            <div>
+              <div style="font-size:10px; color:#047857; font-weight:700;">Full Access</div>
+              <div style="font-size:15px; font-weight:800; color:#065F46;">${fullAccessCount}</div>
+            </div>
+          </div>
+          <div style="background:#F1F5F9; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:8px;">
             <span class="material-symbols-rounded filled" style="font-size:20px; color:#6366F1;">flash_on</span>
             <div>
-              <div style="font-size:10.5px; color:#64748B; font-weight:600;">Showing</div>
-              <div id="admin-students-showing-count" style="font-size:16px; font-weight:800; color:#0F172A;">${initialFiltered.length}</div>
+              <div style="font-size:10px; color:#64748B; font-weight:600;">Showing</div>
+              <div id="admin-students-showing-count" style="font-size:15px; font-weight:800; color:#0F172A;">${initialFiltered.length}</div>
             </div>
           </div>
         </div>
@@ -8400,12 +8421,14 @@ class AppController {
           <input type="text" id="input-admin-student-search" placeholder="Search by name, phone or ID..." value="${this.adminStudentSearchQuery}">
         </div>
 
-        <!-- Batch Filter Chips -->
+        <!-- Batch & Access Filter Chips -->
         <div class="apk-chips-scroll-row" id="admin-students-batch-chips">
           ${batches.map(b => {
             const isSel = this.adminStudentBatchFilter === b;
+            const isFullAccChip = b === 'Full Access';
+            const isNoAccChip = b === 'No Access';
             return `
-              <button class="apk-filter-chip ${isSel ? 'active' : ''}" data-batch="${b}">
+              <button class="apk-filter-chip ${isSel ? 'active' : ''}" data-batch="${b}" style="${isFullAccChip ? 'border-color:#A7F3D0; color:#047857;' : (isNoAccChip ? 'border-color:#FDE68A; color:#B45309;' : '')}">
                 ${isSel ? '<span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">check</span> ' : ''}${b}
               </button>
             `;
@@ -8465,26 +8488,38 @@ class AppController {
         <div style="display:flex; flex-direction:column; gap:10px;">
           ${filtered.map(st => {
             const isDup = phoneCounts[st.phone] > 1;
+            const acc = accessMap.get(st.id) || accessMap.get(st.studentId) || { hasFullAccess: false, monthName: 'October 2027', statusText: 'No Access' };
             return `
               <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
-                <div style="display:flex; align-items:center; gap:12px;">
+                <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
                   <div style="width:42px; height:42px; border-radius:50%; background:${getAvatarGrad(st.name || st.id)}; color:#FFFFFF; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.12); flex-shrink:0;">
                     ${escapeHTML((st.name || 'S').charAt(0).toUpperCase())}
                   </div>
-                  <div>
+                  <div style="min-width:0; flex:1;">
                     <div style="font-size:14px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                       <span>${escapeHTML(st.name || 'Student')}</span>
+                      ${acc.hasFullAccess
+                        ? `<span style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; padding:2px 7px; border-radius:6px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:3px;" title="Super Paper Class 2027 (${acc.monthName}) Unlocked & Paid">
+                             <span class="material-symbols-rounded filled" style="font-size:13px; color:#059669;">verified</span> Full Access
+                           </span>`
+                        : `<span style="background:#FFFBEB; color:#92400E; border:1px solid #FDE68A; padding:2px 7px; border-radius:6px; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:3px;" title="Super Paper Class 2027 (${acc.monthName}) Not Purchased / Locked">
+                             <span class="material-symbols-rounded" style="font-size:13px; color:#D97706;">lock</span> No Access
+                           </span>`
+                      }
                       ${isDup ? '<span style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:1px 6px; border-radius:6px; font-size:10px; font-weight:700;">⚠️ Duplicate Phone</span>' : ''}
                     </div>
-                    <div style="font-size:11.5px; color:#64748B; margin-top:2px;">
-                      ${escapeHTML(st.phone || 'No phone')} • <span style="color:#2563EB; font-weight:700;">${escapeHTML(st.examYear || '2026 A/L')}</span>
-                      <span style="margin-left:6px; font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">⚡ ${st.credits || 0} XP</span>
-                      ${st.studentId ? `<span style="margin-left:4px; font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${escapeHTML(st.studentId)}</span>` : ''}
+                    <div style="font-size:11.5px; color:#64748B; margin-top:3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <span>${escapeHTML(st.phone || 'No phone')}</span> • <span style="color:#2563EB; font-weight:700;">${escapeHTML(st.examYear || '2026 A/L')}</span>
+                      <span style="font-size:11px; background:#EFF6FF; color:#1D4ED8; padding:2px 7px; border-radius:6px; font-weight:800;">⚡ ${st.credits || 0} XP</span>
+                      ${st.studentId ? `<span style="font-size:10.5px; background:#F1F5F9; color:#475569; padding:1px 5px; border-radius:4px; font-family:monospace; font-weight:600;">${escapeHTML(st.studentId)}</span>` : ''}
+                      <span style="font-size:10.5px; color:${acc.hasFullAccess ? '#059669' : '#94A3B8'}; font-weight:600;">
+                        ${acc.hasFullAccess ? '• Super Paper ' + acc.monthName + ' Unlocked' : '• Super Paper ' + acc.monthName + ' Locked'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
                   <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; font-size:16px;">
                     <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
                   </button>
@@ -8528,6 +8563,7 @@ class AppController {
     // Refresh Directory event
     document.getElementById('btn-refresh-admin-students')?.addEventListener('click', async () => {
       this._adminStudentsListCache = null;
+      this._adminStudentsAccessCache = null;
       dbService.clearCache('all_admin_students');
       const btn = document.getElementById('btn-refresh-admin-students');
       if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
@@ -8541,6 +8577,7 @@ class AppController {
     this._adminStudentsCreditsHandler = () => {
       if (!container.isConnected || this.adminTab !== 'students') return;
       this._adminStudentsListCache = null;
+      this._adminStudentsAccessCache = null;
       dbService.clearCache('all_admin_students');
       this.renderAdminStudentsScreen(container);
     };

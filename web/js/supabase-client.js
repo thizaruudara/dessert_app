@@ -291,3 +291,119 @@ export async function checkSuperPaperSubscription(
   }
 }
 
+/**
+ * Batch resolve full access status for Super Paper Class 2027 latest month
+ * for a list of students in the Admin console.
+ * Returns a Map: studentKey -> { hasFullAccess: boolean, monthName: string, courseTitle: string, statusText: string }
+ */
+export async function getSuperPaperBatchAccess(students = []) {
+  const accessMap = new Map();
+  if (!students || students.length === 0) return accessMap;
+
+  try {
+    // 1. Fetch latest month course for Super Paper Class 2027
+    const { data: courses } = await supabase
+      .from('courses')
+      .select('id, title, month_name, parent_course_id, created_at')
+      .or('title.ilike.%Super Paper Class%,parent_course_id.ilike.%super-paper%,id.ilike.%super-paper%')
+      .eq('active', true)
+      .order('created_at', { ascending: false });
+
+    // Latest month course (e.g. crs-phy-muu3k9m4)
+    const latestMonthlyCourse = (courses || []).find(c => c.id === 'crs-phy-muu3k9m4')
+      || (courses || []).find(c => c.parent_course_id === 'crs-base-super-paper-2027' && c.month_name)
+      || (courses || []).find(c => c.month_name)
+      || { id: 'crs-phy-muu3k9m4', title: 'Super Paper Class - October 2027', month_name: 'October 2027' };
+
+    const targetCourseId = latestMonthlyCourse.id;
+    const targetMonthName = latestMonthlyCourse.month_name || 'October 2027';
+
+    // 2. Fetch all paid/approved enrollments for this monthly course in batch
+    const { data: enrollments } = await supabase
+      .from('enrollments')
+      .select('student_id, course_id, payment_status')
+      .eq('course_id', targetCourseId);
+
+    const paidStudentIds = new Set();
+    const cancelledStudentIds = new Set();
+
+    (enrollments || []).forEach(enr => {
+      const sId = String(enr.student_id || '').toLowerCase().trim();
+      const status = String(enr.payment_status || '').toLowerCase().trim();
+      if (['paid', 'approved', 'active'].includes(status)) {
+        paidStudentIds.add(sId);
+      } else if (['cancelled', 'refunded', 'revoked'].includes(status)) {
+        cancelledStudentIds.add(sId);
+      }
+    });
+
+    // 3. Fetch approved orders from broadcast_schedules in batch
+    const { data: orders } = await supabase
+      .from('broadcast_schedules')
+      .select('coursetitle, status')
+      .like('id', 'order-%')
+      .in('status', ['order_approved', 'approved', 'Approved'])
+      .limit(100);
+
+    const approvedOrderKeys = new Set();
+    (orders || []).forEach(ord => {
+      try {
+        const p = typeof ord.coursetitle === 'string' ? JSON.parse(ord.coursetitle) : ord.coursetitle;
+        const cId = p?.courseId || p?.course_id;
+        if (cId === targetCourseId || String(p?.courseTitle || '').includes('October 2027')) {
+          if (p?.studentId) approvedOrderKeys.add(String(p.studentId).toLowerCase().trim());
+          if (p?.studentPhone) approvedOrderKeys.add(String(p.studentPhone).replace(/\D/g, '').slice(-9));
+          if (p?.studentEmail) approvedOrderKeys.add(String(p.studentEmail).toLowerCase().trim());
+        }
+      } catch (_) {}
+    });
+
+    // 4. Evaluate each student
+    for (const st of students) {
+      const keys = [
+        st.id,
+        st.studentId,
+        st.email,
+        st.phone ? String(st.phone).replace(/\D/g, '').slice(-9) : null
+      ].filter(Boolean).map(k => String(k).toLowerCase().trim());
+
+      const isCancelled = keys.some(k => cancelledStudentIds.has(k));
+      let hasFullAccess = false;
+
+      if (!isCancelled) {
+        // Direct enrollment paid check
+        if (keys.some(k => paidStudentIds.has(k))) {
+          hasFullAccess = true;
+        }
+
+        // Check profiles enrolledCourses array
+        if (!hasFullAccess && st.enrolledCourses) {
+          const list = Array.isArray(st.enrolledCourses) ? st.enrolledCourses : [];
+          if (list.includes(targetCourseId) || list.some(c => String(c).includes('muu3k9m4'))) {
+            hasFullAccess = true;
+          }
+        }
+
+        // Check approved orders
+        if (!hasFullAccess && keys.some(k => approvedOrderKeys.has(k))) {
+          hasFullAccess = true;
+        }
+      }
+
+      const accData = {
+        hasFullAccess,
+        monthName: targetMonthName,
+        courseTitle: latestMonthlyCourse.title || `Super Paper Class - ${targetMonthName}`,
+        statusText: hasFullAccess ? `Full Access (${targetMonthName})` : 'No Access (Locked)'
+      };
+      if (st.id) accessMap.set(st.id, accData);
+      if (st.studentId) accessMap.set(st.studentId, accData);
+    }
+  } catch (err) {
+    console.warn('[Supabase] getSuperPaperBatchAccess error:', err);
+  }
+
+  return accessMap;
+}
+
+
