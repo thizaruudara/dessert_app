@@ -34,9 +34,11 @@
 }
 
 html {
+  background: #F8FAFC !important;
   scroll-behavior: smooth;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
 }
 
 ::selection {
@@ -50,7 +52,7 @@ html {
 }
 
 body {
-  background: #F1F5F9;
+  background: #F8FAFC !important;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-main);
   min-height: 100vh;

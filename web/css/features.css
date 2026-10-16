@@ -3774,7 +3774,7 @@ html[data-theme="dark"] .splash-loading-text {
 
 /* ── Screen AppBars ── */
 .apk-screen-appbar {
-  padding: 12px 16px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px 16px;
   background: #FFFFFF;
   border-bottom: 1px solid #E2E8F0;
   display: flex;
@@ -4200,10 +4200,20 @@ button:focus-visible {
 .app-top-scrim,
 .status-bar-scrim,
 .top-cloud-overlay,
-.ios-notch-scrim {
+.ios-notch-scrim,
+.top-blur-overlay,
+.status-bar-blur,
+.notch-overlay,
+.notch-scrim,
+.header-cloud,
+.top-cloud {
   display: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* ── Live Invigilator Proctor Hall Fullscreen Responsive Shell ── */
