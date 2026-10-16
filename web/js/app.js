@@ -8881,30 +8881,53 @@ class AppController {
     });
   }
 
-  _openEssayPageViewer(urls, startPage = 0) {
+  _openEssayPageViewer(urls, startPage = 0, meta = {}) {
     if (!urls || urls.length === 0) return;
     const viewer = document.createElement('div');
     viewer.style.cssText = 'position:fixed;inset:0;z-index:10000005;background:rgba(0,0,0,0.96);display:flex;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;';
     let currentPage = Math.max(0, Math.min(startPage, urls.length - 1));
+    let zoomLevel = 1.0;
 
     const closeViewer = (e) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       viewer.remove();
     };
 
+    const updateZoom = (newZoom) => {
+      zoomLevel = Math.max(1.0, Math.min(4.0, newZoom));
+      const img = viewer.querySelector('#viewer-target-image');
+      const zoomText = viewer.querySelector('#viewer-zoom-val');
+      if (img) {
+        img.style.transform = `scale(${zoomLevel})`;
+        img.style.transformOrigin = 'center center';
+        img.style.transition = 'transform 0.15s ease-out';
+      }
+      if (zoomText) zoomText.textContent = `${Math.round(zoomLevel * 100)}%`;
+    };
+
     const render = () => {
+      zoomLevel = 1.0;
       viewer.innerHTML = `
-        <!-- Top Bar with iOS Notch / Dynamic Island Safe Area -->
+        <!-- Top Bar with iOS Notch / Dynamic Island Safe Area & Zoom Controls -->
         <div style="display:flex; align-items:center; justify-content:space-between; padding:calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px; background:rgba(15,23,42,0.85); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.1); z-index:20;">
           <button id="viewer-top-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#FFFFFF; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
             <span>Back</span>
           </button>
           
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:#FFFFFF; font-size:13.5px; font-weight:800; background:rgba(255,255,255,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(255,255,255,0.15);">
-              Page ${currentPage + 1} of ${urls.length}
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="color:#FFFFFF; font-size:13px; font-weight:800; background:rgba(255,255,255,0.1); padding:4px 10px; border-radius:20px; border:1px solid rgba(255,255,255,0.15);">
+              P${currentPage + 1}/${urls.length}
             </span>
+            <div style="display:flex; align-items:center; gap:4px; background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
+              <button id="viewer-zoom-out" type="button" title="Zoom Out" style="background:none; border:none; color:#FFFFFF; border-radius:6px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                <span class="material-symbols-rounded" style="font-size:18px;">zoom_out</span>
+              </button>
+              <span id="viewer-zoom-val" style="color:#E2E8F0; font-size:11px; font-weight:700; min-width:38px; text-align:center;">100%</span>
+              <button id="viewer-zoom-in" type="button" title="Zoom In" style="background:none; border:none; color:#FFFFFF; border-radius:6px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                <span class="material-symbols-rounded" style="font-size:18px;">zoom_in</span>
+              </button>
+            </div>
           </div>
 
           <button id="viewer-top-close" type="button" title="Close" style="display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#FFFFFF; border-radius:50%; width:36px; height:36px; cursor:pointer; touch-action:manipulation;">
@@ -8912,26 +8935,30 @@ class AppController {
           </button>
         </div>
 
-        <!-- Center Image Viewer with Responsive Framing -->
+        <!-- Center Image Viewer with Pinch / Zoom & Scroll -->
         <div id="viewer-image-container" style="flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:12px; position:relative; -webkit-overflow-scrolling:touch;">
-          <img src="${urls[currentPage]}" alt="Student Submission Page ${currentPage + 1}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); user-select:none;" />
+          <img id="viewer-target-image" src="${urls[currentPage]}" alt="Student Submission Page ${currentPage + 1}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); user-select:none; transform:scale(1); transition:transform 0.15s ease-out;" />
         </div>
 
         <!-- Bottom Bar with Back / Navigation / Download Controls -->
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px calc(env(safe-area-inset-bottom, 0px) + 14px); background:rgba(15,23,42,0.9); backdrop-filter:blur(10px); border-top:1px solid rgba(255,255,255,0.1); z-index:20;">
-          <button id="viewer-bottom-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:#EF4444; border:none; color:#FFFFFF; border-radius:12px; padding:10px 16px; font-size:13px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(239,68,68,0.3); touch-action:manipulation;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px calc(env(safe-area-inset-bottom, 0px) + 14px); background:rgba(15,23,42,0.9); backdrop-filter:blur(10px); border-top:1px solid rgba(255,255,255,0.1); z-index:20;">
+          <button id="viewer-bottom-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:#EF4444; border:none; color:#FFFFFF; border-radius:12px; padding:10px 14px; font-size:13px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(239,68,68,0.3); touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
             <span>Back</span>
           </button>
 
-          <div style="display:flex; align-items:center; gap:14px;">
-            <button id="viewer-prev" ${currentPage === 0 ? 'disabled' : ''} type="button" title="Previous Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${currentPage === 0 ? '0.35' : '1'};">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button id="viewer-prev" ${currentPage === 0 ? 'disabled' : ''} type="button" title="Previous Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:40px; height:40px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${currentPage === 0 ? '0.35' : '1'};">
               <span class="material-symbols-rounded">chevron_left</span>
             </button>
-            <a href="${urls[currentPage]}" download="submission_page_${currentPage + 1}.jpg" target="_blank" title="Download Page" style="background:rgba(37,99,235,0.85); border:1px solid #3B82F6; color:#fff; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; text-decoration:none; box-shadow:0 4px 12px rgba(37,99,235,0.3); touch-action:manipulation;">
-              <span class="material-symbols-rounded" style="font-size:20px;">download</span>
+            <a href="${urls[currentPage]}" download="submission_page_${currentPage + 1}.jpg" target="_blank" title="Download Current Page Image" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#fff; border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; text-decoration:none; touch-action:manipulation;">
+              <span class="material-symbols-rounded" style="font-size:19px;">download</span>
             </a>
-            <button id="viewer-next" ${currentPage === urls.length - 1 ? 'disabled' : ''} type="button" title="Next Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${currentPage === urls.length - 1 ? '0.35' : '1'};">
+            <button id="viewer-download-pdf" type="button" title="Download all pages as 1 PDF" style="display:inline-flex; align-items:center; gap:5px; background:#2563EB; border:none; color:#FFFFFF; border-radius:12px; padding:10px 14px; font-size:12.5px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(37,99,235,0.3); touch-action:manipulation;">
+              <span class="material-symbols-rounded" style="font-size:17px;">picture_as_pdf</span>
+              <span>All PDF</span>
+            </button>
+            <button id="viewer-next" ${currentPage === urls.length - 1 ? 'disabled' : ''} type="button" title="Next Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:40px; height:40px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${currentPage === urls.length - 1 ? '0.35' : '1'};">
               <span class="material-symbols-rounded">chevron_right</span>
             </button>
           </div>
@@ -8941,6 +8968,9 @@ class AppController {
       viewer.querySelector('#viewer-top-back')?.addEventListener('click', closeViewer);
       viewer.querySelector('#viewer-top-close')?.addEventListener('click', closeViewer);
       viewer.querySelector('#viewer-bottom-back')?.addEventListener('click', closeViewer);
+
+      viewer.querySelector('#viewer-zoom-in')?.addEventListener('click', () => updateZoom(zoomLevel + 0.35));
+      viewer.querySelector('#viewer-zoom-out')?.addEventListener('click', () => updateZoom(zoomLevel - 0.35));
 
       viewer.querySelector('#viewer-prev')?.addEventListener('click', () => {
         if (currentPage > 0) {
@@ -8954,17 +8984,52 @@ class AppController {
           render();
         }
       });
+
+      // 1-Click Compiled PDF Download
+      viewer.querySelector('#viewer-download-pdf')?.addEventListener('click', async () => {
+        const btn = viewer.querySelector('#viewer-download-pdf');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;animation:spin 0.75s linear infinite;">progress_activity</span> Compiling...';
+        }
+        try {
+          const pdfBlob = await buildPdf(urls);
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          const a = document.createElement('a');
+          a.href = pdfUrl;
+          a.download = `Submission_All_Pages_${Date.now()}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(pdfUrl), 2000);
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;color:#86EFAC;">check</span> Saved';
+          }
+          setTimeout(() => {
+            if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">picture_as_pdf</span><span>All PDF</span>';
+          }, 2000);
+        } catch (pdfErr) {
+          console.warn('[PDF Download error]:', pdfErr);
+          alert('Could not compile PDF: ' + (pdfErr.message || 'Error'));
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:17px;">picture_as_pdf</span><span>All PDF</span>';
+          }
+        }
+      });
     };
 
     render();
     document.body.appendChild(viewer);
 
-    // Swipe navigation support on mobile
+    // Swipe navigation support on mobile (when not zoomed in)
     let touchStartX = 0;
     viewer.addEventListener('touchstart', e => {
       touchStartX = e.touches[0].clientX;
     }, { passive: true });
     viewer.addEventListener('touchend', e => {
+      if (zoomLevel > 1.1) return; // Prevent accidental page change while zoomed
       const dx = e.changedTouches[0].clientX - touchStartX;
       if (Math.abs(dx) > 50) {
         if (dx < 0 && currentPage < urls.length - 1) { currentPage++; render(); }

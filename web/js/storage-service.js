@@ -13,10 +13,31 @@ export class StorageService {
     this.supabaseBucket = 'dessert_uploads';
   }
 
-  // ── Solution 2: Ultra Client-Side Compression ──────────────────────────────
-  // Compresses image to WebP (or optimized JPEG) with max 1100px dimension and ~70% quality.
-  // Shrinks 5-8MB camera photos down to 50KB-90KB without losing handwritten text clarity.
-  async compressImage(dataUrlOrBlob, maxDim = 1100, quality = 0.70) {
+  // Get active Cloudflare R2 endpoint URL
+  getR2Endpoint() {
+    if (typeof window !== 'undefined') {
+      return window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url') || this.r2Endpoint || null;
+    }
+    return this.r2Endpoint || null;
+  }
+
+  // Save or update Cloudflare R2 worker endpoint URL
+  setR2Endpoint(url) {
+    this.r2Endpoint = url ? String(url).trim().replace(/\/+$/, '') : null;
+    if (typeof window !== 'undefined') {
+      if (this.r2Endpoint) {
+        localStorage.setItem('edupeak_r2_worker_url', this.r2Endpoint);
+        window.EDUPEAK_R2_URL = this.r2Endpoint;
+      } else {
+        localStorage.removeItem('edupeak_r2_worker_url');
+      }
+    }
+  }
+
+  // ── Solution 2: Crisp Document Image Compression ───────────────────────────
+  // Compresses image to WebP (or optimized JPEG) with Full HD 1920px max dimension and ~84% quality.
+  // Preserves clear math equations, fractions, and pencil handwriting while keeping size ~140KB-180KB.
+  async compressImage(dataUrlOrBlob, maxDim = 1920, quality = 0.84) {
     return new Promise((resolve) => {
       let src = dataUrlOrBlob;
       let shouldRevoke = false;
@@ -96,22 +117,28 @@ export class StorageService {
   // ── Solution 3: Cloudflare R2 / Supabase Storage Multi-Cloud Upload ────────
   // Uploads single homework page and returns public CDN URL.
   async uploadPage(pageDataUrl, { studentId = 'student', pageIndex = 1, filePrefix = 'dessert' } = {}) {
-    // Step A: Ultra-compress first
-    const compressedDataUrl = await this.compressImage(pageDataUrl, 1100, 0.70);
-    const blob = this.dataUrlToBlob(compressedDataUrl);
-    const ext = blob.type.includes('webp') ? 'webp' : 'jpg';
+    // If page is already a high-res data URL from camera scanner, avoid recompressing to prevent double loss!
+    let blob;
+    if (typeof pageDataUrl === 'string' && pageDataUrl.startsWith('data:')) {
+      blob = this.dataUrlToBlob(pageDataUrl);
+    } else {
+      const compressedDataUrl = await this.compressImage(pageDataUrl, 1920, 0.84);
+      blob = this.dataUrlToBlob(compressedDataUrl);
+    }
+    const ext = blob.type.includes('webp') ? 'webp' : (blob.type.includes('pdf') ? 'pdf' : 'jpg');
     const timestamp = Date.now();
     const cleanStudentId = String(studentId || 'st').replace(/[^a-zA-Z0-9_-]/g, '_');
     const fileName = `${cleanStudentId}/${filePrefix}_${timestamp}_p${pageIndex}.${ext}`;
 
-    // 1. Try Cloudflare R2 Worker if configured
-    if (this.r2Endpoint) {
+    // 1. Try Cloudflare R2 Worker if configured (10 GB Free + $0 Bandwidth)
+    const activeR2 = this.getR2Endpoint();
+    if (activeR2) {
       try {
         const formData = new FormData();
         formData.append('file', blob, fileName);
         formData.append('key', fileName);
 
-        const r2Res = await fetch(this.r2Endpoint, {
+        const r2Res = await fetch(activeR2, {
           method: 'POST',
           body: formData
         });

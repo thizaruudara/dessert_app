@@ -32,8 +32,8 @@ export class CameraService {
       audio: false,
       video: {
         facingMode: { ideal: facingMode },
-        width: { ideal: facingMode === 'environment' ? 1920 : 1280 },
-        height: { ideal: facingMode === 'environment' ? 1080 : 720 }
+        width: { ideal: facingMode === 'environment' ? 2560 : 1280, min: 1280 },
+        height: { ideal: facingMode === 'environment' ? 1440 : 720, min: 720 }
       }
     };
 
@@ -97,8 +97,8 @@ export class CameraService {
     return false;
   }
 
-  // Compress and resize image dataUrl to keep payload size lightweight (<100KB)
-  compressImage(dataUrl, maxDim = 1100, quality = 0.70) {
+  // Compress and resize image dataUrl with high clarity for A4 documents (~140-180KB)
+  compressImage(dataUrl, maxDim = 1920, quality = 0.85) {
     return new Promise((resolve) => {
       if (!dataUrl || typeof dataUrl !== 'string') return resolve(dataUrl);
       const img = new Image();
@@ -132,20 +132,20 @@ export class CameraService {
     });
   }
 
-  // Capture high-resolution photo from the live video feed
+  // Capture high-resolution photo from the live video feed (Full HD 1920px document scan)
   capturePhoto(applyFilter = 'none') {
     const video = this.videoElement || document.getElementById('scanner-live-video');
     const stream = this.stream || video?.srcObject;
 
-    let width = video?.videoWidth || 1280;
-    let height = video?.videoHeight || 720;
+    let width = video?.videoWidth || 1920;
+    let height = video?.videoHeight || 1080;
     if (width === 0 || height === 0) {
-      width = 1280;
-      height = 720;
+      width = 1920;
+      height = 1080;
     }
 
-    // Downscale if dimension exceeds 1200 to prevent oversized payloads
-    const maxDim = 1200;
+    // Preserve Full HD 1920px dimension for sharp handwritten math & physics text
+    const maxDim = 1920;
     let targetW = width;
     let targetH = height;
     if (targetW > maxDim || targetH > maxDim) {
@@ -162,6 +162,8 @@ export class CameraService {
     canvas.width = targetW;
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     // If front camera, flip horizontally for natural mirror feel
     if (this.currentFacingMode === 'user') {
@@ -200,10 +202,10 @@ export class CameraService {
 
     let dataUrl;
     try {
-      const webp = canvas.toDataURL('image/webp', 0.70);
-      dataUrl = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.70);
+      const webp = canvas.toDataURL('image/webp', 0.85);
+      dataUrl = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.85);
     } catch (_) {
-      dataUrl = canvas.toDataURL('image/jpeg', 0.70);
+      dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     }
     this.scannedPages.push(dataUrl);
 

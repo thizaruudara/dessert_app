@@ -1,0 +1,14 @@
+name = "edupeak-r2-storage"
+main = "worker.js"
+compatibility_date = "2024-04-01"
+
+# Cloudflare R2 Bucket Binding
+# Replace "edupeak-submissions" with your bucket name if you chose a different name
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "edupeak-submissions"
+preview_bucket_name = "edupeak-submissions"
+
+# Optional: If you enable public access on your R2 bucket (r2.dev or custom domain), set it here:
+# [vars]
+# PUBLIC_URL = "https://pub-xxxxxx.r2.dev"
