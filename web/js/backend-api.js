@@ -2,7 +2,11 @@ import { auth } from './firebase-config.js';
 
 function getApiBase() {
   if (typeof window !== 'undefined') {
-    return '/api';
+    const host = window.location.hostname;
+    if (host.includes('vercel.app')) {
+      return '/api';
+    }
+    return 'https://edupeak-web.vercel.app/api';
   }
   return 'https://edupeak-web.vercel.app/api';
 }
@@ -17,7 +21,7 @@ export async function callBackend(endpoint, payload, { authenticated = true } = 
     headers.Authorization = `Bearer ${await user.getIdToken()}`;
   }
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4000);
+  const timer = setTimeout(() => controller.abort(), 2000);
   try {
     const response = await fetch(`${API_BASE}/${endpoint}`, {
       method: 'POST',

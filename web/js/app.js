@@ -2187,38 +2187,47 @@ class AppController {
         const pId = btn.dataset.paperId;
         const sId = btn.dataset.slotId;
 
-        btn.disabled = true;
-        btn.innerHTML = `
-          <span class="material-symbols-rounded" style="font-size:18px; animation:spin 1s linear infinite;">progress_activity</span>
-          <span>Registering...</span>
-        `;
+        // OPTIMISTIC UPDATE: Update UI immediately (0ms visual feedback)
+        const optimisticReg = {
+          paperId: pId,
+          studentId: user.uid || user.id || "s_default",
+          studentName: user.name || "Student",
+          studentPhone: user.phone || '',
+          selectedSlot: sId,
+          slotId: sId,
+          status: 'registered',
+          isCameraActive: false,
+          registeredAt: new Date().toISOString()
+        };
+        registrations.set(pId, optimisticReg);
+        this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
+        this._studentSelectedSlotMap.set(pId, sId);
 
-        try {
-          const regRes = await dbService.registerStudentSlot({
-            paperId: pId,
-            studentId: user.uid || user.id || "s_default",
-            studentName: user.name || "Student",
-            studentPhone: user.phone || '',
-            slotId: sId
-          });
-          const studentId = user.uid || user.id || 's_default';
-          const updatedReg = await dbService.getStudentRegistration(pId, studentId, { forceRefresh: true });
-          registrations.set(pId, updatedReg || regRes);
-          this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
-          this._studentSelectedSlotMap.set(pId, sId);
+        const liveTab = container.querySelector('#papers-tab-live-content');
+        if (liveTab) {
+          const subSpan = container.querySelector('#tab-papers-live-sub');
+          if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(sessions);
+          liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, user.examYear || '2027 A/L', user.examYear || '2027 A/L');
+          this._bindStudentLiveSessionActions(container, sessions, registrations, user);
+        }
 
-          const liveTab = container.querySelector('#papers-tab-live-content');
+        // Fast background persist via Firestore SDK
+        dbService.registerStudentSlot({
+          paperId: pId,
+          studentId: user.uid || user.id || "s_default",
+          studentName: user.name || "Student",
+          studentPhone: user.phone || '',
+          slotId: sId
+        }).then(regRes => {
+          if (regRes) registrations.set(pId, regRes);
+        }).catch(err => {
+          console.error('[Registration] Failed to persist slot:', err);
+          registrations.delete(pId);
           if (liveTab) {
-            const subSpan = container.querySelector('#tab-papers-live-sub');
-            if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(sessions);
             liveTab.innerHTML = this._buildStudentLiveSessionsHTML(sessions, registrations, user, user.examYear || '2027 A/L', user.examYear || '2027 A/L');
             this._bindStudentLiveSessionActions(container, sessions, registrations, user);
           }
-        } catch (err) {
-          console.error('[Registration] Failed to register slot:', err);
-          btn.disabled = false;
-          btn.textContent = 'Retry Registration';
-        }
+        });
       });
     });
 
@@ -2439,10 +2448,7 @@ class AppController {
       if (paperHints && paperHints.length) this._cachedPaperHints = paperHints;
 
       const studentId = user.uid || user.id || 's_default';
-      const registrations = new Map(await Promise.all(sessions.map(async session => [
-        session.id,
-        await this.safePromise(dbService.getStudentRegistration(session.id, studentId), 1500, null)
-      ])));
+      const registrations = await dbService.getStudentAllRegistrations(studentId, user.phone || '');
       if (renderToken !== this._tabTokens['papers'] || !container.isConnected) return;
       if (this.papersTab > 1) this.papersTab = 0;
 
@@ -2548,10 +2554,7 @@ class AppController {
         const liveTab = container.querySelector('#papers-tab-live-content');
         if (!liveTab) return;
         const studentId = user.uid || user.id || 's_default';
-        const liveRegistrations = new Map(await Promise.all(liveSessions.map(async session => [
-          session.id,
-          await dbService.getStudentRegistration(session.id, studentId)
-        ])));
+        const liveRegistrations = await dbService.getStudentAllRegistrations(studentId, user.phone || '');
         if (!container.isConnected || renderToken !== this._tabTokens['papers']) return;
         const subSpan = container.querySelector('#tab-papers-live-sub');
         if (subSpan) subSpan.textContent = this._computeLiveTabSubtitle(liveSessions);

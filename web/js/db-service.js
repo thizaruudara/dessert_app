@@ -1911,9 +1911,15 @@ export class DbService {
   async registerStudentSlot({ paperId, studentId, studentName, studentPhone, slotId }) {
     if (!paperId || !studentId) return null;
     const normPhone = normalizePhone(studentPhone);
-    let existing = await this.getStudentRegistration(paperId, studentId);
-    if (!existing && normPhone) {
-      existing = await this.getStudentRegistration(paperId, normPhone);
+    const cacheKey = `paper_reg_${paperId}_${studentId}`;
+
+    // Fast-path: Check memory/local cache first before network query
+    let existing = this.getCached(cacheKey);
+    if (!existing) {
+      existing = await this.getStudentRegistration(paperId, studentId);
+      if (!existing && normPhone) {
+        existing = await this.getStudentRegistration(paperId, normPhone);
+      }
     }
     if (existing && (existing.status === 'submitted' || existing.isSubmitted === true || (existing.submissionPhotos && existing.submissionPhotos.length > 0))) {
       return existing; // DO NOT OVERWRITE SUBMITTED STATE!
@@ -1933,30 +1939,40 @@ export class DbService {
       isCameraActive: false,
       registeredAt: new Date().toISOString()
     };
+
+    // 1. INSTANT IN-MEMORY CACHE UPDATE (0ms response)
+    this.setCache(cacheKey, regData);
+    const allRegsKey = `all_regs_${studentId}`;
+    const allRegs = this.getCached(allRegsKey);
+    if (allRegs) {
+      allRegs[paperId] = regData;
+      this.setCache(allRegsKey, allRegs);
+    }
+    this.clearCache('paper_sessions');
+
+    // 2. Fire-and-forget backend notification (never blocks user interaction)
     try {
-      await callBackend('papers/register-slot', { paperId, slotId });
-    } catch (error) {
-      console.warn('[DB] Backend paper registration notice, saving direct record:', error);
+      callBackend('papers/register-slot', { paperId, slotId }).catch(() => {});
+    } catch (_) {}
+
+    // 3. Fast direct Firestore write via SDK (handles offline/optimistic updates)
+    const sessionRef = doc(db, 'paper_sessions', paperId);
+    const writePromises = [
+      setDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`), regData, { merge: true })
+    ];
+    if (isNewReg) {
+      const fieldName = slotId === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
+      writePromises.push(updateDoc(sessionRef, { [fieldName]: increment(1) }).catch(() => {}));
+    } else if (isSlotChange) {
+      const decField = prevSlot === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
+      const incField = slotId === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
+      writePromises.push(updateDoc(sessionRef, { [decField]: increment(-1), [incField]: increment(1) }).catch(() => {}));
     }
 
-    try {
-      await setDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`), regData, { merge: true });
-      // Real-time counter synchronization on the paper_sessions document
-      const sessionRef = doc(db, 'paper_sessions', paperId);
-      if (isNewReg) {
-        const fieldName = slotId === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
-        await updateDoc(sessionRef, { [fieldName]: increment(1) }).catch(() => {});
-      } else if (isSlotChange) {
-        const decField = prevSlot === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
-        const incField = slotId === 'slot2' ? 'slot2.registeredCount' : 'slot1.registeredCount';
-        await updateDoc(sessionRef, { [decField]: increment(-1), [incField]: increment(1) }).catch(() => {});
-      }
-    } catch (directErr) {
-      console.warn('[DB] Direct registration write error:', directErr);
-    }
-    const cacheKey = `paper_reg_${paperId}_${studentId}`;
-    this.setCache(cacheKey, regData);
-    this.clearCache('paper_sessions');
+    Promise.all(writePromises).catch(directErr => {
+      console.warn('[DB] Background Firestore registration write notice:', directErr);
+    });
+
     return regData;
   }
 
@@ -1964,19 +1980,66 @@ export class DbService {
     if (!paperId || !studentId) return null;
     const cacheKey = `paper_reg_${paperId}_${studentId}`;
     if (!forceRefresh) {
-      const cached = this.getCached(cacheKey, 30000);
+      const cached = this.getCached(cacheKey, 60000);
       if (cached !== null && cached !== undefined) return cached;
     }
-    if (!paperId || !studentId) return null;
     try {
-      const snap = await getDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`));
-      const res = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      const snap = await Promise.race([
+        getDoc(doc(db, 'paper_registrations', `${paperId}_${studentId}`)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+      ]);
+      const res = snap && snap.exists() ? { id: snap.id, ...snap.data() } : null;
       this.setCache(cacheKey, res);
       return res;
     } catch (error) {
-      console.warn('[DB] getStudentRegistration error:', error);
-      return null;
+      return this.getCached(cacheKey) || null;
     }
+  }
+
+  async getStudentAllRegistrations(studentId, phone = '') {
+    if (!studentId) return new Map();
+    const cacheKey = `all_regs_${studentId}`;
+    const cached = this.getCached(cacheKey, 60000);
+    if (cached) return new Map(Object.entries(cached));
+
+    const map = new Map();
+    try {
+      const regsRef = collection(db, 'paper_registrations');
+      const q = query(regsRef, where('studentId', '==', studentId), limit(50));
+      const snap = await Promise.race([
+        getDocs(q),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1800))
+      ]);
+      if (snap && !snap.empty) {
+        snap.forEach(d => {
+          const data = { id: d.id, ...d.data() };
+          if (data.paperId) {
+            map.set(data.paperId, data);
+            this.setCache(`paper_reg_${data.paperId}_${studentId}`, data);
+          }
+        });
+      }
+      if (map.size === 0 && phone) {
+        const normPhone = normalizePhone(phone);
+        if (normPhone) {
+          const qPhone = query(regsRef, where('studentPhone', '==', normPhone), limit(50));
+          const snapPhone = await getDocs(qPhone).catch(() => null);
+          if (snapPhone && !snapPhone.empty) {
+            snapPhone.forEach(d => {
+              const data = { id: d.id, ...d.data() };
+              if (data.paperId) {
+                map.set(data.paperId, data);
+                this.setCache(`paper_reg_${data.paperId}_${studentId}`, data);
+              }
+            });
+          }
+        }
+      }
+      this.setCache(cacheKey, Object.fromEntries(map));
+    } catch (e) {
+      console.warn('[DB] getStudentAllRegistrations notice:', e);
+    }
+    return map;
   }
 
   async getSlotRegistrations(paperId, slotId) {

@@ -32,11 +32,18 @@ export function getChannelName(paperId) {
 // Fetch token from server endpoint
 export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
   try {
-    const res = await fetch('/api/agora/token', {
+    const apiBase = (typeof window !== 'undefined' && !window.location.hostname.includes('vercel.app'))
+      ? 'https://edupeak-web.vercel.app/api'
+      : '/api';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1200);
+    const res = await fetch(`${apiBase}/agora/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelName, uid, role })
+      body: JSON.stringify({ channelName, uid, role }),
+      signal: controller.signal
     });
+    clearTimeout(timer);
     if (res.ok) {
       const data = await res.json();
       if (data?.result?.token) {
@@ -44,7 +51,7 @@ export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
       }
     }
   } catch (err) {
-    console.warn('[Agora] Token fetch warning (will attempt joining):', err);
+    console.warn('[Agora] Token fetch notice (proceeding with direct client authentication):', err.message);
   }
   return '';
 }
