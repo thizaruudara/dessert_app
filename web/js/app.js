@@ -5837,13 +5837,13 @@ class AppController {
 
     root.innerHTML = `
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding-bottom:80px;">
-        <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
-        <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
-        <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
-        <div id="admin-tab-viewport-students" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
-        <div id="admin-tab-viewport-broadcasts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
-        <div id="admin-tab-viewport-essays" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 80px 0;">
+        <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
+        <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
+        <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
+        <div id="admin-tab-viewport-students" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
+        <div id="admin-tab-viewport-broadcasts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
+        <div id="admin-tab-viewport-essays" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
       </div>
 
       <!-- Contained Floating Action Button Slot (Strictly inside #app-root) -->
@@ -5918,7 +5918,7 @@ class AppController {
       panel = document.createElement('div');
       panel.id = `admin-tab-viewport-${tabName}`;
       panel.className = 'tab-viewport';
-      panel.style.cssText = 'display:none; width:100%; flex-direction:column; gap:16px;';
+      panel.style.cssText = 'display:none; width:100%; flex-direction:column; gap:0;';
       mainVp.appendChild(panel);
     }
     return panel;
@@ -6689,7 +6689,7 @@ class AppController {
 
     container.innerHTML = `
       <!-- Screen AppBar -->
-      <div class="apk-screen-appbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px;">
+      <div class="apk-screen-appbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
         <div class="apk-appbar-left" style="min-width:0; flex:1; display:flex; align-items:center; gap:10px;">
           <div class="apk-appbar-icon-box" style="flex-shrink:0;">
             <span class="material-symbols-rounded" style="font-size:22px; color:#2563EB;">fact_check</span>
@@ -8488,9 +8488,6 @@ class AppController {
                   <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; font-size:16px;">
                     <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
                   </button>
-                  <button class="apk-icon-action-btn" title="Delete Account" data-delete-student="${st.id}" style="color:#EF4444; font-size:16px; background:#FEF2F2;">
-                    <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
-                  </button>
                 </div>
               </div>
             `;
@@ -8503,14 +8500,6 @@ class AppController {
         btn.addEventListener('click', () => {
           const st = allStudents.find(x => x.id === btn.dataset.msgStudent);
           if (st) this.openSendCustomMessageModal(st);
-        });
-      });
-
-      // Delete Student
-      listEl.querySelectorAll('[data-delete-student]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const st = allStudents.find(x => x.id === btn.dataset.deleteStudent);
-          if (st) this.confirmDeleteStudent(st);
         });
       });
     };
@@ -8644,7 +8633,7 @@ class AppController {
     if (!container) return;
 
     container.innerHTML = `
-      <div style="padding:16px 16px 0;">
+      <div style="padding:calc(12px + var(--safe-top)) 16px 0;">
         <!-- Header -->
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
           <div>

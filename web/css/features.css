@@ -2261,16 +2261,19 @@ html[data-theme="dark"],
    ══════════════════════════════════════════════════════════════════ */
 
 #admin-main-viewport {
-  padding: calc(12px + var(--safe-top)) 16px 85px;
+  padding: 0 0 85px 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 #admin-main-viewport > * {
   flex-shrink: 0;
+}
+#admin-main-viewport > .tab-viewport {
+  gap: 0;
 }
 
 .admin-executive-header {
@@ -3263,6 +3266,7 @@ html[data-theme="dark"] .splash-loading-text {
    ═════════════════════════════════════════════════════════════════════════ */
 
 .apk-admin-screen-container {
+  padding-top: calc(12px + var(--safe-top));
   padding-bottom: 90px;
   background: #F8FAFC;
   min-height: 100%;
