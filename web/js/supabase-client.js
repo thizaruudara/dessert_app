@@ -106,12 +106,13 @@ export async function checkSuperPaperSubscription(
     const monthName = activeMonthlyCourse.month_name || 'October 2027';
     const enrollUrl = `https://edupeak.lk/checkout.html?course=${encodeURIComponent(activeMonthlyCourse.id)}`;
 
-    // Strictly monthly course IDs (EXCLUDING crs-base-super-paper-2027 which is free base registration!)
+    // Monthly and base course IDs for Super Paper Class
     const validMonthlyCourseIds = Array.from(new Set([
       activeMonthlyCourse.id,
       'crs-phy-muu3k9m4',
+      'crs-base-super-paper-2027',
       ...(courses || [])
-        .filter(c => c.id !== 'crs-base-super-paper-2027' && !c.is_base_course && (c.parent_course_id === 'crs-base-super-paper-2027' || c.month_name))
+        .filter(c => (c.parent_course_id === 'crs-base-super-paper-2027' || c.month_name || String(c.id).includes('super-paper')))
         .map(c => c.id)
     ].filter(Boolean)));
 
@@ -329,11 +330,19 @@ export async function getSuperPaperBatchAccess(students = []) {
     const targetCourseId = latestMonthlyCourse.id;
     const targetMonthName = latestMonthlyCourse.month_name || 'October 2027';
 
-    // 2. Fetch all paid/approved enrollments for this monthly course in batch
+    // All valid courses for Super Paper Class
+    const validCourseIds = Array.from(new Set([
+      targetCourseId,
+      'crs-phy-muu3k9m4',
+      'crs-base-super-paper-2027',
+      ...(courses || []).map(c => c.id)
+    ].filter(Boolean)));
+
+    // 2. Fetch all paid/approved enrollments for any Super Paper course
     const { data: enrollments } = await supabase
       .from('enrollments')
       .select('student_id, course_id, payment_status')
-      .eq('course_id', targetCourseId);
+      .in('course_id', validCourseIds);
 
     const paidStudentIds = new Set();
     const cancelledStudentIds = new Set();
@@ -341,14 +350,54 @@ export async function getSuperPaperBatchAccess(students = []) {
     (enrollments || []).forEach(enr => {
       const sId = String(enr.student_id || '').toLowerCase().trim();
       const status = String(enr.payment_status || '').toLowerCase().trim();
+      const digits = sId.replace(/\D/g, '');
+      const sId9 = digits.length >= 9 ? digits.slice(-9) : null;
+
       if (['paid', 'approved', 'active'].includes(status)) {
         paidStudentIds.add(sId);
+        if (digits) paidStudentIds.add(digits);
+        if (sId9) paidStudentIds.add(sId9);
       } else if (['cancelled', 'refunded', 'revoked'].includes(status)) {
         cancelledStudentIds.add(sId);
+        if (digits) cancelledStudentIds.add(digits);
+        if (sId9) cancelledStudentIds.add(sId9);
       }
     });
 
-    // 3. Fetch approved orders from broadcast_schedules in batch
+    // 3. Fetch profiles to check enrolled_courses in Supabase
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, email, phone, enrolled_courses');
+
+    const profileEnrolledKeys = new Set();
+    (profiles || []).forEach(prof => {
+      const ec = prof.enrolled_courses;
+      let list = [];
+      if (Array.isArray(ec)) list = ec;
+      else if (typeof ec === 'string') {
+        try { list = JSON.parse(ec); } catch (_) {}
+      }
+
+      const hasCourse = list.some(cId => 
+        validCourseIds.includes(cId) || 
+        String(cId).toLowerCase().includes('super-paper') || 
+        String(cId).toLowerCase().includes('muu3k9m4')
+      );
+
+      if (hasCourse) {
+        if (prof.id) profileEnrolledKeys.add(String(prof.id).toLowerCase().trim());
+        if (prof.email) profileEnrolledKeys.add(String(prof.email).toLowerCase().trim());
+        if (prof.phone) {
+          const ph = String(prof.phone).trim().toLowerCase();
+          profileEnrolledKeys.add(ph);
+          const d = ph.replace(/\D/g, '');
+          if (d) profileEnrolledKeys.add(d);
+          if (d.length >= 9) profileEnrolledKeys.add(d.slice(-9));
+        }
+      }
+    });
+
+    // 4. Fetch approved orders from broadcast_schedules in batch
     const { data: orders } = await supabase
       .from('broadcast_schedules')
       .select('coursetitle, status')
@@ -361,21 +410,30 @@ export async function getSuperPaperBatchAccess(students = []) {
       try {
         const p = typeof ord.coursetitle === 'string' ? JSON.parse(ord.coursetitle) : ord.coursetitle;
         const cId = p?.courseId || p?.course_id;
-        if (cId === targetCourseId || String(p?.courseTitle || '').includes('October 2027')) {
+        if (validCourseIds.includes(cId) || String(p?.courseTitle || '').includes('October 2027') || String(p?.courseTitle || '').toLowerCase().includes('super paper')) {
           if (p?.studentId) approvedOrderKeys.add(String(p.studentId).toLowerCase().trim());
-          if (p?.studentPhone) approvedOrderKeys.add(String(p.studentPhone).replace(/\D/g, '').slice(-9));
+          if (p?.studentPhone) {
+            const ph = String(p.studentPhone).replace(/\D/g, '');
+            if (ph.length >= 9) approvedOrderKeys.add(ph.slice(-9));
+          }
           if (p?.studentEmail) approvedOrderKeys.add(String(p.studentEmail).toLowerCase().trim());
         }
       } catch (_) {}
     });
 
-    // 4. Evaluate each student
+    // 5. Evaluate each student
     for (const st of students) {
+      const rawPhone = String(st.phone || '').trim();
+      const phoneDigits = rawPhone.replace(/\D/g, '');
+      const phone9 = phoneDigits.length >= 9 ? phoneDigits.slice(-9) : null;
+
       const keys = [
         st.id,
         st.studentId,
         st.email,
-        st.phone ? String(st.phone).replace(/\D/g, '').slice(-9) : null
+        rawPhone,
+        phoneDigits,
+        phone9
       ].filter(Boolean).map(k => String(k).toLowerCase().trim());
 
       const isCancelled = keys.some(k => cancelledStudentIds.has(k));
@@ -387,10 +445,15 @@ export async function getSuperPaperBatchAccess(students = []) {
           hasFullAccess = true;
         }
 
-        // Check profiles enrolledCourses array
+        // Profile enrolled_courses check
+        if (!hasFullAccess && keys.some(k => profileEnrolledKeys.has(k))) {
+          hasFullAccess = true;
+        }
+
+        // Check local st.enrolledCourses array
         if (!hasFullAccess && st.enrolledCourses) {
           const list = Array.isArray(st.enrolledCourses) ? st.enrolledCourses : [];
-          if (list.includes(targetCourseId) || list.some(c => String(c).includes('muu3k9m4'))) {
+          if (list.some(c => validCourseIds.includes(c) || String(c).toLowerCase().includes('super-paper') || String(c).includes('muu3k9m4'))) {
             hasFullAccess = true;
           }
         }
@@ -409,6 +472,7 @@ export async function getSuperPaperBatchAccess(students = []) {
       };
       if (st.id) accessMap.set(st.id, accData);
       if (st.studentId) accessMap.set(st.studentId, accData);
+      if (st.phone) accessMap.set(st.phone, accData);
     }
   } catch (err) {
     console.warn('[Supabase] getSuperPaperBatchAccess error:', err);
@@ -416,5 +480,145 @@ export async function getSuperPaperBatchAccess(students = []) {
 
   return accessMap;
 }
+
+/**
+ * Admin: Grant full Super Paper Class access to a student in Supabase
+ */
+export async function grantSuperPaperAccess(student) {
+  if (!student) throw new Error('Student missing');
+  const sId = student.studentId || student.id;
+  const targetCourseId = 'crs-phy-muu3k9m4';
+  const baseCourseId = 'crs-base-super-paper-2027';
+
+  // 1. Upsert or update enrollments table for target courses
+  const { data: existingEnr } = await supabase
+    .from('enrollments')
+    .select('id, course_id, payment_status')
+    .eq('student_id', sId)
+    .in('course_id', [targetCourseId, baseCourseId]);
+
+  const now = new Date().toISOString();
+  if (existingEnr && existingEnr.length > 0) {
+    for (const enr of existingEnr) {
+      await supabase
+        .from('enrollments')
+        .update({ payment_status: 'paid', enrolled_at: now })
+        .eq('id', enr.id);
+    }
+  } else {
+    await supabase
+      .from('enrollments')
+      .insert([
+        {
+          student_id: sId,
+          course_id: targetCourseId,
+          payment_status: 'paid',
+          enrolled_at: now,
+          attendance_mode: student.attendanceMode || 'online'
+        },
+        {
+          student_id: sId,
+          course_id: baseCourseId,
+          payment_status: 'paid',
+          enrolled_at: now,
+          attendance_mode: student.attendanceMode || 'online'
+        }
+      ]);
+  }
+
+  // 2. Update profiles table enrolled_courses if profile exists
+  try {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('id, enrolled_courses')
+      .or(`id.eq.${sId},phone.eq.${student.phone || ''}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (prof) {
+      let list = Array.isArray(prof.enrolled_courses) ? prof.enrolled_courses : [];
+      if (!list.includes(targetCourseId)) list.push(targetCourseId);
+      if (!list.includes(baseCourseId)) list.push(baseCourseId);
+      await supabase
+        .from('profiles')
+        .update({ enrolled_courses: list })
+        .eq('id', prof.id);
+    }
+  } catch (err) {
+    console.warn('[Supabase] grantSuperPaperAccess profile update notice:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('edupeak:student-access-changed', {
+      detail: { studentId: sId, action: 'granted' }
+    }));
+  }
+
+  return { success: true };
+}
+
+/**
+ * Admin: Revoke Super Paper Class access for a student in Supabase
+ */
+export async function revokeSuperPaperAccess(student) {
+  if (!student) throw new Error('Student missing');
+  const sId = student.studentId || student.id;
+  const targetCourseId = 'crs-phy-muu3k9m4';
+  const baseCourseId = 'crs-base-super-paper-2027';
+
+  // 1. Update enrollments to revoked
+  const { data: existingEnr } = await supabase
+    .from('enrollments')
+    .select('id')
+    .eq('student_id', sId)
+    .in('course_id', [targetCourseId, baseCourseId]);
+
+  if (existingEnr && existingEnr.length > 0) {
+    for (const enr of existingEnr) {
+      await supabase
+        .from('enrollments')
+        .update({ payment_status: 'revoked' })
+        .eq('id', enr.id);
+    }
+  } else {
+    await supabase
+      .from('enrollments')
+      .insert({
+        student_id: sId,
+        course_id: targetCourseId,
+        payment_status: 'revoked',
+        attendance_mode: 'online'
+      });
+  }
+
+  // 2. Remove from profile enrolled_courses
+  try {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('id, enrolled_courses')
+      .or(`id.eq.${sId},phone.eq.${student.phone || ''}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (prof && Array.isArray(prof.enrolled_courses)) {
+      const list = prof.enrolled_courses.filter(c => c !== targetCourseId && c !== baseCourseId && !String(c).includes('super-paper'));
+      await supabase
+        .from('profiles')
+        .update({ enrolled_courses: list })
+        .eq('id', prof.id);
+    }
+  } catch (err) {
+    console.warn('[Supabase] revokeSuperPaperAccess profile update notice:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('edupeak:student-access-changed', {
+      detail: { studentId: sId, action: 'revoked' }
+    }));
+  }
+
+  return { success: true };
+}
+
 
 

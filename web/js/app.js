@@ -2,6 +2,7 @@
 // Matches current_real_dashboard.png, screen_cockpit_full.png & real_dashboard_light_v4.html
 import { authService } from './auth-service.js';
 import { dbService, normalizePhone } from './db-service.js';
+import { supabase } from './supabase-client.js';
 import { notificationService } from './notification-service.js';
 import { cameraService } from './camera-service.js';
 import { storageService } from './storage-service.js';
@@ -1883,8 +1884,19 @@ class AppController {
     return sessions.map(session => {
       const reg = registrations.get(session.id);
       const uId = user.uid || user.id || 's_default';
-      const localSub = localStorage.getItem(`paper_submitted_${session.id}_${uId}`) === 'true' || localStorage.getItem(`paper_submitted_${session.id}`) === 'true';
-      const isSubmitted = localSub || reg?.status === 'submitted' || reg?.isSubmitted === true || (reg?.submissionPhotos && reg.submissionPhotos.length > 0);
+      const sId = user.studentId || '';
+      const uPhone = user.phone || user.phoneNumber || '';
+      const localSub = localStorage.getItem(`paper_submitted_${session.id}`) === 'true' ||
+        localStorage.getItem(`paper_submitted_${session.id}_${uId}`) === 'true' ||
+        (sId && localStorage.getItem(`paper_submitted_${session.id}_${sId}`) === 'true') ||
+        (uPhone && localStorage.getItem(`paper_submitted_${session.id}_${uPhone}`) === 'true');
+      const isSubmitted = localSub ||
+        reg?.status === 'submitted' ||
+        reg?.isSubmitted === true ||
+        !!reg?.submittedAt ||
+        (Array.isArray(reg?.submissionPhotos) && reg.submissionPhotos.length > 0) ||
+        reg?.mcqScore !== undefined ||
+        (reg?.mcqAnswers && typeof reg.mcqAnswers === 'object' && Object.keys(reg.mcqAnswers).length > 0);
       const registeredSlotId = reg?.selectedSlot || reg?.slotId || null;
       this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
       const selectedSlotId = this._studentSelectedSlotMap.get(session.id) || registeredSlotId || 'slot1';
@@ -2104,7 +2116,7 @@ class AppController {
           ${isSubmitted ? `
             <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${session.id}">
               <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
-              <span>Submitted (${reg?.submissionPhotos?.length || 4} Pages) • විස්තර බලන්න</span>
+              <span>Submitted ${reg?.submissionPhotos?.length ? `(${reg.submissionPhotos.length} Pages)` : (reg?.mcqScore !== undefined ? `(${reg.mcqScore}/${reg.mcqTotal || session.mcqCount || 50})` : '')} • View Details (විස්තර බලන්න)</span>
             </button>
           ` : isPackageOpening ? `
             <button class="btn-primary" style="background:#D97706; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
@@ -2253,6 +2265,26 @@ class AppController {
         if (!this.checkSubscriptionAccess('Live Paper Writing Sessions')) return;
         const paperId = btn.dataset.enterExam;
         const reg = registrations.get(paperId);
+        const uId = user.uid || user.id || 's_default';
+        const sId = user.studentId || '';
+        const uPhone = user.phone || user.phoneNumber || '';
+        const isSub = localStorage.getItem(`paper_submitted_${paperId}`) === 'true' ||
+          localStorage.getItem(`paper_submitted_${paperId}_${uId}`) === 'true' ||
+          (sId && localStorage.getItem(`paper_submitted_${paperId}_${sId}`) === 'true') ||
+          (uPhone && localStorage.getItem(`paper_submitted_${paperId}_${uPhone}`) === 'true') ||
+          reg?.status === 'submitted' ||
+          reg?.isSubmitted === true ||
+          !!reg?.submittedAt ||
+          (Array.isArray(reg?.submissionPhotos) && reg.submissionPhotos.length > 0) ||
+          reg?.mcqScore !== undefined;
+
+        if (isSub) {
+          notificationService.showInAppBanner('Answer Sheet Submitted', 'You have already submitted this exam paper. Re-entry is not allowed.', 'info');
+          const sess = sessions.find(s => s.id === paperId);
+          this.showSubmissionDetailsDialog(sess || { id: paperId, title: 'Exam Paper' }, reg || { paperId, isSubmitted: true });
+          return;
+        }
+
         const selectedSlot = reg?.selectedSlot || 'slot1';
         this.openLiveExamRoom(paperId, selectedSlot);
       });
@@ -5323,6 +5355,46 @@ class AppController {
           note
         });
 
+        // Set persistent lock flags across all student identification keys
+        localStorage.setItem(`paper_submitted_${paperId}`, 'true');
+        localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
+        if (user.uid) localStorage.setItem(`paper_submitted_${paperId}_${user.uid}`, 'true');
+        if (user.id) localStorage.setItem(`paper_submitted_${paperId}_${user.id}`, 'true');
+        if (user.phone) localStorage.setItem(`paper_submitted_${paperId}_${user.phone}`, 'true');
+
+        dbService.invalidateRegistrationCache(paperId, studentId, user.phone);
+
+        // Immediately update any visible session card in the DOM so button instantly becomes "Submitted"
+        const card = document.getElementById(`paper-card-${paperId}`);
+        if (card) {
+          const btn = card.querySelector('[data-enter-exam], [data-scan-answers]');
+          if (btn) {
+            btn.outerHTML = `
+              <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${paperId}">
+                <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
+                <span>Submitted (${finalUrls.length} Pages) • View Details (විස්තර බලන්න)</span>
+              </button>
+            `;
+            card.querySelector(`[data-view-sub="${paperId}"]`)?.addEventListener('click', () => {
+              this.showSubmissionDetailsDialog(session || { id: paperId, title: paperTitle }, record || { paperId, studentId, status: 'submitted', isSubmitted: true, submissionPhotos: finalUrls });
+            });
+          }
+          const banner = card.querySelector('.phase-status-banner-box');
+          if (banner) {
+            banner.outerHTML = `
+              <div class="phase-status-banner-box submitted">
+                <span class="material-symbols-rounded filled" style="font-size:26px; color:#15803D;">verified</span>
+                <div>
+                  <div style="font-size:12px; font-weight:800; color:#15803D;">පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)</div>
+                  <div style="font-size:11px; color:#475569; margin-top:2px;">
+                    ඔබ විසින් පිටු ${finalUrls.length} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදෙන ලදී.
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+        }
+
         modal.remove();
 
         // 4. Trigger clean exit from scanner & exam room
@@ -5360,7 +5432,10 @@ class AppController {
           receiptModal.remove();
           const room = document.getElementById('live-exam-room-root');
           if (room) room.remove();
-          if (this.currentTab === 'papers' || this.currentMode === 'student') {
+          const screenContent = document.querySelector('.screen-content');
+          if (this.currentTab === 'papers' && screenContent) {
+            this.renderPapersScreen(screenContent);
+          } else if (this.currentMode === 'student') {
             try { this.switchTab('papers'); } catch (_) {}
           }
         });
@@ -8386,8 +8461,11 @@ class AppController {
         <div class="apk-appbar-left">
           <div style="font-size:16px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:6px;">
             <span class="material-symbols-rounded" style="font-size:20px; color:#2563EB;">group</span> Registered Students
+            <span id="admin-students-live-indicator" style="font-size:10px; font-weight:800; background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:4px;" title="Connected to Supabase Realtime">
+              <span style="width:6px; height:6px; border-radius:50%; background:#10B981; animation:pulse 2s infinite;"></span> Live Sync
+            </span>
           </div>
-          <div style="font-size:11px; color:#64748B;">Live Student Directory</div>
+          <div style="font-size:11px; color:#64748B;">Live Student Directory & Access Controller</div>
         </div>
         <div class="apk-appbar-right">
           <button class="btn-vault-refresh" id="btn-refresh-admin-students" title="Refresh Directory" style="background:#F1F5F9; border:none; border-radius:10px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#475569;">
@@ -8410,7 +8488,7 @@ class AppController {
             <span class="material-symbols-rounded filled" style="font-size:20px; color:#059669;">verified</span>
             <div>
               <div style="font-size:10px; color:#047857; font-weight:700;">Full Access</div>
-              <div style="font-size:15px; font-weight:800; color:#065F46;">${fullAccessCount}</div>
+              <div id="admin-students-full-access-count" style="font-size:15px; font-weight:800; color:#065F46;">${fullAccessCount}</div>
             </div>
           </div>
           <div style="background:#F1F5F9; border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:8px;">
@@ -8451,6 +8529,10 @@ class AppController {
       const filtered = getFilteredStudents();
       const countEl = document.getElementById('admin-students-showing-count');
       if (countEl) countEl.textContent = filtered.length;
+      const fullCountEl = document.getElementById('admin-students-full-access-count');
+      if (fullCountEl) {
+        fullCountEl.textContent = allStudents.filter(s => (accessMap.get(s.id) || accessMap.get(s.studentId) || accessMap.get(s.phone))?.hasFullAccess).length;
+      }
 
       const listEl = document.getElementById('admin-students-list');
       if (!listEl) return;
@@ -8495,7 +8577,7 @@ class AppController {
         <div style="display:flex; flex-direction:column; gap:10px;">
           ${filtered.map(st => {
             const isDup = phoneCounts[st.phone] > 1;
-            const acc = accessMap.get(st.id) || accessMap.get(st.studentId) || { hasFullAccess: false, monthName: 'October 2027', statusText: 'No Access' };
+            const acc = accessMap.get(st.id) || accessMap.get(st.studentId) || accessMap.get(st.phone) || { hasFullAccess: false, monthName: 'October 2027', statusText: 'No Access' };
             return `
               <div class="admin-student-card" style="padding:14px; background:#FFFFFF; border-radius:14px; border:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center; transition:box-shadow 0.2s ease;">
                 <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
@@ -8526,8 +8608,17 @@ class AppController {
                   </div>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
-                  <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; font-size:16px;">
+                <div style="display:flex; align-items:center; gap:6px; margin-left:8px;">
+                  <!-- Direct Access Toggle Action -->
+                  ${acc.hasFullAccess
+                    ? `<button class="apk-icon-action-btn btn-toggle-access" title="Revoke Super Paper Class Access" data-revoke-student="${st.id}" style="color:#DC2626; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;" aria-label="Revoke Access">
+                         <span class="material-symbols-rounded" style="font-size:18px;">lock</span>
+                       </button>`
+                    : `<button class="apk-icon-action-btn btn-toggle-access" title="Grant Full Super Paper Access" data-grant-student="${st.id}" style="color:#059669; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;" aria-label="Grant Access">
+                         <span class="material-symbols-rounded filled" style="font-size:18px;">key</span>
+                       </button>`
+                  }
+                  <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
                     <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
                   </button>
                 </div>
@@ -8542,6 +8633,82 @@ class AppController {
         btn.addEventListener('click', () => {
           const st = allStudents.find(x => x.id === btn.dataset.msgStudent);
           if (st) this.openSendCustomMessageModal(st);
+        });
+      });
+
+      // Grant Access Button Handler
+      listEl.querySelectorAll('[data-grant-student]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const st = allStudents.find(x => x.id === btn.dataset.grantStudent);
+          if (!st) return;
+
+          const ok = confirm(`Grant Full Access to Super Paper Class for ${st.name || st.studentId || 'this student'}?`);
+          if (!ok) return;
+
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
+          try {
+            await dbService.grantSuperPaperAccess(st);
+            notificationService.showInAppBanner('Access Granted', `Full Access granted to ${st.name || 'student'}!`, 'success');
+            
+            // Optimistically update map
+            const acc = accessMap.get(st.id) || {};
+            const targetMonth = acc.monthName || 'October 2027';
+            const updated = {
+              hasFullAccess: true,
+              monthName: targetMonth,
+              courseTitle: acc.courseTitle || `Super Paper Class - ${targetMonth}`,
+              statusText: `Full Access (${targetMonth})`
+            };
+            if (st.id) accessMap.set(st.id, updated);
+            if (st.studentId) accessMap.set(st.studentId, updated);
+            if (st.phone) accessMap.set(st.phone, updated);
+            renderRows();
+          } catch (err) {
+            console.error('[Admin] Grant access error:', err);
+            alert('Could not grant access: ' + (err.message || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">key</span>';
+          }
+        });
+      });
+
+      // Revoke Access Button Handler
+      listEl.querySelectorAll('[data-revoke-student]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const st = allStudents.find(x => x.id === btn.dataset.revokeStudent);
+          if (!st) return;
+
+          const ok = confirm(`Revoke Super Paper Class access for ${st.name || st.studentId || 'this student'}?`);
+          if (!ok) return;
+
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
+          try {
+            await dbService.revokeSuperPaperAccess(st);
+            notificationService.showInAppBanner('Access Revoked', `Access revoked for ${st.name || 'student'}.`, 'info');
+
+            // Optimistically update map
+            const acc = accessMap.get(st.id) || {};
+            const targetMonth = acc.monthName || 'October 2027';
+            const updated = {
+              hasFullAccess: false,
+              monthName: targetMonth,
+              courseTitle: acc.courseTitle || `Super Paper Class - ${targetMonth}`,
+              statusText: 'No Access (Locked)'
+            };
+            if (st.id) accessMap.set(st.id, updated);
+            if (st.studentId) accessMap.set(st.studentId, updated);
+            if (st.phone) accessMap.set(st.phone, updated);
+            renderRows();
+          } catch (err) {
+            console.error('[Admin] Revoke access error:', err);
+            alert('Could not revoke access: ' + (err.message || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">lock</span>';
+          }
         });
       });
     };
@@ -8577,16 +8744,59 @@ class AppController {
       await this.renderAdminStudentsScreen(container);
     });
 
+    // Setup Supabase Realtime channel for instant live updates when enrollments, profiles or logins change
+    if (this._adminStudentsRealtimeChannel) {
+      try { supabase.removeChannel(this._adminStudentsRealtimeChannel); } catch (_) {}
+      this._adminStudentsRealtimeChannel = null;
+    }
+
+    const triggerRealtimeRefresh = () => {
+      if (!container.isConnected || this.adminTab !== 'students') return;
+      if (this._adminRefreshDebounceTimer) clearTimeout(this._adminRefreshDebounceTimer);
+      this._adminRefreshDebounceTimer = setTimeout(async () => {
+        this._adminStudentsListCache = null;
+        this._adminStudentsAccessCache = null;
+        dbService.clearCache('all_admin_students');
+        if (container.isConnected && this.adminTab === 'students') {
+          await this.renderAdminStudentsScreen(container);
+        }
+      }, 300);
+    };
+
+    try {
+      this._adminStudentsRealtimeChannel = supabase
+        .channel('admin-students-live-' + Date.now())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, (payload) => {
+          console.log('⚡ [Realtime] Enrollments changed:', payload);
+          triggerRealtimeRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+          console.log('⚡ [Realtime] Profiles changed:', payload);
+          triggerRealtimeRefresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'dessert_app_logins' }, (payload) => {
+          console.log('⚡ [Realtime] Student logins changed:', payload);
+          triggerRealtimeRefresh();
+        })
+        .subscribe();
+    } catch (rtErr) {
+      console.warn('[Realtime] Failed to subscribe to admin-students channel:', rtErr);
+    }
+
+    if (this._adminStudentsAccessChangedHandler) {
+      window.removeEventListener('edupeak:student-access-changed', this._adminStudentsAccessChangedHandler);
+    }
+    this._adminStudentsAccessChangedHandler = () => {
+      triggerRealtimeRefresh();
+    };
+    window.addEventListener('edupeak:student-access-changed', this._adminStudentsAccessChangedHandler);
+
     if (this._adminStudentsCreditsHandler) {
       window.removeEventListener('edupeak:credits-updated', this._adminStudentsCreditsHandler);
       window.removeEventListener('edupeak:dessert-reviewed', this._adminStudentsCreditsHandler);
     }
     this._adminStudentsCreditsHandler = () => {
-      if (!container.isConnected || this.adminTab !== 'students') return;
-      this._adminStudentsListCache = null;
-      this._adminStudentsAccessCache = null;
-      dbService.clearCache('all_admin_students');
-      this.renderAdminStudentsScreen(container);
+      triggerRealtimeRefresh();
     };
     window.addEventListener('edupeak:credits-updated', this._adminStudentsCreditsHandler);
     window.addEventListener('edupeak:dessert-reviewed', this._adminStudentsCreditsHandler);
@@ -11926,49 +12136,117 @@ class AppController {
     const modal = document.createElement('div');
     modal.id = 'proctor-fullscreen-modal';
     modal.dataset.studentId = student.studentId;
-    modal.style.cssText = 'position:fixed; inset:0; background:#0F172A; display:flex; flex-direction:column; z-index:10002; font-family:Poppins,sans-serif;';
+    modal.style.cssText = 'position:fixed; inset:0; background:#0F172A; display:flex; flex-direction:column; z-index:10002; font-family:Poppins,sans-serif; user-select:none;';
     modal.innerHTML = `
-      <div style="background:#1E293B; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155;">
-        <div>
-          <div style="font-size:14px; font-weight:700; color:#FFFFFF;">${student.studentName}</div>
-          <div style="font-size:11px; color:#94A3B8;">Surveillance Monitor • Slot: ${student.selectedSlot || 'slot1'}</div>
+      <!-- Top Bar Header with Back & Exit controls -->
+      <div style="background:#1E293B; padding:max(12px, env(safe-area-inset-top, 12px)) 16px 12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; gap:12px; flex-shrink:0;">
+        <button id="fs-back-btn" title="Back to Proctor Hall" style="background:#0F172A; border:1px solid #475569; color:#FFFFFF; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0; transition:background 0.2s;">
+          <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
+          <span>Back</span>
+        </button>
+
+        <div style="flex:1; min-width:0; text-align:center;">
+          <div style="font-size:14px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${student.studentName || 'Student'}</div>
+          <div style="font-size:11px; color:#38BDF8; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#22C55E; box-shadow:0 0 6px #22C55E;"></span>
+            <span>Surveillance Monitor • Slot: ${student.selectedSlot || 'slot1'}</span>
+          </div>
         </div>
-        <button id="fs-close-btn" style="background:#334155; border:none; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-          <span class="material-symbols-rounded" style="font-size:16px;">fullscreen_exit</span>
+
+        <button id="fs-close-btn" title="Exit Full Screen View" style="background:#DC2626; border:none; color:#FFFFFF; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0; box-shadow:0 2px 6px rgba(220,38,38,0.4); transition:background 0.2s;">
+          <span class="material-symbols-rounded" style="font-size:18px;">fullscreen_exit</span>
           <span>Exit Full View</span>
         </button>
       </div>
 
-      <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#000000; position:relative; overflow:hidden;" id="fs-feed-container">
-        ${student.cameraSnapshotUrl ? `
-          <img id="fs-student-stream" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />
-        ` : `
-          <div id="fs-student-stream-placeholder" style="text-align:center; color:#94A3B8;">
-            <span class="material-symbols-rounded" style="font-size:48px; margin-bottom:12px; color:#64748B;">videocam</span>
-            <div style="font-size:14px; font-weight:600;">Active Proctoring Feed</div>
-            <div style="font-size:11px;">Audio & Video Active • Real-time Monitoring</div>
-          </div>
-        `}
+      <!-- Main Video Container with Floating Circular Close Button -->
+      <div style="position:relative; flex:1; display:flex; flex-direction:column; overflow:hidden; background:#000000;">
+        <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#000000; position:relative; overflow:hidden;" id="fs-feed-container">
+          ${student.cameraSnapshotUrl ? `
+            <img id="fs-student-stream" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />
+          ` : `
+            <div id="fs-student-stream-placeholder" style="text-align:center; color:#94A3B8;">
+              <span class="material-symbols-rounded" style="font-size:48px; margin-bottom:12px; color:#64748B;">videocam</span>
+              <div style="font-size:14px; font-weight:600;">Active Proctoring Feed</div>
+              <div style="font-size:11px;">Audio & Video Active • Real-time Monitoring</div>
+            </div>
+          `}
+        </div>
+
+        <!-- Floating Glassmorphism Exit Button on Video -->
+        <button id="fs-floating-close-btn" title="Exit Full Screen (Esc)" style="position:absolute; top:16px; right:16px; z-index:10010; width:44px; height:44px; border-radius:50%; background:rgba(15,23,42,0.85); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1.5px solid rgba(255,255,255,0.3); color:#FFFFFF; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.6); transition:transform 0.15s ease, background 0.15s ease;">
+          <span class="material-symbols-rounded" style="font-size:24px;">close</span>
+        </button>
       </div>
 
-      <div style="background:#1E293B; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #334155;">
-        <button id="fs-warn-btn" style="background:#EF4444; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-          <span class="material-symbols-rounded filled" style="font-size:15px;">warning</span> Issue Direct Warning
+      <!-- Bottom Bar with Back to Grid & Action Buttons -->
+      <div style="background:#1E293B; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #334155; gap:10px; flex-shrink:0;">
+        <button id="fs-bottom-close-btn" style="background:#334155; color:#FFFFFF; border:1px solid #475569; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">arrow_back</span>
+          <span>Return to Proctor Hall</span>
         </button>
-        ${(student.submissionPhotos?.length || student.status === 'submitted') ? `
-          <button id="fs-answers-btn" style="background:#22C55E; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer;">
-            View Submitted Answers
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button id="fs-warn-btn" style="background:#EF4444; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded filled" style="font-size:15px;">warning</span> Issue Direct Warning
           </button>
-        ` : ''}
+          ${(student.submissionPhotos?.length || student.status === 'submitted') ? `
+            <button id="fs-answers-btn" style="background:#22C55E; color:#FFFFFF; border:none; border-radius:8px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded filled" style="font-size:15px;">description</span> View Submitted Answers
+            </button>
+          ` : ''}
+        </div>
       </div>
     `;
 
-    modal.querySelector('#fs-close-btn').onclick = () => {
+    // Central exit handler with proper cleanup and stream recovery
+    let isClosed = false;
+    const closeFullScreenViewer = (fromPopState = false) => {
+      if (isClosed) return;
+      isClosed = true;
+
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('popstate', onPopState);
+
+      if (!fromPopState) {
+        if (history.state && history.state.proctorModal === 'fullscreen') {
+          history.back();
+        }
+      }
+
+      if (document.fullscreenElement) {
+        try { document.exitFullscreen().catch(() => {}); } catch (_) {}
+      }
+
       this._fullScreenStudentId = null;
       modal.remove();
+
       if (typeof this._renderProctorHall === 'function') this._renderProctorHall();
       if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
     };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        e.preventDefault();
+        closeFullScreenViewer();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    const onPopState = () => {
+      closeFullScreenViewer(true);
+    };
+    try {
+      history.pushState({ proctorModal: 'fullscreen' }, '');
+      window.addEventListener('popstate', onPopState);
+    } catch (_) {}
+
+    // Attach click events to all exit controls
+    modal.querySelector('#fs-back-btn').onclick = () => closeFullScreenViewer();
+    modal.querySelector('#fs-close-btn').onclick = () => closeFullScreenViewer();
+    modal.querySelector('#fs-floating-close-btn').onclick = () => closeFullScreenViewer();
+    modal.querySelector('#fs-bottom-close-btn').onclick = () => closeFullScreenViewer();
+
     modal.querySelector('#fs-warn-btn').onclick = () => {
       this._showDirectAlertSheet(paperId, student);
     };
@@ -11998,6 +12276,27 @@ class AppController {
     const studentId = student.uid || student.id || 's_default';
     const studentName = student.name || student.displayName || 'Student';
     const studentPhone = student.phone || student.phoneNumber || '';
+    const uId = student.uid || student.id || '';
+    const sId = student.studentId || '';
+
+    // Fast-path guard: Check if already submitted locally
+    const isLocalSubmitted = localStorage.getItem(`paper_submitted_${paperId}`) === 'true' ||
+      localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' ||
+      (uId && localStorage.getItem(`paper_submitted_${paperId}_${uId}`) === 'true') ||
+      (sId && localStorage.getItem(`paper_submitted_${paperId}_${sId}`) === 'true') ||
+      (studentPhone && localStorage.getItem(`paper_submitted_${paperId}_${studentPhone}`) === 'true');
+
+    if (isLocalSubmitted) {
+      if (typeof notificationService !== 'undefined') {
+        notificationService.showInAppBanner('Answer Sheet Submitted', 'You have already submitted this exam paper. Re-entry is not allowed. (ඔබ දැනටමත් පිළිතුරු පත්‍රය භාර දී ඇත.)', 'info');
+      }
+      const [sess, reg] = await Promise.all([
+        dbService.getPaperSession(paperId).catch(() => null),
+        dbService.getStudentRegistration(paperId, studentId).catch(() => null)
+      ]);
+      this.showSubmissionDetailsDialog(sess || { id: paperId, title: 'Exam Paper' }, reg || { paperId, studentId, isSubmitted: true });
+      return;
+    }
 
     // Fullscreen View Container matching Flutter Scaffold - Mount immediately for instant responsive UX!
     const roomContainer = document.createElement('div');
@@ -12021,6 +12320,32 @@ class AppController {
       dbService.getStudentRegistration(paperId, studentId).catch(() => null),
       dbService.getPaperSession(paperId).catch(() => null)
     ]);
+
+    const isRegSubmitted = existingReg && (
+      existingReg.isSubmitted === true ||
+      existingReg.status === 'submitted' ||
+      existingReg.submittedAt ||
+      existingReg.mcqScore !== undefined ||
+      existingReg.mcqAnswers ||
+      (Array.isArray(existingReg.photoUrls) && existingReg.photoUrls.length > 0)
+    );
+
+    if (isRegSubmitted) {
+      localStorage.setItem(`paper_submitted_${paperId}`, 'true');
+      localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
+      if (uId) localStorage.setItem(`paper_submitted_${paperId}_${uId}`, 'true');
+      if (sId) localStorage.setItem(`paper_submitted_${paperId}_${sId}`, 'true');
+      if (studentPhone) localStorage.setItem(`paper_submitted_${paperId}_${studentPhone}`, 'true');
+      if (typeof dbService !== 'undefined' && dbService.invalidateRegistrationCache) {
+        dbService.invalidateRegistrationCache(paperId, studentId, studentPhone);
+      }
+      roomContainer.remove();
+      if (typeof notificationService !== 'undefined') {
+        notificationService.showInAppBanner('Answer Sheet Submitted', 'You have already submitted this exam paper. Re-entry is not allowed. (ඔබ දැනටමත් පිළිතුරු පත්‍රය භාර දී ඇත.)', 'info');
+      }
+      this.showSubmissionDetailsDialog(session || { id: paperId, title: 'Exam Paper' }, existingReg);
+      return;
+    }
 
     if (!session) {
       session = {
@@ -12086,7 +12411,10 @@ class AppController {
     const sendHeartbeat = async (isActive) => {
       try {
         const isAlreadySubmitted = localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' ||
-          localStorage.getItem(`paper_submitted_${paperId}`) === 'true';
+          localStorage.getItem(`paper_submitted_${paperId}`) === 'true' ||
+          (uId && localStorage.getItem(`paper_submitted_${paperId}_${uId}`) === 'true') ||
+          (sId && localStorage.getItem(`paper_submitted_${paperId}_${sId}`) === 'true') ||
+          (studentPhone && localStorage.getItem(`paper_submitted_${paperId}_${studentPhone}`) === 'true');
 
         if (isAlreadySubmitted) {
           await dbService.updateCameraHeartbeat({
@@ -12744,7 +13072,7 @@ ${!times.isWaiting ? `
               }
             },
             onSubmitted: () => {
-              cleanupAndExit();
+              cleanupAndExit(true);
             }
           });
         }
@@ -12790,7 +13118,7 @@ ${!times.isWaiting ? `
     };
 
     // Cleanup and Exit
-    const cleanupAndExit = () => {
+    const cleanupAndExit = (isSubmitted = false) => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       if (syncInterval) clearInterval(syncInterval); if (liveSessionUnsub) { try { liveSessionUnsub(); } catch (_) {} liveSessionUnsub = null; }
       if (timerInterval) clearInterval(timerInterval);
@@ -12803,6 +13131,38 @@ ${!times.isWaiting ? `
       }
       sendHeartbeat(false);
       roomContainer.remove();
+
+      if (isSubmitted) {
+        // Mark local storage keys for fast UI update
+        const uId = student.uid || student.id || '';
+        const sId = student.studentId || '';
+        const uPhone = student.phone || student.phoneNumber || '';
+        localStorage.setItem(`paper_submitted_${paperId}`, 'true');
+        localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
+        if (uId) localStorage.setItem(`paper_submitted_${paperId}_${uId}`, 'true');
+        if (sId) localStorage.setItem(`paper_submitted_${paperId}_${sId}`, 'true');
+        if (uPhone) localStorage.setItem(`paper_submitted_${paperId}_${uPhone}`, 'true');
+
+        // Immediately purge caches so registrations re-fetch fresh or use updated state
+        if (typeof dbService !== 'undefined' && dbService.invalidateRegistrationCache) {
+          dbService.invalidateRegistrationCache(paperId, studentId, uPhone);
+        }
+
+        // Instantly update any visible paper card button on the dashboard/papers screen
+        const cardBtn = document.querySelector(`#paper-card-${paperId} [data-enter-exam]`);
+        if (cardBtn) {
+          cardBtn.dataset.isSubmitted = 'true';
+          cardBtn.className = 'w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all';
+          cardBtn.style.background = '#0F172A';
+          cardBtn.style.color = '#38BDF8';
+          cardBtn.style.border = '1px solid #334155';
+          cardBtn.innerHTML = `
+            <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
+            <span>Submitted • View Details (විස්තර බලන්න)</span>
+          `;
+        }
+      }
+
       this.renderApp();
     };
 
@@ -12935,7 +13295,7 @@ ${!times.isWaiting ? `
 
       resultModal.querySelector('#btn-result-finish-exit')?.addEventListener('click', () => {
         resultModal.remove();
-        cleanupAndExit();
+        cleanupAndExit(true);
       });
     };
 
@@ -13188,6 +13548,13 @@ ${!times.isWaiting ? `
             // LocalStorage locks
             localStorage.setItem(`paper_submitted_${session.id}_${studentId}`, 'true');
             localStorage.setItem(`paper_submitted_${session.id}`, 'true');
+            if (uId) localStorage.setItem(`paper_submitted_${session.id}_${uId}`, 'true');
+            if (sId) localStorage.setItem(`paper_submitted_${session.id}_${sId}`, 'true');
+            if (studentPhone) localStorage.setItem(`paper_submitted_${session.id}_${studentPhone}`, 'true');
+
+            if (typeof dbService !== 'undefined' && dbService.invalidateRegistrationCache) {
+              dbService.invalidateRegistrationCache(session.id, studentId, studentPhone);
+            }
 
             overlay.remove();
             mcqModal.remove();
@@ -13448,6 +13815,13 @@ ${!times.isWaiting ? `
 
             localStorage.setItem(`paper_submitted_${session.id}_${studentId}`, 'true');
             localStorage.setItem(`paper_submitted_${session.id}`, 'true');
+            if (uId) localStorage.setItem(`paper_submitted_${session.id}_${uId}`, 'true');
+            if (sId) localStorage.setItem(`paper_submitted_${session.id}_${sId}`, 'true');
+            if (studentPhone) localStorage.setItem(`paper_submitted_${session.id}_${studentPhone}`, 'true');
+
+            if (typeof dbService !== 'undefined' && dbService.invalidateRegistrationCache) {
+              dbService.invalidateRegistrationCache(session.id, studentId, studentPhone);
+            }
 
             overlay.remove();
             combModal.remove();
@@ -13771,6 +14145,13 @@ ${!times.isWaiting ? `
               // Permanent local storage locks to prevent re-entering
               localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
               localStorage.setItem(`paper_submitted_${paperId}`, 'true');
+              if (uId) localStorage.setItem(`paper_submitted_${paperId}_${uId}`, 'true');
+              if (sId) localStorage.setItem(`paper_submitted_${paperId}_${sId}`, 'true');
+              if (studentPhone) localStorage.setItem(`paper_submitted_${paperId}_${studentPhone}`, 'true');
+
+              if (typeof dbService !== 'undefined' && dbService.invalidateRegistrationCache) {
+                dbService.invalidateRegistrationCache(paperId, studentId, studentPhone);
+              }
 
               overlay.remove();
               if (scannerStream) scannerStream.getTracks().forEach(t => t.stop());
@@ -13778,7 +14159,7 @@ ${!times.isWaiting ? `
 
               // Show success message and exit
               alert(`පිළිතුරු පත්‍ර (${photoUrls.length} Pages) සාර්ථකව භාරදෙන ලදී!`);
-              cleanupAndExit();
+              cleanupAndExit(true);
             } catch (err) {
               console.error('Submission save error:', err);
               overlay.remove();

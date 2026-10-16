@@ -19,7 +19,7 @@ import {
   increment
 } from './firebase-config.js';
 import { callBackend } from './backend-api.js';
-import { supabase, getSuperPaperBatchAccess } from './supabase-client.js';
+import { supabase, getSuperPaperBatchAccess, grantSuperPaperAccess, revokeSuperPaperAccess } from './supabase-client.js';
 
 export function normalizePhone(rawPhone) {
   if (!rawPhone) return '';
@@ -143,14 +143,61 @@ export class DbService {
     return false;
   }
 
+  invalidateCache(key) {
+    if (!key) return;
+    this._memCache.delete(key);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(`edupeak_swr_${key}`);
+        localStorage.removeItem(`edupeak_cached_${key}`);
+      }
+    } catch (_) {}
+  }
+
+  invalidateRegistrationCache(paperId, studentId, phone = '') {
+    if (studentId) {
+      this.invalidateCache(`all_regs_${studentId}`);
+      if (paperId) this.invalidateCache(`paper_reg_${paperId}_${studentId}`);
+    }
+    if (phone) {
+      const norm = normalizePhone(phone);
+      if (norm) {
+        this.invalidateCache(`all_regs_${norm}`);
+        if (paperId) this.invalidateCache(`paper_reg_${paperId}_${norm}`);
+      }
+    }
+    this.clearCache('paper_sessions');
+    this.clearCache('all_regs');
+  }
+
   clearCache(prefix) {
     if (!prefix) {
       this._memCache.clear();
+      try {
+        if (typeof localStorage !== 'undefined') {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('edupeak_swr_') || k.startsWith('edupeak_cached_'))) {
+              localStorage.removeItem(k);
+            }
+          }
+        }
+      } catch (_) {}
       return;
     }
-    for (const k of this._memCache.keys()) {
+    for (const k of Array.from(this._memCache.keys())) {
       if (k.startsWith(prefix)) this._memCache.delete(k);
     }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith(`edupeak_swr_${prefix}`) || k.startsWith(`edupeak_cached_${prefix}`))) {
+            localStorage.removeItem(k);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   // ── 1. Desserts (Homework Submissions) ─────────────────────────────────────
@@ -480,18 +527,29 @@ export class DbService {
 
     // 3. Keep paper_registrations in sync so live exam room marks it submitted
     if (paperId && studentId) {
+      const regData = {
+        paperId,
+        studentId,
+        studentName,
+        status: 'submitted',
+        isSubmitted: true,
+        submittedAt: nowIso,
+        submissionPhotos: mediaUrls || [],
+        submissionUrl: mediaUrls && mediaUrls[0] ? mediaUrls[0] : null
+      };
+
+      // Instantly update cache so client immediately renders "Submitted"
+      this.setCache(`paper_reg_${paperId}_${studentId}`, regData);
+      const allRegs = this.getCached(`all_regs_${studentId}`);
+      if (allRegs) {
+        allRegs[paperId] = { ...(allRegs[paperId] || {}), ...regData };
+        this.setCache(`all_regs_${studentId}`, allRegs);
+      }
+      this.invalidateRegistrationCache(paperId, studentId);
+
       try {
         const regRef = doc(db, 'paper_registrations', `${paperId}_${studentId}`);
-        await setDoc(regRef, {
-          paperId,
-          studentId,
-          studentName,
-          status: 'submitted',
-          isSubmitted: true,
-          submittedAt: nowIso,
-          submissionPhotos: mediaUrls || [],
-          submissionUrl: mediaUrls && mediaUrls[0] ? mediaUrls[0] : null
-        }, { merge: true }).catch(() => {});
+        await setDoc(regRef, regData, { merge: true }).catch(() => {});
       } catch (_) {}
     }
 
@@ -1320,6 +1378,16 @@ export class DbService {
   // Admin: Resolve Super Paper Class access for students
   async getSuperPaperAccessMap(students = []) {
     return await getSuperPaperBatchAccess(students);
+  }
+
+  // Admin: Grant Super Paper Class access to a student
+  async grantSuperPaperAccess(student) {
+    return await grantSuperPaperAccess(student);
+  }
+
+  // Admin: Revoke Super Paper Class access for a student
+  async revokeSuperPaperAccess(student) {
+    return await revokeSuperPaperAccess(student);
   }
 
   // Admin: Delete student account and associated data
@@ -2206,6 +2274,18 @@ export class DbService {
       } catch (_) {}
 
       await setDoc(regRef, updates, { merge: true });
+
+      if (updates.isSubmitted === true || updates.status === 'submitted') {
+        const cacheKey = `paper_reg_${paperId}_${studentId}`;
+        this.setCache(cacheKey, { ...updates, paperId, studentId });
+        const allRegsKey = `all_regs_${studentId}`;
+        const allRegs = this.getCached(allRegsKey);
+        if (allRegs) {
+          allRegs[paperId] = { ...(allRegs[paperId] || {}), ...updates, paperId, studentId };
+          this.setCache(allRegsKey, allRegs);
+        }
+        this.invalidateRegistrationCache(paperId, studentId, studentPhone);
+      }
     } catch (e) {
       console.warn('[DB] updateCameraHeartbeat error:', e);
     }
