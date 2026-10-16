@@ -4925,120 +4925,72 @@ class AppController {
       this.studentBroadcaster = null;
     }
     document.querySelectorAll('video').forEach(v => {
-      if (v.id !== 'essay-scanner-video' && v.srcObject && typeof v.srcObject.getTracks === 'function') {
+      if (v.id !== 'scanner-live-video' && v.srcObject && typeof v.srcObject.getTracks === 'function') {
         try { v.srcObject.getTracks().forEach(t => t.stop()); } catch (_) {}
         v.srcObject = null;
       }
     });
 
-    // Lazy load OpenCV.js in background
-    let cvInstance = null;
-    loadOpenCV().then(cv => { cvInstance = cv; }).catch(() => {});
-
-    // Scanned pages state: array of { id, originalCanvas, corners, warpedCanvas, finalCanvas, filter, rotation, dataUrl }
-    let scannedPages = [];
-    let currentFilter = 'magic'; // 'magic' | 'bw' | 'gray' | 'original'
-    let cameraStream = null;
-    let detectionTimer = null;
-    let lastDetectedCorners = null;
+    cameraService.clearPages();
 
     const modal = document.createElement('div');
     modal.className = 'scanner-modal';
-    modal.id = 'essay-scanner-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:#0F172A;z-index:999999;display:flex;flex-direction:column;color:#fff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent;';
+    modal.id = 'camera-scanner-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:#000;z-index:999999;display:flex;flex-direction:column;color:#fff;overflow:hidden;-webkit-tap-highlight-color:transparent;';
 
     modal.innerHTML = `
-      <!-- Top App Bar with Clear Back Button -->
-      <div style="background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);padding:calc(env(safe-area-inset-top,20px) + 12px) 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155;z-index:30;">
-        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-          <button id="essay-btn-back" type="button" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">
-            <span class="material-symbols-rounded" style="font-size:22px;pointer-events:none;">arrow_back</span>
+      <div class="scanner-top-bar" style="z-index:30;padding-top:calc(env(safe-area-inset-top,0px) + 12px);">
+        <div class="scanner-title" style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <button class="btn-scanner-icon" id="btn-back-scanner" type="button" title="Back" style="touch-action:manipulation;cursor:pointer;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:20px;pointer-events:none;">arrow_back</span>
           </button>
           <div style="min-width:0;">
-            <div style="font-size:14px;font-weight:800;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">${escapeHTML(paperTitle)}</div>
-            <div style="font-size:10.5px;color:#94A3B8;display:flex;align-items:center;gap:6px;">
-              <span id="essay-pages-count-badge" style="background:#22C55E22;color:#4ADE80;padding:1px 6px;border-radius:4px;font-weight:700;">0 Pages</span>
-              <span>• CamScanner Mode</span>
-            </div>
+            <div style="font-size:13.5px;font-weight:800;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">${escapeHTML(paperTitle)}</div>
+            <div style="font-size:10px;color:#94A3B8;">CamScanner Mode</div>
           </div>
+          <span class="scanner-page-counter" id="scanner-page-count" style="margin-left:4px;flex-shrink:0;">0 Pages</span>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button id="essay-btn-torch" type="button" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;">
-            <span class="material-symbols-rounded" style="font-size:19px;pointer-events:none;">flash_on</span>
+        <div class="scanner-top-actions">
+          <button class="btn-scanner-icon" id="btn-toggle-torch" type="button" title="Flashlight" style="touch-action:manipulation;cursor:pointer;">
+            <span class="material-symbols-rounded" style="font-size:18px;pointer-events:none;">flash_on</span>
           </button>
-          <button id="essay-btn-close" type="button" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;">
+          <button class="btn-scanner-icon" id="btn-close-scanner" type="button" title="Close" style="touch-action:manipulation;cursor:pointer;">
             <span class="material-symbols-rounded" style="font-size:20px;pointer-events:none;">close</span>
           </button>
         </div>
       </div>
 
-      <!-- Live Viewfinder & Real-Time Edge Overlay -->
-      <div style="flex:1;position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;">
-        <video id="essay-scanner-video" autoplay playsinline webkit-playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
-        <canvas id="essay-detection-canvas" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;"></canvas>
-
-        <!-- Center Fallback Action Card (triggers native camera directly via label) -->
-        <div id="essay-cam-fallback-box" style="display:flex;position:absolute;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;z-index:22;pointer-events:auto;">
-          <div style="width:64px;height:64px;border-radius:50%;background:rgba(37,99,235,0.2);border:2px solid #38BDF8;display:flex;align-items:center;justify-content:center;color:#38BDF8;box-shadow:0 0 24px rgba(56,189,248,0.3);">
-            <span class="material-symbols-rounded" style="font-size:32px;">photo_camera</span>
-          </div>
-          <div style="font-size:14px;font-weight:700;color:#FFFFFF;max-width:260px;line-height:1.4;">
-            Tap below or tap red shutter to take photo of your paper
-          </div>
-          <label for="essay-native-cam-input" id="essay-btn-open-cam" style="background:#2563EB;color:#FFFFFF;border:none;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(37,99,235,0.45);touch-action:manipulation;">
-            <span class="material-symbols-rounded" style="font-size:20px;">photo_camera</span>
-            <span>Take Photo (කැමරාව)</span>
-          </label>
+      <div class="scanner-viewfinder-container" style="flex:1;position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        <video class="scanner-video" id="scanner-live-video" autoplay playsinline webkit-playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+        <div class="scanner-frame-overlay" style="pointer-events:none;">
+          <div class="scanner-laser"></div>
+          <span class="scanner-hint-text">Align document within the frame</span>
         </div>
-
-        <!-- Detection Status Pill -->
-        <div id="essay-detection-pill" style="position:absolute;top:14px;background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#E2E8F0;font-size:11px;font-weight:700;padding:6px 14px;border-radius:20px;display:flex;align-items:center;gap:6px;z-index:20;transition:all 0.2s ease;">
-          <span class="material-symbols-rounded" style="font-size:15px;color:#38BDF8;">crop_free</span>
-          <span>Point at paper on a flat surface</span>
-        </div>
-
-        <!-- Flash Animation Overlay -->
-        <div id="essay-flash-effect" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity 0.12s ease-out;z-index:25;"></div>
+        <div class="scanner-flash-overlay" id="scanner-flash" style="pointer-events:none;"></div>
       </div>
 
-      <!-- Bottom Controls -->
-      <div style="background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border-top:1px solid #334155;padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 14px);z-index:30;">
-        <!-- Filter Selector -->
-        <div style="display:flex;justify-content:center;gap:8px;margin-bottom:12px;">
-          <button type="button" class="scanner-filter-pill active" data-filter="magic" style="background:#2563EB;color:#fff;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
-            <span class="material-symbols-rounded" style="font-size:14px;">auto_fix_high</span> Magic Color
-          </button>
-          <button type="button" class="scanner-filter-pill" data-filter="bw" style="background:#334155;color:#94A3B8;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
-            B&amp;W Clean
-          </button>
-          <button type="button" class="scanner-filter-pill" data-filter="gray" style="background:#334155;color:#94A3B8;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
-            Grayscale
-          </button>
-          <button type="button" class="scanner-filter-pill" data-filter="original" style="background:#334155;color:#94A3B8;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
-            Original
-          </button>
+      <div class="scanner-bottom-bar" style="z-index:30;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);">
+        <div class="scanner-filter-bar">
+          <button type="button" class="filter-pill active" data-filter="none" style="touch-action:manipulation;cursor:pointer;">Natural</button>
+          <button type="button" class="filter-pill" data-filter="document" style="touch-action:manipulation;cursor:pointer;">Enhance</button>
+          <button type="button" class="filter-pill" data-filter="bw" style="touch-action:manipulation;cursor:pointer;">B&amp;W</button>
         </div>
 
-        <!-- Thumbnails Strip -->
-        <div id="essay-scanned-strip" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:10px;min-height:56px;align-items:center;">
-          <span style="font-size:11px;color:#64748B;font-style:italic;padding-left:4px;">No pages captured yet. Tap Shutter to scan.</span>
-        </div>
+        <div class="scanner-thumbnails-strip" id="scanner-thumb-strip"></div>
 
-        <!-- Shutter Row -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 10px;">
-          <label for="essay-gallery-input" style="background:#1E293B;border:1px solid #475569;color:#E2E8F0;border-radius:12px;padding:9px 12px;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;touch-action:manipulation;">
-            <span class="material-symbols-rounded" style="font-size:17px;color:#38BDF8;">photo_library</span>
+        <div class="scanner-shutter-row">
+          <label class="btn-upload-file-fallback" for="input-file-camera" style="touch-action:manipulation;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:18px;color:#38BDF8;">photo_library</span>
             <span>Gallery</span>
-            <input type="file" id="essay-gallery-input" accept="image/*" multiple style="display:none;" />
-          </label>
-          <input type="file" id="essay-native-cam-input" accept="image/*" capture="environment" style="display:none;" />
-
-          <!-- Big Red Camera Shutter (Direct Native Camera Trigger via Label) -->
-          <label for="essay-native-cam-input" id="essay-shutter-btn" style="position:relative;width:68px;height:68px;border-radius:50%;background:#FFFFFF;border:5px solid #DC2626;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 16px rgba(220,38,38,0.4);touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;">
-            <div style="width:50px;height:50px;border-radius:50%;background:#DC2626;pointer-events:none;"></div>
+            <input type="file" id="input-file-camera" accept="image/*" style="display:none;" multiple />
           </label>
 
-          <button id="essay-submit-all-btn" type="button" disabled style="background:#16A34A;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px;opacity:0.4;transition:all 0.2s ease;touch-action:manipulation;">
+          <button class="shutter-btn-wrap" id="btn-trigger-shutter" type="button" aria-label="Take Photo" style="touch-action:manipulation;cursor:pointer;">
+            <span class="shutter-outer-ring"></span>
+            <span class="btn-shutter-inner"></span>
+          </button>
+
+          <button class="btn-done-scanning" id="btn-finish-scan" type="button" disabled style="display:inline-flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation;cursor:pointer;">
             <span>Submit</span>
             <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
           </button>
@@ -5048,360 +5000,144 @@ class AppController {
 
     document.body.appendChild(modal);
 
-    const videoEl = modal.querySelector('#essay-scanner-video');
-    const overlayCanvas = modal.querySelector('#essay-detection-canvas');
-    const detectionPill = modal.querySelector('#essay-detection-pill');
-    const stripEl = modal.querySelector('#essay-scanned-strip');
-    const submitBtn = modal.querySelector('#essay-submit-all-btn');
-    const countBadge = modal.querySelector('#essay-pages-count-badge');
+    const videoEl = modal.querySelector('#scanner-live-video');
+    let currentFilter = 'none';
 
-    const fallbackBox = modal.querySelector('#essay-cam-fallback-box');
-    const nativeCamInput = modal.querySelector('#essay-native-cam-input');
-
-    // 2. Real-time Document Edge Detection Loop (Section 7 Build Spec)
-    const runDetection = () => {
-      if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth || !overlayCanvas) return;
-      overlayCanvas.width = videoEl.videoWidth;
-      overlayCanvas.height = videoEl.videoHeight;
-      const ctx = overlayCanvas.getContext('2d');
-      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-      const corners = detectDocument(cvInstance, videoEl);
-      lastDetectedCorners = corners;
-
-      if (corners && corners.length === 4) {
-        ctx.lineWidth = Math.max(4, overlayCanvas.width / 220);
-        ctx.strokeStyle = '#22C55E';
-        ctx.fillStyle = 'rgba(34, 197, 94, 0.18)';
-        ctx.beginPath();
-        corners.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Draw corner target markers
-        corners.forEach((p) => {
-          ctx.fillStyle = '#22C55E';
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, ctx.lineWidth * 2.2, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        if (detectionPill) {
-          detectionPill.style.borderColor = '#22C55E';
-          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#22C55E;">check_circle</span> 📄 Page Detected • Tap Shutter';
-        }
-      } else {
-        if (detectionPill) {
-          detectionPill.style.borderColor = 'rgba(255,255,255,0.15)';
-          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#38BDF8;">crop_free</span> Align page in frame';
-        }
-      }
-    };
-
-    // 3. Update Scanned Pages Strip
-    const updateStripUI = () => {
-      if (countBadge) countBadge.textContent = `${scannedPages.length} Page${scannedPages.length !== 1 ? 's' : ''}`;
-      if (submitBtn) {
-        submitBtn.disabled = scannedPages.length === 0;
-        submitBtn.style.opacity = scannedPages.length > 0 ? '1' : '0.4';
-      }
-
-      if (!stripEl) return;
-      if (scannedPages.length === 0) {
-        stripEl.innerHTML = '<span style="font-size:11px;color:#64748B;font-style:italic;padding-left:4px;">No pages captured yet. Tap Shutter to scan.</span>';
-        return;
-      }
-
-      stripEl.innerHTML = scannedPages.map((page, idx) => `
-        <div class="scanned-page-thumb" data-page-idx="${idx}" style="position:relative;width:58px;height:78px;flex-shrink:0;border-radius:10px;overflow:hidden;border:2px solid #2563EB;box-shadow:0 3px 8px rgba(0,0,0,0.4);cursor:pointer;background:#000;">
-          <img src="${page.dataUrl}" style="width:100%;height:100%;object-fit:cover;" />
-          <span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;">P${idx + 1}</span>
-          <button class="btn-del-page" data-page-idx="${idx}" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;">
-            <span class="material-symbols-rounded" style="font-size:12px;">close</span>
-          </button>
-        </div>
-      `).join('') + `
-        <label for="essay-native-cam-input" style="height:78px;min-width:58px;border-radius:10px;border:1.5px dashed #475569;background:rgba(255,255,255,0.05);color:#94A3B8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;padding:4px;touch-action:manipulation;">
-          <span class="material-symbols-rounded" style="font-size:20px;color:#38BDF8;">add_a_photo</span>
-          <span style="font-size:9.5px;font-weight:700;">+ Page</span>
-        </label>
-      `;
-
-      stripEl.querySelectorAll('.btn-del-page').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = Number(btn.dataset.pageIdx);
-          scannedPages.splice(idx, 1);
-          updateStripUI();
-        });
-      });
-    };
-
-    // 4. Interactive 4-Corner Adjustment Editor (Section 8 Build Spec)
-    const openCornerAdjustmentEditor = (fullCanvas, initialCorners, onCropDone) => {
-      const editor = document.createElement('div');
-      editor.style.cssText = 'position:fixed;inset:0;background:#0B132B;z-index:1000001;display:flex;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;color:#fff;';
-
-      let pts = initialCorners && initialCorners.length === 4 ? [...initialCorners] : detectDocumentCanvasFallback(fullCanvas);
-      let draggingIdx = -1;
-      const dataUrl = fullCanvas.toDataURL('image/jpeg', 0.85);
-
-      editor.innerHTML = `
-        <div style="background:#1E293B;padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155;">
-          <div>
-            <div style="font-size:14px;font-weight:800;color:#FFFFFF;display:flex;align-items:center;gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:18px;color:#22C55E;">crop</span>
-              <span>Adjust Document Corners</span>
-            </div>
-            <div style="font-size:10.5px;color:#94A3B8;">Drag 4 green handles to match paper edges</div>
-          </div>
-          <button id="editor-cancel-btn" type="button" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;">Retake</button>
-        </div>
-
-        <div id="editor-viewport" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:12px;background:#000;">
-          <div style="position:relative;max-width:100%;max-height:100%;aspect-ratio:${fullCanvas.width}/${fullCanvas.height};">
-            <img id="editor-base-img" src="${dataUrl}" style="width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none;border-radius:6px;" />
-            <svg id="editor-svg-overlay" viewBox="0 0 ${fullCanvas.width} ${fullCanvas.height}" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;overflow:visible;">
-              <polygon id="editor-svg-poly" fill="rgba(34,197,94,0.22)" stroke="#22C55E" stroke-width="${Math.max(4, fullCanvas.width / 160)}" />
-              <g id="editor-handles-group"></g>
-            </svg>
-          </div>
-        </div>
-
-        <div style="background:#1E293B;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:12px;border-top:1px solid #334155;">
-          <button id="editor-auto-detect-btn" type="button" style="flex:1;background:#334155;color:#E2E8F0;border:none;border-radius:12px;padding:12px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;">
-            <span class="material-symbols-rounded" style="font-size:16px;color:#38BDF8;">magic_button</span> Auto Detect
-          </button>
-          <button id="editor-confirm-btn" type="button" style="flex:2;background:#22C55E;color:#FFFFFF;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 14px rgba(34,197,94,0.35);touch-action:manipulation;">
-            <span class="material-symbols-rounded" style="font-size:18px;">crop</span> Crop &amp; Enhance Page
-          </button>
-        </div>
-      `;
-
-      document.body.appendChild(editor);
-
-      const svgEl = editor.querySelector('#editor-svg-overlay');
-      const polyEl = editor.querySelector('#editor-svg-poly');
-      const handlesGroup = editor.querySelector('#editor-handles-group');
-      const handleR = Math.max(22, Math.round(fullCanvas.width / 32));
-
-      const renderSvgHandles = () => {
-        polyEl.setAttribute('points', pts.map(p => `${Math.round(p.x)},${Math.round(p.y)}`).join(' '));
-        handlesGroup.innerHTML = pts.map((p, i) => `
-          <circle cx="${Math.round(p.x)}" cy="${Math.round(p.y)}" r="${handleR}" fill="#22C55E" fill-opacity="0.85" stroke="#FFFFFF" stroke-width="${Math.max(3, handleR / 6)}" style="cursor:grab;" data-handle="${i}" />
-          <text x="${Math.round(p.x)}" y="${Math.round(p.y + handleR / 3)}" font-size="${Math.round(handleR * 0.9)}" font-weight="900" fill="#000" text-anchor="middle" pointer-events="none">${i + 1}</text>
-        `).join('');
-      };
-
-      renderSvgHandles();
-
-      const toImgCoords = (e) => {
-        const r = svgEl.getBoundingClientRect();
-        const touch = e.touches ? e.touches[0] : e;
-        return {
-          x: Math.min(fullCanvas.width, Math.max(0, ((touch.clientX - r.left) / r.width) * fullCanvas.width)),
-          y: Math.min(fullCanvas.height, Math.max(0, ((touch.clientY - r.top) / r.height) * fullCanvas.height))
-        };
-      };
-
-      const handlePointerDown = (e) => {
-        const target = e.target;
-        if (target && target.dataset && target.dataset.handle !== undefined) {
-          draggingIdx = Number(target.dataset.handle);
-        }
-      };
-
-      const handlePointerMove = (e) => {
-        if (draggingIdx < 0) return;
-        const p = toImgCoords(e);
-        pts[draggingIdx] = p;
-        renderSvgHandles();
-      };
-
-      const handlePointerUp = () => { draggingIdx = -1; };
-
-      svgEl.addEventListener('pointerdown', handlePointerDown);
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-
-      editor.querySelector('#editor-cancel-btn')?.addEventListener('click', () => {
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        editor.remove();
-      });
-
-      editor.querySelector('#editor-auto-detect-btn')?.addEventListener('click', () => {
-        const found = detectDocument(cvInstance, fullCanvas);
-        pts = found ? [...found] : detectDocumentCanvasFallback(fullCanvas);
-        renderSvgHandles();
-      });
-
-      editor.querySelector('#editor-confirm-btn')?.addEventListener('click', async () => {
-        const btn = editor.querySelector('#editor-confirm-btn');
-        if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;animation:spin 0.7s linear infinite;">progress_activity</span> Flattening &amp; Enhancing...';
-        await new Promise(r => setTimeout(r, 60));
-
-        // 1. Perspective Warp (Dewarp angled paper)
-        const warped = warpDocument(cvInstance, fullCanvas, pts);
-        // 2. Enhance with CamScanner filter
-        const enhanced = enhance(cvInstance, warped, currentFilter);
-        const finalUrl = enhanced.toDataURL('image/jpeg', 0.86);
-
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        editor.remove();
-
-        onCropDone({
-          rawCanvas: fullCanvas,
-          corners: pts,
-          warpedCanvas: warped,
-          enhancedCanvas: enhanced,
-          filter: currentFilter,
-          rotation: 0,
-          dataUrl: finalUrl
-        });
-      });
-    };
-
-    // Helper to process selected or captured image files
-    const processImageFiles = async (files) => {
-      if (!files || files.length === 0) return;
-      for (const file of files) {
-        try {
-          const img = new Image();
-          const imgUrl = URL.createObjectURL(file);
-          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = imgUrl; });
-          const fullCanvas = document.createElement('canvas');
-          fullCanvas.width = img.naturalWidth || img.width;
-          fullCanvas.height = img.naturalHeight || img.height;
-          const ctx = fullCanvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          URL.revokeObjectURL(imgUrl);
-
-          const corners = detectDocument(cvInstance, fullCanvas) || detectDocumentCanvasFallback(fullCanvas);
-          await new Promise((resDone) => {
-            openCornerAdjustmentEditor(fullCanvas, corners, (newPage) => {
-              scannedPages.push(newPage);
-              updateStripUI();
-              resDone();
-            });
-          });
-        } catch (err) {
-          console.warn('[Image load error]:', err);
-        }
-      }
-    };
-
-    // 5. Capture Photo from Video Viewfinder (if stream active)
-    const captureFromLiveVideo = () => {
-      if (!videoEl || !videoEl.videoWidth || videoEl.videoWidth === 0 || videoEl.paused) {
-        return false;
-      }
-
-      const flash = modal.querySelector('#essay-flash-effect');
-      if (flash) {
-        flash.style.opacity = '0.9';
-        setTimeout(() => { flash.style.opacity = '0'; }, 100);
-      }
-
-      const fullCanvas = document.createElement('canvas');
-      fullCanvas.width = videoEl.videoWidth;
-      fullCanvas.height = videoEl.videoHeight;
-      const ctx = fullCanvas.getContext('2d');
-      ctx.drawImage(videoEl, 0, 0);
-
-      const corners = lastDetectedCorners || detectDocument(cvInstance, fullCanvas) || detectDocumentCanvasFallback(fullCanvas);
-
-      openCornerAdjustmentEditor(fullCanvas, corners, (newPage) => {
-        scannedPages.push(newPage);
-        updateStripUI();
-      });
-      return true;
-    };
-
-    // When tapping shutter: If live WebRTC stream is active, capture frame; otherwise allow default label action (opens native camera)
-    modal.querySelector('#essay-shutter-btn')?.addEventListener('click', (e) => {
-      if (captureFromLiveVideo()) {
-        e.preventDefault();
-      }
+    // Start live camera stream via cameraService
+    cameraService.startCamera(videoEl, 'environment').catch(err => {
+      console.warn('[Camera] Service notice:', err.message);
     });
 
-    // 6. Gallery and Native Camera Upload Handlers
-    modal.querySelector('#essay-gallery-input')?.addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []);
-      await processImageFiles(files);
-      e.target.value = '';
+    // Torch Toggle
+    const btnTorch = modal.querySelector('#btn-toggle-torch');
+    btnTorch?.addEventListener('click', async () => {
+      const active = await cameraService.toggleTorch();
+      btnTorch.classList.toggle('active', active);
     });
 
-    modal.querySelector('#essay-native-cam-input')?.addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []);
-      await processImageFiles(files);
-      e.target.value = '';
-    });
-
-    // 7. Filter Change Buttons
-    modal.querySelectorAll('.scanner-filter-pill').forEach(pill => {
-      const applyFilter = () => {
-        modal.querySelectorAll('.scanner-filter-pill').forEach(p => {
-          p.classList.remove('active');
-          p.style.background = '#334155';
-          p.style.color = '#94A3B8';
-        });
+    // Filters
+    modal.querySelectorAll('.filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        modal.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
-        pill.style.background = '#2563EB';
-        pill.style.color = '#fff';
         currentFilter = pill.dataset.filter;
-
-        scannedPages.forEach(p => {
-          p.filter = currentFilter;
-          p.enhancedCanvas = enhance(cvInstance, p.warpedCanvas, currentFilter);
-          p.dataUrl = p.enhancedCanvas.toDataURL('image/jpeg', 0.86);
-        });
-        updateStripUI();
-      };
-      pill.addEventListener('click', applyFilter);
+      });
     });
 
-    // 8. Torch Button
-    modal.querySelector('#essay-btn-torch')?.addEventListener('click', async () => {
-      try {
-        if (!cameraStream) return;
-        const track = cameraStream.getVideoTracks()[0];
-        const caps = track?.getCapabilities ? track.getCapabilities() : {};
-        if (caps.torch) {
-          const enabled = !track._torchOn;
-          await track.applyConstraints({ advanced: [{ torch: enabled }] });
-          track._torchOn = enabled;
-          modal.querySelector('#essay-btn-torch').style.background = enabled ? '#F59E0B' : 'rgba(255,255,255,0.1)';
-        } else {
-          alert('Torch is not supported on this device/browser.');
-        }
-      } catch (_) {}
-    });
+    // Update Thumbnails Strip
+    const updateThumbnails = () => {
+      const pages = cameraService.getPages();
+      const countEl = modal.querySelector('#scanner-page-count');
+      const stripEl = modal.querySelector('#scanner-thumb-strip');
+      const doneBtn = modal.querySelector('#btn-finish-scan');
 
-    // 9. Clean Exit / Close Scanner (Fast 0ms response)
-    const closeScanner = () => {
-      if (detectionTimer) clearInterval(detectionTimer);
-      if (cameraStream) {
-        try { cameraStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      if (countEl) countEl.textContent = `${pages.length} Pages`;
+      if (doneBtn) {
+        doneBtn.disabled = pages.length === 0;
+        doneBtn.style.opacity = pages.length > 0 ? '1' : '0.4';
       }
+
+      if (stripEl) {
+        if (pages.length === 0) {
+          stripEl.innerHTML = '<span style="font-size:11px;color:#64748B;font-style:italic;padding-left:4px;">No pages captured yet. Tap Shutter to scan.</span>';
+          return;
+        }
+
+        stripEl.innerHTML = pages.map((dataUrl, idx) => `
+          <div class="thumb-card" style="position:relative;width:52px;height:70px;border-radius:8px;border:2px solid #22C55E;overflow:hidden;flex-shrink:0;">
+            <img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;" />
+            <button type="button" class="thumb-del-btn" data-del-idx="${idx}" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;">
+              <span class="material-symbols-rounded" style="font-size:12px;pointer-events:none;">close</span>
+            </button>
+            <span class="thumb-page-badge" style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;">P${idx + 1}</span>
+          </div>
+        `).join('');
+
+        stripEl.querySelectorAll('.thumb-del-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            cameraService.removePage(Number(btn.dataset.delIdx));
+            updateThumbnails();
+          });
+        });
+      }
+    };
+
+    updateThumbnails();
+
+    // Shutter Photo Capture
+    const triggerPhotoCapture = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      try {
+        const flash = modal.querySelector('#scanner-flash');
+        if (flash) {
+          flash.classList.add('flashing');
+          setTimeout(() => flash.classList.remove('flashing'), 140);
+        }
+        cameraService.capturePhoto(currentFilter);
+        updateThumbnails();
+      } catch (err) {
+        console.warn('[Camera] Shutter capture notice:', err);
+      }
+    };
+
+    const shutterBtn = modal.querySelector('#btn-trigger-shutter');
+    if (shutterBtn) {
+      shutterBtn.addEventListener('click', triggerPhotoCapture);
+      shutterBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        triggerPhotoCapture();
+      }, { passive: false });
+    }
+
+    // Gallery Upload
+    const fileInp = modal.querySelector('#input-file-camera');
+    fileInp?.addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      for (const file of Array.from(files)) {
+        try {
+          const rawDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (evt) => resolve(evt.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          if (rawDataUrl) {
+            const compressed = await cameraService.compressImage(rawDataUrl, 1400, 0.82);
+            cameraService.addPageFromDataUrl(compressed);
+          }
+        } catch (err) {
+          console.warn('[Camera] File read error:', err);
+        }
+      }
+      updateThumbnails();
+      e.target.value = '';
+    });
+
+    // Close & Exit Handlers
+    const closeScanner = () => {
+      cameraService.stopCamera();
       modal.remove();
       if (typeof options.onClose === 'function') {
-        try { options.onClose(); } catch (e) { console.warn('[Scanner onClose err]:', e); }
+        try { options.onClose(); } catch (err) { console.warn('[Scanner onClose err]:', err); }
       }
     };
 
     const handleBackOrClose = (e) => {
       if (e) e.preventDefault();
-      if (scannedPages.length > 0) {
-        if (!confirm(`You have ${scannedPages.length} scanned page(s). Are you sure you want to exit without submitting?`)) return;
+      const pages = cameraService.getPages();
+      if (pages.length > 0) {
+        if (!confirm(`You have ${pages.length} scanned page(s). Are you sure you want to exit without submitting?`)) return;
       }
       closeScanner();
     };
 
-    const btnBack = modal.querySelector('#essay-btn-back');
-    const btnClose = modal.querySelector('#essay-btn-close');
+    const btnBack = modal.querySelector('#btn-back-scanner');
+    const btnClose = modal.querySelector('#btn-close-scanner');
 
     if (btnBack) {
       btnBack.addEventListener('click', handleBackOrClose);
@@ -5412,84 +5148,14 @@ class AppController {
       btnClose.addEventListener('touchend', handleBackOrClose);
     }
 
-    // 10. Proceed to Review & Submit
-    submitBtn?.addEventListener('click', () => {
-      if (scannedPages.length === 0) return;
-      if (detectionTimer) clearInterval(detectionTimer);
-      if (cameraStream) {
-        try { cameraStream.getTracks().forEach(t => t.stop()); } catch (_) {}
-      }
-      modal.remove();
-      this.openEssaySubmitDialog(scannedPages, paperId, session, user);
+    // Submit Action
+    const doneBtn = modal.querySelector('#btn-finish-scan');
+    doneBtn?.addEventListener('click', () => {
+      const pages = cameraService.getPages();
+      if (pages.length === 0) return;
+      closeScanner();
+      this.openEssaySubmitDialog(pages, paperId, session, user);
     });
-
-    // 11. Background Camera Initialization
-    const initCameraStream = async () => {
-      videoEl.setAttribute('playsinline', 'true');
-      videoEl.setAttribute('webkit-playsinline', 'true');
-      videoEl.muted = true;
-      videoEl.autoplay = true;
-
-      await new Promise(r => setTimeout(r, 150));
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        if (fallbackBox) fallbackBox.style.display = 'flex';
-        return;
-      }
-
-      const getStreamWithTimeout = (constraints, ms = 12000) => {
-        return Promise.race([
-          navigator.mediaDevices.getUserMedia(constraints),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
-        ]);
-      };
-
-      try {
-        cameraStream = await getStreamWithTimeout({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-          audio: false
-        });
-      } catch (e1) {
-        try {
-          cameraStream = await getStreamWithTimeout({
-            video: { facingMode: 'environment' },
-            audio: false
-          });
-        } catch (e2) {
-          try {
-            cameraStream = await getStreamWithTimeout({ video: true, audio: false });
-          } catch (e3) {
-            console.warn('[Scanner Camera] WebRTC stream not available:', e3);
-          }
-        }
-      }
-
-      if (cameraStream) {
-        videoEl.srcObject = cameraStream;
-        videoEl.onloadedmetadata = () => {
-          videoEl.play().catch(() => {});
-        };
-        await videoEl.play().catch(() => {});
-
-        setTimeout(() => {
-          if (!videoEl.videoWidth || videoEl.videoWidth === 0) {
-            if (fallbackBox) fallbackBox.style.display = 'flex';
-          } else {
-            if (fallbackBox) fallbackBox.style.display = 'none';
-            detectionTimer = setInterval(runDetection, 320);
-          }
-        }, 600);
-      } else {
-        if (fallbackBox) fallbackBox.style.display = 'flex';
-        if (detectionPill) {
-          detectionPill.style.borderColor = '#38BDF8';
-          detectionPill.style.color = '#38BDF8';
-          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#38BDF8;">photo_camera</span> Ready \u2022 Tap Camera or Shutter to Snap';
-        }
-      }
-    };
-
-    initCameraStream();
   }
 
   // ── Essay Answer Sheet Submit Dialog (Multi-Page PDF & Cloud Storage) ────────
