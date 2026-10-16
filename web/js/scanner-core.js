@@ -364,7 +364,28 @@ export async function buildPdf(canvases) {
     for (let i = 0; i < canvases.length; i++) {
       if (i > 0) pdf.addPage('a4');
       const c = canvases[i];
-      const dataUrl = (typeof c === 'string') ? c : (c.toDataURL ? c.toDataURL('image/jpeg', 0.85) : '');
+      let dataUrl = '';
+      if (typeof c === 'string') {
+        if (c.startsWith('data:')) {
+          dataUrl = c;
+        } else if (c.startsWith('http')) {
+          // Fetch remote image and convert to dataURL for jsPDF
+          try {
+            const resp = await fetch(c, { mode: 'cors' });
+            const blob = await resp.blob();
+            dataUrl = await new Promise((res, rej) => {
+              const r = new FileReader();
+              r.onload = () => res(r.result);
+              r.onerror = rej;
+              r.readAsDataURL(blob);
+            });
+          } catch (fetchErr) {
+            console.warn('[buildPdf fetch image err]:', fetchErr);
+          }
+        }
+      } else if (c && c.toDataURL) {
+        dataUrl = c.toDataURL('image/jpeg', 0.85);
+      }
       if (dataUrl) {
         pdf.addImage(dataUrl, 'JPEG', 0, 0, pageW, pageH);
       }

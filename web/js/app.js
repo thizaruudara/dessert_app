@@ -8813,8 +8813,9 @@ class AppController {
                 <span class="material-symbols-rounded" style="font-size:15px;">${sub.status === 'graded' ? 'edit' : 'grade'}</span>
                 ${sub.status === 'graded' ? 'Edit Grade' : 'Grade'}
               </button>
-              <button class="essay-download-btn" data-urls='${escapeHTML(JSON.stringify(sub.mediaUrls || []))}' data-name="${escapeHTML(sub.studentName)}" style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:700; color:#334155; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
-                <span class="material-symbols-rounded" style="font-size:15px;">download</span>
+              <button class="essay-download-btn" data-urls='${escapeHTML(JSON.stringify(sub.mediaUrls || []))}' data-name="${escapeHTML(sub.studentName)}" data-paper="${escapeHTML(sub.paperTitle)}" title="Download all pages as a single PDF" style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:800; color:#2563EB; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                <span class="material-symbols-rounded" style="font-size:16px;">picture_as_pdf</span>
+                <span>PDF</span>
               </button>
             </div>
           </div>
@@ -8844,29 +8845,41 @@ class AppController {
       });
     });
 
-    // Download all pages for a submission
+    // Download all pages for a submission as a single compiled PDF
     listEl.querySelectorAll('.essay-download-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
           const urls = JSON.parse(btn.dataset.urls || '[]');
           const name = btn.dataset.name || 'student';
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px; animation:spin 0.75s linear infinite;">progress_activity</span>';
-          for (let i = 0; i < urls.length; i++) {
+          const paper = btn.dataset.paper || 'exam';
+          if (!urls || urls.length === 0) {
+            alert('No scanned pages found for this submission.');
+            return;
+          }
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px; animation:spin 0.75s linear infinite;">progress_activity</span> <span>Compiling...</span>';
+
+          const pdfBlob = await buildPdf(urls);
+          if (pdfBlob) {
+            const pdfUrl = URL.createObjectURL(pdfBlob);
             const a = document.createElement('a');
-            a.href = urls[i];
-            a.download = `${name.replace(/\s+/g,'_')}_P${i+1}.jpg`;
-            a.target = '_blank';
-            a.rel = 'noopener';
+            a.href = pdfUrl;
+            a.download = `${name.replace(/\s+/g,'_')}_${paper.replace(/\s+/g,'_')}.pdf`;
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
-            await new Promise(r => setTimeout(r, 350));
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(pdfUrl), 3000);
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px; color:#16A34A;">check</span> <span>Saved</span>';
+            setTimeout(() => { btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">picture_as_pdf</span> <span>PDF</span>'; }, 2000);
+          } else {
+            throw new Error('PDF compiler returned empty.');
           }
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check</span>';
-          setTimeout(() => { btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span>'; }, 2000);
         } catch (err) {
-          console.warn('[Admin Essays] Download error:', err);
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span>';
+          console.warn('[Admin Essays] PDF compile error:', err);
+          alert('Could not compile PDF: ' + (err.message || 'Error'));
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">picture_as_pdf</span> <span>PDF</span>';
         }
       });
     });
