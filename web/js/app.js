@@ -4912,12 +4912,24 @@ class AppController {
 
 
   // ── Essay Answer Sheet Scanner (CamScanner-Grade Engine matching Build Spec) ──
-  async openEssayScannerModal(paperId, session, options = {}) {
+  openEssayScannerModal(paperId, session, options = {}) {
     const user = this.currentUser || {};
     const paperTitle = session?.title || session?.name || 'Exam Paper';
     const studentName = user?.name || user?.displayName || 'Student';
     const studentBatch = user?.examYear || user?.batch || '2027 A/L';
     const studentId = user?.studentId || user?.uid || user?.id || 'student';
+
+    // Stop any existing video streams or Agora broadcasters to release hardware camera on iOS
+    if (this.studentBroadcaster) {
+      try { this.studentBroadcaster.stop(); } catch (_) {}
+      this.studentBroadcaster = null;
+    }
+    document.querySelectorAll('video').forEach(v => {
+      if (v.id !== 'essay-scanner-video' && v.srcObject && typeof v.srcObject.getTracks === 'function') {
+        try { v.srcObject.getTracks().forEach(t => t.stop()); } catch (_) {}
+        v.srcObject = null;
+      }
+    });
 
     // Lazy load OpenCV.js in background
     let cvInstance = null;
@@ -4964,6 +4976,20 @@ class AppController {
       <div style="flex:1;position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;">
         <video id="essay-scanner-video" autoplay playsinline webkit-playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
         <canvas id="essay-detection-canvas" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;"></canvas>
+
+        <!-- Center Fallback Action Card (visible if WebRTC stream is blocked by iOS hardware locks or permissions) -->
+        <div id="essay-cam-fallback-box" style="display:flex;position:absolute;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;z-index:22;pointer-events:auto;">
+          <div style="width:64px;height:64px;border-radius:50%;background:rgba(37,99,235,0.2);border:2px solid #38BDF8;display:flex;align-items:center;justify-content:center;color:#38BDF8;box-shadow:0 0 24px rgba(56,189,248,0.3);">
+            <span class="material-symbols-rounded" style="font-size:32px;">photo_camera</span>
+          </div>
+          <div style="font-size:14px;font-weight:700;color:#FFFFFF;max-width:260px;line-height:1.4;">
+            Tap below or tap red shutter to take photo of your paper
+          </div>
+          <button id="essay-btn-open-cam" style="background:#2563EB;color:#FFFFFF;border:none;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(37,99,235,0.45);">
+            <span class="material-symbols-rounded" style="font-size:20px;">photo_camera</span>
+            <span>Take Photo (කැමරාව)</span>
+          </button>
+        </div>
 
         <!-- Detection Status Pill -->
         <div id="essay-detection-pill" style="position:absolute;top:14px;background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#E2E8F0;font-size:11px;font-weight:700;padding:6px 14px;border-radius:20px;display:flex;align-items:center;gap:6px;z-index:20;transition:all 0.2s ease;">
@@ -5029,47 +5055,8 @@ class AppController {
     const submitBtn = modal.querySelector('#essay-submit-all-btn');
     const countBadge = modal.querySelector('#essay-pages-count-badge');
 
-    // 1. Camera Initialization with iOS WebKit Optimizations
-    videoEl.setAttribute('playsinline', 'true');
-    videoEl.setAttribute('webkit-playsinline', 'true');
-    videoEl.muted = true;
-    videoEl.autoplay = true;
-
-    try {
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false
-      });
-    } catch (camErr1) {
-      console.warn('[Scanner Camera] Rear ideal resolution fallback:', camErr1);
-      try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false
-        });
-      } catch (camErr2) {
-        console.warn('[Scanner Camera] Basic environment fallback:', camErr2);
-        try {
-          cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        } catch (camErr3) {
-          console.warn('[Scanner Camera] WebRTC getUserMedia unavailable:', camErr3);
-        }
-      }
-    }
-
-    if (cameraStream) {
-      videoEl.srcObject = cameraStream;
-      videoEl.onloadedmetadata = () => {
-        videoEl.play().catch(() => {});
-      };
-      await videoEl.play().catch(() => {});
-    } else {
-      if (detectionPill) {
-        detectionPill.style.borderColor = '#F59E0B';
-        detectionPill.style.color = '#F59E0B';
-        detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#F59E0B;">photo_camera</span> Tap Shutter to take photo or choose Gallery';
-      }
-    }
+    const fallbackBox = modal.querySelector('#essay-cam-fallback-box');
+    const nativeCamInput = modal.querySelector('#essay-native-cam-input');
 
     // 2. Real-time Document Edge Detection Loop (Section 7 Build Spec)
     const runDetection = () => {
@@ -5310,9 +5297,8 @@ class AppController {
 
     // 5. Capture Photo from Video Viewfinder (with Native Camera Fallback if WebRTC is blocked/black)
     const captureFromCamera = () => {
-      // If WebRTC camera is blocked, has zero dimensions, or is not streaming (e.g. iOS lock), open native camera capture
-      if (!videoEl || !videoEl.videoWidth) {
-        const nativeCamInput = modal.querySelector('#essay-native-cam-input');
+      // If WebRTC camera is blocked, has zero dimensions, or is not playing, open native camera capture
+      if (!videoEl || !videoEl.videoWidth || videoEl.videoWidth === 0 || videoEl.paused) {
         if (nativeCamInput) {
           nativeCamInput.click();
         } else {
@@ -5342,6 +5328,10 @@ class AppController {
     };
 
     modal.querySelector('#essay-shutter-btn')?.addEventListener('click', captureFromCamera);
+    modal.querySelector('#essay-btn-open-cam')?.addEventListener('click', () => {
+      if (nativeCamInput) nativeCamInput.click();
+      else captureFromCamera();
+    });
 
     // 6. Gallery and Native Camera Upload Handlers
     modal.querySelector('#essay-gallery-input')?.addEventListener('change', async (e) => {
@@ -5399,7 +5389,9 @@ class AppController {
     // 9. Clean Exit / Close Scanner (Calls options.onClose to resume any background camera streams)
     const closeScanner = () => {
       if (detectionTimer) clearInterval(detectionTimer);
-      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+      if (cameraStream) {
+        try { cameraStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      }
       modal.remove();
       if (typeof options.onClose === 'function') {
         try { options.onClose(); } catch (e) { console.warn('[Scanner onClose err]:', e); }
@@ -5419,9 +5411,77 @@ class AppController {
     // 10. Proceed to Review & Submit
     submitBtn?.addEventListener('click', () => {
       if (scannedPages.length === 0) return;
-      closeScanner();
+      if (detectionTimer) clearInterval(detectionTimer);
+      if (cameraStream) {
+        try { cameraStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      }
+      modal.remove();
       this.openEssaySubmitDialog(scannedPages, paperId, session, user);
     });
+
+    // 11. Non-Blocking Background Camera Initialization
+    const initCameraStream = async () => {
+      videoEl.setAttribute('playsinline', 'true');
+      videoEl.setAttribute('webkit-playsinline', 'true');
+      videoEl.muted = true;
+      videoEl.autoplay = true;
+
+      // Small delay on iOS to allow hardware to finish switching from front proctoring to rear camera
+      await new Promise(r => setTimeout(r, 120));
+
+      const getStreamWithTimeout = (constraints, ms = 2200) => {
+        return Promise.race([
+          navigator.mediaDevices.getUserMedia(constraints),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+        ]);
+      };
+
+      try {
+        cameraStream = await getStreamWithTimeout({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+      } catch (e1) {
+        try {
+          cameraStream = await getStreamWithTimeout({
+            video: { facingMode: 'environment' },
+            audio: false
+          });
+        } catch (e2) {
+          try {
+            cameraStream = await getStreamWithTimeout({ video: true, audio: false });
+          } catch (e3) {
+            console.warn('[Scanner Camera] WebRTC stream failed or timed out:', e3);
+          }
+        }
+      }
+
+      if (cameraStream) {
+        videoEl.srcObject = cameraStream;
+        videoEl.onloadedmetadata = () => {
+          videoEl.play().catch(() => {});
+        };
+        await videoEl.play().catch(() => {});
+
+        setTimeout(() => {
+          if (!videoEl.videoWidth || videoEl.videoWidth === 0) {
+            if (fallbackBox) fallbackBox.style.display = 'flex';
+          } else {
+            if (fallbackBox) fallbackBox.style.display = 'none';
+            detectionTimer = setInterval(runDetection, 320);
+          }
+        }, 800);
+      } else {
+        if (fallbackBox) fallbackBox.style.display = 'flex';
+        if (detectionPill) {
+          detectionPill.style.borderColor = '#F59E0B';
+          detectionPill.style.color = '#F59E0B';
+          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#F59E0B;">photo_camera</span> Ready • Tap Shutter to Snap';
+        }
+      }
+    };
+
+    initCameraStream();
   }
 
   // ── Essay Answer Sheet Submit Dialog (Multi-Page PDF & Cloud Storage) ────────
@@ -12786,7 +12846,11 @@ ${!times.isWaiting ? `
         } else if (session.paperType === 'mcq_essay') {
           openCombinedAnswerSheetModal();
         } else {
-          // Release live proctoring camera hardware on iOS so CamScanner rear camera can open without black screen!
+          // Release live proctoring camera hardware & Agora broadcaster on iOS so CamScanner rear camera can open without black screen!
+          if (this.studentBroadcaster) {
+            try { this.studentBroadcaster.stop(); } catch (_) {}
+            this.studentBroadcaster = null;
+          }
           if (cameraStream) {
             try {
               cameraStream.getTracks().forEach(t => t.stop());
