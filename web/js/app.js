@@ -5119,10 +5119,10 @@ class AppController {
     });
 
     // Close & Exit Handlers
-    const closeScanner = () => {
+    const closeScanner = (triggerOnClose = true) => {
       cameraService.stopCamera();
       modal.remove();
-      if (typeof options.onClose === 'function') {
+      if (triggerOnClose && typeof options.onClose === 'function') {
         try { options.onClose(); } catch (err) { console.warn('[Scanner onClose err]:', err); }
       }
     };
@@ -5133,7 +5133,7 @@ class AppController {
       if (pages.length > 0) {
         if (!confirm(`You have ${pages.length} scanned page(s). Are you sure you want to exit without submitting?`)) return;
       }
-      closeScanner();
+      closeScanner(true);
     };
 
     const btnBack = modal.querySelector('#btn-back-scanner');
@@ -5148,21 +5148,49 @@ class AppController {
       btnClose.addEventListener('touchend', handleBackOrClose);
     }
 
-    // Submit Action
+    // Submit Action: Open Confirmation Sheet directly on top without closing scanner prematurely
     const doneBtn = modal.querySelector('#btn-finish-scan');
-    doneBtn?.addEventListener('click', () => {
+    let isSubmittingSheetOpen = false;
+    const handleDoneClick = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (isSubmittingSheetOpen) return;
       const pages = cameraService.getPages();
       if (pages.length === 0) return;
-      closeScanner();
-      this.openEssaySubmitDialog(pages, paperId, session, user);
-    });
+      isSubmittingSheetOpen = true;
+      this.openEssaySubmitDialog(pages, paperId, session, user, {
+        onClose: () => {
+          isSubmittingSheetOpen = false;
+        },
+        onSuccess: () => {
+          isSubmittingSheetOpen = false;
+          closeScanner(false);
+          if (typeof options.onSubmitted === 'function') {
+            options.onSubmitted();
+          } else {
+            const room = document.getElementById('live-exam-room-root');
+            if (room) room.remove();
+            if (this.currentTab === 'papers' || this.currentMode === 'student') {
+              try { this.switchTab('papers'); } catch (_) {}
+            }
+          }
+        }
+      });
+    };
+    if (doneBtn) {
+      doneBtn.addEventListener('click', handleDoneClick);
+      doneBtn.addEventListener('touchend', handleDoneClick);
+    }
   }
 
   // ── Essay Answer Sheet Submit Dialog (Multi-Page PDF & Cloud Storage) ────────
-  openEssaySubmitDialog(scannedPages, paperId, session, user) {
+  openEssaySubmitDialog(scannedPages, paperId, session, user, dialogOptions = {}) {
     if (!scannedPages || scannedPages.length === 0) return;
     const modal = document.createElement('div');
     modal.className = 'app-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);backdrop-filter:blur(10px);z-index:10000005;display:flex;align-items:flex-end;justify-content:center;-webkit-tap-highlight-color:transparent;';
     const paperTitle = session?.title || session?.name || 'Exam Paper';
     const studentName = user?.name || user?.displayName || 'Student';
     const studentBatch = user?.examYear || user?.batch || '2027 A/L';
@@ -5170,8 +5198,8 @@ class AppController {
     const pagesCount = scannedPages.length;
 
     modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:92vh;overflow-y:auto;border-radius:24px 24px 0 0;background:#FFFFFF;">
-        <div class="modal-header" style="position:sticky;top:0;background:#fff;z-index:10;padding-bottom:12px;border-bottom:1px solid #E2E8F0;">
+      <div class="modal-sheet" style="max-height:92vh;overflow-y:auto;border-radius:24px 24px 0 0;background:#FFFFFF;width:100%;max-width:540px;">
+        <div class="modal-header" style="position:sticky;top:0;background:#fff;z-index:10;padding:16px 20px 12px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
           <div>
             <h3 class="modal-title" style="margin:0;display:flex;align-items:center;gap:8px;font-size:17px;font-weight:900;color:#0F172A;">
               <span class="material-symbols-rounded filled" style="font-size:22px;color:#16A34A;">verified</span>
@@ -5179,10 +5207,12 @@ class AppController {
             </h3>
             <div style="font-size:12px;color:#64748B;font-weight:600;margin-top:2px;">${escapeHTML(paperTitle)} • ${pagesCount} Pages</div>
           </div>
-          <button class="modal-close-btn" id="essay-submit-close"><span class="material-symbols-rounded">close</span></button>
+          <button class="modal-close-btn" id="essay-submit-close" style="background:#F1F5F9;border:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+            <span class="material-symbols-rounded" style="font-size:20px;color:#475569;">close</span>
+          </button>
         </div>
 
-        <div style="padding:16px 0 0;">
+        <div style="padding:16px 20px 24px;">
           <!-- Scanned Pages Gallery Preview -->
           <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;">
             Preview Scanned Pages (${pagesCount}):
@@ -5221,7 +5251,7 @@ class AppController {
             </div>
           </div>
 
-          <button class="btn-primary" id="essay-submit-confirm-btn" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#16A34A;border:none;border-radius:14px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(22,163,74,0.35);">
+          <button class="btn-primary" id="essay-submit-confirm-btn" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#16A34A;border:none;border-radius:14px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(22,163,74,0.35);touch-action:manipulation;">
             <span class="material-symbols-rounded filled" style="font-size:19px;">cloud_upload</span>
             <span>Confirm &amp; Submit ${pagesCount} Pages</span>
           </button>
@@ -5230,7 +5260,16 @@ class AppController {
     `;
 
     document.body.appendChild(modal);
-    modal.querySelector('#essay-submit-close')?.addEventListener('click', () => modal.remove());
+    const closeSubmitModal = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      modal.remove();
+      if (typeof dialogOptions.onClose === 'function') {
+        try { dialogOptions.onClose(); } catch (_) {}
+      }
+    };
+    const submitCloseBtn = modal.querySelector('#essay-submit-close');
+    submitCloseBtn?.addEventListener('click', closeSubmitModal);
+    submitCloseBtn?.addEventListener('touchend', closeSubmitModal);
 
     modal.querySelector('#essay-submit-confirm-btn')?.addEventListener('click', async () => {
       const btn = modal.querySelector('#essay-submit-confirm-btn');
@@ -5279,10 +5318,18 @@ class AppController {
 
         modal.remove();
 
-        // 4. Show Beautiful Submission Receipt Modal (DO NOT kick student out!)
+        // 4. Trigger clean exit from scanner & exam room
+        if (typeof dialogOptions.onSuccess === 'function') {
+          try { dialogOptions.onSuccess(); } catch (_) {}
+        } else {
+          const room = document.getElementById('live-exam-room-root');
+          if (room) room.remove();
+        }
+
+        // 5. Show Beautiful Submission Receipt Modal on top
         const receiptModal = document.createElement('div');
         receiptModal.className = 'app-modal';
-        receiptModal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        receiptModal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.9);backdrop-filter:blur(12px);z-index:10000010;display:flex;align-items:center;justify-content:center;padding:20px;-webkit-tap-highlight-color:transparent;';
         receiptModal.innerHTML = `
           <div style="background:#FFFFFF;border-radius:24px;padding:28px 24px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);border:1px solid #E2E8F0;">
             <div style="width:68px;height:68px;border-radius:50%;background:#F0FDF4;border:2px solid #86EFAC;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#16A34A;">
@@ -5304,6 +5351,8 @@ class AppController {
         document.body.appendChild(receiptModal);
         receiptModal.querySelector('#btn-receipt-dismiss')?.addEventListener('click', () => {
           receiptModal.remove();
+          const room = document.getElementById('live-exam-room-root');
+          if (room) room.remove();
           if (this.currentTab === 'papers' || this.currentMode === 'student') {
             try { this.switchTab('papers'); } catch (_) {}
           }
@@ -12537,6 +12586,9 @@ ${!times.isWaiting ? `
               if (roomContainer && roomContainer.isConnected) {
                 initCamera();
               }
+            },
+            onSubmitted: () => {
+              cleanupAndExit();
             }
           });
         }
