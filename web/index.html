@@ -66,11 +66,11 @@
     })();
   </script>
 
-  <script type="module" src="./js/app.bundle.js?v=1.6.0"></script>
+  <script type="module" src="./js/app.bundle.js?v=1.7.0"></script>
   <!-- Service Worker Immediate Registration & Cache Refresh -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=1.6.0', { scope: './' }).then(reg => {
+      navigator.serviceWorker.register('./sw.js?v=1.7.0', { scope: './' }).then(reg => {
         reg.update();
       }).catch(() => {});
     }

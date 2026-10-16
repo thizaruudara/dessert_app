@@ -92,6 +92,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     match /submissions/{id} { allow read, write: if isAdmin(); }
+    match /essay_submissions/{id} { allow read, write: if true; }
     match /dessert_reviews/{id} { allow read, write: if isAdmin(); }
     // OTP documents must only be accessed by trusted server-side code.
     match /otp_requests/{id} { allow read, write: if false; }

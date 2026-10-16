@@ -438,6 +438,7 @@ export class DbService {
     const essayRef = collection(db, 'essay_submissions');
     const docRef = doc(essayRef);
     const docId = docRef.id;
+    const nowIso = new Date().toISOString();
 
     const newDoc = {
       id: docId,
@@ -454,24 +455,44 @@ export class DbService {
       adminComment: null,
       gradedBy: null,
       gradedAt: null,
-      submittedAt: new Date().toISOString()
+      submittedAt: nowIso
     };
 
-    // Persist locally so submission survives network issues
+    // 1. Persist locally immediately
     try {
       let localList = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
       localList = localList.filter(d => d.id !== docId);
       localList.unshift(newDoc);
       localStorage.setItem('edupeak_local_essay_submissions', JSON.stringify(localList.slice(0, 100)));
+      localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
+      localStorage.setItem(`paper_submitted_${paperId}`, 'true');
     } catch (_) {}
 
+    // 2. Write to essay_submissions collection in Firestore
     try {
       await Promise.race([
         setDoc(docRef, newDoc),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('submitEssayPaper timeout')), 8000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('submitEssayPaper timeout')), 4000))
       ]);
     } catch (e) {
       console.warn('[DB] submitEssayPaper Firestore note (saved locally):', e);
+    }
+
+    // 3. Keep paper_registrations in sync so live exam room marks it submitted
+    if (paperId && studentId) {
+      try {
+        const regRef = doc(db, 'paper_registrations', `${paperId}_${studentId}`);
+        await setDoc(regRef, {
+          paperId,
+          studentId,
+          studentName,
+          status: 'submitted',
+          isSubmitted: true,
+          submittedAt: nowIso,
+          submissionPhotos: mediaUrls || [],
+          submissionUrl: mediaUrls && mediaUrls[0] ? mediaUrls[0] : null
+        }, { merge: true }).catch(() => {});
+      } catch (_) {}
     }
 
     try {
@@ -482,39 +503,118 @@ export class DbService {
   }
 
   async getEssaySubmissions({ paperId = null, limit: lim = 200 } = {}) {
+    const results = [];
+    const seenIds = new Set();
+
+    // 1. Read from essay_submissions in Firestore with 2.5s timeout
     try {
       let q;
       if (paperId) {
-        q = query(collection(db, 'essay_submissions'), where('paperId', '==', paperId), orderBy('submittedAt', 'desc'), limit(lim));
+        q = query(collection(db, 'essay_submissions'), where('paperId', '==', paperId), limit(lim));
       } else {
-        q = query(collection(db, 'essay_submissions'), orderBy('submittedAt', 'desc'), limit(lim));
+        q = query(collection(db, 'essay_submissions'), limit(lim));
       }
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const snap = await Promise.race([
+        getDocs(q),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getEssaySubmissions timeout')), 2500))
+      ]);
+      snap.forEach(d => {
+        const item = { ...d.data(), id: d.id };
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          results.push(item);
+        }
+      });
     } catch (e) {
-      console.warn('[DB] getEssaySubmissions note:', e);
-      // Fallback to local cache
-      try {
-        const local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
-        return paperId ? local.filter(d => d.paperId === paperId) : local;
-      } catch (_) { return []; }
+      console.warn('[DB] getEssaySubmissions Firestore note:', e.message);
     }
+
+    // 2. Read from paper_registrations for any submissions uploaded via live exam room
+    try {
+      let regQ;
+      if (paperId) {
+        regQ = query(collection(db, 'paper_registrations'), where('paperId', '==', paperId), where('status', '==', 'submitted'), limit(lim));
+      } else {
+        regQ = query(collection(db, 'paper_registrations'), where('status', '==', 'submitted'), limit(lim));
+      }
+      const regSnap = await Promise.race([
+        getDocs(regQ),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('regSnap timeout')), 2000))
+      ]);
+      regSnap.forEach(d => {
+        const data = d.data();
+        const subId = `reg_${d.id}`;
+        if (!seenIds.has(subId) && !seenIds.has(d.id)) {
+          seenIds.add(subId);
+          results.push({
+            id: subId,
+            paperId: data.paperId || '',
+            paperTitle: data.paperTitle || 'Live Exam Paper',
+            studentId: data.studentId || '',
+            studentName: data.studentName || 'Student',
+            studentBatch: data.studentBatch || '2027 A/L',
+            mediaUrls: data.submissionPhotos || (data.submissionUrl ? [data.submissionUrl] : []),
+            pageCount: data.submissionPhotos ? data.submissionPhotos.length : 1,
+            note: data.note || '',
+            status: data.isGraded ? 'graded' : (data.status === 'submitted' ? 'pending' : 'pending'),
+            marks: data.marks ?? null,
+            adminComment: data.adminComment || null,
+            gradedBy: data.gradedBy || null,
+            gradedAt: data.gradedAt || null,
+            submittedAt: data.submittedAt || new Date().toISOString()
+          });
+        }
+      });
+    } catch (_) {}
+
+    // 3. Merge local cached essay submissions
+    try {
+      const local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
+      local.forEach(item => {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          if (!paperId || item.paperId === paperId) {
+            results.push(item);
+          }
+        }
+      });
+    } catch (_) {}
+
+    // Sort descending by submittedAt
+    results.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+    return results;
   }
 
   async gradeEssaySubmission({ submissionId, marks, adminComment, gradedBy }) {
+    const isRegSub = String(submissionId).startsWith('reg_');
+    const actualId = isRegSub ? String(submissionId).replace(/^reg_/, '') : submissionId;
+
     try {
-      const ref = doc(db, 'essay_submissions', submissionId);
-      await updateDoc(ref, {
-        marks: marks ?? null,
-        adminComment: String(adminComment || '').trim(),
-        gradedBy: String(gradedBy || 'Admin'),
-        gradedAt: new Date().toISOString(),
-        status: 'graded'
-      });
-      // Update local cache too
+      if (isRegSub) {
+        const ref = doc(db, 'paper_registrations', actualId);
+        await setDoc(ref, {
+          marks: marks ?? null,
+          adminComment: String(adminComment || '').trim(),
+          gradedBy: String(gradedBy || 'Admin'),
+          gradedAt: new Date().toISOString(),
+          isGraded: true,
+          status: 'graded'
+        }, { merge: true });
+      } else {
+        const ref = doc(db, 'essay_submissions', actualId);
+        await updateDoc(ref, {
+          marks: marks ?? null,
+          adminComment: String(adminComment || '').trim(),
+          gradedBy: String(gradedBy || 'Admin'),
+          gradedAt: new Date().toISOString(),
+          status: 'graded'
+        });
+      }
+
+      // Update local cache
       try {
         let local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
-        local = local.map(d => d.id === submissionId ? { ...d, marks, adminComment, gradedBy, gradedAt: new Date().toISOString(), status: 'graded' } : d);
+        local = local.map(d => (d.id === submissionId || d.id === actualId) ? { ...d, marks, adminComment, gradedBy, gradedAt: new Date().toISOString(), status: 'graded' } : d);
         localStorage.setItem('edupeak_local_essay_submissions', JSON.stringify(local));
       } catch (_) {}
     } catch (e) {

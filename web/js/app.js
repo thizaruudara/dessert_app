@@ -7,6 +7,7 @@ import { cameraService } from './camera-service.js';
 import { storageService } from './storage-service.js';
 import { PwaGatekeeper } from './pwa-gatekeeper.js';
 import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid } from './agora-service.js';
+import { loadOpenCV, detectDocument, warpDocument, enhance, rotateCanvas, canvasToBlob, canvasToDataURL, orderPoints, buildPdf } from './scanner-core.js';
 
 export function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -4907,65 +4908,109 @@ class AppController {
   }
 
 
-  // ── Essay Answer Sheet Scanner ─────────────────────────────────────────────
-  // Paper-specific scanner that saves to essay_submissions collection
-  openEssayScannerModal(paperId, session) {
+  // ── Essay Answer Sheet Scanner (CamScanner-Grade Engine matching Build Spec) ──
+  async openEssayScannerModal(paperId, session) {
     const user = this.currentUser || {};
-    cameraService.clearPages();
+    const paperTitle = session?.title || session?.name || 'Exam Paper';
+    const studentName = user?.name || user?.displayName || 'Student';
+    const studentBatch = user?.examYear || user?.batch || '2027 A/L';
+    const studentId = user?.studentId || user?.uid || user?.id || 'student';
+
+    // Lazy load OpenCV.js in background
+    let cvInstance = null;
+    loadOpenCV().then(cv => { cvInstance = cv; }).catch(() => {});
+
+    // Scanned pages state: array of { id, originalCanvas, corners, warpedCanvas, finalCanvas, filter, rotation, dataUrl }
+    let scannedPages = [];
+    let currentFilter = 'magic'; // 'magic' | 'bw' | 'gray' | 'original'
+    let cameraStream = null;
+    let detectionTimer = null;
+    let lastDetectedCorners = null;
 
     const modal = document.createElement('div');
     modal.className = 'scanner-modal';
     modal.id = 'essay-scanner-modal';
-
-    const paperTitle = session?.title || session?.name || 'Exam Paper';
+    modal.style.cssText = 'position:fixed;inset:0;background:#0F172A;z-index:999999;display:flex;flex-direction:column;color:#fff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;';
 
     modal.innerHTML = `
-      <div class="scanner-top-bar">
-        <div class="scanner-title">
-          <span style="display:inline-flex; align-items:center; gap:6px;">
-            <span class="material-symbols-rounded">history_edu</span>
-            <span style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${paperTitle}</span>
-          </span>
-          <span class="scanner-page-counter" id="essay-page-count">0 Pages</span>
+      <!-- Top App Bar -->
+      <div style="background:rgba(15,23,42,0.95);backdrop-filter:blur(10px);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155;z-index:30;">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <div style="width:34px;height:34px;border-radius:10px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);display:flex;align-items:center;justify-content:center;color:#EF4444;flex-shrink:0;">
+            <span class="material-symbols-rounded" style="font-size:20px;">document_scanner</span>
+          </div>
+          <div style="min-width:0;">
+            <div style="font-size:13.5px;font-weight:800;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${escapeHTML(paperTitle)}</div>
+            <div style="font-size:10.5px;color:#94A3B8;display:flex;align-items:center;gap:6px;">
+              <span id="essay-pages-count-badge" style="background:#22C55E22;color:#4ADE80;padding:1px 6px;border-radius:4px;font-weight:700;">0 Pages</span>
+              <span>• CamScanner Mode</span>
+            </div>
+          </div>
         </div>
-        <div class="scanner-top-actions">
-          <button class="btn-scanner-icon" id="essay-btn-torch" title="Flashlight" style="display:inline-flex; align-items:center; justify-content:center;">
-            <span class="material-symbols-rounded" style="font-size:18px;">flash_on</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="essay-btn-torch" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+            <span class="material-symbols-rounded" style="font-size:19px;">flash_on</span>
           </button>
-          <button class="btn-scanner-icon" id="essay-btn-close" title="Close" style="display:inline-flex; align-items:center; justify-content:center;">
+          <button id="essay-btn-close" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
             <span class="material-symbols-rounded" style="font-size:20px;">close</span>
           </button>
         </div>
       </div>
 
-      <div class="scanner-viewfinder-container">
-        <video class="scanner-video" id="essay-scanner-video" autoplay playsinline muted></video>
-        <div class="scanner-frame-overlay">
-          <div class="scanner-laser"></div>
-          <span class="scanner-hint-text">Align answer sheet within the frame • Good light, flat surface</span>
+      <!-- Live Viewfinder & Real-Time Edge Overlay -->
+      <div style="flex:1;position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        <video id="essay-scanner-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+        <canvas id="essay-detection-canvas" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;"></canvas>
+
+        <!-- Detection Status Pill -->
+        <div id="essay-detection-pill" style="position:absolute;top:14px;background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#E2E8F0;font-size:11px;font-weight:700;padding:6px 14px;border-radius:20px;display:flex;align-items:center;gap:6px;z-index:20;transition:all 0.2s ease;">
+          <span class="material-symbols-rounded" style="font-size:15px;color:#38BDF8;">crop_free</span>
+          <span>Point at paper on a flat surface</span>
         </div>
-        <div class="scanner-flash-overlay" id="essay-scanner-flash"></div>
+
+        <!-- Flash Animation Overlay -->
+        <div id="essay-flash-effect" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity 0.12s ease-out;z-index:25;"></div>
       </div>
 
-      <div class="scanner-bottom-bar">
-        <div class="scanner-filter-bar">
-          <button class="filter-pill active" data-filter="none">Natural</button>
-          <button class="filter-pill" data-filter="document">Enhance</button>
-          <button class="filter-pill" data-filter="bw">B&amp;W</button>
-        </div>
-        <div class="scanner-thumbnails-strip" id="essay-thumb-strip"></div>
-        <div class="scanner-shutter-row">
-          <label class="btn-upload-file-fallback" for="essay-file-input">
-            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:18px;">photo_library</span> Gallery</span>
-            <input type="file" id="essay-file-input" accept="image/*" capture="environment" style="display:none;" multiple />
-          </label>
-          <button class="shutter-btn-wrap" id="essay-shutter" type="button" aria-label="Take Photo">
-            <span class="shutter-outer-ring" style="border-color:#DC2626;"></span>
-            <span class="btn-shutter-inner" style="background:#DC2626;"></span>
+      <!-- Bottom Controls -->
+      <div style="background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border-top:1px solid #334155;padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 14px);z-index:30;">
+        <!-- Filter Selector -->
+        <div style="display:flex;justify-content:center;gap:8px;margin-bottom:12px;">
+          <button class="scanner-filter-pill active" data-filter="magic" style="background:#2563EB;color:#fff;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            <span class="material-symbols-rounded" style="font-size:14px;">auto_fix_high</span> Magic Color
           </button>
-          <button class="btn-done-scanning" id="essay-done-btn" disabled style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+          <button class="scanner-filter-pill" data-filter="bw" style="background:#334155;color:#94A3B8;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            B&amp;W Clean
+          </button>
+          <button class="scanner-filter-pill" data-filter="gray" style="background:#334155;color:#94A3B8;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            Grayscale
+          </button>
+          <button class="scanner-filter-pill" data-filter="original" style="background:#334155;color:#94A3B8;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            Original
+          </button>
+        </div>
+
+        <!-- Thumbnails Strip -->
+        <div id="essay-scanned-strip" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:10px;min-height:56px;align-items:center;">
+          <span style="font-size:11px;color:#64748B;font-style:italic;padding-left:4px;">No pages captured yet. Tap Shutter to scan.</span>
+        </div>
+
+        <!-- Shutter Row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 10px;">
+          <label for="essay-gallery-input" style="background:#1E293B;border:1px solid #475569;color:#E2E8F0;border-radius:12px;padding:9px 12px;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+            <span class="material-symbols-rounded" style="font-size:17px;color:#38BDF8;">photo_library</span>
+            <span>Gallery</span>
+            <input type="file" id="essay-gallery-input" accept="image/*" multiple style="display:none;" />
+          </label>
+
+          <!-- Big Red Camera Shutter -->
+          <button id="essay-shutter-btn" style="width:68px;height:68px;border-radius:50%;background:#FFFFFF;border:5px solid #DC2626;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 16px rgba(220,38,38,0.4);">
+            <div style="width:50px;height:50px;border-radius:50%;background:#DC2626;transition:transform 0.1s ease;"></div>
+          </button>
+
+          <button id="essay-submit-all-btn" disabled style="background:#16A34A;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px;opacity:0.4;transition:all 0.2s ease;">
             <span>Submit</span>
-            <span class="material-symbols-rounded" style="font-size:16px;">upload</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
           </button>
         </div>
       </div>
@@ -4973,208 +5018,470 @@ class AppController {
 
     document.body.appendChild(modal);
 
-    const videoEl = document.getElementById('essay-scanner-video');
-    let currentFilter = 'none';
+    const videoEl = modal.querySelector('#essay-scanner-video');
+    const overlayCanvas = modal.querySelector('#essay-detection-canvas');
+    const detectionPill = modal.querySelector('#essay-detection-pill');
+    const stripEl = modal.querySelector('#essay-scanned-strip');
+    const submitBtn = modal.querySelector('#essay-submit-all-btn');
+    const countBadge = modal.querySelector('#essay-pages-count-badge');
 
-    cameraService.startCamera(videoEl, 'environment').catch(err => {
-      console.warn('[EssayScanner] Camera notice:', err.message);
-    });
-
-    document.getElementById('essay-btn-torch')?.addEventListener('click', async () => {
-      const active = await cameraService.toggleTorch();
-      document.getElementById('essay-btn-torch')?.classList.toggle('active', active);
-    });
-
-    modal.querySelectorAll('.filter-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        modal.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        currentFilter = pill.dataset.filter;
+    // 1. Camera Initialization
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false
       });
-    });
-
-    const updateEssayThumbs = () => {
-      const pages = cameraService.getPages();
-      const countEl = document.getElementById('essay-page-count');
-      const stripEl = document.getElementById('essay-thumb-strip');
-      const doneBtn = document.getElementById('essay-done-btn');
-      if (countEl) countEl.textContent = `${pages.length} Pages`;
-      if (doneBtn) doneBtn.disabled = pages.length === 0;
-      if (stripEl) {
-        stripEl.innerHTML = pages.map((dataUrl, idx) => `
-          <div class="thumb-card">
-            <img src="${dataUrl}"/>
-            <button class="thumb-del-btn" data-del-idx="${idx}" style="display:inline-flex; align-items:center; justify-content:center;">
-              <span class="material-symbols-rounded" style="font-size:12px;">close</span>
-            </button>
-            <span class="thumb-page-badge">P${idx + 1}</span>
-          </div>
-        `).join('');
-        stripEl.querySelectorAll('.thumb-del-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            cameraService.removePage(Number(btn.dataset.delIdx));
-            updateEssayThumbs();
-          });
-        });
-      }
-    };
-
-    const takePhoto = (e) => {
-      if (e) { e.preventDefault(); e.stopPropagation(); }
+      videoEl.srcObject = cameraStream;
+      await videoEl.play().catch(() => {});
+    } catch (camErr) {
+      console.warn('[Scanner Camera] Rear camera fallback:', camErr);
       try {
-        const flash = document.getElementById('essay-scanner-flash');
-        if (flash) { flash.classList.add('flashing'); setTimeout(() => flash.classList.remove('flashing'), 140); }
-        cameraService.capturePhoto(currentFilter);
-        updateEssayThumbs();
-      } catch (err) {
-        console.warn('[EssayScanner] Capture notice:', err);
-        notificationService.showInAppBanner('Camera Notice', 'Could not capture. Try Gallery upload.', 'warning');
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        videoEl.srcObject = cameraStream;
+        await videoEl.play().catch(() => {});
+      } catch (err2) {
+        if (detectionPill) {
+          detectionPill.style.color = '#F87171';
+          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#F87171;">error</span> Camera unavailable. Please pick photos via Gallery.';
+        }
       }
-    };
-
-    const shutterBtn = document.getElementById('essay-shutter');
-    if (shutterBtn) {
-      shutterBtn.addEventListener('click', takePhoto);
-      shutterBtn.addEventListener('touchend', (e) => { e.preventDefault(); takePhoto(); }, { passive: false });
     }
 
-    document.getElementById('essay-file-input')?.addEventListener('change', async (e) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
-      for (const file of Array.from(files)) {
-        try {
-          const rawDataUrl = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = evt => resolve(evt.target.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          if (rawDataUrl) {
-            const compressed = await cameraService.compressImage(rawDataUrl, 1600, 0.82);
-            cameraService.addPageFromDataUrl(compressed);
-          }
-        } catch (err) { console.warn('[EssayScanner] File read error:', err); }
+    // 2. Real-time Document Edge Detection Loop (Section 7 Build Spec)
+    const runDetection = () => {
+      if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth || !overlayCanvas) return;
+      overlayCanvas.width = videoEl.videoWidth;
+      overlayCanvas.height = videoEl.videoHeight;
+      const ctx = overlayCanvas.getContext('2d');
+      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+      const corners = detectDocument(cvInstance, videoEl);
+      lastDetectedCorners = corners;
+
+      if (corners && corners.length === 4) {
+        ctx.lineWidth = Math.max(4, overlayCanvas.width / 220);
+        ctx.strokeStyle = '#22C55E';
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.18)';
+        ctx.beginPath();
+        corners.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw corner target markers
+        corners.forEach((p) => {
+          ctx.fillStyle = '#22C55E';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, ctx.lineWidth * 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        if (detectionPill) {
+          detectionPill.style.borderColor = '#22C55E';
+          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#22C55E;">check_circle</span> 📄 Page Detected • Tap Shutter';
+        }
+      } else {
+        if (detectionPill) {
+          detectionPill.style.borderColor = 'rgba(255,255,255,0.15)';
+          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#38BDF8;">crop_free</span> Align page in frame';
+        }
       }
-      updateEssayThumbs();
+    };
+
+    detectionTimer = setInterval(runDetection, 320);
+
+    // 3. Update Scanned Pages Strip
+    const updateStripUI = () => {
+      if (countBadge) countBadge.textContent = `${scannedPages.length} Page${scannedPages.length !== 1 ? 's' : ''}`;
+      if (submitBtn) {
+        submitBtn.disabled = scannedPages.length === 0;
+        submitBtn.style.opacity = scannedPages.length > 0 ? '1' : '0.4';
+      }
+
+      if (!stripEl) return;
+      if (scannedPages.length === 0) {
+        stripEl.innerHTML = '<span style="font-size:11px;color:#64748B;font-style:italic;padding-left:4px;">No pages captured yet. Tap Shutter to scan.</span>';
+        return;
+      }
+
+      stripEl.innerHTML = scannedPages.map((page, idx) => `
+        <div class="scanned-page-thumb" data-page-idx="${idx}" style="position:relative;width:58px;height:78px;flex-shrink:0;border-radius:10px;overflow:hidden;border:2px solid #2563EB;box-shadow:0 3px 8px rgba(0,0,0,0.4);cursor:pointer;background:#000;">
+          <img src="${page.dataUrl}" style="width:100%;height:100%;object-fit:cover;" />
+          <span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;">P${idx + 1}</span>
+          <button class="btn-del-page" data-page-idx="${idx}" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#EF4444;color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;">
+            <span class="material-symbols-rounded" style="font-size:12px;">close</span>
+          </button>
+        </div>
+      `).join('') + `
+        <button id="btn-add-more-pages" style="height:78px;min-width:58px;border-radius:10px;border:1.5px dashed #475569;background:rgba(255,255,255,0.05);color:#94A3B8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;padding:4px;">
+          <span class="material-symbols-rounded" style="font-size:20px;color:#38BDF8;">add_a_photo</span>
+          <span style="font-size:9.5px;font-weight:700;">+ Page</span>
+        </button>
+      `;
+
+      stripEl.querySelectorAll('.btn-del-page').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = Number(btn.dataset.pageIdx);
+          scannedPages.splice(idx, 1);
+          updateStripUI();
+        });
+      });
+    };
+
+    // 4. Interactive 4-Corner Adjustment Editor (Section 8 Build Spec)
+    const openCornerAdjustmentEditor = (fullCanvas, initialCorners, onCropDone) => {
+      const editor = document.createElement('div');
+      editor.style.cssText = 'position:fixed;inset:0;background:#0B132B;z-index:1000001;display:flex;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;color:#fff;';
+
+      let pts = initialCorners && initialCorners.length === 4 ? [...initialCorners] : detectDocumentCanvasFallback(fullCanvas);
+      let draggingIdx = -1;
+      const dataUrl = fullCanvas.toDataURL('image/jpeg', 0.85);
+
+      editor.innerHTML = `
+        <div style="background:#1E293B;padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155;">
+          <div>
+            <div style="font-size:14px;font-weight:800;color:#FFFFFF;display:flex;align-items:center;gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:18px;color:#22C55E;">crop</span>
+              <span>Adjust Document Corners</span>
+            </div>
+            <div style="font-size:10.5px;color:#94A3B8;">Drag 4 green handles to match paper edges</div>
+          </div>
+          <button id="editor-cancel-btn" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">Retake</button>
+        </div>
+
+        <div id="editor-viewport" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:12px;background:#000;">
+          <div style="position:relative;max-width:100%;max-height:100%;aspect-ratio:${fullCanvas.width}/${fullCanvas.height};">
+            <img id="editor-base-img" src="${dataUrl}" style="width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none;border-radius:6px;" />
+            <svg id="editor-svg-overlay" viewBox="0 0 ${fullCanvas.width} ${fullCanvas.height}" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;overflow:visible;">
+              <polygon id="editor-svg-poly" fill="rgba(34,197,94,0.22)" stroke="#22C55E" stroke-width="${Math.max(4, fullCanvas.width / 160)}" />
+              <g id="editor-handles-group"></g>
+            </svg>
+          </div>
+        </div>
+
+        <div style="background:#1E293B;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:12px;border-top:1px solid #334155;">
+          <button id="editor-auto-detect-btn" style="flex:1;background:#334155;color:#E2E8F0;border:none;border-radius:12px;padding:12px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+            <span class="material-symbols-rounded" style="font-size:16px;color:#38BDF8;">magic_button</span> Auto Detect
+          </button>
+          <button id="editor-confirm-btn" style="flex:2;background:#22C55E;color:#FFFFFF;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 14px rgba(34,197,94,0.35);">
+            <span class="material-symbols-rounded" style="font-size:18px;">crop</span> Crop &amp; Enhance Page
+          </button>
+        </div>
+      `;
+
+      document.body.appendChild(editor);
+
+      const svgEl = editor.querySelector('#editor-svg-overlay');
+      const polyEl = editor.querySelector('#editor-svg-poly');
+      const handlesGroup = editor.querySelector('#editor-handles-group');
+      const handleR = Math.max(22, Math.round(fullCanvas.width / 32));
+
+      const renderSvgHandles = () => {
+        polyEl.setAttribute('points', pts.map(p => `${Math.round(p.x)},${Math.round(p.y)}`).join(' '));
+        handlesGroup.innerHTML = pts.map((p, i) => `
+          <circle cx="${Math.round(p.x)}" cy="${Math.round(p.y)}" r="${handleR}" fill="#22C55E" fill-opacity="0.85" stroke="#FFFFFF" stroke-width="${Math.max(3, handleR / 6)}" style="cursor:grab;" data-handle="${i}" />
+          <text x="${Math.round(p.x)}" y="${Math.round(p.y + handleR / 3)}" font-size="${Math.round(handleR * 0.9)}" font-weight="900" fill="#000" text-anchor="middle" pointer-events="none">${i + 1}</text>
+        `).join('');
+      };
+
+      renderSvgHandles();
+
+      const toImgCoords = (e) => {
+        const r = svgEl.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        return {
+          x: Math.min(fullCanvas.width, Math.max(0, ((touch.clientX - r.left) / r.width) * fullCanvas.width)),
+          y: Math.min(fullCanvas.height, Math.max(0, ((touch.clientY - r.top) / r.height) * fullCanvas.height))
+        };
+      };
+
+      const handlePointerDown = (e) => {
+        const target = e.target;
+        if (target && target.dataset && target.dataset.handle !== undefined) {
+          draggingIdx = Number(target.dataset.handle);
+        }
+      };
+
+      const handlePointerMove = (e) => {
+        if (draggingIdx < 0) return;
+        const p = toImgCoords(e);
+        pts[draggingIdx] = p;
+        renderSvgHandles();
+      };
+
+      const handlePointerUp = () => { draggingIdx = -1; };
+
+      svgEl.addEventListener('pointerdown', handlePointerDown);
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+
+      editor.querySelector('#editor-cancel-btn')?.addEventListener('click', () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        editor.remove();
+      });
+
+      editor.querySelector('#editor-auto-detect-btn')?.addEventListener('click', () => {
+        const found = detectDocument(cvInstance, fullCanvas);
+        pts = found ? [...found] : detectDocumentCanvasFallback(fullCanvas);
+        renderSvgHandles();
+      });
+
+      editor.querySelector('#editor-confirm-btn')?.addEventListener('click', async () => {
+        const btn = editor.querySelector('#editor-confirm-btn');
+        if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;animation:spin 0.7s linear infinite;">progress_activity</span> Flattening &amp; Enhancing...';
+        await new Promise(r => setTimeout(r, 60));
+
+        // 1. Perspective Warp (Dewarp angled paper)
+        const warped = warpDocument(cvInstance, fullCanvas, pts);
+        // 2. Enhance with CamScanner filter
+        const enhanced = enhance(cvInstance, warped, currentFilter);
+        const finalUrl = enhanced.toDataURL('image/jpeg', 0.86);
+
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        editor.remove();
+
+        onCropDone({
+          rawCanvas: fullCanvas,
+          corners: pts,
+          warpedCanvas: warped,
+          enhancedCanvas: enhanced,
+          filter: currentFilter,
+          rotation: 0,
+          dataUrl: finalUrl
+        });
+      });
+    };
+
+    // 5. Capture Photo from Video Viewfinder
+    const captureFromCamera = () => {
+      if (!videoEl || !videoEl.videoWidth) return;
+      const flash = modal.querySelector('#essay-flash-effect');
+      if (flash) {
+        flash.style.opacity = '0.9';
+        setTimeout(() => { flash.style.opacity = '0'; }, 100);
+      }
+
+      const fullCanvas = document.createElement('canvas');
+      fullCanvas.width = videoEl.videoWidth;
+      fullCanvas.height = videoEl.videoHeight;
+      const ctx = fullCanvas.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0);
+
+      const corners = lastDetectedCorners || detectDocument(cvInstance, fullCanvas) || detectDocumentCanvasFallback(fullCanvas);
+
+      openCornerAdjustmentEditor(fullCanvas, corners, (newPage) => {
+        scannedPages.push(newPage);
+        updateStripUI();
+      });
+    };
+
+    modal.querySelector('#essay-shutter-btn')?.addEventListener('click', captureFromCamera);
+
+    // 6. Gallery File Upload Fallback
+    modal.querySelector('#essay-gallery-input')?.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      for (const file of files) {
+        try {
+          const img = new Image();
+          const imgUrl = URL.createObjectURL(file);
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = imgUrl; });
+          const fullCanvas = document.createElement('canvas');
+          fullCanvas.width = img.naturalWidth || img.width;
+          fullCanvas.height = img.naturalHeight || img.height;
+          const ctx = fullCanvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(imgUrl);
+
+          const corners = detectDocument(cvInstance, fullCanvas) || detectDocumentCanvasFallback(fullCanvas);
+          await new Promise((resDone) => {
+            openCornerAdjustmentEditor(fullCanvas, corners, (newPage) => {
+              scannedPages.push(newPage);
+              updateStripUI();
+              resDone();
+            });
+          });
+        } catch (err) {
+          console.warn('[Gallery image load error]:', err);
+        }
+      }
       e.target.value = '';
     });
 
-    const closeEssayScanner = () => {
-      cameraService.stopCamera();
+    // 7. Filter Change Buttons
+    modal.querySelectorAll('.scanner-filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        modal.querySelectorAll('.scanner-filter-pill').forEach(p => {
+          p.classList.remove('active');
+          p.style.background = '#334155';
+          p.style.color = '#94A3B8';
+        });
+        pill.classList.add('active');
+        pill.style.background = '#2563EB';
+        pill.style.color = '#fff';
+        currentFilter = pill.dataset.filter;
+
+        // Re-enhance existing pages with the newly selected filter
+        scannedPages.forEach(p => {
+          p.filter = currentFilter;
+          p.enhancedCanvas = enhance(cvInstance, p.warpedCanvas, currentFilter);
+          p.dataUrl = p.enhancedCanvas.toDataURL('image/jpeg', 0.86);
+        });
+        updateStripUI();
+      });
+    });
+
+    // 8. Torch Button
+    modal.querySelector('#essay-btn-torch')?.addEventListener('click', async () => {
+      try {
+        if (!cameraStream) return;
+        const track = cameraStream.getVideoTracks()[0];
+        const caps = track?.getCapabilities ? track.getCapabilities() : {};
+        if (caps.torch) {
+          const enabled = !track._torchOn;
+          await track.applyConstraints({ advanced: [{ torch: enabled }] });
+          track._torchOn = enabled;
+          modal.querySelector('#essay-btn-torch').style.background = enabled ? '#F59E0B' : 'rgba(255,255,255,0.1)';
+        } else {
+          alert('Torch is not supported on this device/browser.');
+        }
+      } catch (_) {}
+    });
+
+    // 9. Clean Exit / Close Scanner
+    const closeScanner = () => {
+      if (detectionTimer) clearInterval(detectionTimer);
+      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
       modal.remove();
     };
 
-    document.getElementById('essay-btn-close')?.addEventListener('click', () => {
-      const pages = cameraService.getPages();
-      if (pages.length > 0) {
-        if (!confirm(`You have ${pages.length} scanned page(s). Close without submitting?`)) return;
+    modal.querySelector('#essay-btn-close')?.addEventListener('click', () => {
+      if (scannedPages.length > 0) {
+        if (!confirm(`You have ${scannedPages.length} scanned page(s). Are you sure you want to exit without submitting?`)) return;
       }
-      closeEssayScanner();
+      closeScanner();
     });
 
-    document.getElementById('essay-done-btn')?.addEventListener('click', () => {
-      const pages = cameraService.getPages();
-      if (pages.length === 0) return;
-      closeEssayScanner();
-      this.openEssaySubmitDialog(pages, paperId, session, user);
+    // 10. Proceed to Review & Submit
+    submitBtn?.addEventListener('click', () => {
+      if (scannedPages.length === 0) return;
+      closeScanner();
+      this.openEssaySubmitDialog(scannedPages, paperId, session, user);
     });
   }
 
-  openEssaySubmitDialog(pages, paperId, session, user) {
-    if (!pages || pages.length === 0) return;
+  // ── Essay Answer Sheet Submit Dialog (Multi-Page PDF & Cloud Storage) ────────
+  openEssaySubmitDialog(scannedPages, paperId, session, user) {
+    if (!scannedPages || scannedPages.length === 0) return;
     const modal = document.createElement('div');
     modal.className = 'app-modal';
     const paperTitle = session?.title || session?.name || 'Exam Paper';
-    const studentName = user?.name || 'Student';
+    const studentName = user?.name || user?.displayName || 'Student';
     const studentBatch = user?.examYear || user?.batch || '2027 A/L';
+    const studentId = user?.studentId || user?.uid || user?.id || 'student';
+    const pagesCount = scannedPages.length;
 
     modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:90vh; overflow-y:auto;">
-        <div class="modal-header" style="position:sticky; top:0; background:#fff; z-index:2; padding-bottom:12px; border-bottom:1px solid #E2E8F0;">
-          <div style="display:flex; flex-direction:column; gap:2px;">
-            <h3 class="modal-title" style="margin:0;">Submit Answer Sheet</h3>
-            <div style="font-size:12px; color:#64748B; font-weight:600;">${paperTitle}</div>
+      <div class="modal-sheet" style="max-height:92vh;overflow-y:auto;border-radius:24px 24px 0 0;background:#FFFFFF;">
+        <div class="modal-header" style="position:sticky;top:0;background:#fff;z-index:10;padding-bottom:12px;border-bottom:1px solid #E2E8F0;">
+          <div>
+            <h3 class="modal-title" style="margin:0;display:flex;align-items:center;gap:8px;font-size:17px;font-weight:900;color:#0F172A;">
+              <span class="material-symbols-rounded filled" style="font-size:22px;color:#16A34A;">verified</span>
+              Confirm Answer Sheet Submission
+            </h3>
+            <div style="font-size:12px;color:#64748B;font-weight:600;margin-top:2px;">${escapeHTML(paperTitle)} • ${pagesCount} Pages</div>
           </div>
-          <button class="modal-close-btn" id="essay-submit-close">
-            <span class="material-symbols-rounded">close</span>
-          </button>
+          <button class="modal-close-btn" id="essay-submit-close"><span class="material-symbols-rounded">close</span></button>
         </div>
 
         <div style="padding:16px 0 0;">
-          <!-- Page Previews -->
-          <div style="font-size:12px; font-weight:700; color:#475569; margin-bottom:8px;">
-            Scanned Pages (${pages.length}):
+          <!-- Scanned Pages Gallery Preview -->
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;">
+            Preview Scanned Pages (${pagesCount}):
           </div>
-          <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; padding-bottom:6px; -webkit-overflow-scrolling:touch;">
-            ${pages.map((img, i) => `
-              <div style="position:relative; width:64px; height:84px; flex-shrink:0; border-radius:10px; overflow:hidden; border:2px solid #DC2626; box-shadow:0 2px 8px rgba(220,38,38,0.15);">
-                <img src="${img}" style="width:100%; height:100%; object-fit:cover;" />
-                <span style="position:absolute; bottom:2px; left:2px; background:rgba(220,38,38,0.85); color:#fff; font-size:9px; font-weight:800; padding:1px 5px; border-radius:4px;">P${i+1}</span>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;margin-bottom:16px;-webkit-overflow-scrolling:touch;">
+            ${scannedPages.map((pg, i) => `
+              <div style="position:relative;width:74px;height:102px;flex-shrink:0;border-radius:12px;overflow:hidden;border:2px solid #2563EB;box-shadow:0 3px 10px rgba(37,99,235,0.2);">
+                <img src="${pg.dataUrl || pg}" style="width:100%;height:100%;object-fit:cover;" />
+                <span style="position:absolute;bottom:3px;left:3px;background:rgba(15,23,42,0.85);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;">P${i + 1}</span>
               </div>
             `).join('')}
           </div>
 
-          <!-- Student Info (readonly) -->
-          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px;">
-            <span class="material-symbols-rounded filled" style="font-size:28px; color:#2563EB;">account_circle</span>
-            <div>
-              <div style="font-size:13px; font-weight:800; color:#0F172A;">${studentName}</div>
-              <div style="font-size:11px; color:#64748B;">${studentBatch} • ${pages.length} page${pages.length !== 1 ? 's' : ''}</div>
+          <!-- Student Profile Summary -->
+          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+            <div style="width:38px;height:38px;border-radius:50%;background:#EFF6FF;border:1px solid #BFDBFE;display:flex;align-items:center;justify-content:center;color:#2563EB;flex-shrink:0;">
+              <span class="material-symbols-rounded filled" style="font-size:22px;">account_circle</span>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13.5px;font-weight:800;color:#0F172A;">${escapeHTML(studentName)}</div>
+              <div style="font-size:11.5px;color:#64748B;">${escapeHTML(studentBatch)} • Student ID: ${escapeHTML(studentId)}</div>
             </div>
           </div>
 
-          <!-- Optional Note -->
-          <div class="form-group">
-            <label class="form-label">Note to Admin (Optional)</label>
-            <textarea class="form-textarea" id="essay-submit-note" rows="2" placeholder="e.g. Q3 was left blank, handwriting question 5..."></textarea>
+          <!-- Optional Teacher Note -->
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label" style="font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;display:block;">Note for Examiner / Teacher (Optional)</label>
+            <textarea class="form-textarea" id="essay-submit-note" rows="2" placeholder="e.g. Question 4 has calculations on page 2..." style="width:100%;border:1.5px solid #CBD5E1;border-radius:12px;padding:10px;font-size:12.5px;box-sizing:border-box;"></textarea>
           </div>
 
-          <!-- Quality Warning -->
-          <div style="background:#FFF7ED; border:1px solid #FED7AA; border-radius:10px; padding:10px 12px; margin-bottom:14px; display:flex; gap:8px; align-items:flex-start;">
-            <span class="material-symbols-rounded" style="font-size:18px; color:#D97706; flex-shrink:0;">info</span>
-            <div style="font-size:11.5px; color:#92400E; line-height:1.4;">
-              Make sure all writing is clearly visible. Use good lighting and a flat surface. You cannot re-submit once confirmed.
+          <!-- Confirmation Advice -->
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:10px 12px;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start;">
+            <span class="material-symbols-rounded" style="font-size:18px;color:#16A34A;flex-shrink:0;">verified_user</span>
+            <div style="font-size:11.5px;color:#166534;line-height:1.45;">
+              All ${pagesCount} pages will be compiled and sent directly to the examiner. You will remain in the app and can view your submission receipt anytime.
             </div>
           </div>
 
-          <button class="btn-primary" id="essay-submit-confirm" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; background:#DC2626;">
-            <span class="material-symbols-rounded filled" style="font-size:18px;">cloud_upload</span>
-            <span>Submit ${pages.length} Pages Now</span>
+          <button class="btn-primary" id="essay-submit-confirm-btn" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:#16A34A;border:none;border-radius:14px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(22,163,74,0.35);">
+            <span class="material-symbols-rounded filled" style="font-size:19px;">cloud_upload</span>
+            <span>Confirm &amp; Submit ${pagesCount} Pages</span>
           </button>
         </div>
       </div>
     `;
 
     document.body.appendChild(modal);
-    document.getElementById('essay-submit-close')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('#essay-submit-close')?.addEventListener('click', () => modal.remove());
 
-    document.getElementById('essay-submit-confirm')?.addEventListener('click', async () => {
-      const btn = document.getElementById('essay-submit-confirm');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">hourglass_top</span>&nbsp;Optimizing pages...'; }
+    modal.querySelector('#essay-submit-confirm-btn')?.addEventListener('click', async () => {
+      const btn = modal.querySelector('#essay-submit-confirm-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;animation:spin 0.75s linear infinite;">progress_activity</span> Compiling PDF &amp; Uploading...';
+      }
 
       try {
-        const studentId = user?.studentId || user?.uid || user?.id || 'student';
-        const note = document.getElementById('essay-submit-note')?.value?.trim() || '';
+        const note = modal.querySelector('#essay-submit-note')?.value?.trim() || '';
+        const rawCanvases = scannedPages.map(p => p.enhancedCanvas || p.warpedCanvas || p.dataUrl || p);
+        const dataUrls = scannedPages.map(p => p.dataUrl || (typeof p === 'string' ? p : ''));
 
-        if (btn) btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">cloud_upload</span>&nbsp;Uploading pages...';
+        // 1. Build compiled PDF with jsPDF
+        let pdfBlob = null;
+        try {
+          pdfBlob = await buildPdf(rawCanvases);
+        } catch (pdfErr) {
+          console.warn('[PDF generation note]:', pdfErr);
+        }
 
-        // Upload pages to storage
+        // 2. Upload pages to Cloud Storage
         let uploadedUrls = [];
         try {
-          uploadedUrls = await storageService.uploadAllPages(pages, {
+          uploadedUrls = await storageService.uploadAllPages(dataUrls, {
             studentId,
             filePrefix: `essay_${paperId || 'paper'}`
           });
         } catch (uploadErr) {
-          console.warn('[EssayScanner] Storage upload note:', uploadErr);
+          console.warn('[Storage upload note]:', uploadErr);
         }
 
-        const finalUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : pages;
+        const finalUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : dataUrls;
 
-        if (btn) btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">save</span>&nbsp;Saving submission...';
-
-        await dbService.submitEssayPaper({
+        // 3. Save to database via dbService.submitEssayPaper (writes to essay_submissions AND paper_registrations)
+        const record = await dbService.submitEssayPaper({
           paperId: paperId || '',
           paperTitle,
           studentId,
@@ -5185,26 +5492,45 @@ class AppController {
           note
         });
 
-        cameraService.clearPages();
         modal.remove();
-        notificationService.showInAppBanner(
-          'Answer Sheet Submitted! ✅',
-          `${pages.length} page${pages.length !== 1 ? 's' : ''} submitted. Admin will review your paper.`,
-          'success'
-        );
 
-        // Refresh the papers card if on papers tab
-        if (this.currentTab === 'papers' || this.currentMode === 'student') {
-          setTimeout(() => { try { this.switchTab('papers'); } catch (_) {} }, 800);
-        }
+        // 4. Show Beautiful Submission Receipt Modal (DO NOT kick student out!)
+        const receiptModal = document.createElement('div');
+        receiptModal.className = 'app-modal';
+        receiptModal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        receiptModal.innerHTML = `
+          <div style="background:#FFFFFF;border-radius:24px;padding:28px 24px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);border:1px solid #E2E8F0;">
+            <div style="width:68px;height:68px;border-radius:50%;background:#F0FDF4;border:2px solid #86EFAC;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#16A34A;">
+              <span class="material-symbols-rounded filled" style="font-size:38px;">verified</span>
+            </div>
+            <h3 style="font-size:19px;font-weight:900;color:#0F172A;margin:0 0 6px 0;">Answer Sheet Submitted!</h3>
+            <p style="font-size:12.5px;color:#64748B;margin:0 0 16px 0;line-height:1.5;">
+              Your <strong>${finalUrls.length} pages</strong> have been securely recorded. The faculty will review and grade your submission.
+            </p>
+            <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin-bottom:20px;display:flex;justify-content:space-between;font-size:11.5px;color:#334155;">
+              <span><strong>Paper:</strong> ${escapeHTML(paperTitle)}</span>
+              <span><strong>Status:</strong> <span style="color:#16A34A;font-weight:800;">✓ Received</span></span>
+            </div>
+            <button id="btn-receipt-dismiss" style="background:#2563EB;color:#fff;border:none;border-radius:12px;padding:13px 24px;width:100%;font-size:13.5px;font-weight:800;cursor:pointer;">
+              Done (හරි)
+            </button>
+          </div>
+        `;
+        document.body.appendChild(receiptModal);
+        receiptModal.querySelector('#btn-receipt-dismiss')?.addEventListener('click', () => {
+          receiptModal.remove();
+          if (this.currentTab === 'papers' || this.currentMode === 'student') {
+            try { this.switchTab('papers'); } catch (_) {}
+          }
+        });
 
       } catch (err) {
-        console.error('[EssayScanner] Submit error:', err);
+        console.error('[Essay Submit Error]:', err);
         if (btn) {
           btn.disabled = false;
-          btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">cloud_upload</span><span>Retry Submit</span>';
+          btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:19px;">cloud_upload</span><span>Retry Submit</span>';
         }
-        notificationService.showInAppBanner('Submission Failed', err.message || 'Failed to submit. Please try again.', 'error');
+        alert('Submission failed: ' + (err.message || 'Please retry.'));
       }
     });
   }
@@ -8527,11 +8853,15 @@ class AppController {
 
     // Load and render submissions
     const loadSubmissions = async () => {
+      const btn = document.getElementById('essays-refresh-btn');
       let allSubs = [];
       try {
+        if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px; animation:spin 0.75s linear infinite;">progress_activity</span> Loading...';
         allSubs = await dbService.getEssaySubmissions({ limit: 300 });
       } catch (e) {
         console.warn('[Admin Essays] Load error:', e);
+      } finally {
+        if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;">refresh</span> Refresh';
       }
 
       this._essaySubsCache = allSubs;
@@ -8541,8 +8871,6 @@ class AppController {
     await loadSubmissions();
 
     document.getElementById('essays-refresh-btn')?.addEventListener('click', async () => {
-      const btn = document.getElementById('essays-refresh-btn');
-      if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px; animation:spin 0.75s linear infinite;">progress_activity</span> Loading...';
       await loadSubmissions();
     });
 
@@ -8771,69 +9099,172 @@ class AppController {
     const escapeHTML = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
     const modal = document.createElement('div');
     modal.className = 'app-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:12px;';
 
-    modal.innerHTML = `
-      <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
-        <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px;">
-          <div>
-            <h3 class="modal-title" style="margin:0;">Grade Submission</h3>
-            <div style="font-size:11px; color:#64748B;">${escapeHTML(sub.studentName)} • ${escapeHTML(sub.paperTitle)}</div>
-          </div>
-          <button id="grade-modal-close" class="modal-close-btn"><span class="material-symbols-rounded">close</span></button>
-        </div>
-        <div style="padding:16px 0 0;">
-          <!-- Quick Page Preview -->
-          <div style="display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px;">
-            ${(sub.mediaUrls || []).slice(0, 6).map((url, i) => `
-              <div style="width:50px; height:66px; flex-shrink:0; border-radius:8px; overflow:hidden; border:1.5px solid #E2E8F0; cursor:pointer;" onclick="window.open('${escapeHTML(url)}','_blank')">
-                <img src="${escapeHTML(url)}" style="width:100%; height:100%; object-fit:cover;" loading="lazy" />
+    const urls = sub.mediaUrls || [];
+    let currentPage = 0;
+    let questions = [
+      { label: 'Q1', marks: '', max: 25 },
+      { label: 'Q2', marks: '', max: 25 },
+      { label: 'Q3', marks: '', max: 25 },
+      { label: 'Q4', marks: '', max: 25 }
+    ];
+
+    const renderModal = () => {
+      const totalMarks = questions.reduce((sum, q) => sum + (parseFloat(q.marks) || 0), 0);
+      const totalMax = questions.reduce((sum, q) => sum + (parseFloat(q.max) || 0), 0);
+
+      modal.innerHTML = `
+        <div style="background:#FFFFFF;border-radius:20px;max-width:820px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.4);border:1px solid #E2E8F0;">
+          <!-- Header -->
+          <div style="background:#F8FAFC;padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:16px;font-weight:900;color:#0F172A;display:flex;align-items:center;gap:8px;">
+                <span class="material-symbols-rounded filled" style="font-size:22px;color:#2563EB;">history_edu</span>
+                <span>Examiner Grading: ${escapeHTML(sub.studentName)}</span>
               </div>
-            `).join('')}
+              <div style="font-size:12px;color:#64748B;margin-top:2px;">
+                ${escapeHTML(sub.studentBatch)} • ${escapeHTML(sub.paperTitle)} • ${urls.length} Page(s)
+              </div>
+            </div>
+            <button id="grade-modal-close" style="background:#F1F5F9;border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#475569;">
+              <span class="material-symbols-rounded">close</span>
+            </button>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Marks Awarded</label>
-            <input type="number" class="form-input" id="grade-marks-input" min="0" max="999" step="0.5" value="${sub.marks ?? ''}" placeholder="e.g. 75" style="font-size:20px; font-weight:900; text-align:center;" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Admin Comment / Feedback</label>
-            <textarea class="form-textarea" id="grade-comment-input" rows="3" placeholder="Feedback for student (optional)...">${escapeHTML(sub.adminComment || '')}</textarea>
-          </div>
+          <!-- Body Split: Left Page Viewer, Right Marks Entry -->
+          <div style="flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;flex-wrap:wrap;">
+            <!-- Left: Document Preview & Zoom -->
+            <div style="flex:1.2;min-width:280px;background:#0F172A;display:flex;flex-direction:column;position:relative;border-right:1px solid #E2E8F0;">
+              <div style="padding:8px 12px;background:rgba(15,23,42,0.9);display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:12px;font-weight:700;">
+                <span>Page ${urls.length > 0 ? currentPage + 1 : 0} of ${urls.length}</span>
+                <div style="display:flex;gap:6px;">
+                  <button id="btn-grade-prev-pg" ${currentPage === 0 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;">chevron_left</span>
+                  </button>
+                  <button id="btn-grade-next-pg" ${currentPage >= urls.length - 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;">
+                    <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;">chevron_right</span>
+                  </button>
+                  <a href="${urls[currentPage] || '#'}" target="_blank" rel="noopener" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;">
+                    <span class="material-symbols-rounded" style="font-size:16px;">open_in_new</span>
+                  </a>
+                </div>
+              </div>
+              <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:10px;background:#020617;">
+                ${urls.length > 0 ? `
+                  <img src="${urls[currentPage]}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" />
+                ` : `
+                  <div style="color:#64748B;font-size:13px;">No pages scanned</div>
+                `}
+              </div>
+            </div>
 
-          <button id="grade-save-btn" class="btn-primary" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; background:#16A34A;">
-            <span class="material-symbols-rounded filled" style="font-size:18px;">save</span>
-            <span>Save Grade</span>
-          </button>
+            <!-- Right: Question Marks & Comments -->
+            <div style="flex:1;min-width:280px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;">
+              <div>
+                <div style="font-size:13px;font-weight:800;color:#0F172A;margin-bottom:8px;">Per-Question Marks Breakdown</div>
+                <div id="grade-question-rows" style="display:flex;flex-direction:column;gap:8px;">
+                  ${questions.map((q, i) => `
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <input type="text" class="grade-q-label" data-idx="${i}" value="${escapeHTML(q.label)}" style="width:64px;padding:6px 8px;border:1.5px solid #CBD5E1;border-radius:8px;font-weight:800;font-size:12px;text-align:center;" />
+                      <input type="number" step="0.5" min="0" max="${q.max}" class="grade-q-marks" data-idx="${i}" value="${q.marks}" placeholder="0" style="flex:1;padding:6px 10px;border:1.5px solid #CBD5E1;border-radius:8px;font-weight:900;font-size:14px;color:#16A34A;" />
+                      <span style="font-size:13px;color:#64748B;font-weight:700;">/</span>
+                      <input type="number" class="grade-q-max" data-idx="${i}" value="${q.max}" style="width:55px;padding:6px 8px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12px;color:#64748B;text-align:center;" />
+                    </div>
+                  `).join('')}
+                </div>
+                <button id="btn-add-q-row" style="margin-top:8px;background:#F1F5F9;border:1px dashed #CBD5E1;color:#475569;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;width:100%;">
+                  + Add Question Row
+                </button>
+              </div>
+
+              <!-- Total Card -->
+              <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.5px;">Computed Total Score</div>
+                  <div style="font-size:22px;font-weight:900;color:#15803D;line-height:1.2;">
+                    ${totalMarks > 0 ? totalMarks : (sub.marks ?? 0)} <span style="font-size:13px;font-weight:700;color:#16A34A;">/ ${totalMax > 0 ? totalMax : 100}</span>
+                  </div>
+                </div>
+                <div style="text-align:right;">
+                  <span style="background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;">
+                    ${totalMax > 0 ? Math.round((totalMarks / totalMax) * 100) : (sub.marks ?? 0)}%
+                  </span>
+                </div>
+              </div>
+
+              <!-- Comment Field -->
+              <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:block;">Examiner Feedback / Comments for Student</label>
+                <textarea id="grade-comment-input" rows="3" placeholder="Provide actionable corrections and commendations..." style="width:100%;border:1.5px solid #CBD5E1;border-radius:10px;padding:8px 10px;font-size:12px;box-sizing:border-box;">${escapeHTML(sub.adminComment || '')}</textarea>
+              </div>
+
+              <!-- Actions -->
+              <button id="grade-save-btn" style="background:#16A34A;color:#fff;border:none;border-radius:12px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 12px rgba(22,163,74,0.3);margin-top:auto;">
+                <span class="material-symbols-rounded filled" style="font-size:18px;">save</span>
+                <span>Save Grade &amp; Update Record</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    document.body.appendChild(modal);
-    document.getElementById('grade-modal-close')?.addEventListener('click', () => modal.remove());
+      // Event listeners inside modal
+      modal.querySelector('#grade-modal-close')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('#btn-grade-prev-pg')?.addEventListener('click', () => {
+        if (currentPage > 0) { currentPage--; renderModal(); }
+      });
+      modal.querySelector('#btn-grade-next-pg')?.addEventListener('click', () => {
+        if (currentPage < urls.length - 1) { currentPage++; renderModal(); }
+      });
 
-    document.getElementById('grade-save-btn')?.addEventListener('click', async () => {
-      const btn = document.getElementById('grade-save-btn');
-      const marksRaw = document.getElementById('grade-marks-input')?.value;
-      const comment = document.getElementById('grade-comment-input')?.value?.trim() || '';
-      const marks = marksRaw !== '' ? Number(marksRaw) : null;
-
-      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">hourglass_top</span>&nbsp;Saving...'; }
-      try {
-        await dbService.gradeEssaySubmission({
-          submissionId: sub.id,
-          marks,
-          adminComment: comment,
-          gradedBy: this.currentUser?.name || 'Admin'
+      modal.querySelectorAll('.grade-q-marks').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          questions[idx].marks = e.target.value;
+          const totalEl = modal.querySelector('#grade-save-btn');
         });
-        modal.remove();
-        notificationService.showInAppBanner('Grade Saved', `${sub.studentName}'s submission graded${marks != null ? ` — ${marks} marks` : ''}.`, 'success');
-        // Refresh the essays tab
-        this.refreshAdminTab('essays');
-      } catch (err) {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">save</span><span>Retry Save</span>'; }
-        notificationService.showInAppBanner('Save Failed', err.message || 'Could not save grade.', 'error');
-      }
-    });
+      });
+
+      modal.querySelector('#btn-add-q-row')?.addEventListener('click', () => {
+        questions.push({ label: `Q${questions.length + 1}`, marks: '', max: 25 });
+        renderModal();
+      });
+
+      modal.querySelector('#grade-save-btn')?.addEventListener('click', async () => {
+        const btn = modal.querySelector('#grade-save-btn');
+        const comment = modal.querySelector('#grade-comment-input')?.value?.trim() || '';
+        const calculatedTotal = questions.reduce((sum, q) => sum + (parseFloat(q.marks) || 0), 0);
+        const finalMarks = calculatedTotal > 0 ? calculatedTotal : (sub.marks ?? 0);
+
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;animation:spin 0.75s linear infinite;">progress_activity</span> Saving Grade...';
+        }
+
+        try {
+          await dbService.gradeEssaySubmission({
+            submissionId: sub.id,
+            marks: finalMarks,
+            adminComment: comment,
+            gradedBy: this.currentUser?.name || 'Admin',
+            questionMarks: questions
+          });
+          modal.remove();
+          notificationService.showInAppBanner('Grade Saved', `${sub.studentName}'s submission graded — ${finalMarks} marks.`, 'success');
+          this.refreshAdminTab('essays');
+        } catch (err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">save</span><span>Retry Save</span>';
+          }
+          notificationService.showInAppBanner('Save Failed', err.message || 'Could not save grade.', 'error');
+        }
+      });
+    };
+
+    renderModal();
+    document.body.appendChild(modal);
   }
 
   // ── Helper Modal Dialogs ───────────────────────────────────────────────
@@ -11578,54 +12009,29 @@ class AppController {
     const studentName = student.name || student.displayName || 'Student';
     const studentPhone = student.phone || student.phoneNumber || '';
 
-    // 1. Check if student already submitted this paper (matching _checkIfAlreadySubmitted)
-    const localSubmitted = localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' || localStorage.getItem(`paper_submitted_${paperId}`) === 'true';
-    const existingReg = await dbService.getStudentRegistration(paperId, studentId);
-    const hasSubmittedPhotos = !!(existingReg?.submissionPhotos && existingReg.submissionPhotos.length > 0);
-    const isAlreadySubmitted = localSubmitted || hasSubmittedPhotos || existingReg?.isSubmitted === true || existingReg?.status === 'submitted';
+    // Fullscreen View Container matching Flutter Scaffold - Mount immediately for instant responsive UX!
+    const roomContainer = document.createElement('div');
+    roomContainer.id = 'live-exam-room-root';
+    roomContainer.style.cssText = `
+      position: fixed; inset: 0; background: #0F172A; z-index: 99999;
+      display: flex; flex-direction: column; color: #F8FAFC;
+      font-family: 'Poppins', sans-serif; overflow: hidden;
+    `;
+    roomContainer.innerHTML = `
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+        <div style="width:42px; height:42px; border:3.5px solid #334155; border-top-color:#38BDF8; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+        <div style="font-size:14px; font-weight:800; color:#FFFFFF;">විභාග ශාලාවට සම්බන්ධ වෙමින්... (Entering Room)</div>
+        <div style="font-size:11.5px; color:#94A3B8;">Connecting video feed &amp; proctoring session</div>
+      </div>
+    `;
+    document.body.appendChild(roomContainer);
 
-    if (isAlreadySubmitted) {
-      const alreadySubmittedModal = document.createElement('div');
-      alreadySubmittedModal.className = 'app-modal';
-      alreadySubmittedModal.style.cssText = 'display:flex; justify-content:center; align-items:center; background:rgba(15,23,42,0.85); z-index:99999;';
-      alreadySubmittedModal.innerHTML = `
-        <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:24px; max-width:440px; width:90%; color:#F8FAFC; box-shadow:0 20px 40px rgba(0,0,0,0.6); font-family:'Poppins',sans-serif;">
-          <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-            <span class="material-symbols-rounded filled" style="color:#22C55E; font-size:28px;">check_circle</span>
-            <h3 style="font-size:16px; font-weight:700; color:#FFFFFF; margin:0;">Paper Already Submitted</h3>
-          </div>
-          <p style="font-size:13px; color:#CBD5E1; line-height:1.5; margin:0 0 20px 0;">
-            ඔබ මෙම විභාගයේ පිළිතුරු පත්‍ර දැනටමත් සාර්ථකව භාරදී ඇත. නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.
-          </p>
-          <div style="display:flex; justify-content:flex-end;">
-            <button id="btn-submitted-ok" style="background:#22C55E; color:#FFFFFF; border:none; padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">
-              හරි (OK)
-            </button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(alreadySubmittedModal);
-      alreadySubmittedModal.querySelector('#btn-submitted-ok')?.addEventListener('click', () => {
-        alreadySubmittedModal.remove();
-      });
-      return;
-    }
+    // Fetch registration and session in parallel with fast timeouts
+    let [existingReg, session] = await Promise.all([
+      dbService.getStudentRegistration(paperId, studentId).catch(() => null),
+      dbService.getPaperSession(paperId).catch(() => null)
+    ]);
 
-    // Auto-register student if not yet registered without overwriting an existing slot
-    const finalSlotId = slotId || existingReg?.selectedSlot || existingReg?.slotId || 'slot1';
-    if (!existingReg) {
-      await dbService.registerStudentSlot({
-        paperId,
-        studentId,
-        studentName,
-        studentPhone,
-        slotId: finalSlotId
-      });
-    }
-
-
-    // 2. Fetch session from Firestore
-    let session = await dbService.getPaperSession(paperId);
     if (!session) {
       session = {
         id: paperId,
@@ -11639,14 +12045,17 @@ class AppController {
       };
     }
 
-    // Fullscreen View Container matching Flutter Scaffold
-    const roomContainer = document.createElement('div');
-    roomContainer.id = 'live-exam-room-root';
-    roomContainer.style.cssText = `
-      position: fixed; inset: 0; background: #0F172A; z-index: 99999;
-      display: flex; flex-direction: column; color: #F8FAFC;
-      font-family: 'Poppins', sans-serif; overflow: hidden;
-    `;
+    // Auto-register student if not yet registered without overwriting an existing slot
+    const finalSlotId = slotId || existingReg?.selectedSlot || existingReg?.slotId || 'slot1';
+    if (!existingReg) {
+      dbService.registerStudentSlot({
+        paperId,
+        studentId,
+        studentName,
+        studentPhone,
+        slotId: finalSlotId
+      }).catch(() => {});
+    }
 
     // State Variables
     let cameraStream = null;
@@ -12326,7 +12735,7 @@ ${!times.isWaiting ? `
         } else if (session.paperType === 'mcq_essay') {
           openCombinedAnswerSheetModal();
         } else {
-          openDocumentScanner();
+          this.openEssayScannerModal(paperId, session);
         }
       };
 

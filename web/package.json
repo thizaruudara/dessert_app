@@ -4,7 +4,7 @@
   "description": "EduPeak Physics Institute iOS PWA & Web App with Camera Scanner & Push Notifications",
   "main": "index.html",
   "scripts": {
-    "build": "esbuild js/app.js --bundle --platform=browser --format=esm --outfile=js/app.bundle.js",
+    "build": "esbuild js/app.js --bundle --minify --platform=browser --format=esm --outfile=js/app.bundle.js",
     "start": "node dev-server.cjs"
   },
   "keywords": [
@@ -33,7 +33,8 @@
     "agora-token": "^2.0.6",
     "esbuild": "^0.28.2",
     "firebase": "^12.19.0",
-    "firebase-admin": "^14.5.0"
+    "firebase-admin": "^14.5.0",
+    "jspdf": "^4.2.1"
   },
   "devDependencies": {
     "potrace": "^2.1.8"
