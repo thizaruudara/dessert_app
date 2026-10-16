@@ -13,6 +13,10 @@ export class AuthService {
         const stored = localStorage.getItem('edupeak_cached_user');
         if (stored) {
           initialUser = JSON.parse(stored);
+          // For students, never trust potentially stale cached full access until fresh Supabase verification completes
+          if (initialUser && (!initialUser.role || initialUser.role === 'student')) {
+            initialUser.isSubscribed = false;
+          }
         }
       } catch (_) {}
     }

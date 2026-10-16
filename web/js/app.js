@@ -560,10 +560,10 @@ class AppController {
   // ── Subscription Gatekeeper: Super Paper Class Monthly Access ──
   checkSubscriptionAccess(featureName = 'this feature') {
     if (!this.currentUser || this.currentUser.role === 'admin' || this.currentUser.role === 'teacher') return true;
-    if (this.currentUser.isSubscribed !== false) return true;
+    if (this.currentUser.isSubscribed === true) return true;
 
     const subDetails = this.currentUser.subscriptionDetails || {};
-    const month = subDetails.monthName || 'this month';
+    const month = subDetails.monthName || 'October 2027';
     this.showSubscriptionModal(featureName, month);
     return false;
   }
@@ -2122,7 +2122,12 @@ class AppController {
               <span>Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)</span>
             </button>
           ` : (isScheduled && !isLive && !isEnded) ? (
-            !registeredSlotId ? `
+            user.isSubscribed === false ? `
+              <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #475569 0%, #334155 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; border:none; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.18);">
+                <span class="material-symbols-rounded" style="font-size:20px; color:#F59E0B;">lock</span>
+                <span>Unlock Paper Session (${user.subscriptionDetails?.monthName || 'October 2027'} Subscription Required)</span>
+              </button>
+            ` : !registeredSlotId ? `
               <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(37,99,235,0.3); border:none; cursor:pointer;">
                 <span class="material-symbols-rounded" style="font-size:19px;">how_to_reg</span>
                 <span>Register for ${selectedSlotId === 'slot2' ? 'Evening Session (Slot 2)' : 'Morning Session (Slot 1)'}</span>
@@ -2163,9 +2168,10 @@ class AppController {
   }
 
   _bindStudentLiveSessionActions(container, sessions, registrations, user) {
-    // Slot Selection - purely local card selection toggle, NO auto registration, NO toast!
+    // Slot Selection - check subscription before allowing slot change
     container.querySelectorAll('.slot-selection-box').forEach(box => {
       box.addEventListener('click', () => {
+        if (!this.checkSubscriptionAccess('Paper Slot Selection')) return;
         const pId = box.dataset.paperId;
         const sId = box.dataset.slotId;
         this._studentSelectedSlotMap = this._studentSelectedSlotMap || new Map();
@@ -4913,6 +4919,7 @@ class AppController {
 
   // ── Essay Answer Sheet Scanner (CamScanner-Grade Engine matching Build Spec) ──
   openEssayScannerModal(paperId, session, options = {}) {
+    if (!this.checkSubscriptionAccess('Exam Answer Submission')) return;
     const user = this.currentUser || {};
     const paperTitle = session?.title || session?.name || 'Exam Paper';
     const studentName = user?.name || user?.displayName || 'Student';
@@ -11986,6 +11993,7 @@ class AppController {
 
   // ── B. Student Live Exam Writing Room (1:1 with live_exam_room_screen.dart & in_app_document_scanner_screen.dart) ──
   async openStudentLiveExamRoom(paperId, slotId = 'slot1') {
+    if (!this.checkSubscriptionAccess('Live Paper Writing Sessions')) return;
     const student = this.currentUser || { id: 's_default', name: 'Student', phone: '' };
     const studentId = student.uid || student.id || 's_default';
     const studentName = student.name || student.displayName || 'Student';

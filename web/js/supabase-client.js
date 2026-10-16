@@ -95,22 +95,25 @@ export async function checkSuperPaperSubscription(
       console.warn('[Supabase] Could not fetch courses:', coursesError);
     }
 
-    // Comprehensive list of course IDs that represent Super Paper Class
-    const allRelatedCourseIds = Array.from(new Set([
-      'crs-base-super-paper-2027',
-      'crs-phy-muu3k9m4',
-      ...(courses || []).map(c => c.id)
-    ].filter(Boolean)));
 
     // Determine the active monthly course for metadata and checkout display
+    // Target is crs-phy-muu3k9m4 ("Super Paper Class - October 2027")
     const activeMonthlyCourse = (courses || []).find(c => c.id === 'crs-phy-muu3k9m4')
-      || (courses || []).find(c => c.parent_course_id === 'crs-base-super-paper-2027')
-      || (courses || []).find(c => c.id === 'crs-base-super-paper-2027')
-      || (courses || [])[0]
-      || { id: 'crs-base-super-paper-2027', title: 'Super Paper Class - 2027 A/L', month_name: 'October 2027' };
+      || (courses || []).find(c => c.parent_course_id === 'crs-base-super-paper-2027' && c.month_name)
+      || (courses || []).find(c => c.month_name && String(c.title).toLowerCase().includes('paper'))
+      || { id: 'crs-phy-muu3k9m4', title: 'Super Paper Class - October 2027', month_name: 'October 2027' };
 
     const monthName = activeMonthlyCourse.month_name || 'October 2027';
     const enrollUrl = `https://edupeak.lk/checkout.html?course=${encodeURIComponent(activeMonthlyCourse.id)}`;
+
+    // Strictly monthly course IDs (EXCLUDING crs-base-super-paper-2027 which is free base registration!)
+    const validMonthlyCourseIds = Array.from(new Set([
+      activeMonthlyCourse.id,
+      'crs-phy-muu3k9m4',
+      ...(courses || [])
+        .filter(c => c.id !== 'crs-base-super-paper-2027' && !c.is_base_course && (c.parent_course_id === 'crs-base-super-paper-2027' || c.month_name))
+        .map(c => c.id)
+    ].filter(Boolean)));
 
     // Compile all candidate student identifiers (e.g. EP-2027-312, email, phone, auth UUID)
     const studentKeys = Array.from(new Set([
@@ -124,9 +127,6 @@ export async function checkSuperPaperSubscription(
       authUser?.email
     ].filter(Boolean).map(s => String(s).trim())));
 
-    let isPaid = false;
-    let paidEnrollment = null;
-
     // 1.5 Fast-Path: Supabase RPC check_student_subscription (Security Definer, bypasses RLS safely)
     try {
       const targetId = studentId || profile?.id || studentKeys.find(k => k.startsWith('EP-')) || '';
@@ -137,26 +137,43 @@ export async function checkSuperPaperSubscription(
         p_email: String(targetEmail).trim()
       });
 
-      if (!rpcErr && rpcRes && rpcRes.is_subscribed === true) {
-        return {
-          isSubscribed: true,
-          currentCourse: activeMonthlyCourse,
-          enrollUrl,
-          monthName: rpcRes.month_name || monthName
-        };
+      if (!rpcErr && rpcRes && typeof rpcRes.is_subscribed === 'boolean') {
+        if (rpcRes.is_subscribed === true) {
+          return {
+            isSubscribed: true,
+            currentCourse: activeMonthlyCourse,
+            enrollUrl: rpcRes.enroll_url || enrollUrl,
+            monthName: rpcRes.month_name || monthName
+          };
+        } else {
+          // RPC EXPLICITLY DETERMINED STUDENT DOES NOT HAVE THE LATEST MONTH SUBSCRIPTION!
+          // Return immediately with isSubscribed: false. Never fall through to base course matches!
+          return {
+            isSubscribed: false,
+            reason: 'PAYMENT_REQUIRED',
+            currentCourse: activeMonthlyCourse,
+            enrollUrl: rpcRes.enroll_url || enrollUrl,
+            monthName: rpcRes.month_name || monthName,
+            message: `Full tuition payment required for ${rpcRes.month_name || monthName}. 1st lesson free trials do not unlock paper sessions or homework submissions.`
+          };
+        }
       }
     } catch (rpcEx) {
-      console.warn('[Supabase] check_student_subscription RPC check:', rpcEx);
+      console.warn('[Supabase] check_student_subscription RPC check notice, falling back:', rpcEx);
     }
 
-    // 2. CHECK ENROLLMENTS TABLE:
-    // Look for any enrollment record in all related Super Paper courses for this student
+    let isPaid = false;
+    let paidEnrollment = null;
+
+    // 2. CHECK ENROLLMENTS TABLE (FALLBACK):
+    // Only check against valid paid monthly course IDs (e.g. crs-phy-muu3k9m4).
+    // NEVER match crs-base-super-paper-2027!
     if (studentKeys.length > 0) {
       const { data: enrollments, error: enrollErr } = await supabase
         .from('enrollments')
         .select('*')
         .in('student_id', studentKeys)
-        .in('course_id', allRelatedCourseIds);
+        .in('course_id', validMonthlyCourseIds);
 
       if (enrollments && enrollments.length > 0) {
         for (const enr of enrollments) {
@@ -170,8 +187,7 @@ export async function checkSuperPaperSubscription(
       }
     }
 
-    // 3. CHECK PROFILE'S ENROLLED_COURSES:
-    // If not verified yet, inspect the enrolled_courses array in public.profiles
+    // 3. CHECK PROFILE'S ENROLLED_COURSES (FALLBACK):
     if (!isPaid) {
       let resolvedProfile = profile;
       if (!resolvedProfile && (studentEmail || studentId)) {
@@ -188,13 +204,8 @@ export async function checkSuperPaperSubscription(
           } catch (_) {}
         }
 
-        const hasMatch = enrolledList.some(cId => {
-          const s = String(cId).toLowerCase();
-          return allRelatedCourseIds.includes(cId) ||
-                 s.includes('super-paper') ||
-                 s === 'crs-phy-muu3k9m4' ||
-                 s === 'crs-base-super-paper-2027';
-        });
+        // Must explicitly match the target monthly course, NOT crs-base-super-paper-2027 and NOT generic 'super-paper'!
+        const hasMatch = enrolledList.some(cId => validMonthlyCourseIds.includes(cId));
 
         if (hasMatch) {
           // Verify student does not have an explicit cancellation in enrollments table
@@ -202,7 +213,7 @@ export async function checkSuperPaperSubscription(
             .from('enrollments')
             .select('id, payment_status')
             .in('student_id', studentKeys)
-            .in('course_id', allRelatedCourseIds)
+            .in('course_id', validMonthlyCourseIds)
             .in('payment_status', ['cancelled', 'refunded', 'revoked'])
             .limit(1);
 
@@ -213,7 +224,7 @@ export async function checkSuperPaperSubscription(
       }
     }
 
-    // 4. CHECK APPROVED ORDERS IN broadcast_schedules (order-*)
+    // 4. CHECK APPROVED ORDERS IN broadcast_schedules (order-*) (FALLBACK)
     if (!isPaid && (studentEmail || studentId)) {
       try {
         const { data: orders } = await supabase
@@ -228,7 +239,7 @@ export async function checkSuperPaperSubscription(
             try {
               const p = typeof ord.coursetitle === 'string' ? JSON.parse(ord.coursetitle) : ord.coursetitle;
               const ordCourseId = p?.courseId || p?.course_id;
-              if (ordCourseId && allRelatedCourseIds.includes(ordCourseId)) {
+              if (ordCourseId && validMonthlyCourseIds.includes(ordCourseId)) {
                 const mailMatch = studentEmail && String(p.studentEmail || '').toLowerCase() === String(studentEmail).toLowerCase();
                 const idMatch = studentId && String(p.studentId || '') === String(studentId);
                 if (mailMatch || idMatch) {
@@ -244,7 +255,7 @@ export async function checkSuperPaperSubscription(
       }
     }
 
-    // 5. CHECK LOCAL EDUPEAK SESSION CACHE (Browser context)
+    // 5. CHECK LOCAL EDUPEAK SESSION CACHE (FALLBACK)
     if (!isPaid && typeof window !== 'undefined' && window.localStorage) {
       try {
         const sessionKeys = ['edupeak_auth_session', 'edupeak_active_session', 'edupeak_cached_user'];
@@ -253,7 +264,7 @@ export async function checkSuperPaperSubscription(
           if (raw) {
             const parsed = JSON.parse(raw);
             const courses = parsed?.enrolledCourses || parsed?.enrolled_courses || parsed?.user?.enrolledCourses || [];
-            if (Array.isArray(courses) && courses.some(c => allRelatedCourseIds.includes(c) || String(c).includes('super-paper'))) {
+            if (Array.isArray(courses) && courses.some(c => validMonthlyCourseIds.includes(c))) {
               isPaid = true;
               break;
             }
