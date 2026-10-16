@@ -7,7 +7,7 @@ import { cameraService } from './camera-service.js';
 import { storageService } from './storage-service.js';
 import { PwaGatekeeper } from './pwa-gatekeeper.js';
 import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid } from './agora-service.js';
-import { loadOpenCV, detectDocument, warpDocument, enhance, rotateCanvas, canvasToBlob, canvasToDataURL, orderPoints, buildPdf } from './scanner-core.js';
+import { loadOpenCV, detectDocument, detectDocumentCanvasFallback, warpDocument, enhance, rotateCanvas, canvasToBlob, canvasToDataURL, orderPoints, buildPdf } from './scanner-core.js';
 
 export function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -4945,14 +4945,14 @@ class AppController {
     const modal = document.createElement('div');
     modal.className = 'scanner-modal';
     modal.id = 'essay-scanner-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:#0F172A;z-index:999999;display:flex;flex-direction:column;color:#fff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;';
+    modal.style.cssText = 'position:fixed;inset:0;background:#0F172A;z-index:999999;display:flex;flex-direction:column;color:#fff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent;';
 
     modal.innerHTML = `
       <!-- Top App Bar with Clear Back Button -->
       <div style="background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);padding:calc(env(safe-area-inset-top,20px) + 12px) 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155;z-index:30;">
         <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-          <button id="essay-btn-back" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
-            <span class="material-symbols-rounded" style="font-size:22px;">arrow_back</span>
+          <button id="essay-btn-back" type="button" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">
+            <span class="material-symbols-rounded" style="font-size:22px;pointer-events:none;">arrow_back</span>
           </button>
           <div style="min-width:0;">
             <div style="font-size:14px;font-weight:800;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">${escapeHTML(paperTitle)}</div>
@@ -4963,11 +4963,11 @@ class AppController {
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <button id="essay-btn-torch" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-            <span class="material-symbols-rounded" style="font-size:19px;">flash_on</span>
+          <button id="essay-btn-torch" type="button" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:19px;pointer-events:none;">flash_on</span>
           </button>
-          <button id="essay-btn-close" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-            <span class="material-symbols-rounded" style="font-size:20px;">close</span>
+          <button id="essay-btn-close" type="button" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:20px;pointer-events:none;">close</span>
           </button>
         </div>
       </div>
@@ -4977,7 +4977,7 @@ class AppController {
         <video id="essay-scanner-video" autoplay playsinline webkit-playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
         <canvas id="essay-detection-canvas" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;"></canvas>
 
-        <!-- Center Fallback Action Card (visible if WebRTC stream is blocked by iOS hardware locks or permissions) -->
+        <!-- Center Fallback Action Card (triggers native camera directly via label) -->
         <div id="essay-cam-fallback-box" style="display:flex;position:absolute;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;z-index:22;pointer-events:auto;">
           <div style="width:64px;height:64px;border-radius:50%;background:rgba(37,99,235,0.2);border:2px solid #38BDF8;display:flex;align-items:center;justify-content:center;color:#38BDF8;box-shadow:0 0 24px rgba(56,189,248,0.3);">
             <span class="material-symbols-rounded" style="font-size:32px;">photo_camera</span>
@@ -4985,10 +4985,10 @@ class AppController {
           <div style="font-size:14px;font-weight:700;color:#FFFFFF;max-width:260px;line-height:1.4;">
             Tap below or tap red shutter to take photo of your paper
           </div>
-          <button id="essay-btn-open-cam" style="background:#2563EB;color:#FFFFFF;border:none;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(37,99,235,0.45);">
+          <label for="essay-native-cam-input" id="essay-btn-open-cam" style="background:#2563EB;color:#FFFFFF;border:none;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(37,99,235,0.45);touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:20px;">photo_camera</span>
             <span>Take Photo (කැමරාව)</span>
-          </button>
+          </label>
         </div>
 
         <!-- Detection Status Pill -->
@@ -5005,16 +5005,16 @@ class AppController {
       <div style="background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border-top:1px solid #334155;padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 14px);z-index:30;">
         <!-- Filter Selector -->
         <div style="display:flex;justify-content:center;gap:8px;margin-bottom:12px;">
-          <button class="scanner-filter-pill active" data-filter="magic" style="background:#2563EB;color:#fff;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <button type="button" class="scanner-filter-pill active" data-filter="magic" style="background:#2563EB;color:#fff;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:14px;">auto_fix_high</span> Magic Color
           </button>
-          <button class="scanner-filter-pill" data-filter="bw" style="background:#334155;color:#94A3B8;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <button type="button" class="scanner-filter-pill" data-filter="bw" style="background:#334155;color:#94A3B8;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
             B&amp;W Clean
           </button>
-          <button class="scanner-filter-pill" data-filter="gray" style="background:#334155;color:#94A3B8;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <button type="button" class="scanner-filter-pill" data-filter="gray" style="background:#334155;color:#94A3B8;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
             Grayscale
           </button>
-          <button class="scanner-filter-pill" data-filter="original" style="background:#334155;color:#94A3B8;border:none;padding:5px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <button type="button" class="scanner-filter-pill" data-filter="original" style="background:#334155;color:#94A3B8;border:none;padding:6px 12px;border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;touch-action:manipulation;">
             Original
           </button>
         </div>
@@ -5026,19 +5026,19 @@ class AppController {
 
         <!-- Shutter Row -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:0 10px;">
-          <label for="essay-gallery-input" style="background:#1E293B;border:1px solid #475569;color:#E2E8F0;border-radius:12px;padding:9px 12px;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+          <label for="essay-gallery-input" style="background:#1E293B;border:1px solid #475569;color:#E2E8F0;border-radius:12px;padding:9px 12px;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:17px;color:#38BDF8;">photo_library</span>
             <span>Gallery</span>
             <input type="file" id="essay-gallery-input" accept="image/*" multiple style="display:none;" />
           </label>
           <input type="file" id="essay-native-cam-input" accept="image/*" capture="environment" style="display:none;" />
 
-          <!-- Big Red Camera Shutter -->
-          <button id="essay-shutter-btn" style="width:68px;height:68px;border-radius:50%;background:#FFFFFF;border:5px solid #DC2626;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 16px rgba(220,38,38,0.4);">
-            <div style="width:50px;height:50px;border-radius:50%;background:#DC2626;transition:transform 0.1s ease;"></div>
-          </button>
+          <!-- Big Red Camera Shutter (Direct Native Camera Trigger via Label) -->
+          <label for="essay-native-cam-input" id="essay-shutter-btn" style="position:relative;width:68px;height:68px;border-radius:50%;background:#FFFFFF;border:5px solid #DC2626;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 0 16px rgba(220,38,38,0.4);touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;">
+            <div style="width:50px;height:50px;border-radius:50%;background:#DC2626;pointer-events:none;"></div>
+          </label>
 
-          <button id="essay-submit-all-btn" disabled style="background:#16A34A;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px;opacity:0.4;transition:all 0.2s ease;">
+          <button id="essay-submit-all-btn" type="button" disabled style="background:#16A34A;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px;opacity:0.4;transition:all 0.2s ease;touch-action:manipulation;">
             <span>Submit</span>
             <span class="material-symbols-rounded" style="font-size:16px;">arrow_forward</span>
           </button>
@@ -5099,8 +5099,6 @@ class AppController {
       }
     };
 
-    detectionTimer = setInterval(runDetection, 320);
-
     // 3. Update Scanned Pages Strip
     const updateStripUI = () => {
       if (countBadge) countBadge.textContent = `${scannedPages.length} Page${scannedPages.length !== 1 ? 's' : ''}`;
@@ -5124,10 +5122,10 @@ class AppController {
           </button>
         </div>
       `).join('') + `
-        <button id="btn-add-more-pages" style="height:78px;min-width:58px;border-radius:10px;border:1.5px dashed #475569;background:rgba(255,255,255,0.05);color:#94A3B8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;padding:4px;">
+        <label for="essay-native-cam-input" style="height:78px;min-width:58px;border-radius:10px;border:1.5px dashed #475569;background:rgba(255,255,255,0.05);color:#94A3B8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;padding:4px;touch-action:manipulation;">
           <span class="material-symbols-rounded" style="font-size:20px;color:#38BDF8;">add_a_photo</span>
           <span style="font-size:9.5px;font-weight:700;">+ Page</span>
-        </button>
+        </label>
       `;
 
       stripEl.querySelectorAll('.btn-del-page').forEach(btn => {
@@ -5158,7 +5156,7 @@ class AppController {
             </div>
             <div style="font-size:10.5px;color:#94A3B8;">Drag 4 green handles to match paper edges</div>
           </div>
-          <button id="editor-cancel-btn" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">Retake</button>
+          <button id="editor-cancel-btn" type="button" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;">Retake</button>
         </div>
 
         <div id="editor-viewport" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:12px;background:#000;">
@@ -5172,10 +5170,10 @@ class AppController {
         </div>
 
         <div style="background:#1E293B;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:12px;border-top:1px solid #334155;">
-          <button id="editor-auto-detect-btn" style="flex:1;background:#334155;color:#E2E8F0;border:none;border-radius:12px;padding:12px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+          <button id="editor-auto-detect-btn" type="button" style="flex:1;background:#334155;color:#E2E8F0;border:none;border-radius:12px;padding:12px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:16px;color:#38BDF8;">magic_button</span> Auto Detect
           </button>
-          <button id="editor-confirm-btn" style="flex:2;background:#22C55E;color:#FFFFFF;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 14px rgba(34,197,94,0.35);">
+          <button id="editor-confirm-btn" type="button" style="flex:2;background:#22C55E;color:#FFFFFF;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 14px rgba(34,197,94,0.35);touch-action:manipulation;">
             <span class="material-symbols-rounded" style="font-size:18px;">crop</span> Crop &amp; Enhance Page
           </button>
         </div>
@@ -5295,16 +5293,10 @@ class AppController {
       }
     };
 
-    // 5. Capture Photo from Video Viewfinder (with Native Camera Fallback if WebRTC is blocked/black)
-    const captureFromCamera = () => {
-      // If WebRTC camera is blocked, has zero dimensions, or is not playing, open native camera capture
+    // 5. Capture Photo from Video Viewfinder (if stream active)
+    const captureFromLiveVideo = () => {
       if (!videoEl || !videoEl.videoWidth || videoEl.videoWidth === 0 || videoEl.paused) {
-        if (nativeCamInput) {
-          nativeCamInput.click();
-        } else {
-          modal.querySelector('#essay-gallery-input')?.click();
-        }
-        return;
+        return false;
       }
 
       const flash = modal.querySelector('#essay-flash-effect');
@@ -5325,12 +5317,14 @@ class AppController {
         scannedPages.push(newPage);
         updateStripUI();
       });
+      return true;
     };
 
-    modal.querySelector('#essay-shutter-btn')?.addEventListener('click', captureFromCamera);
-    modal.querySelector('#essay-btn-open-cam')?.addEventListener('click', () => {
-      if (nativeCamInput) nativeCamInput.click();
-      else captureFromCamera();
+    // When tapping shutter: If live WebRTC stream is active, capture frame; otherwise allow default label action (opens native camera)
+    modal.querySelector('#essay-shutter-btn')?.addEventListener('click', (e) => {
+      if (captureFromLiveVideo()) {
+        e.preventDefault();
+      }
     });
 
     // 6. Gallery and Native Camera Upload Handlers
@@ -5348,7 +5342,7 @@ class AppController {
 
     // 7. Filter Change Buttons
     modal.querySelectorAll('.scanner-filter-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
+      const applyFilter = () => {
         modal.querySelectorAll('.scanner-filter-pill').forEach(p => {
           p.classList.remove('active');
           p.style.background = '#334155';
@@ -5359,14 +5353,14 @@ class AppController {
         pill.style.color = '#fff';
         currentFilter = pill.dataset.filter;
 
-        // Re-enhance existing pages with the newly selected filter
         scannedPages.forEach(p => {
           p.filter = currentFilter;
           p.enhancedCanvas = enhance(cvInstance, p.warpedCanvas, currentFilter);
           p.dataUrl = p.enhancedCanvas.toDataURL('image/jpeg', 0.86);
         });
         updateStripUI();
-      });
+      };
+      pill.addEventListener('click', applyFilter);
     });
 
     // 8. Torch Button
@@ -5386,7 +5380,7 @@ class AppController {
       } catch (_) {}
     });
 
-    // 9. Clean Exit / Close Scanner (Calls options.onClose to resume any background camera streams)
+    // 9. Clean Exit / Close Scanner (Fast 0ms response)
     const closeScanner = () => {
       if (detectionTimer) clearInterval(detectionTimer);
       if (cameraStream) {
@@ -5398,15 +5392,25 @@ class AppController {
       }
     };
 
-    const handleBackOrClose = () => {
+    const handleBackOrClose = (e) => {
+      if (e) e.preventDefault();
       if (scannedPages.length > 0) {
         if (!confirm(`You have ${scannedPages.length} scanned page(s). Are you sure you want to exit without submitting?`)) return;
       }
       closeScanner();
     };
 
-    modal.querySelector('#essay-btn-back')?.addEventListener('click', handleBackOrClose);
-    modal.querySelector('#essay-btn-close')?.addEventListener('click', handleBackOrClose);
+    const btnBack = modal.querySelector('#essay-btn-back');
+    const btnClose = modal.querySelector('#essay-btn-close');
+
+    if (btnBack) {
+      btnBack.addEventListener('click', handleBackOrClose);
+      btnBack.addEventListener('touchend', handleBackOrClose);
+    }
+    if (btnClose) {
+      btnClose.addEventListener('click', handleBackOrClose);
+      btnClose.addEventListener('touchend', handleBackOrClose);
+    }
 
     // 10. Proceed to Review & Submit
     submitBtn?.addEventListener('click', () => {
@@ -5419,17 +5423,21 @@ class AppController {
       this.openEssaySubmitDialog(scannedPages, paperId, session, user);
     });
 
-    // 11. Non-Blocking Background Camera Initialization
+    // 11. Background Camera Initialization
     const initCameraStream = async () => {
       videoEl.setAttribute('playsinline', 'true');
       videoEl.setAttribute('webkit-playsinline', 'true');
       videoEl.muted = true;
       videoEl.autoplay = true;
 
-      // Small delay on iOS to allow hardware to finish switching from front proctoring to rear camera
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 150));
 
-      const getStreamWithTimeout = (constraints, ms = 2200) => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (fallbackBox) fallbackBox.style.display = 'flex';
+        return;
+      }
+
+      const getStreamWithTimeout = (constraints, ms = 12000) => {
         return Promise.race([
           navigator.mediaDevices.getUserMedia(constraints),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
@@ -5451,7 +5459,7 @@ class AppController {
           try {
             cameraStream = await getStreamWithTimeout({ video: true, audio: false });
           } catch (e3) {
-            console.warn('[Scanner Camera] WebRTC stream failed or timed out:', e3);
+            console.warn('[Scanner Camera] WebRTC stream not available:', e3);
           }
         }
       }
@@ -5470,13 +5478,13 @@ class AppController {
             if (fallbackBox) fallbackBox.style.display = 'none';
             detectionTimer = setInterval(runDetection, 320);
           }
-        }, 800);
+        }, 600);
       } else {
         if (fallbackBox) fallbackBox.style.display = 'flex';
         if (detectionPill) {
-          detectionPill.style.borderColor = '#F59E0B';
-          detectionPill.style.color = '#F59E0B';
-          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#F59E0B;">photo_camera</span> Ready • Tap Shutter to Snap';
+          detectionPill.style.borderColor = '#38BDF8';
+          detectionPill.style.color = '#38BDF8';
+          detectionPill.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;color:#38BDF8;">photo_camera</span> Ready \u2022 Tap Camera or Shutter to Snap';
         }
       }
     };
