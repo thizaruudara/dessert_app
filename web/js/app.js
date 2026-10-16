@@ -2242,11 +2242,13 @@ class AppController {
       });
     });
 
-    // Scan Answers
+    // Scan Answers — essay-specific scanner with paper context
     container.querySelectorAll('[data-scan-answers]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (!this.checkSubscriptionAccess('Exam Answer Submission')) return;
-        this.openDocumentScanner();
+        const paperId = btn.dataset.scanAnswers;
+        const session = sessions.find(s => s.id === paperId);
+        this.openEssayScannerModal(paperId, session);
       });
     });
   }
@@ -4904,6 +4906,309 @@ class AppController {
     renderQuestion();
   }
 
+
+  // ── Essay Answer Sheet Scanner ─────────────────────────────────────────────
+  // Paper-specific scanner that saves to essay_submissions collection
+  openEssayScannerModal(paperId, session) {
+    const user = this.currentUser || {};
+    cameraService.clearPages();
+
+    const modal = document.createElement('div');
+    modal.className = 'scanner-modal';
+    modal.id = 'essay-scanner-modal';
+
+    const paperTitle = session?.title || session?.name || 'Exam Paper';
+
+    modal.innerHTML = `
+      <div class="scanner-top-bar">
+        <div class="scanner-title">
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <span class="material-symbols-rounded">history_edu</span>
+            <span style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${paperTitle}</span>
+          </span>
+          <span class="scanner-page-counter" id="essay-page-count">0 Pages</span>
+        </div>
+        <div class="scanner-top-actions">
+          <button class="btn-scanner-icon" id="essay-btn-torch" title="Flashlight" style="display:inline-flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:18px;">flash_on</span>
+          </button>
+          <button class="btn-scanner-icon" id="essay-btn-close" title="Close" style="display:inline-flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded" style="font-size:20px;">close</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="scanner-viewfinder-container">
+        <video class="scanner-video" id="essay-scanner-video" autoplay playsinline muted></video>
+        <div class="scanner-frame-overlay">
+          <div class="scanner-laser"></div>
+          <span class="scanner-hint-text">Align answer sheet within the frame • Good light, flat surface</span>
+        </div>
+        <div class="scanner-flash-overlay" id="essay-scanner-flash"></div>
+      </div>
+
+      <div class="scanner-bottom-bar">
+        <div class="scanner-filter-bar">
+          <button class="filter-pill active" data-filter="none">Natural</button>
+          <button class="filter-pill" data-filter="document">Enhance</button>
+          <button class="filter-pill" data-filter="bw">B&amp;W</button>
+        </div>
+        <div class="scanner-thumbnails-strip" id="essay-thumb-strip"></div>
+        <div class="scanner-shutter-row">
+          <label class="btn-upload-file-fallback" for="essay-file-input">
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:18px;">photo_library</span> Gallery</span>
+            <input type="file" id="essay-file-input" accept="image/*" capture="environment" style="display:none;" multiple />
+          </label>
+          <button class="shutter-btn-wrap" id="essay-shutter" type="button" aria-label="Take Photo">
+            <span class="shutter-outer-ring" style="border-color:#DC2626;"></span>
+            <span class="btn-shutter-inner" style="background:#DC2626;"></span>
+          </button>
+          <button class="btn-done-scanning" id="essay-done-btn" disabled style="display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+            <span>Submit</span>
+            <span class="material-symbols-rounded" style="font-size:16px;">upload</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const videoEl = document.getElementById('essay-scanner-video');
+    let currentFilter = 'none';
+
+    cameraService.startCamera(videoEl, 'environment').catch(err => {
+      console.warn('[EssayScanner] Camera notice:', err.message);
+    });
+
+    document.getElementById('essay-btn-torch')?.addEventListener('click', async () => {
+      const active = await cameraService.toggleTorch();
+      document.getElementById('essay-btn-torch')?.classList.toggle('active', active);
+    });
+
+    modal.querySelectorAll('.filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        modal.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentFilter = pill.dataset.filter;
+      });
+    });
+
+    const updateEssayThumbs = () => {
+      const pages = cameraService.getPages();
+      const countEl = document.getElementById('essay-page-count');
+      const stripEl = document.getElementById('essay-thumb-strip');
+      const doneBtn = document.getElementById('essay-done-btn');
+      if (countEl) countEl.textContent = `${pages.length} Pages`;
+      if (doneBtn) doneBtn.disabled = pages.length === 0;
+      if (stripEl) {
+        stripEl.innerHTML = pages.map((dataUrl, idx) => `
+          <div class="thumb-card">
+            <img src="${dataUrl}"/>
+            <button class="thumb-del-btn" data-del-idx="${idx}" style="display:inline-flex; align-items:center; justify-content:center;">
+              <span class="material-symbols-rounded" style="font-size:12px;">close</span>
+            </button>
+            <span class="thumb-page-badge">P${idx + 1}</span>
+          </div>
+        `).join('');
+        stripEl.querySelectorAll('.thumb-del-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            cameraService.removePage(Number(btn.dataset.delIdx));
+            updateEssayThumbs();
+          });
+        });
+      }
+    };
+
+    const takePhoto = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      try {
+        const flash = document.getElementById('essay-scanner-flash');
+        if (flash) { flash.classList.add('flashing'); setTimeout(() => flash.classList.remove('flashing'), 140); }
+        cameraService.capturePhoto(currentFilter);
+        updateEssayThumbs();
+      } catch (err) {
+        console.warn('[EssayScanner] Capture notice:', err);
+        notificationService.showInAppBanner('Camera Notice', 'Could not capture. Try Gallery upload.', 'warning');
+      }
+    };
+
+    const shutterBtn = document.getElementById('essay-shutter');
+    if (shutterBtn) {
+      shutterBtn.addEventListener('click', takePhoto);
+      shutterBtn.addEventListener('touchend', (e) => { e.preventDefault(); takePhoto(); }, { passive: false });
+    }
+
+    document.getElementById('essay-file-input')?.addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      for (const file of Array.from(files)) {
+        try {
+          const rawDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = evt => resolve(evt.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          if (rawDataUrl) {
+            const compressed = await cameraService.compressImage(rawDataUrl, 1600, 0.82);
+            cameraService.addPageFromDataUrl(compressed);
+          }
+        } catch (err) { console.warn('[EssayScanner] File read error:', err); }
+      }
+      updateEssayThumbs();
+      e.target.value = '';
+    });
+
+    const closeEssayScanner = () => {
+      cameraService.stopCamera();
+      modal.remove();
+    };
+
+    document.getElementById('essay-btn-close')?.addEventListener('click', () => {
+      const pages = cameraService.getPages();
+      if (pages.length > 0) {
+        if (!confirm(`You have ${pages.length} scanned page(s). Close without submitting?`)) return;
+      }
+      closeEssayScanner();
+    });
+
+    document.getElementById('essay-done-btn')?.addEventListener('click', () => {
+      const pages = cameraService.getPages();
+      if (pages.length === 0) return;
+      closeEssayScanner();
+      this.openEssaySubmitDialog(pages, paperId, session, user);
+    });
+  }
+
+  openEssaySubmitDialog(pages, paperId, session, user) {
+    if (!pages || pages.length === 0) return;
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+    const paperTitle = session?.title || session?.name || 'Exam Paper';
+    const studentName = user?.name || 'Student';
+    const studentBatch = user?.examYear || user?.batch || '2027 A/L';
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:90vh; overflow-y:auto;">
+        <div class="modal-header" style="position:sticky; top:0; background:#fff; z-index:2; padding-bottom:12px; border-bottom:1px solid #E2E8F0;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <h3 class="modal-title" style="margin:0;">Submit Answer Sheet</h3>
+            <div style="font-size:12px; color:#64748B; font-weight:600;">${paperTitle}</div>
+          </div>
+          <button class="modal-close-btn" id="essay-submit-close">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+
+        <div style="padding:16px 0 0;">
+          <!-- Page Previews -->
+          <div style="font-size:12px; font-weight:700; color:#475569; margin-bottom:8px;">
+            Scanned Pages (${pages.length}):
+          </div>
+          <div style="display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; padding-bottom:6px; -webkit-overflow-scrolling:touch;">
+            ${pages.map((img, i) => `
+              <div style="position:relative; width:64px; height:84px; flex-shrink:0; border-radius:10px; overflow:hidden; border:2px solid #DC2626; box-shadow:0 2px 8px rgba(220,38,38,0.15);">
+                <img src="${img}" style="width:100%; height:100%; object-fit:cover;" />
+                <span style="position:absolute; bottom:2px; left:2px; background:rgba(220,38,38,0.85); color:#fff; font-size:9px; font-weight:800; padding:1px 5px; border-radius:4px;">P${i+1}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Student Info (readonly) -->
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px;">
+            <span class="material-symbols-rounded filled" style="font-size:28px; color:#2563EB;">account_circle</span>
+            <div>
+              <div style="font-size:13px; font-weight:800; color:#0F172A;">${studentName}</div>
+              <div style="font-size:11px; color:#64748B;">${studentBatch} • ${pages.length} page${pages.length !== 1 ? 's' : ''}</div>
+            </div>
+          </div>
+
+          <!-- Optional Note -->
+          <div class="form-group">
+            <label class="form-label">Note to Admin (Optional)</label>
+            <textarea class="form-textarea" id="essay-submit-note" rows="2" placeholder="e.g. Q3 was left blank, handwriting question 5..."></textarea>
+          </div>
+
+          <!-- Quality Warning -->
+          <div style="background:#FFF7ED; border:1px solid #FED7AA; border-radius:10px; padding:10px 12px; margin-bottom:14px; display:flex; gap:8px; align-items:flex-start;">
+            <span class="material-symbols-rounded" style="font-size:18px; color:#D97706; flex-shrink:0;">info</span>
+            <div style="font-size:11.5px; color:#92400E; line-height:1.4;">
+              Make sure all writing is clearly visible. Use good lighting and a flat surface. You cannot re-submit once confirmed.
+            </div>
+          </div>
+
+          <button class="btn-primary" id="essay-submit-confirm" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; background:#DC2626;">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">cloud_upload</span>
+            <span>Submit ${pages.length} Pages Now</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('essay-submit-close')?.addEventListener('click', () => modal.remove());
+
+    document.getElementById('essay-submit-confirm')?.addEventListener('click', async () => {
+      const btn = document.getElementById('essay-submit-confirm');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">hourglass_top</span>&nbsp;Optimizing pages...'; }
+
+      try {
+        const studentId = user?.studentId || user?.uid || user?.id || 'student';
+        const note = document.getElementById('essay-submit-note')?.value?.trim() || '';
+
+        if (btn) btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">cloud_upload</span>&nbsp;Uploading pages...';
+
+        // Upload pages to storage
+        let uploadedUrls = [];
+        try {
+          uploadedUrls = await storageService.uploadAllPages(pages, {
+            studentId,
+            filePrefix: `essay_${paperId || 'paper'}`
+          });
+        } catch (uploadErr) {
+          console.warn('[EssayScanner] Storage upload note:', uploadErr);
+        }
+
+        const finalUrls = (uploadedUrls && uploadedUrls.length > 0) ? uploadedUrls : pages;
+
+        if (btn) btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">save</span>&nbsp;Saving submission...';
+
+        await dbService.submitEssayPaper({
+          paperId: paperId || '',
+          paperTitle,
+          studentId,
+          studentName,
+          studentBatch,
+          mediaUrls: finalUrls,
+          pageCount: finalUrls.length,
+          note
+        });
+
+        cameraService.clearPages();
+        modal.remove();
+        notificationService.showInAppBanner(
+          'Answer Sheet Submitted! ✅',
+          `${pages.length} page${pages.length !== 1 ? 's' : ''} submitted. Admin will review your paper.`,
+          'success'
+        );
+
+        // Refresh the papers card if on papers tab
+        if (this.currentTab === 'papers' || this.currentMode === 'student') {
+          setTimeout(() => { try { this.switchTab('papers'); } catch (_) {} }, 800);
+        }
+
+      } catch (err) {
+        console.error('[EssayScanner] Submit error:', err);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">cloud_upload</span><span>Retry Submit</span>';
+        }
+        notificationService.showInAppBanner('Submission Failed', err.message || 'Failed to submit. Please try again.', 'error');
+      }
+    });
+  }
+
   // ── Camera Document Scanner Flow (Full iOS Match) ─────────────────────────
   openDocumentScanner() {
     cameraService.clearPages();
@@ -5367,7 +5672,7 @@ class AppController {
     this.currentMode = 'admin';
     const params = new URLSearchParams(window.location.search);
     const requestedAdminTab = params.get('admin_tab');
-    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
+    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts', 'essays'];
     this.adminTab = allowedAdminTabs.includes(requestedAdminTab) ? requestedAdminTab : (this.adminTab || 'dashboard');
 
     root.innerHTML = `
@@ -5378,6 +5683,7 @@ class AppController {
         <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
         <div id="admin-tab-viewport-students" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
         <div id="admin-tab-viewport-broadcasts" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
+        <div id="admin-tab-viewport-essays" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:16px;"></div>
       </div>
 
       <!-- Contained Floating Action Button Slot (Strictly inside #app-root) -->
@@ -5404,6 +5710,10 @@ class AppController {
         <button class="nav-tab-btn ${this.adminTab === 'broadcasts' ? 'active' : ''}" data-admin-tab="broadcasts">
           <div class="nav-pill-icon"><span class="material-symbols-rounded">send</span></div>
           <span>Broadcasts</span>
+        </button>
+        <button class="nav-tab-btn ${this.adminTab === 'essays' ? 'active' : ''}" data-admin-tab="essays">
+          <div class="nav-pill-icon"><span class="material-symbols-rounded">history_edu</span></div>
+          <span>Essays</span>
         </button>
       </nav>
     `;
@@ -5460,7 +5770,7 @@ class AppController {
   }
 
   switchAdminTab(tabName, { historyMode = 'push', forceRefresh = false } = {}) {
-    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts'];
+    const allowedAdminTabs = ['dashboard', 'papers', 'sprints', 'students', 'broadcasts', 'essays'];
     if (!allowedAdminTabs.includes(tabName)) tabName = 'dashboard';
     const previousTab = this.adminTab;
     this.adminTab = tabName;
@@ -5497,6 +5807,7 @@ class AppController {
     });
 
     // 4. Instant tab switching with hardware-accelerated crossfade
+    // Update nav pills for the expanded set
     allowedAdminTabs.forEach(t => {
       const panel = this.getAdminTabViewport(t);
       if (panel) {
@@ -5567,6 +5878,9 @@ class AppController {
       case 'broadcasts':
         this.renderAdminBroadcastsScreen(targetViewport);
         markRendered();
+        break;
+      case 'essays':
+        this.renderAdminEssaySubmissionsScreen(targetViewport).then(markRendered).catch(err => handleAdminError('essays', err));
         break;
       default:
         this.renderAdminDashboardScreen(targetViewport).then(markRendered).catch(err => handleAdminError('dashboard', err));
@@ -8163,7 +8477,367 @@ class AppController {
     });
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ── ADMIN: Essay Submissions Screen ─────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  async renderAdminEssaySubmissionsScreen(container) {
+    if (!container) return;
+
+    container.innerHTML = `
+      <div style="padding:16px 16px 0;">
+        <!-- Header -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+          <div>
+            <div style="font-size:18px; font-weight:900; color:#0F172A; display:flex; align-items:center; gap:8px;">
+              <span class="material-symbols-rounded" style="font-size:22px; color:#DC2626;">history_edu</span>
+              Essay Submissions
+            </div>
+            <div style="font-size:12px; color:#64748B; margin-top:2px;">Student answer sheets for exam papers</div>
+          </div>
+          <button id="essays-refresh-btn" style="background:#F1F5F9; border:1px solid #E2E8F0; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color:#334155; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+            <span class="material-symbols-rounded" style="font-size:16px;">refresh</span> Refresh
+          </button>
+        </div>
+
+        <!-- Search + Filter Bar -->
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <div style="flex:1; position:relative;">
+            <span class="material-symbols-rounded" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:18px; color:#94A3B8;">search</span>
+            <input type="text" id="essays-search" placeholder="Search student, paper, batch..." style="width:100%; padding:10px 12px 10px 36px; border:1.5px solid #E2E8F0; border-radius:12px; font-size:13px; font-weight:600; color:#0F172A; background:#fff; box-sizing:border-box;" />
+          </div>
+          <select id="essays-status-filter" style="border:1.5px solid #E2E8F0; border-radius:12px; padding:10px 12px; font-size:13px; font-weight:700; color:#0F172A; background:#fff; cursor:pointer;">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="graded">Graded</option>
+          </select>
+        </div>
+
+        <!-- Stats Row -->
+        <div id="essays-stats-row" style="display:flex; gap:10px; margin-bottom:16px;"></div>
+
+        <!-- Submissions List -->
+        <div id="essays-list-container">
+          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:40vh; gap:12px;">
+            <div style="width:32px; height:32px; border:3px solid #DBEAFE; border-top-color:#2563EB; border-radius:50%; animation:spin 0.75s linear infinite;"></div>
+            <div style="font-size:12px; font-weight:700; color:#64748B;">Loading submissions…</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Load and render submissions
+    const loadSubmissions = async () => {
+      let allSubs = [];
+      try {
+        allSubs = await dbService.getEssaySubmissions({ limit: 300 });
+      } catch (e) {
+        console.warn('[Admin Essays] Load error:', e);
+      }
+
+      this._essaySubsCache = allSubs;
+      this._renderEssayList(container, allSubs);
+    };
+
+    await loadSubmissions();
+
+    document.getElementById('essays-refresh-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('essays-refresh-btn');
+      if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px; animation:spin 0.75s linear infinite;">progress_activity</span> Loading...';
+      await loadSubmissions();
+    });
+
+    document.getElementById('essays-search')?.addEventListener('input', () => {
+      const q = document.getElementById('essays-search')?.value?.toLowerCase() || '';
+      const status = document.getElementById('essays-status-filter')?.value || '';
+      const filtered = (this._essaySubsCache || []).filter(s =>
+        (!q || s.studentName?.toLowerCase().includes(q) || s.paperTitle?.toLowerCase().includes(q) || s.studentBatch?.toLowerCase().includes(q)) &&
+        (!status || s.status === status)
+      );
+      this._renderEssayList(container, filtered, false);
+    });
+
+    document.getElementById('essays-status-filter')?.addEventListener('change', () => {
+      const q = document.getElementById('essays-search')?.value?.toLowerCase() || '';
+      const status = document.getElementById('essays-status-filter')?.value || '';
+      const filtered = (this._essaySubsCache || []).filter(s =>
+        (!q || s.studentName?.toLowerCase().includes(q) || s.paperTitle?.toLowerCase().includes(q) || s.studentBatch?.toLowerCase().includes(q)) &&
+        (!status || s.status === status)
+      );
+      this._renderEssayList(container, filtered, false);
+    });
+  }
+
+  _renderEssayList(container, subs, updateStats = true) {
+    const escapeHTML = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    const formatDate = v => { try { const d = new Date(v); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }); } catch(_){ return '—'; }};
+
+    // Update stats
+    if (updateStats) {
+      const statsRow = document.getElementById('essays-stats-row');
+      if (statsRow) {
+        const total = subs.length;
+        const pending = subs.filter(s => s.status === 'pending').length;
+        const graded = subs.filter(s => s.status === 'graded').length;
+        statsRow.innerHTML = [
+          ['history_edu', total, 'Total', '#2563EB', '#EFF6FF'],
+          ['pending_actions', pending, 'Pending', '#D97706', '#FFF7ED'],
+          ['grade', graded, 'Graded', '#16A34A', '#F0FDF4'],
+        ].map(([icon, count, label, color, bg]) => `
+          <div style="flex:1; background:${bg}; border-radius:12px; padding:10px 12px; text-align:center;">
+            <span class="material-symbols-rounded" style="font-size:20px; color:${color};">${icon}</span>
+            <div style="font-size:20px; font-weight:900; color:${color}; line-height:1;">${count}</div>
+            <div style="font-size:10px; font-weight:700; color:${color};">${label}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    const listEl = document.getElementById('essays-list-container');
+    if (!listEl) return;
+
+    if (!subs || subs.length === 0) {
+      listEl.innerHTML = `
+        <div style="padding:60px 20px; text-align:center; color:#64748B;">
+          <span class="material-symbols-rounded" style="font-size:52px; color:#CBD5E1;">history_edu</span>
+          <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:10px;">No Submissions Yet</div>
+          <div style="font-size:12px; margin-top:4px;">Students submit after Time Up on their exam paper.</div>
+        </div>`;
+      return;
+    }
+
+    // CSV Export button
+    listEl.innerHTML = `
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+        <button id="essays-export-csv" style="background:#0F172A; color:#fff; border:none; border-radius:10px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+          <span class="material-symbols-rounded" style="font-size:16px;">download</span> Export CSV
+        </button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px; padding-bottom:20px;">
+        ${subs.map(sub => `
+          <div class="essay-sub-card" data-sub-id="${escapeHTML(sub.id)}" style="background:#fff; border:1.5px solid ${sub.status === 'graded' ? '#86EFAC' : '#E2E8F0'}; border-radius:16px; overflow:hidden; box-shadow:0 2px 10px rgba(15,23,42,0.05);">
+            <!-- Card Header -->
+            <div style="padding:12px 14px; display:flex; align-items:flex-start; gap:10px; border-bottom:1px solid #F1F5F9;">
+              <span class="material-symbols-rounded filled" style="font-size:32px; color:${sub.status === 'graded' ? '#16A34A' : '#2563EB'}; flex-shrink:0;">account_circle</span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:13px; font-weight:800; color:#0F172A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(sub.studentName)}</div>
+                <div style="font-size:11px; color:#64748B; margin-top:1px;">${escapeHTML(sub.studentBatch)} • ${escapeHTML(sub.paperTitle)}</div>
+                <div style="font-size:10.5px; color:#94A3B8; margin-top:2px;">${formatDate(sub.submittedAt)}</div>
+              </div>
+              <div style="flex-shrink:0; text-align:right;">
+                <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; background:${sub.status === 'graded' ? '#F0FDF4' : '#FFF7ED'}; color:${sub.status === 'graded' ? '#16A34A' : '#D97706'}; border:1px solid ${sub.status === 'graded' ? '#86EFAC' : '#FED7AA'};">
+                  ${sub.status === 'graded' ? '✓ Graded' : '⏳ Pending'}
+                </span>
+                ${sub.marks != null ? `<div style="font-size:13px; font-weight:900; color:#16A34A; margin-top:4px;">${sub.marks} marks</div>` : ''}
+              </div>
+            </div>
+
+            <!-- Page Thumbnails -->
+            <div style="padding:10px 14px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+              ${(sub.mediaUrls || []).map((url, i) => `
+                <div class="essay-thumb-open" data-urls='${escapeHTML(JSON.stringify(sub.mediaUrls))}' data-page="${i}" style="position:relative; width:54px; height:72px; flex-shrink:0; border-radius:8px; overflow:hidden; cursor:pointer; border:1.5px solid #E2E8F0;">
+                  <img src="${escapeHTML(url)}" style="width:100%; height:100%; object-fit:cover;" loading="lazy" onerror="this.style.display='none'" />
+                  <span style="position:absolute; bottom:1px; left:1px; background:rgba(0,0,0,0.65); color:#fff; font-size:8px; font-weight:800; padding:1px 4px; border-radius:3px;">P${i+1}</span>
+                </div>
+              `).join('')}
+              ${(sub.mediaUrls || []).length === 0 ? '<span style="font-size:11px; color:#94A3B8; padding:8px 0;">No pages</span>' : ''}
+            </div>
+
+            ${sub.note ? `<div style="padding:0 14px 8px; font-size:11.5px; color:#64748B; font-style:italic;">"${escapeHTML(sub.note)}"</div>` : ''}
+            ${sub.adminComment ? `<div style="padding:0 14px 8px; font-size:11.5px; color:#16A34A; font-weight:700;"><span class="material-symbols-rounded" style="font-size:13px; vertical-align:middle;">comment</span> ${escapeHTML(sub.adminComment)}</div>` : ''}
+
+            <!-- Actions -->
+            <div style="padding:10px 14px; display:flex; gap:8px; border-top:1px solid #F1F5F9;">
+              <button class="essay-grade-btn" data-sub-id="${escapeHTML(sub.id)}" style="flex:1; background:${sub.status === 'graded' ? '#F1F5F9' : '#2563EB'}; color:${sub.status === 'graded' ? '#334155' : '#fff'}; border:none; border-radius:10px; padding:9px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
+                <span class="material-symbols-rounded" style="font-size:15px;">${sub.status === 'graded' ? 'edit' : 'grade'}</span>
+                ${sub.status === 'graded' ? 'Edit Grade' : 'Grade'}
+              </button>
+              <button class="essay-download-btn" data-urls='${escapeHTML(JSON.stringify(sub.mediaUrls || []))}' data-name="${escapeHTML(sub.studentName)}" style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:700; color:#334155; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                <span class="material-symbols-rounded" style="font-size:15px;">download</span>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // CSV Export
+    document.getElementById('essays-export-csv')?.addEventListener('click', () => {
+      const rows = [['ID','Student','Batch','Paper','Pages','Status','Marks','Submitted']];
+      subs.forEach(s => rows.push([s.id, s.studentName, s.studentBatch, s.paperTitle, s.pageCount || s.mediaUrls?.length || 0, s.status, s.marks ?? '', s.submittedAt]));
+      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+      a.download = `essay_submissions_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+    });
+
+    // Open image viewer on thumbnail click
+    listEl.querySelectorAll('.essay-thumb-open').forEach(el => {
+      el.addEventListener('click', () => {
+        try {
+          const urls = JSON.parse(el.dataset.urls || '[]');
+          const startPage = Number(el.dataset.page || 0);
+          this._openEssayPageViewer(urls, startPage);
+        } catch (_) {}
+      });
+    });
+
+    // Download all pages for a submission
+    listEl.querySelectorAll('.essay-download-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          const urls = JSON.parse(btn.dataset.urls || '[]');
+          const name = btn.dataset.name || 'student';
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px; animation:spin 0.75s linear infinite;">progress_activity</span>';
+          for (let i = 0; i < urls.length; i++) {
+            const a = document.createElement('a');
+            a.href = urls[i];
+            a.download = `${name.replace(/\s+/g,'_')}_P${i+1}.jpg`;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            await new Promise(r => setTimeout(r, 350));
+          }
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">check</span>';
+          setTimeout(() => { btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span>'; }, 2000);
+        } catch (err) {
+          console.warn('[Admin Essays] Download error:', err);
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span>';
+        }
+      });
+    });
+
+    // Grade button
+    listEl.querySelectorAll('.essay-grade-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const subId = btn.dataset.subId;
+        const sub = subs.find(s => s.id === subId);
+        if (sub) this._openEssayGradeModal(sub);
+      });
+    });
+  }
+
+  _openEssayPageViewer(urls, startPage = 0) {
+    const viewer = document.createElement('div');
+    viewer.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;';
+    let currentPage = startPage;
+
+    const render = () => {
+      viewer.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:rgba(0,0,0,0.5);">
+          <span style="color:#fff; font-size:13px; font-weight:700;">Page ${currentPage + 1} / ${urls.length}</span>
+          <button id="viewer-close" style="background:none; border:none; color:#fff; cursor:pointer; padding:4px;">
+            <span class="material-symbols-rounded" style="font-size:26px;">close</span>
+          </button>
+        </div>
+        <div style="flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:8px;">
+          <img src="${urls[currentPage]}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; user-select:none;" />
+        </div>
+        <div style="display:flex; justify-content:center; gap:20px; padding:14px; background:rgba(0,0,0,0.5);">
+          <button id="viewer-prev" ${currentPage === 0 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded">chevron_left</span>
+          </button>
+          <a href="${urls[currentPage]}" download="page_${currentPage+1}.jpg" target="_blank" style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; text-decoration:none;">
+            <span class="material-symbols-rounded" style="font-size:20px;">download</span>
+          </a>
+          <button id="viewer-next" ${currentPage === urls.length - 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <span class="material-symbols-rounded">chevron_right</span>
+          </button>
+        </div>
+      `;
+      viewer.querySelector('#viewer-close')?.addEventListener('click', () => viewer.remove());
+      viewer.querySelector('#viewer-prev')?.addEventListener('click', () => { if (currentPage > 0) { currentPage--; render(); } });
+      viewer.querySelector('#viewer-next')?.addEventListener('click', () => { if (currentPage < urls.length - 1) { currentPage++; render(); } });
+    };
+
+    render();
+    document.body.appendChild(viewer);
+
+    // Swipe support
+    let touchStartX = 0;
+    viewer.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    viewer.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 50) {
+        if (dx < 0 && currentPage < urls.length - 1) { currentPage++; render(); }
+        if (dx > 0 && currentPage > 0) { currentPage--; render(); }
+      }
+    }, { passive: true });
+  }
+
+  _openEssayGradeModal(sub) {
+    const escapeHTML = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    const modal = document.createElement('div');
+    modal.className = 'app-modal';
+
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:88vh; overflow-y:auto;">
+        <div class="modal-header" style="border-bottom:1px solid #E2E8F0; padding-bottom:12px;">
+          <div>
+            <h3 class="modal-title" style="margin:0;">Grade Submission</h3>
+            <div style="font-size:11px; color:#64748B;">${escapeHTML(sub.studentName)} • ${escapeHTML(sub.paperTitle)}</div>
+          </div>
+          <button id="grade-modal-close" class="modal-close-btn"><span class="material-symbols-rounded">close</span></button>
+        </div>
+        <div style="padding:16px 0 0;">
+          <!-- Quick Page Preview -->
+          <div style="display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px;">
+            ${(sub.mediaUrls || []).slice(0, 6).map((url, i) => `
+              <div style="width:50px; height:66px; flex-shrink:0; border-radius:8px; overflow:hidden; border:1.5px solid #E2E8F0; cursor:pointer;" onclick="window.open('${escapeHTML(url)}','_blank')">
+                <img src="${escapeHTML(url)}" style="width:100%; height:100%; object-fit:cover;" loading="lazy" />
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Marks Awarded</label>
+            <input type="number" class="form-input" id="grade-marks-input" min="0" max="999" step="0.5" value="${sub.marks ?? ''}" placeholder="e.g. 75" style="font-size:20px; font-weight:900; text-align:center;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Admin Comment / Feedback</label>
+            <textarea class="form-textarea" id="grade-comment-input" rows="3" placeholder="Feedback for student (optional)...">${escapeHTML(sub.adminComment || '')}</textarea>
+          </div>
+
+          <button id="grade-save-btn" class="btn-primary" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; background:#16A34A;">
+            <span class="material-symbols-rounded filled" style="font-size:18px;">save</span>
+            <span>Save Grade</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('grade-modal-close')?.addEventListener('click', () => modal.remove());
+
+    document.getElementById('grade-save-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('grade-save-btn');
+      const marksRaw = document.getElementById('grade-marks-input')?.value;
+      const comment = document.getElementById('grade-comment-input')?.value?.trim() || '';
+      const marks = marksRaw !== '' ? Number(marksRaw) : null;
+
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:16px;">hourglass_top</span>&nbsp;Saving...'; }
+      try {
+        await dbService.gradeEssaySubmission({
+          submissionId: sub.id,
+          marks,
+          adminComment: comment,
+          gradedBy: this.currentUser?.name || 'Admin'
+        });
+        modal.remove();
+        notificationService.showInAppBanner('Grade Saved', `${sub.studentName}'s submission graded${marks != null ? ` — ${marks} marks` : ''}.`, 'success');
+        // Refresh the essays tab
+        this.refreshAdminTab('essays');
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">save</span><span>Retry Save</span>'; }
+        notificationService.showInAppBanner('Save Failed', err.message || 'Could not save grade.', 'error');
+      }
+    });
+  }
+
   // ── Helper Modal Dialogs ───────────────────────────────────────────────
+
     // ── Helper Modal Dialogs ───────────────────────────────────────────────
   async openAdminDailyInsightModal() {
     // Remove any existing insight modal first
@@ -10515,9 +11189,12 @@ class AppController {
               onConfirm: async () => {
                 session.currentPhase = 'writing';
                 session.isLive = true;
-                session.writingStartedAt = new Date().toISOString();
+                const shouldReset = !session.writingStartedAt;
+                if (shouldReset) {
+                  session.writingStartedAt = new Date().toISOString();
+                }
                 render();
-                await dbService.setSessionPhase(session.id, 'writing', { forceResetTimer: true });
+                await dbService.setSessionPhase(session.id, 'writing', { forceResetTimer: shouldReset });
                 notificationService.showInAppBanner('Exam Writing Live', 'Exam writing phase active for all students.', 'success');
               }
             });
@@ -11160,6 +11837,8 @@ class AppController {
             startTime = new Date();
             localStorage.setItem(`paper_writing_start_${session.id}`, startTime.toISOString());
           }
+        } else {
+          localStorage.setItem(`paper_writing_start_${session.id}`, startTime.toISOString());
         }
         const elapsed = Math.max(0, Math.floor((new Date() - startTime) / 1000));
         if (elapsed > totalWritingSecs) {
@@ -11478,15 +12157,6 @@ ${!times.isWaiting ? `
                   </div>
                 </div>
               ` : times.isWriting ? `
-                ${(session.paperPdfUrl || session.pdfUrl) ? `
-                  <div style="margin-bottom:10px; display:flex; justify-content:center; width:100%;">
-                    <button id="btn-open-paper-pdf-hud" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.4); border-radius:14px; padding:10px 18px; font-size:13px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 6px 18px rgba(37,99,235,0.45); letter-spacing:0.3px; width:100%; max-width:420px; justify-content:center; transition:transform 0.15s ease;">
-                      <span class="material-symbols-rounded filled" style="font-size:20px; color:#93C5FD;">menu_book</span>
-                      <span>ප්‍රශ්න පත්‍රය බලන්න (View Exam Paper)</span>
-                      <span style="background:rgba(255,255,255,0.25); border-radius:6px; font-size:9.5px; padding:2px 6px; font-weight:800;">PDF</span>
-                    </button>
-                  </div>
-                ` : ''}
                 <!-- Giant High-Contrast Digital Digits HUD -->
                 ${isBigTimerMinimized ? `
                   <div style="background:rgba(15,23,42,0.92); border:1.5px solid ${times.writingSecsLeft < 900 ? '#EF4444' : '#22C55E'}; border-radius:14px; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 6px 20px rgba(0,0,0,0.5);">
@@ -11563,40 +12233,33 @@ ${!times.isWaiting ? `
               ` : ''}
             </div>
 
-            <!-- Floating Paper Button during Writing Phase -->
-            ${(times.isWriting && (session.paperPdfUrl || session.pdfUrl)) ? `
-              <div id="btn-floating-view-paper" style="position:fixed; top:70px; right:14px; z-index:35; background:linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%); color:#FFFFFF; border:1.5px solid rgba(255,255,255,0.4); border-radius:30px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 6px 18px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
-                <span class="material-symbols-rounded filled" style="font-size:18px; color:#60A5FA;">menu_book</span>
-                <span style="white-space:nowrap;">ප්‍රශ්න පත්‍රය (Paper)</span>
-              </div>
-            ` : ''}
-
             <!-- Bottom Exam Control Bar (_buildBottomExamControlBar) -->
-            <div style="position:absolute; bottom:20px; left:16px; right:16px; z-index:20; max-width:680px; margin:0 auto;">
-              <div style="background:rgba(30,41,59,0.92); border:1px solid ${times.isTimeUp ? '#EF4444' : '#334155'}; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 24px rgba(0,0,0,0.5); gap:8px;">
-                <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                  <div style="width:36px; height:36px; border-radius:50%; background:${times.isTimeUp ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; display:flex; align-items:center; justify-content:center; color:${times.isTimeUp ? '#EF4444' : '#4ADE80'}; font-size:18px; flex-shrink:0;">
-                    <span class="material-symbols-rounded filled" style="font-size:20px;">${times.isTimeUp ? 'alarm' : 'shield'}</span>
+            <div style="position:absolute; bottom:16px; left:12px; right:12px; z-index:20; max-width:680px; margin:0 auto;">
+              <div style="background:rgba(30,41,59,0.95); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid ${times.isTimeUp ? '#EF4444' : '#334155'}; border-radius:16px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 8px 24px rgba(0,0,0,0.6); gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                  <div style="width:34px; height:34px; border-radius:50%; background:${times.isTimeUp ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}; display:flex; align-items:center; justify-content:center; color:${times.isTimeUp ? '#EF4444' : '#4ADE80'}; font-size:18px; flex-shrink:0;">
+                    <span class="material-symbols-rounded filled" style="font-size:19px;">${times.isTimeUp ? 'alarm' : 'shield'}</span>
                   </div>
-                  <div style="min-width:0;">
-                    <div style="font-size:11px; font-weight:600; color:${times.isTimeUp ? '#FCA5A5' : '#FFFFFF'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                      ${times.isTimeUp ? 'වේලාව අවසන් කර ඇත' : 'කැමරා අධීක්ෂණය සක්‍රීයයි'}
+                  <div style="min-width:0; flex:1; overflow:hidden;">
+                    <div style="font-size:11px; font-weight:700; color:${times.isTimeUp ? '#FCA5A5' : '#38BDF8'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:4px;">
+                      ${!times.isTimeUp ? '<span style="width:6px; height:6px; border-radius:50%; background:#22C55E; display:inline-block; flex-shrink:0; box-shadow:0 0 6px #22C55E;"></span>' : ''}
+                      <span>${times.isTimeUp ? 'වේලාව අවසන්' : 'සජීවී අධීක්ෂණය'}</span>
                     </div>
-                    <div style="font-size:10px; color:#94A3B8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                      ${times.isTimeUp ? 'පිළිතුරු පත්‍ර Submit කරන්න' : 'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි'}
+                    <div style="font-size:9.5px; color:#94A3B8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2; margin-top:1px;">
+                      ${times.isTimeUp ? 'Submit Now' : 'Camera Monitored'}
                     </div>
                   </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                   ${(times.isWriting && (session.paperPdfUrl || session.pdfUrl)) ? `
-                    <button id="btn-bottom-view-paper" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; border:1px solid rgba(255,255,255,0.3); padding:10px 14px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(37,99,235,0.35);">
+                    <button id="btn-bottom-view-paper" style="background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; border:1px solid rgba(255,255,255,0.3); padding:9px 12px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 4px 12px rgba(37,99,235,0.35); flex-shrink:0;">
                       <span class="material-symbols-rounded filled" style="font-size:16px; color:#93C5FD;">menu_book</span>
                       <span style="white-space:nowrap;">Exam Paper</span>
                     </button>
                   ` : ''}
-                  <button id="btn-bottom-submit" style="background:${times.isEnded ? '#334155' : (times.isTimeUp ? '#22C55E' : '#6366F1')}; color:#FFFFFF; border:none; padding:10px 16px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                  <button id="btn-bottom-submit" style="background:${times.isEnded ? '#334155' : (times.isTimeUp ? '#22C55E' : '#6366F1')}; color:#FFFFFF; border:none; padding:9px 13px; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; flex-shrink:0;">
                     <span class="material-symbols-rounded filled" style="font-size:16px;">${session.paperType === 'mcq' ? 'fact_check' : (session.paperType === 'mcq_essay' ? 'auto_stories' : (times.isTimeUp ? 'description' : 'upload'))}</span>
-                    <span style="white-space:nowrap;">${session.paperType === 'mcq' ? 'Submit MCQ Answers' : (session.paperType === 'mcq_essay' ? 'Submit Answers' : (times.isTimeUp ? 'Scan & Submit' : 'Submit Paper'))}</span>
+                    <span style="white-space:nowrap;">${session.paperType === 'mcq' ? 'Submit MCQs' : (session.paperType === 'mcq_essay' ? 'Submit Answers' : (times.isTimeUp ? 'Scan & Submit' : 'Submit Paper'))}</span>
                   </button>
                 </div>
               </div>
@@ -12783,17 +13446,12 @@ ${!times.isWaiting ? `
                           session.packageOpeningStartedAt !== s.packageOpeningStartedAt;
           const phaseChanged = session.currentPhase !== s.currentPhase;
           session = s;
+          if (s.writingStartedAt) {
+            localStorage.setItem(`paper_writing_start_${paperId}`, s.writingStartedAt);
+          }
           if (phaseChanged) {
-            if (s.currentPhase === 'writing') {
-              localStorage.removeItem(`paper_pkg_start_${paperId}`);
-              if (s.writingStartedAt) {
-                localStorage.setItem(`paper_writing_start_${paperId}`, s.writingStartedAt);
-              }
-            } else if (s.currentPhase === 'package_opening') {
-              localStorage.removeItem(`paper_writing_start_${paperId}`);
-              if (s.packageOpeningStartedAt) {
-                localStorage.setItem(`paper_pkg_start_${paperId}`, s.packageOpeningStartedAt);
-              }
+            if (s.currentPhase === 'package_opening' && s.packageOpeningStartedAt) {
+              localStorage.setItem(`paper_pkg_start_${paperId}`, s.packageOpeningStartedAt);
             }
           }
           if (changed) renderRoom();
@@ -12810,13 +13468,9 @@ ${!times.isWaiting ? `
                           session.status !== s.status || 
                           session.isTimeUp !== s.isTimeUp ||
                           session.writingStartedAt !== s.writingStartedAt;
-          const phaseChanged = session.currentPhase !== s.currentPhase;
           session = s;
-          if (phaseChanged && s.currentPhase === 'writing') {
-            localStorage.removeItem(`paper_pkg_start_${paperId}`);
-            if (s.writingStartedAt) {
-              localStorage.setItem(`paper_writing_start_${paperId}`, s.writingStartedAt);
-            }
+          if (s.writingStartedAt) {
+            localStorage.setItem(`paper_writing_start_${paperId}`, s.writingStartedAt);
           }
           if (changed) renderRoom();
         }

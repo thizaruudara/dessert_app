@@ -433,6 +433,97 @@ export class DbService {
     return newDoc;
   }
 
+  // ── Essay Answer Sheet Submissions ────────────────────────────────────────
+  async submitEssayPaper({ paperId, paperTitle, studentId, studentName, studentBatch, mediaUrls, pageCount, note }) {
+    const essayRef = collection(db, 'essay_submissions');
+    const docRef = doc(essayRef);
+    const docId = docRef.id;
+
+    const newDoc = {
+      id: docId,
+      paperId: String(paperId || ''),
+      paperTitle: String(paperTitle || 'Exam Paper'),
+      studentId: String(studentId || 'student'),
+      studentName: String(studentName || 'Student'),
+      studentBatch: String(studentBatch || '2027 A/L'),
+      mediaUrls: mediaUrls || [],
+      pageCount: Number(pageCount || (mediaUrls ? mediaUrls.length : 0)),
+      note: String(note || '').trim(),
+      status: 'pending',  // pending | reviewed | graded
+      marks: null,
+      adminComment: null,
+      gradedBy: null,
+      gradedAt: null,
+      submittedAt: new Date().toISOString()
+    };
+
+    // Persist locally so submission survives network issues
+    try {
+      let localList = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
+      localList = localList.filter(d => d.id !== docId);
+      localList.unshift(newDoc);
+      localStorage.setItem('edupeak_local_essay_submissions', JSON.stringify(localList.slice(0, 100)));
+    } catch (_) {}
+
+    try {
+      await Promise.race([
+        setDoc(docRef, newDoc),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('submitEssayPaper timeout')), 8000))
+      ]);
+    } catch (e) {
+      console.warn('[DB] submitEssayPaper Firestore note (saved locally):', e);
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('edupeak:essay-submitted', { detail: newDoc }));
+    } catch (_) {}
+
+    return newDoc;
+  }
+
+  async getEssaySubmissions({ paperId = null, limit: lim = 200 } = {}) {
+    try {
+      let q;
+      if (paperId) {
+        q = query(collection(db, 'essay_submissions'), where('paperId', '==', paperId), orderBy('submittedAt', 'desc'), limit(lim));
+      } else {
+        q = query(collection(db, 'essay_submissions'), orderBy('submittedAt', 'desc'), limit(lim));
+      }
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    } catch (e) {
+      console.warn('[DB] getEssaySubmissions note:', e);
+      // Fallback to local cache
+      try {
+        const local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
+        return paperId ? local.filter(d => d.paperId === paperId) : local;
+      } catch (_) { return []; }
+    }
+  }
+
+  async gradeEssaySubmission({ submissionId, marks, adminComment, gradedBy }) {
+    try {
+      const ref = doc(db, 'essay_submissions', submissionId);
+      await updateDoc(ref, {
+        marks: marks ?? null,
+        adminComment: String(adminComment || '').trim(),
+        gradedBy: String(gradedBy || 'Admin'),
+        gradedAt: new Date().toISOString(),
+        status: 'graded'
+      });
+      // Update local cache too
+      try {
+        let local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
+        local = local.map(d => d.id === submissionId ? { ...d, marks, adminComment, gradedBy, gradedAt: new Date().toISOString(), status: 'graded' } : d);
+        localStorage.setItem('edupeak_local_essay_submissions', JSON.stringify(local));
+      } catch (_) {}
+    } catch (e) {
+      console.error('[DB] gradeEssaySubmission error:', e);
+      throw e;
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Get student accumulated credits from local cache, submissions, and leaderboard
   async getStudentCredits(studentId, studentPhone, studentIndex, studentName, { forceRefresh = false } = {}) {
     const cacheKey = `credits_${studentId || ''}_${studentPhone || ''}_${studentIndex || ''}_${studentName || ''}`;
@@ -1987,8 +2078,19 @@ export class DbService {
       updates.isEnded = false;
       updates.endedAt = null;
       updates.isLive = true;
-      updates.writingStartedAt = nowIso;
       updates.packageOpeningEndedAt = nowIso;
+      try {
+        const docRef = doc(db, 'paper_sessions', paperId);
+        const existingSnap = await getDoc(docRef);
+        const existingData = existingSnap.exists() ? existingSnap.data() : null;
+        if (forceResetTimer || !existingData?.writingStartedAt) {
+          updates.writingStartedAt = nowIso;
+        }
+      } catch (_) {
+        if (forceResetTimer) {
+          updates.writingStartedAt = nowIso;
+        }
+      }
       alertMessage = '✍️ විභාගය ආරම්භ විය! දැන් පිළිතුරු ලිවීම ආරම්භ කරන්න. (Exam Writing has started!)';
       alertType = 'info';
     } else if (phase === 'time_up') {

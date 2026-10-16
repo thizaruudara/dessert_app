@@ -50,6 +50,7 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
   String _currentStudentId = '';
   DateTime? _cachedPackageOpeningStartTime;
   DateTime? _cachedWritingStartTime;
+  bool _isStartTimesCacheLoaded = false;
 
   PaperSession? _latestSession;
   Timer? _sessionSyncTimer;
@@ -95,9 +96,11 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       if (pkgIso != null && pkgIso.isNotEmpty) {
         _cachedPackageOpeningStartTime = DateTime.tryParse(pkgIso);
       }
-      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading cached exam start times: $e');
+    } finally {
+      _isStartTimesCacheLoaded = true;
+      if (mounted) setState(() {});
     }
   }
 
@@ -116,7 +119,8 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
       return _cachedWritingStartTime;
     }
 
-    if (session.isWriting) {
+    // Only fallback to DateTime.now() if disk cache load is complete and no existing start time was found
+    if (_isStartTimesCacheLoaded && session.isWriting) {
       _cachedWritingStartTime = DateTime.now();
       SharedPreferences.getInstance().then((prefs) {
         prefs.setString('paper_writing_start_${session.id}', _cachedWritingStartTime!.toIso8601String());
@@ -1135,14 +1139,6 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                       ),
                     ),
 
-                    // 2.5 Floating Paper PDF Button during Writing Phase
-                    if (isWriting && session.pdfUrl != null && session.pdfUrl!.trim().isNotEmpty)
-                      Positioned(
-                        right: 16,
-                        bottom: 96,
-                        child: _buildFloatingPaperButton(session),
-                      ),
-
                     // 3. Bottom Submission Bar
                     Positioned(
                       left: 16,
@@ -2078,24 +2074,46 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               size: 18,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  isTimeUp ? 'වේලාව අවසන් කර ඇත' : 'කැමරා අධීක්ෂණය සක්‍රීයයි',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isTimeUp ? const Color(0xFFFCA5A5) : Colors.white,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isTimeUp) ...[
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF22C55E),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Flexible(
+                      child: Text(
+                        isTimeUp ? 'වේලාව අවසන්' : 'සජීවී අධීක්ෂණය',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isTimeUp ? const Color(0xFFFCA5A5) : const Color(0xFF38BDF8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
-                  isTimeUp ? 'පිළිතුරු පත්‍ර Submit කරන්න' : 'ගුරුභවතුන් සජීවීව පරීක්ෂා කරයි',
+                  isTimeUp ? 'Submit Now' : 'Camera Monitored',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     color: const Color(0xFF94A3B8),
                   ),
                 ),
@@ -2107,20 +2125,20 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               ),
               onPressed: () => _showSecurePaperPdfDialog(session!),
-              icon: const Icon(Icons.menu_book, size: 16, color: Colors.white),
+              icon: const Icon(Icons.menu_book, size: 15, color: Colors.white),
               label: Text(
-                'Paper',
+                'Exam Paper',
                 style: GoogleFonts.poppins(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
           ],
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -2130,20 +2148,20 @@ class _LiveExamRoomScreenState extends State<LiveExamRoomScreen> with WidgetsBin
                       ? const Color(0xFF22C55E)
                       : const Color(0xFF6366F1),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             ),
             onPressed: () {
               _openDocumentScanner();
             },
             icon: Icon(
               isTimeUp ? Icons.document_scanner : Icons.upload_file,
-              size: 16,
+              size: 15,
               color: Colors.white,
             ),
             label: Text(
               isTimeUp ? 'Scan & Submit' : 'Submit Paper',
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
