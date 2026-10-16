@@ -4514,28 +4514,50 @@ Student grades, XP points, teacher feedback, and exam history will be 100% prese
         `).join("")}
       </div>
     `,document.getElementById("essays-export-csv")?.addEventListener("click",()=>{let p=[["ID","Student","Batch","Paper","Pages","Status","Marks","Submitted"]];n.forEach(_=>p.push([_.id,_.studentName,_.studentBatch,_.paperTitle,_.pageCount||_.mediaUrls?.length||0,_.status,_.marks??"",_.submittedAt]));let f=p.map(_=>_.map(b=>`"${String(b).replace(/"/g,'""')}"`).join(",")).join(`
-`),m=document.createElement("a");m.href="data:text/csv;charset=utf-8,"+encodeURIComponent(f),m.download=`essay_submissions_${new Date().toISOString().slice(0,10)}.csv`,m.click()}),u.querySelectorAll(".essay-thumb-open").forEach(p=>{p.addEventListener("click",()=>{try{let f=JSON.parse(p.dataset.urls||"[]"),m=Number(p.dataset.page||0);this._openEssayPageViewer(f,m)}catch{}})}),u.querySelectorAll(".essay-download-btn").forEach(p=>{p.addEventListener("click",async()=>{try{let f=JSON.parse(p.dataset.urls||"[]"),m=p.dataset.name||"student";p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px; animation:spin 0.75s linear infinite;">progress_activity</span>';for(let _=0;_<f.length;_++){let b=document.createElement("a");b.href=f[_],b.download=`${m.replace(/\s+/g,"_")}_P${_+1}.jpg`,b.target="_blank",b.rel="noopener",document.body.appendChild(b),b.click(),document.body.removeChild(b),await new Promise(w=>setTimeout(w,350))}p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">check</span>',setTimeout(()=>{p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">download</span>'},2e3)}catch(f){console.warn("[Admin Essays] Download error:",f),p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">download</span>'}})}),u.querySelectorAll(".essay-grade-btn").forEach(p=>{p.addEventListener("click",()=>{let f=p.dataset.subId,m=n.find(_=>_.id===f);m&&this._openEssayGradeModal(m)})})}}_openEssayPageViewer(e,n=0){let a=document.createElement("div");a.style.cssText="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;";let o=n,l=()=>{a.innerHTML=`
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:rgba(0,0,0,0.5);">
-          <span style="color:#fff; font-size:13px; font-weight:700;">Page ${o+1} / ${e.length}</span>
-          <button id="viewer-close" style="background:none; border:none; color:#fff; cursor:pointer; padding:4px;">
-            <span class="material-symbols-rounded" style="font-size:26px;">close</span>
+`),m=document.createElement("a");m.href="data:text/csv;charset=utf-8,"+encodeURIComponent(f),m.download=`essay_submissions_${new Date().toISOString().slice(0,10)}.csv`,m.click()}),u.querySelectorAll(".essay-thumb-open").forEach(p=>{p.addEventListener("click",()=>{try{let f=JSON.parse(p.dataset.urls||"[]"),m=Number(p.dataset.page||0);this._openEssayPageViewer(f,m)}catch{}})}),u.querySelectorAll(".essay-download-btn").forEach(p=>{p.addEventListener("click",async()=>{try{let f=JSON.parse(p.dataset.urls||"[]"),m=p.dataset.name||"student";p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px; animation:spin 0.75s linear infinite;">progress_activity</span>';for(let _=0;_<f.length;_++){let b=document.createElement("a");b.href=f[_],b.download=`${m.replace(/\s+/g,"_")}_P${_+1}.jpg`,b.target="_blank",b.rel="noopener",document.body.appendChild(b),b.click(),document.body.removeChild(b),await new Promise(w=>setTimeout(w,350))}p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">check</span>',setTimeout(()=>{p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">download</span>'},2e3)}catch(f){console.warn("[Admin Essays] Download error:",f),p.innerHTML='<span class="material-symbols-rounded" style="font-size:15px;">download</span>'}})}),u.querySelectorAll(".essay-grade-btn").forEach(p=>{p.addEventListener("click",()=>{let f=p.dataset.subId,m=n.find(_=>_.id===f);m&&this._openEssayGradeModal(m)})})}}_openEssayPageViewer(e,n=0){if(!e||e.length===0)return;let a=document.createElement("div");a.style.cssText="position:fixed;inset:0;z-index:10000005;background:rgba(0,0,0,0.96);display:flex;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;";let o=Math.max(0,Math.min(n,e.length-1)),l=f=>{f&&(f.preventDefault(),f.stopPropagation()),a.remove()},u=()=>{a.innerHTML=`
+        <!-- Top Bar with iOS Notch / Dynamic Island Safe Area -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px; background:rgba(15,23,42,0.85); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.1); z-index:20;">
+          <button id="viewer-top-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#FFFFFF; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
+            <span>Back</span>
+          </button>
+          
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#FFFFFF; font-size:13.5px; font-weight:800; background:rgba(255,255,255,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(255,255,255,0.15);">
+              Page ${o+1} of ${e.length}
+            </span>
+          </div>
+
+          <button id="viewer-top-close" type="button" title="Close" style="display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#FFFFFF; border-radius:50%; width:36px; height:36px; cursor:pointer; touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:20px;">close</span>
           </button>
         </div>
-        <div style="flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:8px;">
-          <img src="${e[o]}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; user-select:none;" />
+
+        <!-- Center Image Viewer with Responsive Framing -->
+        <div id="viewer-image-container" style="flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:12px; position:relative; -webkit-overflow-scrolling:touch;">
+          <img src="${e[o]}" alt="Student Submission Page ${o+1}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); user-select:none;" />
         </div>
-        <div style="display:flex; justify-content:center; gap:20px; padding:14px; background:rgba(0,0,0,0.5);">
-          <button id="viewer-prev" ${o===0?"disabled":""} style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-            <span class="material-symbols-rounded">chevron_left</span>
+
+        <!-- Bottom Bar with Back / Navigation / Download Controls -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px calc(env(safe-area-inset-bottom, 0px) + 14px); background:rgba(15,23,42,0.9); backdrop-filter:blur(10px); border-top:1px solid rgba(255,255,255,0.1); z-index:20;">
+          <button id="viewer-bottom-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:#EF4444; border:none; color:#FFFFFF; border-radius:12px; padding:10px 16px; font-size:13px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(239,68,68,0.3); touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
+            <span>Back</span>
           </button>
-          <a href="${e[o]}" download="page_${o+1}.jpg" target="_blank" style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; text-decoration:none;">
-            <span class="material-symbols-rounded" style="font-size:20px;">download</span>
-          </a>
-          <button id="viewer-next" ${o===e.length-1?"disabled":""} style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-            <span class="material-symbols-rounded">chevron_right</span>
-          </button>
+
+          <div style="display:flex; align-items:center; gap:14px;">
+            <button id="viewer-prev" ${o===0?"disabled":""} type="button" title="Previous Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${o===0?"0.35":"1"};">
+              <span class="material-symbols-rounded">chevron_left</span>
+            </button>
+            <a href="${e[o]}" download="submission_page_${o+1}.jpg" target="_blank" title="Download Page" style="background:rgba(37,99,235,0.85); border:1px solid #3B82F6; color:#fff; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; text-decoration:none; box-shadow:0 4px 12px rgba(37,99,235,0.3); touch-action:manipulation;">
+              <span class="material-symbols-rounded" style="font-size:20px;">download</span>
+            </a>
+            <button id="viewer-next" ${o===e.length-1?"disabled":""} type="button" title="Next Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${o===e.length-1?"0.35":"1"};">
+              <span class="material-symbols-rounded">chevron_right</span>
+            </button>
+          </div>
         </div>
-      `,a.querySelector("#viewer-close")?.addEventListener("click",()=>a.remove()),a.querySelector("#viewer-prev")?.addEventListener("click",()=>{o>0&&(o--,l())}),a.querySelector("#viewer-next")?.addEventListener("click",()=>{o<e.length-1&&(o++,l())})};l(),document.body.appendChild(a);let u=0;a.addEventListener("touchstart",p=>{u=p.touches[0].clientX},{passive:!0}),a.addEventListener("touchend",p=>{let f=p.changedTouches[0].clientX-u;Math.abs(f)>50&&(f<0&&o<e.length-1&&(o++,l()),f>0&&o>0&&(o--,l()))},{passive:!0})}_openEssayGradeModal(e){let n=f=>String(f??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[m]),a=document.createElement("div");a.className="app-modal",a.style.cssText="position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:12px;";let o=e.mediaUrls||[],l=0,u=[{label:"Q1",marks:"",max:25},{label:"Q2",marks:"",max:25},{label:"Q3",marks:"",max:25},{label:"Q4",marks:"",max:25}],p=()=>{let f=u.reduce((_,b)=>_+(parseFloat(b.marks)||0),0),m=u.reduce((_,b)=>_+(parseFloat(b.max)||0),0);a.innerHTML=`
+      `,a.querySelector("#viewer-top-back")?.addEventListener("click",l),a.querySelector("#viewer-top-close")?.addEventListener("click",l),a.querySelector("#viewer-bottom-back")?.addEventListener("click",l),a.querySelector("#viewer-prev")?.addEventListener("click",()=>{o>0&&(o--,u())}),a.querySelector("#viewer-next")?.addEventListener("click",()=>{o<e.length-1&&(o++,u())})};u(),document.body.appendChild(a);let p=0;a.addEventListener("touchstart",f=>{p=f.touches[0].clientX},{passive:!0}),a.addEventListener("touchend",f=>{let m=f.changedTouches[0].clientX-p;Math.abs(m)>50&&(m<0&&o<e.length-1&&(o++,u()),m>0&&o>0&&(o--,u()))},{passive:!0})}_openEssayGradeModal(e){let n=f=>String(f??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[m]),a=document.createElement("div");a.className="app-modal",a.style.cssText="position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:12px;";let o=e.mediaUrls||[],l=0,u=[{label:"Q1",marks:"",max:25},{label:"Q2",marks:"",max:25},{label:"Q3",marks:"",max:25},{label:"Q4",marks:"",max:25}],p=()=>{let f=u.reduce((_,b)=>_+(parseFloat(b.marks)||0),0),m=u.reduce((_,b)=>_+(parseFloat(b.max)||0),0);a.innerHTML=`
         <div style="background:#FFFFFF;border-radius:20px;max-width:820px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.4);border:1px solid #E2E8F0;">
           <!-- Header -->
           <div style="background:#F8FAFC;padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">

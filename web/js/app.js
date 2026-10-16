@@ -8882,44 +8882,88 @@ class AppController {
   }
 
   _openEssayPageViewer(urls, startPage = 0) {
+    if (!urls || urls.length === 0) return;
     const viewer = document.createElement('div');
-    viewer.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;';
-    let currentPage = startPage;
+    viewer.style.cssText = 'position:fixed;inset:0;z-index:10000005;background:rgba(0,0,0,0.96);display:flex;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;';
+    let currentPage = Math.max(0, Math.min(startPage, urls.length - 1));
+
+    const closeViewer = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      viewer.remove();
+    };
 
     const render = () => {
       viewer.innerHTML = `
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:rgba(0,0,0,0.5);">
-          <span style="color:#fff; font-size:13px; font-weight:700;">Page ${currentPage + 1} / ${urls.length}</span>
-          <button id="viewer-close" style="background:none; border:none; color:#fff; cursor:pointer; padding:4px;">
-            <span class="material-symbols-rounded" style="font-size:26px;">close</span>
+        <!-- Top Bar with iOS Notch / Dynamic Island Safe Area -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px; background:rgba(15,23,42,0.85); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.1); z-index:20;">
+          <button id="viewer-top-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#FFFFFF; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
+            <span>Back</span>
+          </button>
+          
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:#FFFFFF; font-size:13.5px; font-weight:800; background:rgba(255,255,255,0.1); padding:4px 12px; border-radius:20px; border:1px solid rgba(255,255,255,0.15);">
+              Page ${currentPage + 1} of ${urls.length}
+            </span>
+          </div>
+
+          <button id="viewer-top-close" type="button" title="Close" style="display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#FFFFFF; border-radius:50%; width:36px; height:36px; cursor:pointer; touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:20px;">close</span>
           </button>
         </div>
-        <div style="flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:8px;">
-          <img src="${urls[currentPage]}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; user-select:none;" />
+
+        <!-- Center Image Viewer with Responsive Framing -->
+        <div id="viewer-image-container" style="flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:12px; position:relative; -webkit-overflow-scrolling:touch;">
+          <img src="${urls[currentPage]}" alt="Student Submission Page ${currentPage + 1}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.5); user-select:none;" />
         </div>
-        <div style="display:flex; justify-content:center; gap:20px; padding:14px; background:rgba(0,0,0,0.5);">
-          <button id="viewer-prev" ${currentPage === 0 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-            <span class="material-symbols-rounded">chevron_left</span>
+
+        <!-- Bottom Bar with Back / Navigation / Download Controls -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px calc(env(safe-area-inset-bottom, 0px) + 14px); background:rgba(15,23,42,0.9); backdrop-filter:blur(10px); border-top:1px solid rgba(255,255,255,0.1); z-index:20;">
+          <button id="viewer-bottom-back" type="button" style="display:inline-flex; align-items:center; gap:6px; background:#EF4444; border:none; color:#FFFFFF; border-radius:12px; padding:10px 16px; font-size:13px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(239,68,68,0.3); touch-action:manipulation;">
+            <span class="material-symbols-rounded" style="font-size:18px;">arrow_back</span>
+            <span>Back</span>
           </button>
-          <a href="${urls[currentPage]}" download="page_${currentPage+1}.jpg" target="_blank" style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; text-decoration:none;">
-            <span class="material-symbols-rounded" style="font-size:20px;">download</span>
-          </a>
-          <button id="viewer-next" ${currentPage === urls.length - 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-            <span class="material-symbols-rounded">chevron_right</span>
-          </button>
+
+          <div style="display:flex; align-items:center; gap:14px;">
+            <button id="viewer-prev" ${currentPage === 0 ? 'disabled' : ''} type="button" title="Previous Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${currentPage === 0 ? '0.35' : '1'};">
+              <span class="material-symbols-rounded">chevron_left</span>
+            </button>
+            <a href="${urls[currentPage]}" download="submission_page_${currentPage + 1}.jpg" target="_blank" title="Download Page" style="background:rgba(37,99,235,0.85); border:1px solid #3B82F6; color:#fff; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; text-decoration:none; box-shadow:0 4px 12px rgba(37,99,235,0.3); touch-action:manipulation;">
+              <span class="material-symbols-rounded" style="font-size:20px;">download</span>
+            </a>
+            <button id="viewer-next" ${currentPage === urls.length - 1 ? 'disabled' : ''} type="button" title="Next Page" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:50%; width:44px; height:44px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; opacity:${currentPage === urls.length - 1 ? '0.35' : '1'};">
+              <span class="material-symbols-rounded">chevron_right</span>
+            </button>
+          </div>
         </div>
       `;
-      viewer.querySelector('#viewer-close')?.addEventListener('click', () => viewer.remove());
-      viewer.querySelector('#viewer-prev')?.addEventListener('click', () => { if (currentPage > 0) { currentPage--; render(); } });
-      viewer.querySelector('#viewer-next')?.addEventListener('click', () => { if (currentPage < urls.length - 1) { currentPage++; render(); } });
+
+      viewer.querySelector('#viewer-top-back')?.addEventListener('click', closeViewer);
+      viewer.querySelector('#viewer-top-close')?.addEventListener('click', closeViewer);
+      viewer.querySelector('#viewer-bottom-back')?.addEventListener('click', closeViewer);
+
+      viewer.querySelector('#viewer-prev')?.addEventListener('click', () => {
+        if (currentPage > 0) {
+          currentPage--;
+          render();
+        }
+      });
+      viewer.querySelector('#viewer-next')?.addEventListener('click', () => {
+        if (currentPage < urls.length - 1) {
+          currentPage++;
+          render();
+        }
+      });
     };
 
     render();
     document.body.appendChild(viewer);
 
-    // Swipe support
+    // Swipe navigation support on mobile
     let touchStartX = 0;
-    viewer.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    viewer.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+    }, { passive: true });
     viewer.addEventListener('touchend', e => {
       const dx = e.changedTouches[0].clientX - touchStartX;
       if (Math.abs(dx) > 50) {
