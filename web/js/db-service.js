@@ -643,36 +643,83 @@ export class DbService {
     return results;
   }
 
-  async gradeEssaySubmission({ submissionId, marks, adminComment, gradedBy }) {
+  async gradeEssaySubmission({ submissionId, marks, adminComment, gradedBy, questionMarks }) {
     const isRegSub = String(submissionId).startsWith('reg_');
     const actualId = isRegSub ? String(submissionId).replace(/^reg_/, '') : submissionId;
 
     try {
+      let paperId = null;
+      let studentId = null;
+      let studentPhone = '';
+
       if (isRegSub) {
         const ref = doc(db, 'paper_registrations', actualId);
-        await setDoc(ref, {
-          marks: marks ?? null,
+        const updatePayload = {
+          marks: marks !== undefined && marks !== null ? Number(marks) : null,
           adminComment: String(adminComment || '').trim(),
           gradedBy: String(gradedBy || 'Admin'),
           gradedAt: new Date().toISOString(),
           isGraded: true,
           status: 'graded'
-        }, { merge: true });
+        };
+        if (Array.isArray(questionMarks)) {
+          updatePayload.questionMarks = questionMarks;
+        }
+        await setDoc(ref, updatePayload, { merge: true });
+
+        // Retrieve paperId and studentId from registration ID (${paperId}_${studentId})
+        const parts = actualId.split('_');
+        if (parts.length >= 2) {
+          paperId = parts[0];
+          studentId = parts.slice(1).join('_');
+        }
       } else {
         const ref = doc(db, 'essay_submissions', actualId);
-        await updateDoc(ref, {
-          marks: marks ?? null,
+        const updatePayload = {
+          marks: marks !== undefined && marks !== null ? Number(marks) : null,
           adminComment: String(adminComment || '').trim(),
           gradedBy: String(gradedBy || 'Admin'),
           gradedAt: new Date().toISOString(),
+          isGraded: true,
           status: 'graded'
-        });
+        };
+        if (Array.isArray(questionMarks)) {
+          updatePayload.questionMarks = questionMarks;
+        }
+        await updateDoc(ref, updatePayload);
+
+        // Also check if corresponding paper_registrations exists and update it
+        try {
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            const data = snap.data();
+            paperId = data.paperId || null;
+            studentId = data.studentId || null;
+            studentPhone = data.studentPhone || '';
+            if (paperId && studentId) {
+              const regDocId = `${paperId}_${studentId}`;
+              await setDoc(doc(db, 'paper_registrations', regDocId), {
+                marks: marks !== undefined && marks !== null ? Number(marks) : null,
+                adminComment: String(adminComment || '').trim(),
+                gradedBy: String(gradedBy || 'Admin'),
+                gradedAt: new Date().toISOString(),
+                isGraded: true,
+                status: 'graded'
+              }, { merge: true });
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Invalidate student caches so examination hub instantly reloads fresh released marks
+      if (paperId || studentId) {
+        this.invalidateRegistrationCache(paperId, studentId, studentPhone);
       }
 
       // Update local cache
       try {
         let local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
-        local = local.map(d => (d.id === submissionId || d.id === actualId) ? { ...d, marks, adminComment, gradedBy, gradedAt: new Date().toISOString(), status: 'graded' } : d);
+        local = local.map(d => (d.id === submissionId || d.id === actualId) ? { ...d, marks, adminComment, gradedBy, gradedAt: new Date().toISOString(), isGraded: true, status: 'graded', questionMarks } : d);
         localStorage.setItem('edupeak_local_essay_submissions', JSON.stringify(local));
       } catch (_) {}
     } catch (e) {

@@ -134,6 +134,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.paper-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.paper-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .phase-pill {
@@ -144,6 +164,7 @@
   border-radius: 20px;
   font-size: 11px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .phase-live {
@@ -4249,6 +4270,235 @@ button:focus-visible {
     border: 1px solid #334155 !important;
     box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7) !important;
     padding-top: 0;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ── Student Live Exam Room: Professional Landscape & Responsive Layout ──
+   ══════════════════════════════════════════════════════════════════════════════ */
+#live-exam-room-root,
+.live-exam-room-root {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#live-exam-room-root #live-timer-pill {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#live-exam-room-root #live-timer-pill:active {
+  transform: scale(0.96);
+}
+
+/* ── Landscape Mode Optimization (@media orientation: landscape & max-height: 520px) ── */
+@media (orientation: landscape), (max-height: 520px) {
+  /* 1. Sleek Compact Top AppBar */
+  #live-exam-room-root .exam-room-appbar {
+    min-height: 42px !important;
+    height: 42px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.8) !important;
+    background: rgba(30, 41, 59, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  #live-exam-room-root .exam-room-title {
+    font-size: 12.5px !important;
+    max-width: 320px !important;
+    line-height: 1.2 !important;
+  }
+
+  #live-exam-room-root .exam-room-subtitle {
+    font-size: 9.5px !important;
+    line-height: 1.1 !important;
+    color: #94A3B8 !important;
+  }
+
+  #live-exam-room-root #live-timer-pill {
+    padding: 3px 10px !important;
+    border-radius: 12px !important;
+    gap: 5px !important;
+  }
+
+  #live-exam-room-root #live-timer-pill .timer-icon {
+    font-size: 14px !important;
+  }
+
+  #live-exam-room-root #live-timer-pill .timer-text {
+    font-size: 12px !important;
+    letter-spacing: 0.3px !important;
+    font-weight: 800 !important;
+  }
+
+  /* 2. Candidate Pill: compact corner placement without obstructing camera */
+  #live-exam-room-root .exam-room-candidate-pill {
+    top: 8px !important;
+    left: max(12px, env(safe-area-inset-left)) !important;
+    padding: 3px 8px !important;
+    border-radius: 8px !important;
+    gap: 6px !important;
+    background: rgba(15, 23, 42, 0.72) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(51, 65, 85, 0.5) !important;
+  }
+
+  #live-exam-room-root .exam-room-candidate-pill .candidate-name {
+    font-size: 10.5px !important;
+  }
+
+  #live-exam-room-root .exam-room-candidate-pill .candidate-tag {
+    font-size: 9px !important;
+    padding: 1px 5px !important;
+  }
+
+  /* 3. Phase Notice Banner:
+     Hide the redundant giant horizontal writing HUD that spans across the center of the video.
+     The countdown timer is already glowing clearly in #live-timer-pill on the top bar!
+  */
+  #live-exam-room-root .exam-room-phase-banner {
+    top: 8px !important;
+    right: max(16px, env(safe-area-inset-right)) !important;
+    left: auto !important;
+    max-width: 440px !important;
+    margin: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  #live-exam-room-root .exam-room-writing-hud {
+    display: none !important; /* Hide redundant banner across the camera feed in landscape */
+  }
+
+  #live-exam-room-root .exam-room-writing-hud.force-show-landscape {
+    display: block !important;
+    position: absolute !important;
+    top: 6px !important;
+    right: max(12px, env(safe-area-inset-right)) !important;
+    max-width: 380px !important;
+    background: rgba(11, 19, 43, 0.94) !important;
+    border-radius: 14px !important;
+    padding: 8px 12px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+  }
+
+  /* 4. Package Opening Banner in Landscape: compact chip */
+  #live-exam-room-root .exam-room-pkg-banner {
+    padding: 8px 12px !important;
+    border-radius: 12px !important;
+    background: rgba(15, 23, 42, 0.94) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border-width: 1.5px !important;
+  }
+
+  #live-exam-room-root .exam-room-pkg-banner .pkg-instruction-steps {
+    display: none !important; /* Hide 3 long text rows in tight landscape */
+  }
+
+  /* 5. Time Up Banner in Landscape */
+  #live-exam-room-root .exam-room-timeup-banner {
+    padding: 6px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  /* 6. Bottom Exam Control Bar in Landscape:
+     Dock flush to the bottom edge with safe-area insets instead of floating in the lower-middle!
+  */
+  #live-exam-room-root .exam-room-bottom-bar-wrapper {
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #live-exam-room-root .exam-room-bottom-bar {
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-top: 1px solid rgba(51, 65, 85, 0.8) !important;
+    padding: 5px max(18px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom, 0px) + 5px) max(18px, env(safe-area-inset-left)) !important;
+    background: rgba(15, 23, 42, 0.90) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+  }
+
+  #live-exam-room-root .bottom-status-icon {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 16px !important;
+  }
+
+  #live-exam-room-root .bottom-status-title {
+    font-size: 10.5px !important;
+  }
+
+  #live-exam-room-root .bottom-status-sub {
+    font-size: 8.5px !important;
+  }
+
+  #live-exam-room-root .exam-room-bottom-bar button {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+    height: 32px !important;
+  }
+
+  #live-exam-room-root .exam-room-bottom-bar button .material-symbols-rounded {
+    font-size: 15px !important;
+  }
+
+  /* 7. Waiting Room View in Landscape */
+  #live-exam-room-root .exam-room-waiting-scroll {
+    max-width: 880px !important;
+    padding: 12px max(20px, env(safe-area-inset-right)) 20px max(20px, env(safe-area-inset-left)) !important;
+  }
+
+  #live-exam-room-root .exam-room-waiting-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    align-items: start !important;
+  }
+
+  /* 8. MCQ Answer Sheet Modal in Landscape: 2-column grid */
+  #mcq-sheet-modal-root .mcq-appbar {
+    padding: 6px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left)) !important;
+  }
+
+  #mcq-sheet-modal-root .mcq-questions-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    max-width: 900px !important;
+    padding: 10px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)) !important;
+  }
+
+  #mcq-sheet-modal-root .mcq-bottom-bar {
+    padding: 6px max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom, 0px) + 6px) max(16px, env(safe-area-inset-left)) !important;
+  }
+
+  /* 9. Combined Answer Sheet Modal in Landscape */
+  #combined-sheet-modal-root .comb-question-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    max-width: 900px !important;
+  }
+
+  /* 10. Instant Review Result Modal in Landscape: scrollable & centered */
+  #instant-result-modal-root > div {
+    max-height: 94vh !important;
+    overflow-y: auto !important;
+    max-width: 600px !important;
   }
 }
 

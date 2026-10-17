@@ -1932,38 +1932,58 @@ class AppController {
       const pkgMin = Math.floor(packageRemainingSecs / 60).toString().padStart(2, '0');
       const pkgSec = (packageRemainingSecs % 60).toString().padStart(2, '0');
 
+      // Determine marks state
+      const hasEssayMarks = reg?.marks !== undefined && reg?.marks !== null;
+      const hasMcqMarks = reg?.mcqScore !== undefined && reg?.mcqScore !== null;
+      const hasReleasedMarks = hasEssayMarks || hasMcqMarks;
+      const totalPaperMarks = session.totalMarks || (session.paperType === 'mcq' ? (reg?.mcqTotal || session.mcqCount || 50) : 100);
+      const studentMarks = hasEssayMarks ? reg.marks : (hasMcqMarks ? (reg.mcqMarks !== undefined ? reg.mcqMarks : reg.mcqScore) : null);
+      const marksPercentage = hasEssayMarks
+        ? (reg.percentage || Math.round((Number(reg.marks) / totalPaperMarks) * 100))
+        : (hasMcqMarks ? (reg.mcqPercentage !== undefined ? reg.mcqPercentage : Math.round((Number(reg.mcqScore) / (reg.mcqTotal || session.mcqCount || 50)) * 100)) : null);
+
       return `
-        <div class="paper-session-card" id="paper-card-${session.id}" style="${isSubmitted ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.15);' : (isLive ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.12);' : '')}">
+        <div class="paper-session-card" id="paper-card-${session.id}" style="${isSubmitted ? (hasReleasedMarks ? 'border-color:#16A34A; box-shadow:0 6px 20px rgba(22,163,74,0.18);' : 'border-color:#F59E0B; box-shadow:0 6px 20px rgba(245,158,11,0.15);') : (isLive ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.12);' : '')}">
           <!-- Header Row -->
           <div class="paper-card-header">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.3); padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;">
+              <span class="paper-tag-chip" style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.25); padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap;">
                 ${session.subject || 'A/L Physics'}
               </span>
-              <span style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; border:1px solid ${session.paperType === 'mcq' ? 'rgba(16,185,129,0.3)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.3)' : 'rgba(245,158,11,0.3)')}; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px;">
+              <span class="paper-tag-chip" style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; border:1px solid ${session.paperType === 'mcq' ? 'rgba(16,185,129,0.25)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.25)' : 'rgba(245,158,11,0.25)')}; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
                 <span class="material-symbols-rounded" style="font-size:13px;">${session.paperType === 'mcq' ? 'check_circle' : (session.paperType === 'mcq_essay' ? 'auto_stories' : 'edit_document')}</span>
                 <span>${session.paperType === 'mcq' ? `MCQ (${session.mcqCount || 50} Qs)` : (session.paperType === 'mcq_essay' ? 'MCQ & Essay' : 'Essay')}</span>
               </span>
-              <span style="background:#FFFFFF; color:#475569; border:1px solid #E2E8F0; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;">
-                ${session.examYear || '2027 A/L'}
+              <span class="paper-tag-chip" style="background:#FFFFFF; color:#334155; border:1px solid #CBD5E1; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(15,23,42,0.04);">
+                <span class="material-symbols-rounded" style="font-size:13px; color:#64748B;">school</span>
+                <span>${session.examYear || '2027 A/L'}</span>
               </span>
             </div>
-            ${isSubmitted ? `
-              <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded filled" style="font-size:13px;">check_circle</span> <span>SUBMITTED</span>
-              </span>
-            ` : isLive ? `
-              <span style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+            ${isSubmitted ? (
+              hasReleasedMarks ? `
+                <span class="paper-status-badge" style="background:#DCFCE7; color:#15803D; border:1.5px solid #86EFAC; padding:4px 12px; border-radius:20px; font-size:11.5px; font-weight:900; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; box-shadow:0 2px 8px rgba(22,163,74,0.15);">
+                  <span class="material-symbols-rounded filled" style="font-size:15px; color:#16A34A;">verified</span>
+                  <span>MARKS: ${studentMarks}/${totalPaperMarks} (${marksPercentage}%)</span>
+                </span>
+              ` : `
+                <span class="paper-status-badge" style="background:#FEF3C7; color:#B45309; border:1.5px solid #FCD34D; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:5px; white-space:nowrap;">
+                  <span class="material-symbols-rounded filled" style="font-size:15px; color:#D97706;">hourglass_top</span>
+                  <span>MARKS PENDING (ලකුණු ලබාදෙමින් පවතී)</span>
+                </span>
+              `
+            ) : isLive ? `
+              <span class="paper-status-badge" style="background:rgba(34,197,94,0.12); color:#15803D; border:1px solid rgba(34,197,94,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:5px; white-space:nowrap;">
                 <span style="width:7px; height:7px; border-radius:50%; background:#22C55E; display:inline-block;"></span>
                 <span>LIVE NOW</span>
               </span>
             ` : isEnded ? `
-              <span style="background:rgba(100,116,139,0.12); color:#64748B; border:1px solid rgba(100,116,139,0.3); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
+              <span class="paper-status-badge" style="background:rgba(100,116,139,0.12); color:#64748B; border:1px solid rgba(100,116,139,0.3); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
                 <span class="material-symbols-rounded" style="font-size:13px;">check_circle</span> <span>ENDED</span>
               </span>
             ` : (isScheduled && !isLive && !isEnded) ? `
-              <span style="background:rgba(37,99,235,0.12); color:#2563EB; border:1px solid rgba(37,99,235,0.4); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">
-                <span class="material-symbols-rounded" style="font-size:13px;">event_available</span> <span>SCHEDULED • REGISTRATION OPEN</span>
+              <span class="paper-status-badge" style="background:linear-gradient(135deg, rgba(37,99,235,0.12), rgba(59,130,246,0.08)); color:#2563EB; border:1px solid rgba(37,99,235,0.35); padding:3.5px 10px; border-radius:20px; font-size:10px; font-weight:800; letter-spacing:0.3px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; box-shadow:0 1px 3px rgba(37,99,235,0.08);">
+                <span class="material-symbols-rounded" style="font-size:13px; color:#2563EB;">event_available</span>
+                <span style="white-space:nowrap;">SCHEDULED • REGISTRATION OPEN</span>
               </span>
             ` : ''}
           </div>
@@ -2033,12 +2053,31 @@ class AppController {
 
           <!-- Real-Time Phase Status Banner Box -->
           ${isSubmitted ? `
-            <div class="phase-status-banner-box submitted">
-              <span class="material-symbols-rounded filled" style="font-size:26px; color:#15803D;">verified</span>
-              <div>
-                <div style="font-size:12px; font-weight:800; color:#15803D;">පිළිතුරු පත්‍ර භාරදී ඇත (Answers Submitted)</div>
-                <div style="font-size:11px; color:#475569; margin-top:2px;">
-                  ඔබ විසින් පිටු ${reg?.submissionPhotos?.length || 4} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදෙන ලදී.
+            <div class="phase-status-banner-box submitted" style="background:${hasReleasedMarks ? '#F0FDF4' : '#FFFBEB'}; border:1.5px solid ${hasReleasedMarks ? '#86EFAC' : '#FDE68A'};">
+              <span class="material-symbols-rounded filled" style="font-size:28px; color:${hasReleasedMarks ? '#16A34A' : '#D97706'};">
+                ${hasReleasedMarks ? 'task_alt' : 'pending_actions'}
+              </span>
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                  <div style="font-size:12.5px; font-weight:900; color:${hasReleasedMarks ? '#15803D' : '#92400E'};">
+                    ${hasReleasedMarks ? `ලකුණු නිකුත් කර ඇත (Marks Released: ${studentMarks}/${totalPaperMarks})` : 'පිළිතුරු පත්‍ර භාරදී ඇත • ලකුණු ලබාදීමට නියමිතයි'}
+                  </div>
+                  ${hasReleasedMarks ? `
+                    <span style="background:#16A34A; color:#FFFFFF; font-size:11px; font-weight:900; padding:2px 8px; border-radius:6px;">
+                      ${marksPercentage}% Score
+                    </span>
+                  ` : `
+                    <span style="background:#FEF3C7; color:#B45309; border:1px solid #FCD34D; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px;">
+                      Pending Evaluation
+                    </span>
+                  `}
+                </div>
+                <div style="font-size:11px; color:#475569; margin-top:3px; line-height:1.45;">
+                  ${hasReleasedMarks
+                    ? `ඔබගේ පිළිතුරු පත්‍රය පරීක්ෂා කර ලකුණු ${studentMarks}/${totalPaperMarks} ක් සටහන් කර ඇත. විස්තර බැලීමට පහත බොත්තම ඔබන්න.`
+                    : (session.paperType === 'mcq'
+                      ? 'MCQ පිළිතුරු පත්‍රය ලැබී ඇති අතර ලකුණු නිකුත් කිරීම සිදු වෙමින් පවතී.'
+                      : `ඔබ විසින් පිටු ${reg?.submissionPhotos?.length || 4} ක පිළිතුරු පත්‍රයක් සාර්ථකව භාරදී ඇත. ගුරුභවතුන් විසින් ලකුණු (Marks) පරීක්ෂා කර අවසන් වූ වහාම මෙහි දිස්වනු ඇත.`)}
                 </div>
               </div>
             </div>
@@ -2114,9 +2153,9 @@ class AppController {
 
           <!-- Action Buttons -->
           ${isSubmitted ? `
-            <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${session.id}">
-              <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
-              <span>Submitted ${reg?.submissionPhotos?.length ? `(${reg.submissionPhotos.length} Pages)` : (reg?.mcqScore !== undefined ? `(${reg.mcqScore}/${reg.mcqTotal || session.mcqCount || 50})` : '')} • View Details (විස්තර බලන්න)</span>
+            <button class="btn-primary" style="background:#0F172A; border:1.5px solid ${hasReleasedMarks ? '#22C55E' : '#F59E0B'}; color:${hasReleasedMarks ? '#4ADE80' : '#FBBF24'}; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${session.id}">
+              <span class="material-symbols-rounded filled" style="font-size:18px; color:${hasReleasedMarks ? '#22C55E' : '#F59E0B'};">${hasReleasedMarks ? 'verified' : 'hourglass_top'}</span>
+              <span>${hasReleasedMarks ? `Marks: ${studentMarks} / ${totalPaperMarks} (${marksPercentage}%) • View Details (විස්තර බලන්න)` : (session.paperType === 'mcq' && hasMcqMarks ? `Marks: ${studentMarks}/${totalPaperMarks} • View Details` : `Submitted • Marks: Pending (ලකුණු ලබාදීමට නියමිතයි)`)}</span>
             </button>
           ` : isPackageOpening ? `
             <button class="btn-primary" style="background:#D97706; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
@@ -2503,7 +2542,7 @@ class AppController {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:10px; padding:5px 10px; font-size:12px; font-weight:700; color:#4F46E5; display:inline-flex; align-items:center; gap:4px;">
+            <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:10px; padding:5px 10px; font-size:12px; font-weight:700; color:#4F46E5; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
               <span class="material-symbols-rounded" style="font-size:15px;">school</span>
               <span>${currentYear}</span>
             </div>
@@ -2961,17 +3000,48 @@ class AppController {
             <div style="font-size:11.5px; color:#94A3B8; margin-top:2px;">Subject: <strong style="color:#FFFFFF;">${session?.subject || 'Paper'} (${session?.examYear || '2027 A/L'})</strong></div>
           </div>
 
-          <div style="background:#0F172A; border:1px solid #334155; border-radius:12px; padding:12px;">
-            <div style="font-size:11px; font-weight:700; color:#F59E0B; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
-              <span class="material-symbols-rounded filled" style="font-size:15px;">description</span> Scanned Answer Sheets
+          <div style="background:#0F172A; border:1px solid ${reg?.marks !== undefined && reg?.marks !== null ? '#16A34A' : '#334155'}; border-radius:12px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <div style="font-size:11px; font-weight:700; color:#F59E0B; display:flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded filled" style="font-size:15px;">description</span> Scanned Answer Sheets
+              </div>
+              ${reg?.marks !== undefined && reg?.marks !== null ? `
+                <span style="background:rgba(34,197,94,0.2); color:#4ADE80; font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid rgba(34,197,94,0.4);">
+                  Marks Released
+                </span>
+              ` : `
+                <span style="background:rgba(245,158,11,0.15); color:#FBBF24; font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid rgba(245,158,11,0.3);">
+                  Marks Pending
+                </span>
+              `}
             </div>
-            <div style="font-size:17px; font-weight:800; color:#4ADE80;">
-              ${photos.length > 0 ? `${photos.length} Pages Uploaded` : 'Answer Sheets Received'}
-            </div>
-            <div style="font-size:11px; color:#64748B; margin-top:2px;">
-              Document Scanner High-Resolution Upload • Secured
-            </div>
+            ${reg?.marks !== undefined && reg?.marks !== null ? `
+              <div style="font-size:22px; font-weight:900; color:#22C55E; display:flex; align-items:baseline; gap:6px;">
+                <span>${reg.marks}</span>
+                <span style="font-size:13px; font-weight:700; color:#94A3B8;">/ ${session?.totalMarks || 100} Marks</span>
+                <span style="font-size:12px; font-weight:800; color:#4ADE80; margin-left:auto;">
+                  (${reg.percentage || Math.round((Number(reg.marks) / (session?.totalMarks || 100)) * 100)}%)
+                </span>
+              </div>
+              <div style="font-size:11px; color:#94A3B8; margin-top:3px;">
+                Examiner: <strong style="color:#FFFFFF;">${escapeHTML(reg.gradedBy || 'Admin')}</strong> • Verified
+              </div>
+            ` : `
+              <div style="font-size:16px; font-weight:800; color:#FBBF24;">
+                ⏳ ලකුණු ලබාදීමට නියමිතයි (Marks Pending)
+              </div>
+              <div style="font-size:11px; color:#94A3B8; margin-top:2px;">
+                ${photos.length > 0 ? `${photos.length} Pages Uploaded • Evaluating by Examiner` : 'Answer Sheets Received • Pending Marking'}
+              </div>
+            `}
           </div>
+
+          ${reg?.adminComment ? `
+            <div style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); border-radius:10px; padding:10px; font-size:11.5px; color:#DCFCE7;">
+              <strong style="color:#4ADE80; display:block; margin-bottom:2px;"><span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">comment</span> Examiner Feedback:</strong>
+              ${escapeHTML(reg.adminComment)}
+            </div>
+          ` : ''}
 
           <div style="font-size:11px; color:#94A3B8; display:flex; align-items:center; gap:4px;">
             <span class="material-symbols-rounded" style="font-size:14px; color:#64748B;">schedule</span>
@@ -2979,7 +3049,9 @@ class AppController {
           </div>
 
           <div style="background:rgba(30,41,59,0.8); border:1px solid #334155; border-radius:10px; padding:10px; font-size:11px; color:#CBD5E1; line-height:1.45;">
-            ඔබගේ පිළිතුරු පත්‍රවල ඡායාරූප (Answer Sheets) ගුරුභවතුන් වෙත සුරක්ෂිතව ලැබී ඇති බැවින් නැවත විභාග ශාලාවට පිවිසීමට අවශ්‍ය නොවේ.
+            ${reg?.marks !== undefined && reg?.marks !== null
+              ? 'ඔබගේ පිළිතුරු පත්‍රය පරීක්ෂා කර ලකුණු ලබාදී ඇති අතර ඉහතින් සඳහන් ලකුණු ප්‍රමාණය නිල වශයෙන් සටහන් කර ඇත.'
+              : 'ඔබගේ පිළිතුරු පත්‍රවල ඡායාරූප (Answer Sheets) ගුරුභවතුන් වෙත සුරක්ෂිතව ලැබී ඇත. ගුරුභවතුන් විසින් පරීක්ෂා කර ලකුණු ලබාදුන් පසු වහාම මෙහි දිස්වනු ඇත.'}
           </div>
         </div>
 
@@ -7199,17 +7271,18 @@ class AppController {
         <div style="padding:14px 16px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
           <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
             <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; flex:1; min-width:0;">
-              <span style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px;">
+              <span class="paper-tag-chip" style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap;">
                 ${session.subject || 'Physics'}
               </span>
-              <span style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
+              <span class="paper-tag-chip" style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
                 <span class="material-symbols-rounded" style="font-size:14px;">${session.paperType === 'mcq' ? 'check_circle' : (session.paperType === 'mcq_essay' ? 'auto_stories' : 'edit_document')}</span>
                 <span>${session.paperType === 'mcq' ? `MCQ (${session.mcqCount || 50} Qs)` : (session.paperType === 'mcq_essay' ? `MCQ & Essay (${session.mcqCount || 50} Qs)` : 'Essay (ලිඛිත)')}</span>
               </span>
-              <span style="background:#FFFFFF; border:1px solid #E2E8F0; color:#64748B; font-size:11px; padding:4px 10px; border-radius:20px;">
-                ${session.examYear || '2027 A/L'}
+              <span class="paper-tag-chip" style="background:#FFFFFF; border:1px solid #CBD5E1; color:#334155; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(15,23,42,0.04);">
+                <span class="material-symbols-rounded" style="font-size:13px; color:#64748B;">school</span>
+                <span>${session.examYear || '2027 A/L'}</span>
               </span>
-              <span style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:4px;">
+              <span class="paper-status-badge" style="background:${badgeBg}; border:1px solid ${badgeBorder}; color:${badgeColor}; font-size:10px; font-weight:700; padding:4px 9px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; letter-spacing:0.2px;">
                 <span class="material-symbols-rounded ${isLive ? 'filled' : ''}" style="font-size:13px;">${badgeIcon}</span>
                 <span>${badgeText}</span>
               </span>
@@ -9052,9 +9125,9 @@ class AppController {
 
             <!-- Actions -->
             <div style="padding:10px 14px; display:flex; gap:8px; border-top:1px solid #F1F5F9;">
-              <button class="essay-grade-btn" data-sub-id="${escapeHTML(sub.id)}" style="flex:1; background:${sub.status === 'graded' ? '#F1F5F9' : '#2563EB'}; color:${sub.status === 'graded' ? '#334155' : '#fff'}; border:none; border-radius:10px; padding:9px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
-                <span class="material-symbols-rounded" style="font-size:15px;">${sub.status === 'graded' ? 'edit' : 'grade'}</span>
-                ${sub.status === 'graded' ? 'Edit Grade' : 'Grade'}
+              <button class="essay-grade-btn" data-sub-id="${escapeHTML(sub.id)}" style="flex:1; background:${sub.status === 'graded' ? '#F1F5F9' : '#16A34A'}; color:${sub.status === 'graded' ? '#334155' : '#fff'}; border:${sub.status === 'graded' ? '1px solid #CBD5E1' : 'none'}; border-radius:10px; padding:9px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
+                <span class="material-symbols-rounded" style="font-size:15px; color:${sub.status === 'graded' ? '#16A34A' : '#FFFFFF'};">${sub.status === 'graded' ? 'edit_note' : 'fact_check'}</span>
+                <span>${sub.status === 'graded' ? `Edit Marks (${sub.marks ?? 0})` : 'Enter Marks'}</span>
               </button>
               <button class="essay-download-btn" data-urls='${escapeHTML(JSON.stringify(sub.mediaUrls || []))}' data-name="${escapeHTML(sub.studentName)}" data-paper="${escapeHTML(sub.paperTitle)}" title="Download all pages as a single PDF" style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:800; color:#2563EB; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
                 <span class="material-symbols-rounded" style="font-size:16px;">picture_as_pdf</span>
@@ -9302,27 +9375,32 @@ class AppController {
 
     const urls = sub.mediaUrls || [];
     let currentPage = 0;
-    let questions = [
-      { label: 'Q1', marks: '', max: 25 },
-      { label: 'Q2', marks: '', max: 25 },
-      { label: 'Q3', marks: '', max: 25 },
-      { label: 'Q4', marks: '', max: 25 }
-    ];
+    let activeMobileTab = 'marks'; // 'preview' | 'marks' for mobile devices
+
+    // Initialize question rows from existing data if available
+    let questions = Array.isArray(sub.questionMarks) && sub.questionMarks.length > 0
+      ? sub.questionMarks.map(q => ({ label: q.label || 'Q', marks: q.marks !== undefined ? q.marks : '', max: q.max || 25 }))
+      : [
+          { label: 'Q1', marks: sub.marks ? String(sub.marks) : '', max: 25 },
+          { label: 'Q2', marks: '', max: 25 },
+          { label: 'Q3', marks: '', max: 25 },
+          { label: 'Q4', marks: '', max: 25 }
+        ];
 
     const renderModal = () => {
       const totalMarks = questions.reduce((sum, q) => sum + (parseFloat(q.marks) || 0), 0);
       const totalMax = questions.reduce((sum, q) => sum + (parseFloat(q.max) || 0), 0);
 
       modal.innerHTML = `
-        <div style="background:#FFFFFF;border-radius:20px;max-width:820px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.4);border:1px solid #E2E8F0;">
+        <div style="background:#FFFFFF;border-radius:20px;max-width:860px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.4);border:1px solid #E2E8F0;">
           <!-- Header -->
-          <div style="background:#F8FAFC;padding:14px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">
+          <div style="background:#F8FAFC;padding:12px 18px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
             <div>
-              <div style="font-size:16px;font-weight:900;color:#0F172A;display:flex;align-items:center;gap:8px;">
-                <span class="material-symbols-rounded filled" style="font-size:22px;color:#2563EB;">history_edu</span>
-                <span>Examiner Grading: ${escapeHTML(sub.studentName)}</span>
+              <div style="font-size:15px;font-weight:900;color:#0F172A;display:flex;align-items:center;gap:8px;">
+                <span class="material-symbols-rounded filled" style="font-size:22px;color:#16A34A;">fact_check</span>
+                <span>Examiner Marks: ${escapeHTML(sub.studentName)}</span>
               </div>
-              <div style="font-size:12px;color:#64748B;margin-top:2px;">
+              <div style="font-size:11.5px;color:#64748B;margin-top:2px;">
                 ${escapeHTML(sub.studentBatch)} • ${escapeHTML(sub.paperTitle)} • ${urls.length} Page(s)
               </div>
             </div>
@@ -9331,17 +9409,29 @@ class AppController {
             </button>
           </div>
 
+          <!-- Mobile Tab Switcher (< 768px) -->
+          <div class="grade-modal-mobile-tabs" style="display:none;background:#F1F5F9;padding:6px 12px;border-bottom:1px solid #E2E8F0;gap:8px;">
+            <button id="btn-tab-preview" style="flex:1;padding:8px;border-radius:8px;border:none;background:${activeMobileTab === 'preview' ? '#2563EB' : 'transparent'};color:${activeMobileTab === 'preview' ? '#FFFFFF' : '#475569'};font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">photo_library</span>
+              <span>View Answer Sheets (${urls.length})</span>
+            </button>
+            <button id="btn-tab-marks" style="flex:1;padding:8px;border-radius:8px;border:none;background:${activeMobileTab === 'marks' ? '#16A34A' : 'transparent'};color:${activeMobileTab === 'marks' ? '#FFFFFF' : '#475569'};font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+              <span class="material-symbols-rounded filled" style="font-size:16px;">edit_note</span>
+              <span>Enter Marks (${totalMarks}/${totalMax})</span>
+            </button>
+          </div>
+
           <!-- Body Split: Left Page Viewer, Right Marks Entry -->
-          <div style="flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;flex-wrap:wrap;">
+          <div class="grade-modal-body" style="flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;">
             <!-- Left: Document Preview & Zoom -->
-            <div style="flex:1.2;min-width:280px;background:#0F172A;display:flex;flex-direction:column;position:relative;border-right:1px solid #E2E8F0;">
-              <div style="padding:8px 12px;background:rgba(15,23,42,0.9);display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:12px;font-weight:700;">
+            <div class="grade-modal-preview-col" style="flex:1.2;min-width:300px;background:#0F172A;display:flex;flex-direction:column;position:relative;border-right:1px solid #E2E8F0;">
+              <div style="padding:8px 12px;background:rgba(15,23,42,0.95);display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:12px;font-weight:700;flex-shrink:0;">
                 <span>Page ${urls.length > 0 ? currentPage + 1 : 0} of ${urls.length}</span>
                 <div style="display:flex;gap:6px;">
-                  <button id="btn-grade-prev-pg" ${currentPage === 0 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;">
+                  <button id="btn-grade-prev-pg" ${currentPage === 0 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;opacity:${currentPage === 0 ? '0.4' : '1'};">
                     <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;">chevron_left</span>
                   </button>
-                  <button id="btn-grade-next-pg" ${currentPage >= urls.length - 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;">
+                  <button id="btn-grade-next-pg" ${currentPage >= urls.length - 1 ? 'disabled' : ''} style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;opacity:${currentPage >= urls.length - 1 ? '0.4' : '1'};">
                     <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;">chevron_right</span>
                   </button>
                   <a href="${urls[currentPage] || '#'}" target="_blank" rel="noopener" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;">
@@ -9359,9 +9449,12 @@ class AppController {
             </div>
 
             <!-- Right: Question Marks & Comments -->
-            <div style="flex:1;min-width:280px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;">
+            <div class="grade-modal-marks-col" style="flex:1;min-width:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;">
               <div>
-                <div style="font-size:13px;font-weight:800;color:#0F172A;margin-bottom:8px;">Per-Question Marks Breakdown</div>
+                <div style="font-size:13px;font-weight:800;color:#0F172A;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                  <span>Per-Question Marks Breakdown</span>
+                  <span style="font-size:11px;color:#64748B;font-weight:600;">(ලකුණු වෙන් කිරීම)</span>
+                </div>
                 <div id="grade-question-rows" style="display:flex;flex-direction:column;gap:8px;">
                   ${questions.map((q, i) => `
                     <div style="display:flex;align-items:center;gap:8px;">
@@ -9380,7 +9473,7 @@ class AppController {
               <!-- Total Card -->
               <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
                 <div>
-                  <div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.5px;">Computed Total Score</div>
+                  <div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.5px;">Computed Total Marks</div>
                   <div style="font-size:22px;font-weight:900;color:#15803D;line-height:1.2;">
                     ${totalMarks > 0 ? totalMarks : (sub.marks ?? 0)} <span style="font-size:13px;font-weight:700;color:#16A34A;">/ ${totalMax > 0 ? totalMax : 100}</span>
                   </div>
@@ -9401,15 +9494,45 @@ class AppController {
               <!-- Actions -->
               <button id="grade-save-btn" style="background:#16A34A;color:#fff;border:none;border-radius:12px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 12px rgba(22,163,74,0.3);margin-top:auto;">
                 <span class="material-symbols-rounded filled" style="font-size:18px;">save</span>
-                <span>Save Grade &amp; Update Record</span>
+                <span>Save Marks &amp; Update Record</span>
               </button>
             </div>
           </div>
         </div>
       `;
 
+      // Apply responsive display styles for mobile viewport
+      const styleEl = document.createElement('style');
+      styleEl.textContent = `
+        @media (max-width: 768px) {
+          .grade-modal-mobile-tabs { display: flex !important; }
+          .grade-modal-body { flex-direction: column !important; }
+          .grade-modal-preview-col {
+            display: ${activeMobileTab === 'preview' ? 'flex' : 'none'} !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            border-right: none !important;
+          }
+          .grade-modal-marks-col {
+            display: ${activeMobileTab === 'marks' ? 'flex' : 'none'} !important;
+            height: 100% !important;
+            min-height: 0 !important;
+          }
+        }
+      `;
+      modal.appendChild(styleEl);
+
       // Event listeners inside modal
       modal.querySelector('#grade-modal-close')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('#btn-tab-preview')?.addEventListener('click', () => {
+        activeMobileTab = 'preview';
+        renderModal();
+      });
+      modal.querySelector('#btn-tab-marks')?.addEventListener('click', () => {
+        activeMobileTab = 'marks';
+        renderModal();
+      });
+
       modal.querySelector('#btn-grade-prev-pg')?.addEventListener('click', () => {
         if (currentPage > 0) { currentPage--; renderModal(); }
       });
@@ -9421,7 +9544,26 @@ class AppController {
         inp.addEventListener('input', (e) => {
           const idx = parseInt(e.target.dataset.idx);
           questions[idx].marks = e.target.value;
-          const totalEl = modal.querySelector('#grade-save-btn');
+          const newTotalMarks = questions.reduce((sum, q) => sum + (parseFloat(q.marks) || 0), 0);
+          const newTotalMax = questions.reduce((sum, q) => sum + (parseFloat(q.max) || 0), 0);
+          const totalValEl = modal.querySelector('#grade-question-rows').nextElementSibling?.querySelector('div > div:nth-child(2)');
+          if (totalValEl) {
+            totalValEl.innerHTML = `${newTotalMarks} <span style="font-size:13px;font-weight:700;color:#16A34A;">/ ${newTotalMax}</span>`;
+          }
+        });
+      });
+
+      modal.querySelectorAll('.grade-q-label').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          questions[idx].label = e.target.value;
+        });
+      });
+
+      modal.querySelectorAll('.grade-q-max').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          questions[idx].max = parseFloat(e.target.value) || 25;
         });
       });
 
@@ -9438,7 +9580,7 @@ class AppController {
 
         if (btn) {
           btn.disabled = true;
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;animation:spin 0.75s linear infinite;">progress_activity</span> Saving Grade...';
+          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;animation:spin 0.75s linear infinite;">progress_activity</span> Saving Marks...';
         }
 
         try {
@@ -9450,14 +9592,14 @@ class AppController {
             questionMarks: questions
           });
           modal.remove();
-          notificationService.showInAppBanner('Grade Saved', `${sub.studentName}'s submission graded — ${finalMarks} marks.`, 'success');
+          notificationService.showInAppBanner('Marks Released', `${sub.studentName}'s paper marks saved — ${finalMarks} marks.`, 'success');
           this.refreshAdminTab('essays');
         } catch (err) {
           if (btn) {
             btn.disabled = false;
             btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">save</span><span>Retry Save</span>';
           }
-          notificationService.showInAppBanner('Save Failed', err.message || 'Could not save grade.', 'error');
+          notificationService.showInAppBanner('Save Failed', err.message || 'Could not save marks.', 'error');
         }
       });
     };
@@ -12301,6 +12443,7 @@ class AppController {
     // Fullscreen View Container matching Flutter Scaffold - Mount immediately for instant responsive UX!
     const roomContainer = document.createElement('div');
     roomContainer.id = 'live-exam-room-root';
+    roomContainer.className = 'live-exam-room-root';
     roomContainer.style.cssText = `
       position: fixed; inset: 0; background: #0F172A; z-index: 99999;
       display: flex; flex-direction: column; color: #F8FAFC;
