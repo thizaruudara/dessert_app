@@ -2075,6 +2075,7 @@ export class DbService {
           isSubmitted: existSub || isSub,
           submissionPhotos: (existSub && existing.submissionPhotos?.length) ? existing.submissionPhotos : (reg.submissionPhotos || existing.submissionPhotos || []),
           isCameraActive: existCam || hasCam,
+          isOnline: reg.isOnline !== undefined ? reg.isOnline : existing.isOnline,
           cameraSnapshotUrl: reg.cameraSnapshotUrl || existing.cameraSnapshotUrl,
           lastCameraPing: reg.lastCameraPing || existing.lastCameraPing,
           selectedSlot: reg.selectedSlot || existing.selectedSlot || 'slot1'
@@ -2285,7 +2286,8 @@ export class DbService {
     mcqMarks,
     mcqPercentage,
     reviewDetails,
-    isSubmitted
+    isSubmitted,
+    isOnline
   }) {
     if (!paperId || !studentId) return;
     try {
@@ -2295,6 +2297,7 @@ export class DbService {
         paperId,
         studentId,
         isCameraActive: !!isCameraActive,
+        isOnline: isOnline !== undefined ? !!isOnline : true,
         lastCameraPing: serverTimestamp()
       };
       if (studentName && String(studentName).trim()) {

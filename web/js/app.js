@@ -11523,14 +11523,117 @@ class AppController {
       return `${h}:${m}:${s}`;
     };
 
-    const isRecentPing = (lastPing) => {
-      if (!lastPing) return false;
-      let date;
-      if (typeof lastPing.toDate === 'function') date = lastPing.toDate();
-      else if (lastPing.seconds) date = new Date(lastPing.seconds * 1000);
-      else date = new Date(lastPing);
-      const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-      return diff >= -5 && diff <= 35;
+    const getStudentLiveStatus = (s) => {
+      if (!s) {
+        return {
+          status: 'offline',
+          badge: 'OFFLINE',
+          color: '#EF4444',
+          isSubmitted: false,
+          isLive: false,
+          isOnline: false,
+          isIdle: false,
+          isOffline: true,
+          label: 'Offline'
+        };
+      }
+
+      if (isStudentSubmitted(s)) {
+        return {
+          status: 'submitted',
+          badge: 'SUBMITTED',
+          color: '#22C55E',
+          isSubmitted: true,
+          isLive: false,
+          isOnline: false,
+          isIdle: false,
+          isOffline: false,
+          label: 'පිළිතුරු පත්‍ර භාරදී ඇත'
+        };
+      }
+
+      const uid = s.agoraUid || getNumericUid(s.studentId);
+      const hasAgora = this.agoraProctor && this.agoraProctor.hasStream(uid);
+
+      let lastPingMs = 0;
+      if (s.lastCameraPing) {
+        if (typeof s.lastCameraPing.toDate === 'function') lastPingMs = s.lastCameraPing.toDate().getTime();
+        else if (s.lastCameraPing.seconds) lastPingMs = s.lastCameraPing.seconds * 1000;
+        else lastPingMs = new Date(s.lastCameraPing).getTime();
+      }
+      const diffSecs = lastPingMs > 0 ? Math.floor((Date.now() - lastPingMs) / 1000) : 999999;
+
+      // 1. If Agora WebRTC connection has a stream, it is undeniably LIVE HD
+      if (hasAgora) {
+        return {
+          status: 'live_hd',
+          badge: 'LIVE HD',
+          color: '#22C55E',
+          isSubmitted: false,
+          isLive: true,
+          isOnline: true,
+          isIdle: false,
+          isOffline: false,
+          label: 'Agora 720p HD Active'
+        };
+      }
+
+      // 2. Active Ping within 75s
+      if (diffSecs >= -5 && diffSecs <= 75) {
+        if (s.isCameraActive) {
+          return {
+            status: 'live',
+            badge: 'LIVE',
+            color: '#22C55E',
+            isSubmitted: false,
+            isLive: true,
+            isOnline: true,
+            isIdle: false,
+            isOffline: false,
+            label: 'Proctor Stream Active'
+          };
+        }
+        // Camera paused / viewing paper
+        return {
+          status: 'online',
+          badge: 'ONLINE (PAPER)',
+          color: '#3B82F6',
+          isSubmitted: false,
+          isLive: false,
+          isOnline: true,
+          isIdle: false,
+          isOffline: false,
+          label: 'Reading Paper / Online'
+        };
+      }
+
+      // 3. Reconnecting / Network lag buffer (75s - 150s)
+      if (diffSecs <= 150 || (s.isOnline && diffSecs <= 180)) {
+        return {
+          status: 'idle',
+          badge: 'RECONNECTING',
+          color: '#F59E0B',
+          isSubmitted: false,
+          isLive: false,
+          isOnline: true,
+          isIdle: true,
+          isOffline: false,
+          label: 'Network Lag / Reconnecting'
+        };
+      }
+
+      // 4. Truly offline (> 150s silent)
+      return {
+        status: 'offline',
+        badge: 'OFFLINE',
+        color: '#EF4444',
+        isSubmitted: false,
+        isLive: false,
+        isOnline: false,
+        isIdle: false,
+        isOffline: true,
+        label: 'Camera Offline'
+      };
     };
 
     const isStudentSubmitted = (s) => {
@@ -11543,6 +11646,124 @@ class AppController {
              (s.mcqAnswers && typeof s.mcqAnswers === 'object' && Object.keys(s.mcqAnswers).length > 0);
     };
 
+    const buildSubmittedBoxHTML = (student, session) => `
+      <div class="submitted-card-view" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height:100%; width:100%; background:rgba(34,197,94,0.08); padding:12px; text-align:center;">
+        <div style="width:40px; height:40px; border-radius:50%; background:rgba(34,197,94,0.2); border:1.5px solid #22C55E; display:flex; align-items:center; justify-content:center;">
+          <span class="material-symbols-rounded filled" style="font-size:24px; color:#22C55E;">check_circle</span>
+        </div>
+        <div style="font-size:11px; font-weight:700; color:#4ADE80;">පිළිතුරු පත්‍ර භාරදී ඇත</div>
+        <div style="font-size:9.5px; color:#94A3B8;">${student.mcqScore !== undefined ? `MCQ Score: ${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)} (${student.mcqPercentage !== undefined ? student.mcqPercentage : Math.round((student.mcqScore / (student.mcqTotal || session.mcqCount || 50)) * 100)}%)` : `${student.submissionPhotos?.length || 1} Pages Submitted`}</div>
+      </div>
+      <div class="status-pill-badge" style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:#22C55E; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
+        SUBMITTED
+      </div>
+    `;
+
+    const buildStudentCardHTML = (student, st, session) => {
+      const isSubmitted = st.isSubmitted;
+      return `
+        <div id="student-card-${student.studentId}" style="background:#1E293B; border-radius:14px; border:1.5px solid ${st.color}; display:flex; flex-direction:column; overflow:hidden;">
+          <!-- Camera Preview Box -->
+          <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+            ${isSubmitted ? buildSubmittedBoxHTML(student, session) : (student.cameraSnapshotUrl) ? `
+              <img class="student-snapshot-img" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
+              <div class="status-pill-badge" style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${st.color}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
+                ${st.badge}
+              </div>
+              <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
+                <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
+              </div>
+            ` : `
+              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+                <span class="material-symbols-rounded stream-placeholder-icon" style="font-size:26px; color:${st.color};">${st.isLive ? 'videocam' : (st.isOnline ? 'menu_book' : 'videocam_off')}</span>
+                <span class="stream-placeholder-label" style="font-size:10px; font-weight:500; color:${st.color};">
+                  ${st.label}
+                </span>
+              </div>
+              <div class="status-pill-badge" style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${st.color}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
+                ${st.badge}
+              </div>
+              <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
+                <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
+              </div>
+            `}
+          </div>
+
+          <!-- Details & Actions -->
+          <div style="padding:10px; display:flex; flex-direction:column; gap:6px;">
+            <div>
+              <div style="font-size:12px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${student.studentName || 'Student'}
+              </div>
+              <div style="font-size:10px; color:#94A3B8;">
+                ${student.studentPhone || `ID: ${(student.studentId || '').slice(0, 6)}`}
+              </div>
+            </div>
+
+            ${isSubmitted ? `
+              <button class="btn-view-answers" data-student-id="${student.studentId}" style="width:100%; height:28px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+                <span class="material-symbols-rounded filled" style="font-size:14px;">description</span>
+                <span>View Answers ${student.submissionPhotos?.length ? `(${student.submissionPhotos.length})` : (student.mcqScore !== undefined ? `(${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)})` : '')}</span>
+              </button>
+            ` : `
+              <div style="display:flex; gap:6px;">
+                <button class="btn-full-view" data-student-id="${student.studentId}" style="flex:1; height:26px; background:transparent; border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
+                  Full View
+                </button>
+                <button class="btn-alert-student" data-student-id="${student.studentId}" style="flex:1; height:26px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
+                  Alert
+                </button>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    };
+
+    const buildEmptyStateHTML = (tab, sess) => `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:280px; text-align:center; padding:24px; grid-column:span 2;">
+        <div style="font-size:13px; color:#94A3B8; line-height:1.6;">
+          ${tab === 'slot2' && !sess.slot2
+            ? 'මෙම Paper එක සඳහා 2nd Slot එකක් සකසා නොමැත.<br><span style="font-size:11px; color:#64748B;">(Single Slot Session)</span>'
+            : 'මෙම සැසිය සඳහා තවම ශිෂ්‍යයින් ලියාපදිංචි වී නොමැත.'}
+        </div>
+      </div>
+    `;
+
+    const buildAnswersListHTML = (submittedList) => {
+      if (submittedList.length === 0) {
+        return `
+          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:260px; text-align:center; padding:32px;">
+            <div style="width:70px; height:70px; border-radius:50%; background:#1E293B; border:1px solid #334155; display:flex; align-items:center; justify-content:center; color:#64748B; margin-bottom:16px;">
+              <span class="material-symbols-rounded" style="font-size:32px;">folder_open</span>
+            </div>
+            <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">තවමත් පිළිතුරු පත්‍ර ලැබී නොමැත</div>
+            <div style="font-size:12px; color:#94A3B8; line-height:1.5;">සිසුන් පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කළ පසු ඒවා ශිෂ්‍ය නාමය සමඟ මෙහි සජීවීව දිස්වනු ඇත.</div>
+          </div>
+        `;
+      }
+      return `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${submittedList.map((s, idx) => `
+            <div style="background:#1E293B; border:1px solid #334155; border-radius:14px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:26px; height:26px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#94A3B8;">
+                  #${idx + 1}
+                </div>
+                <div>
+                  <div style="font-size:13px; font-weight:700; color:#FFFFFF;">${s.studentName || 'Student'}</div>
+                  <div style="font-size:11px; color:#94A3B8;">${s.studentPhone || ''} • ${s.submissionPhotos?.length || 1} Pages</div>
+                </div>
+              </div>
+              <button class="btn-view-answers" data-student-id="${s.studentId}" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                View Answers
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    };
+
     const render = () => {
       this._renderProctorHall = render;
       allStudents = dbService.deduplicateRegistrations(allStudents || []);
@@ -11551,12 +11772,21 @@ class AppController {
       const submittedStudents = allStudents.filter(s => isStudentSubmitted(s));
 
       const currentSlotStudents = activeTab === 'slot2' ? slot2Students : slot1Students;
-      const liveCount = currentSlotStudents.filter(s => {
-        if (isStudentSubmitted(s)) return false;
-        return s.isCameraActive && (isRecentPing(s.lastCameraPing) || s.cameraSnapshotUrl);
-      }).length;
-      const submittedSlotCount = currentSlotStudents.filter(s => isStudentSubmitted(s)).length;
-      const inactiveCount = Math.max(0, currentSlotStudents.length - liveCount - submittedSlotCount);
+
+      let liveCount = 0;
+      let onlinePaperCount = 0;
+      let idleCount = 0;
+      let inactiveCount = 0;
+      let submittedSlotCount = 0;
+
+      currentSlotStudents.forEach(s => {
+        const st = getStudentLiveStatus(s);
+        if (st.isSubmitted) submittedSlotCount++;
+        else if (st.isLive) liveCount++;
+        else if (st.isIdle) idleCount++;
+        else if (st.isOnline) onlinePaperCount++;
+        else inactiveCount++;
+      });
 
       const phase = session.currentPhase || 'waiting';
       let phaseColor = '#818CF8';
@@ -11588,10 +11818,168 @@ class AppController {
       const isEnded = session.isEnded || phase === 'ended';
       const isTimeUp = session.isTimeUp || phase === 'time_up';
 
+      const shell = modal.querySelector('.proctor-hall-shell');
+      const currentTab = modal.dataset.currentTab;
+
+      // In-place DOM update when already mounted and on same tab (preserves active Agora <video> elements)
+      if (shell && currentTab === activeTab) {
+        // 1. Update Phase bar
+        const phaseBadge = modal.querySelector('#proctor-phase-badge');
+        if (phaseBadge) {
+          phaseBadge.style.background = phaseColor + '25';
+          phaseBadge.style.borderColor = phaseColor;
+          const textEl = phaseBadge.querySelector('.phase-text');
+          if (textEl) {
+            textEl.style.color = phaseColor;
+            textEl.innerHTML = phaseLabel;
+          }
+        }
+
+        // 2. Update Stats counts
+        const elReg = modal.querySelector('#stat-registered');
+        if (elReg) elReg.textContent = currentSlotStudents.length;
+
+        const elLive = modal.querySelector('#stat-live');
+        if (elLive) elLive.textContent = liveCount;
+
+        const elOnline = modal.querySelector('#stat-online');
+        if (elOnline) elOnline.textContent = onlinePaperCount + idleCount;
+
+        const elInactive = modal.querySelector('#stat-inactive');
+        if (elInactive) elInactive.textContent = inactiveCount;
+
+        const elSubmitted = modal.querySelector('#stat-submitted');
+        if (elSubmitted) elSubmitted.textContent = submittedSlotCount;
+
+        const elAnswersCount = modal.querySelector('#tab-answers-count');
+        if (elAnswersCount) elAnswersCount.textContent = `Answers (${submittedStudents.length})`;
+
+        // 3. Update student cards
+        if (activeTab === 'answers') {
+          const answersContainer = modal.querySelector('#answers-list-container');
+          if (answersContainer) answersContainer.innerHTML = buildAnswersListHTML(submittedStudents);
+        } else {
+          const grid = modal.querySelector('#students-grid-container');
+          if (grid) {
+            if (currentSlotStudents.length === 0) {
+              grid.innerHTML = buildEmptyStateHTML(activeTab, session);
+            } else {
+              currentSlotStudents.forEach(student => {
+                const st = getStudentLiveStatus(student);
+                let card = modal.querySelector(`#student-card-${student.studentId}`);
+                if (card) {
+                  // Update card border
+                  card.style.borderColor = st.color;
+
+                  // Update status pill badge
+                  const pill = card.querySelector('.status-pill-badge');
+                  if (pill) {
+                    pill.style.background = st.color;
+                    pill.textContent = st.badge;
+                  }
+
+                  // Update camera box if needed
+                  const box = card.querySelector('.student-camera-box');
+                  if (box) {
+                    if (st.isSubmitted) {
+                      if (!box.querySelector('.submitted-card-view')) {
+                        box.innerHTML = buildSubmittedBoxHTML(student, session);
+                      }
+                    } else {
+                      const activeFsStudentId = this._fullScreenStudentId;
+                      if (activeFsStudentId && activeFsStudentId === student.studentId) {
+                        if (!box.querySelector('.fs-active-indicator')) {
+                          box.innerHTML = `
+                            <div class="fs-active-indicator" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:100%; color:#38BDF8; background:#0B132B;">
+                              <span class="material-symbols-rounded" style="font-size:28px;">fullscreen</span>
+                              <span style="font-size:10px; font-weight:700; letter-spacing:0.5px;">VIEWING IN FULL SCREEN</span>
+                            </div>
+                          `;
+                        }
+                      } else {
+                        const uid = student.agoraUid || getNumericUid(student.studentId);
+                        const hasAgora = this.agoraProctor && this.agoraProctor.hasStream(uid);
+
+                        if (hasAgora) {
+                          // If Agora player already mounted, NEVER TOUCH box.innerHTML!
+                          if (!box.querySelector('.agora-active-player')) {
+                            box.innerHTML = '<div class="agora-active-player" style="width:100%; height:100%; position:relative;"></div>';
+                            this.agoraProctor.playRemoteVideo(uid, box.querySelector('.agora-active-player'), { fit: 'cover' });
+                            const badge = document.createElement('div');
+                            badge.style.cssText = 'position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:#22C55E; color:#FFFFFF; font-size:8.5px; font-weight:700; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.5); display:flex; align-items:center; gap:3px;';
+                            badge.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:10px;">videocam</span> AGORA 720p HD';
+                            box.appendChild(badge);
+                          }
+                        } else {
+                          // No Agora WebRTC stream
+                          const hasAgoraVideo = box.querySelector('.agora-active-player');
+                          if (hasAgoraVideo) box.innerHTML = '';
+
+                          if (student.cameraSnapshotUrl) {
+                            const img = box.querySelector('.student-snapshot-img');
+                            if (img) {
+                              if (img.src !== student.cameraSnapshotUrl) img.src = student.cameraSnapshotUrl;
+                            } else {
+                              box.innerHTML = `
+                                <img class="student-snapshot-img" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
+                                <div class="status-pill-badge" style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${st.color}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
+                                  ${st.badge}
+                                </div>
+                                <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
+                                  <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
+                                </div>`;
+                            }
+                          } else {
+                            const ph = box.querySelector('.stream-placeholder-label');
+                            if (ph) {
+                              ph.textContent = st.label;
+                              ph.style.color = st.color;
+                              const icon = box.querySelector('.stream-placeholder-icon');
+                              if (icon) {
+                                icon.style.color = st.color;
+                                icon.textContent = st.isLive ? 'videocam' : (st.isOnline ? 'menu_book' : 'videocam_off');
+                              }
+                            } else {
+                              box.innerHTML = `
+                                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+                                  <span class="material-symbols-rounded stream-placeholder-icon" style="font-size:26px; color:${st.color};">${st.isLive ? 'videocam' : (st.isOnline ? 'menu_book' : 'videocam_off')}</span>
+                                  <span class="stream-placeholder-label" style="font-size:10px; font-weight:500; color:${st.color};">
+                                    ${st.label}
+                                  </span>
+                                </div>
+                                <div class="status-pill-badge" style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${st.color}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
+                                  ${st.badge}
+                                </div>
+                                <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
+                                  <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
+                                </div>`;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                } else {
+                  // If student card does not exist yet, create and append
+                  const cardWrapper = document.createElement('div');
+                  cardWrapper.innerHTML = buildStudentCardHTML(student, st, session);
+                  const newCard = cardWrapper.firstElementChild;
+                  if (newCard) grid.appendChild(newCard);
+                }
+              });
+            }
+          }
+        }
+        if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
+        return;
+      }
+
+      // Full Shell Render (on first load or tab change)
+      modal.dataset.currentTab = activeTab;
       modal.innerHTML = `
         <div class="proctor-hall-shell" style="position:relative;">
           
-          <!-- ── AppBar (matching admin_live_proctor_screen.dart AppBar) ── -->
+          <!-- ── AppBar ── -->
           <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 10px 14px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
               <div style="display:flex; flex-direction:column; gap:2px;">
@@ -11634,21 +12022,21 @@ class AppController {
                 <span class="material-symbols-rounded filled" style="font-size:15px; color:#818CF8;">bedtime</span> ${session.slot2 ? 'Slot 2' : 'Slot 2 (None)'}
               </button>
               <button class="proctor-tab-btn" data-tab="answers" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'answers' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'answers' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <span class="material-symbols-rounded filled" style="font-size:15px; color:#4ADE80;">check_circle</span> Answers (${submittedStudents.length})
+                <span class="material-symbols-rounded filled" style="font-size:15px; color:#4ADE80;">check_circle</span> <span id="tab-answers-count">Answers (${submittedStudents.length})</span>
               </button>
             </div>
           </div>
 
-          <!-- ── Phase Control Bar (_buildSessionPhaseControlBar) ── -->
+          <!-- ── Phase Control Bar ── -->
           <div style="background:#1E293B; border-bottom:1px solid #334155; padding:8px 14px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <div style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
-                <span style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
+              <div id="proctor-phase-badge" style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
+                <span class="phase-text" style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
               </div>
               <div style="font-size:10px; font-weight:600; color:#64748B;">Manual Phase Controls</div>
             </div>
 
-            <!-- Horizontal Action Buttons Matching Mobile Dart Screen -->
+            <!-- Horizontal Action Buttons -->
             <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
               ${phase === 'waiting' ? `
                 <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
@@ -11692,7 +12080,7 @@ class AppController {
           <!-- ── Main Tab Content ── -->
           <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
             ${activeTab === 'answers' ? `
-              <!-- Answers Section (_buildSubmittedAnswersSection) -->
+              <!-- Answers Section -->
               <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:10px;">
                   <div style="padding:8px; background:rgba(34,197,94,0.2); border-radius:10px; color:#4ADE80; display:flex; align-items:center; justify-content:center;">
@@ -11708,151 +12096,52 @@ class AppController {
                 </div>
               </div>
 
-              <!-- List of Submitted Students or Empty State -->
-              <div style="flex:1; padding:16px;">
-                ${submittedStudents.length === 0 ? `
-                  <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:260px; text-align:center; padding:32px;">
-                    <div style="width:70px; height:70px; border-radius:50%; background:#1E293B; border:1px solid #334155; display:flex; align-items:center; justify-content:center; color:#64748B; margin-bottom:16px;">
-                      <span class="material-symbols-rounded" style="font-size:32px;">folder_open</span>
-                    </div>
-                    <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">තවමත් පිළිතුරු පත්‍ර ලැබී නොමැත</div>
-                    <div style="font-size:12px; color:#94A3B8; line-height:1.5;">සිසුන් පිළිතුරු පත්‍ර ඡායාරූප ගෙන Submit කළ පසු ඒවා ශිෂ්‍ය නාමය සමඟ මෙහි සජීවීව දිස්වනු ඇත.</div>
-                  </div>
-                ` : `
-                  <div style="display:flex; flex-direction:column; gap:10px;">
-                    ${submittedStudents.map((s, idx) => `
-                      <div style="background:#1E293B; border:1px solid #334155; border-radius:14px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                          <div style="width:26px; height:26px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#94A3B8;">
-                            #${idx + 1}
-                          </div>
-                          <div>
-                            <div style="font-size:13px; font-weight:700; color:#FFFFFF;">${s.studentName || 'Student'}</div>
-                            <div style="font-size:11px; color:#94A3B8;">${s.studentPhone || ''} • ${s.submissionPhotos?.length || 1} Pages</div>
-                          </div>
-                        </div>
-                        <button class="btn-view-answers" data-student-id="${s.studentId}" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
-                          View Answers
-                        </button>
-                      </div>
-                    `).join('')}
-                  </div>
-                `}
+              <!-- List of Submitted Students -->
+              <div id="answers-list-container" style="flex:1; padding:16px;">
+                ${buildAnswersListHTML(submittedStudents)}
               </div>
             ` : `
-              <!-- Slot Proctored Grid (_buildSlotProctorGrid) -->
-              <!-- Top Analytics Stats Bar -->
+              <!-- Slot Proctored Grid -->
+              <!-- Top Analytics Stats Bar with 5 key metrics -->
               <div style="padding:10px 16px; background:rgba(30,41,59,0.5); display:flex; justify-content:space-around; align-items:center; border-bottom:1px solid #1E293B; flex-shrink:0;">
                 <div style="text-align:center;">
-                  <div style="font-size:15px; font-weight:700; color:#818CF8;">${currentSlotStudents.length}</div>
+                  <div id="stat-registered" style="font-size:15px; font-weight:700; color:#818CF8;">${currentSlotStudents.length}</div>
                   <div style="font-size:10px; color:#94A3B8;">Registered</div>
                 </div>
                 <div style="text-align:center;">
-                  <div style="font-size:15px; font-weight:700; color:#22C55E;">${liveCount}</div>
+                  <div id="stat-live" style="font-size:15px; font-weight:700; color:#22C55E;">${liveCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
                     <span class="material-symbols-rounded filled" style="font-size:12px; color:#22C55E;">videocam</span> Live Cameras
                   </div>
                 </div>
                 <div style="text-align:center;">
-                  <div style="font-size:15px; font-weight:700; color:#EF4444;">${inactiveCount}</div>
+                  <div id="stat-online" style="font-size:15px; font-weight:700; color:#38BDF8;">${onlinePaperCount + idleCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
-                    <span class="material-symbols-rounded" style="font-size:12px; color:#EF4444;">videocam_off</span> Inactive
+                    <span class="material-symbols-rounded" style="font-size:12px; color:#38BDF8;">menu_book</span> Reading Paper
                   </div>
                 </div>
                 <div style="text-align:center;">
-                  <div style="font-size:15px; font-weight:700; color:#38BDF8;">${submittedSlotCount}</div>
+                  <div id="stat-inactive" style="font-size:15px; font-weight:700; color:#EF4444;">${inactiveCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
-                    <span class="material-symbols-rounded filled" style="font-size:12px; color:#38BDF8;">check_circle</span> Submitted
+                    <span class="material-symbols-rounded" style="font-size:12px; color:#EF4444;">videocam_off</span> Offline
+                  </div>
+                </div>
+                <div style="text-align:center;">
+                  <div id="stat-submitted" style="font-size:15px; font-weight:700; color:#4ADE80;">${submittedSlotCount}</div>
+                  <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
+                    <span class="material-symbols-rounded filled" style="font-size:12px; color:#4ADE80;">check_circle</span> Submitted
                   </div>
                 </div>
               </div>
 
-              <!-- Students Grid or Exact Empty State -->
+              <!-- Students Grid Container -->
               <div style="flex:1; padding:14px; overflow-y:auto;">
-                ${currentSlotStudents.length === 0 ? `
-                  <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:280px; text-align:center; padding:24px;">
-                    <div style="font-size:13px; color:#94A3B8; line-height:1.6;">
-                      ${activeTab === 'slot2' && !session.slot2
-                        ? 'මෙම Paper එක සඳහා 2nd Slot එකක් සකසා නොමැත.<br><span style="font-size:11px; color:#64748B;">(Single Slot Session)</span>'
-                        : 'මෙම සැසිය සඳහා තවම ශිෂ්‍යයින් ලියාපදිංචි වී නොමැත.'}
-                    </div>
-                  </div>
-                ` : `
-                  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
-                    ${currentSlotStudents.map(student => {
-                      const isSubmitted = isStudentSubmitted(student);
-                      const pingActive = isRecentPing(student.lastCameraPing);
-                      const isCameraActive = !isSubmitted && !!(student.isCameraActive && (pingActive || student.cameraSnapshotUrl));
-                      const isOnline = !isSubmitted && (isCameraActive || pingActive || student.isOnline);
-                      const borderColor = isSubmitted ? '#22C55E' : isCameraActive ? '#22C55E' : isOnline ? '#3B82F6' : '#EF4444';
-                      const statusBadge = isSubmitted ? 'SUBMITTED' : isCameraActive ? 'LIVE' : isOnline ? 'ONLINE' : 'OFFLINE';
-
-                      return `
-                        <div style="background:#1E293B; border-radius:14px; border:1.5px solid ${borderColor}; display:flex; flex-direction:column; overflow:hidden;">
-                          <!-- Camera Preview Box -->
-                          <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                            ${isSubmitted ? `
-                              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height:100%; width:100%; background:rgba(34,197,94,0.08); padding:12px; text-align:center;">
-                                <div style="width:40px; height:40px; border-radius:50%; background:rgba(34,197,94,0.2); border:1.5px solid #22C55E; display:flex; align-items:center; justify-content:center;">
-                                  <span class="material-symbols-rounded filled" style="font-size:24px; color:#22C55E;">check_circle</span>
-                                </div>
-                                <div style="font-size:11px; font-weight:700; color:#4ADE80;">පිළිතුරු පත්‍ර භාරදී ඇත</div>
-                                <div style="font-size:9.5px; color:#94A3B8;">${student.mcqScore !== undefined ? `MCQ Score: ${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)} (${student.mcqPercentage !== undefined ? student.mcqPercentage : Math.round((student.mcqScore / (student.mcqTotal || session.mcqCount || 50)) * 100)}%)` : `${student.submissionPhotos?.length || 1} Pages Submitted`}</div>
-                              </div>
-                            ` : (student.cameraSnapshotUrl && (isCameraActive || isOnline)) ? `
-                              <img src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
-                            ` : `
-                              <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
-                                <span class="material-symbols-rounded" style="font-size:26px; color:${borderColor};">${isCameraActive ? 'videocam' : 'videocam_off'}</span>
-                                <span style="font-size:10px; font-weight:500; color:${isOnline ? '#4ADE80' : '#94A3B8'};">
-                                  ${isCameraActive ? 'Proctor Stream Active' : 'Camera Offline'}
-                                </span>
-                              </div>
-                            `}
-                            <!-- Status Pill Top Left -->
-                            <div style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${borderColor}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
-                              ${statusBadge}
-                            </div>
-                            <!-- Fullscreen Icon Top Right -->
-                            ${!isSubmitted ? `
-                            <div style="position:absolute; top:6px; right:6px; background:rgba(0,0,0,0.65); padding:3px 5px; border-radius:4px; font-size:10px; color:#FFFFFF; display:flex; align-items:center;">
-                              <span class="material-symbols-rounded" style="font-size:14px;">zoom_in</span>
-                            </div>
-                            ` : ''}
-                          </div>
-
-                          <!-- Details & Actions -->
-                          <div style="padding:10px; display:flex; flex-direction:column; gap:6px;">
-                            <div>
-                              <div style="font-size:12px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${student.studentName || 'Student'}
-                              </div>
-                              <div style="font-size:10px; color:#94A3B8;">
-                                ${student.studentPhone || `ID: ${(student.studentId || '').slice(0, 6)}`}
-                              </div>
-                            </div>
-
-                            ${isSubmitted ? `
-                              <button class="btn-view-answers" data-student-id="${student.studentId}" style="width:100%; height:28px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
-                                <span class="material-symbols-rounded filled" style="font-size:14px;">description</span>
-                                <span>View Answers ${student.submissionPhotos?.length ? `(${student.submissionPhotos.length})` : (student.mcqScore !== undefined ? `(${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)})` : '')}</span>
-                              </button>
-                            ` : `
-                              <div style="display:flex; gap:6px;">
-                                <button class="btn-full-view" data-student-id="${student.studentId}" style="flex:1; height:26px; background:transparent; border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
-                                  Full View
-                                </button>
-                                <button class="btn-alert-student" data-student-id="${student.studentId}" style="flex:1; height:26px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
-                                  Alert
-                                </button>
-                              </div>
-                            `}
-                          </div>
-                        </div>
-                      `;
-                    }).join('')}
-                  </div>
-                `}
+                <div id="students-grid-container" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
+                  ${currentSlotStudents.length === 0 ? buildEmptyStateHTML(activeTab, session) : currentSlotStudents.map(student => {
+                    const st = getStudentLiveStatus(student);
+                    return buildStudentCardHTML(student, st, session);
+                  }).join('')}
+                </div>
               </div>
             `}
           </div>
@@ -11877,6 +12166,7 @@ class AppController {
     const attachEventHandlers = () => {
       // Close Hall
       document.getElementById('btn-close-proctor-hall')?.addEventListener('click', () => {
+        if (renderThrottleTimer) { clearTimeout(renderThrottleTimer); renderThrottleTimer = null; }
         if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
         unsubs.forEach(fn => { try { fn(); } catch (_) {} });
         document.getElementById('proctor-fullscreen-modal')?.remove();
@@ -12103,9 +12393,18 @@ class AppController {
     });
     unsubs.push(unsubSession);
 
+    let renderThrottleTimer = null;
+    const scheduleProctorRender = () => {
+      if (renderThrottleTimer) return;
+      renderThrottleTimer = setTimeout(() => {
+        renderThrottleTimer = null;
+        render();
+      }, 600);
+    };
+
     const unsubRegs = dbService.streamSlotRegistrations(session.id, 'all', (regs) => {
       allStudents = dbService.deduplicateRegistrations(regs || []);
-      render();
+      scheduleProctorRender();
     });
     unsubs.push(unsubRegs);
 
@@ -12557,21 +12856,30 @@ class AppController {
     let captureCanvas = null;
     const captureSnapshot = () => {
       if (!cameraActive || !cameraStream) return null;
-      const videoEl = roomContainer.querySelector('.proctor-video-feed');
-      if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth) return null;
+      // Look for the active playing video element: check if the student is viewing the paper in the PDF modal PiP box
+      const pipVideo = document.getElementById('secure-paper-pip-video');
+      const mainVideo = roomContainer.querySelector('.proctor-video-feed');
+      const videoEl = (pipVideo && pipVideo.readyState >= 2 && pipVideo.videoWidth > 0)
+        ? pipVideo
+        : (mainVideo && mainVideo.readyState >= 2 && mainVideo.videoWidth > 0 ? mainVideo : null);
+
+      if (!videoEl) return null;
       try {
         if (!captureCanvas) {
           captureCanvas = document.createElement('canvas');
         }
-        captureCanvas.width = 850;
-        captureCanvas.height = Math.round(850 * (videoEl.videoHeight / videoEl.videoWidth)) || 540;
+        captureCanvas.width = 480;
+        captureCanvas.height = Math.round(480 * (videoEl.videoHeight / videoEl.videoWidth)) || 320;
         const ctx = captureCanvas.getContext('2d');
         ctx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
-        return captureCanvas.toDataURL('image/jpeg', 0.72);
+        return captureCanvas.toDataURL('image/jpeg', 0.55);
       } catch (err) {
         return null;
       }
     };
+
+    let lastSnapTime = 0;
+    let cachedSnap = null;
 
     // Heartbeat function matching Flutter _sendHeartbeat
     const sendHeartbeat = async (isActive) => {
@@ -12590,6 +12898,7 @@ class AppController {
             studentPhone,
             slotId: slotId || 'slot1',
             isCameraActive: false,
+            isOnline: false,
             agoraUid: studentAgoraUid || getNumericUid(studentId),
             cameraSnapshotUrl: null,
             status: 'submitted',
@@ -12598,7 +12907,16 @@ class AppController {
           return;
         }
 
-        const snap = isActive ? captureSnapshot() : null;
+        // Periodically refresh thumbnail snapshot every 15s to keep Firestore bandwidth lightweight
+        const nowMs = Date.now();
+        if (isActive && (nowMs - lastSnapTime >= 15000 || !cachedSnap)) {
+          const fresh = captureSnapshot();
+          if (fresh) {
+            cachedSnap = fresh;
+            lastSnapTime = nowMs;
+          }
+        }
+
         await dbService.updateCameraHeartbeat({
           paperId,
           studentId,
@@ -12606,8 +12924,9 @@ class AppController {
           studentPhone,
           slotId: slotId || 'slot1',
           isCameraActive: isActive,
+          isOnline: true,
           agoraUid: studentAgoraUid || getNumericUid(studentId),
-          cameraSnapshotUrl: snap,
+          cameraSnapshotUrl: isActive ? cachedSnap : null,
           status: 'in_exam'
         });
       } catch (e) {
@@ -13202,7 +13521,10 @@ ${!times.isWaiting ? `
           alert('මෙම සැසිය සඳහා ප්‍රශ්න පත්‍රයක් අමුණා නැත (No paper attached).');
           return;
         }
-        this.openSecurePaperPdfModal(targetPdf, session, student, cameraStream);
+        sendHeartbeat(cameraActive);
+        this.openSecurePaperPdfModal(targetPdf, session, student, cameraStream, () => {
+          sendHeartbeat(cameraActive);
+        });
       };
 
       roomContainer.querySelector('#btn-open-paper-pdf-hud')?.addEventListener('click', handleOpenPaperPdf);
@@ -14569,11 +14891,18 @@ ${!times.isWaiting ? `
     return cleanUrl;
   }
 
-  openSecurePaperPdfModal(pdfUrl, session = {}, student = {}, cameraStream = null) {
+  openSecurePaperPdfModal(pdfUrl, session = {}, student = {}, cameraStream = null, onKeepAlive = null) {
     const rawPdf = pdfUrl || session.paperPdfUrl || session.pdfUrl;
     if (!rawPdf) {
       alert('මෙම සැසිය සඳහා ප්‍රශ්න පත්‍ර PDF එකක් අමුණා නැත (No Paper PDF attached).');
       return;
+    }
+
+    let keepAliveTimer = null;
+    if (typeof onKeepAlive === 'function') {
+      keepAliveTimer = setInterval(() => {
+        try { onKeepAlive(); } catch (_) {}
+      }, 5000);
     }
 
     const embedUrl = this.formatPdfViewerUrl(rawPdf);
@@ -14708,8 +15037,12 @@ ${!times.isWaiting ? `
     modal.querySelector('#btn-paper-zoom-reset')?.addEventListener('click', () => setZoom(1.0));
 
     const closeSecureModal = () => {
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
       window.removeEventListener('keydown', handleKeyDown, true);
       modal.remove();
+      if (typeof onKeepAlive === 'function') {
+        try { onKeepAlive(); } catch (_) {}
+      }
     };
 
     modal.querySelector('#btn-close-secure-paper')?.addEventListener('click', closeSecureModal);
