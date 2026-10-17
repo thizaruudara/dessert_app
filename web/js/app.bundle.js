@@ -3190,7 +3190,7 @@ ${U}`}var Wo=class extends Error{constructor({message:e,code:n,cause:a,name:o}){
       </div>
     `,document.body.appendChild(e),document.getElementById("btn-close-notif-sheet")?.addEventListener("click",()=>e.remove()),document.getElementById("btn-req-push-perm")?.addEventListener("click",async()=>{await Tn.requestPermission(this.currentUser)}),document.getElementById("btn-send-test-push")?.addEventListener("click",()=>{Tn.showLocalNotification("EduPeak Exam Alert",{body:"2027 A/L Physics Term Paper 01 is now active! Tap to join.",tag:"exam-alert"}),Tn.showInAppBanner("Exam Alert Sent","Look for the system banner and audio chime.","info")})}async startCountdownTimer(){this.countdownTimer&&clearInterval(this.countdownTimer);let n=(this.currentUser||{}).examYear||"2027 A/L",a=null,o=`${n} Physics Final Exam`;try{let f=(await kt.getExamCountdowns()).find(y=>kt.matchesYear(y.examYear,n)&&y.isEnabled!==!1);f&&f.targetDate&&(a=new Date(f.targetDate),f.customTitle&&(o=f.customTitle))}catch{}if(!a||isNaN(a.getTime())){let p=parseInt((n.match(/\d{4}/)||[2027])[0]);a=new Date(`${p}-08-15T08:30:00+05:30`)}let l=document.querySelector(".cd-exam-name");l&&(l.textContent=o);let u=()=>{let p=a-new Date;if(p<=0){let M=document.getElementById("cd-days"),U=document.getElementById("cd-hours"),X=document.getElementById("cd-mins"),ee=document.getElementById("cd-secs");M&&(M.textContent="0"),U&&(U.textContent="00"),X&&(X.textContent="00"),ee&&(ee.textContent="00");return}let f=Math.floor(p/864e5),y=Math.floor(p%864e5/36e5),_=Math.floor(p%36e5/6e4),b=Math.floor(p%6e4/1e3),B=document.getElementById("cd-days"),C=document.getElementById("cd-hours"),D=document.getElementById("cd-mins"),P=document.getElementById("cd-secs");B&&(B.textContent=f),C&&(C.textContent=y.toString().padStart(2,"0")),D&&(D.textContent=_.toString().padStart(2,"0")),P&&(P.textContent=b.toString().padStart(2,"0"))};this.countdownTimer=setInterval(u,1e3),u()}startInspirationRotator(){this.quoteRotator&&clearInterval(this.quoteRotator);let e=["\u201CSuccess is the sum of small efforts repeated day in and day out.\u201D","\u201CDiscipline is choosing between what you want now and what you want most.\u201D","\u201CPhysics isn\u2019t about memorizing formulas; it\u2019s about understanding the universe.\u201D","\u201CSmall progress every single day adds up to big island ranks.\u201D","\u201CFocus on the step in front of you, not the whole staircase.\u201D"],n=0;this.quoteRotator=setInterval(()=>{let a=document.getElementById("inspiration-quote-text");a&&(n=(n+1)%e.length,a.style.opacity="0",a.style.transform="translateY(4px)",setTimeout(()=>{a.textContent=e[n],a.style.opacity="1",a.style.transform="translateY(0)"},350))},5e3)}renderAdminApp(){let e=document.getElementById("app-root");if(!e)return;this.currentMode="admin";let a=new URLSearchParams(window.location.search).get("admin_tab"),o=["dashboard","papers","sprints","students","broadcasts","essays"];this.adminTab=o.includes(a)?a:this.adminTab||"dashboard",e.innerHTML=`
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 80px 0;">
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 calc(76px + var(--safe-bottom, 0px)) 0;">
         <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
@@ -3203,7 +3203,7 @@ ${U}`}var Wo=class extends Error{constructor({message:e,code:n,cause:a,name:o}){
       <div id="admin-fab-slot"></div>
 
       <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart NavigationBar) -->
-      <nav class="bottom-nav-bar" id="admin-bottom-nav" style="background:#FFFFFF; border-top:1px solid #E2E8F0;">
+      <nav class="bottom-nav-bar" id="admin-bottom-nav">
         <button class="nav-tab-btn ${this.adminTab==="dashboard"?"active":""}" data-admin-tab="dashboard">
           <div class="nav-pill-icon"><span class="material-symbols-rounded">dashboard</span></div>
           <span>Dashboard</span>
@@ -3617,7 +3617,7 @@ Student grades, XP points, teacher feedback, and exam history will be 100% prese
       </div>
 
       <!-- Tab Viewport -->
-      <div id="admin-papers-content" class="apk-admin-paper-tab-content" style="padding:0 16px 90px;">
+      <div id="admin-papers-content" class="apk-admin-paper-tab-content" style="padding:0 16px 16px;">
         ${this.adminPaperTab===0?this._buildAdminLiveSessionsHTML(n):""}
         ${this.adminPaperTab===1?this._buildAdminPaperHintsHTML(a,o,this.adminSelectedPaperBatch):""}
         ${this.adminPaperTab===2?this._buildAdminPaperLeaderboardHTML(l,u,this.adminSelectedPaperBatch):""}
@@ -4261,7 +4261,7 @@ Student grades, XP points, teacher feedback, and exam history will be 100% prese
       </div>
 
       <!-- Tab Content Area -->
-      <div id="admin-sprint-content" style="padding-bottom:90px;">
+      <div id="admin-sprint-content" style="padding-bottom:16px;">
         ${this.adminSprintTab===0?this._buildAdminSprintsTabHTML(n,a,o):this._buildAdminSprintLeaderboardHTML(n,l,u)}
       </div>
     `;let p=document.getElementById("admin-fab-slot");p&&(p.innerHTML=`
@@ -4407,7 +4407,7 @@ Student grades, XP points, teacher feedback, and exam history will be 100% prese
       </div>
 
       <!-- Students List View -->
-      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;"></div>
+      <div id="admin-students-list" style="padding:16px; padding-bottom:16px;"></div>
     `;let f=()=>{let _=l(),b=document.getElementById("admin-students-showing-count");b&&(b.textContent=_.length);let B=document.getElementById("admin-students-full-access-count");B&&(B.textContent=n.filter(M=>(a.get(M.id)||a.get(M.studentId)||a.get(M.phone))?.hasFullAccess).length);let C=document.getElementById("admin-students-list");if(!C)return;if(_.length===0){C.innerHTML=`
           <div style="padding:70px 20px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px;">
             <span class="material-symbols-rounded" style="font-size:44px; color:#94A3B8;">search</span>
@@ -4470,7 +4470,7 @@ Student grades, XP points, teacher feedback, and exam history will be 100% prese
         </div>
       </div>
 
-      <div style="padding:16px 16px 90px;">
+      <div style="padding:16px 16px 16px;">
         <div class="hero-card" style="padding:16px;">
           <div class="form-label">Announcement Title:</div>
           <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. Paper 04 Live Exam Started!" />

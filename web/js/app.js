@@ -5991,7 +5991,7 @@ class AppController {
 
     root.innerHTML = `
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 80px 0;">
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 calc(76px + var(--safe-bottom, 0px)) 0;">
         <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
@@ -6004,7 +6004,7 @@ class AppController {
       <div id="admin-fab-slot"></div>
 
       <!-- Admin Bottom Navigation Bar (1:1 with admin_shell.dart NavigationBar) -->
-      <nav class="bottom-nav-bar" id="admin-bottom-nav" style="background:#FFFFFF; border-top:1px solid #E2E8F0;">
+      <nav class="bottom-nav-bar" id="admin-bottom-nav">
         <button class="nav-tab-btn ${this.adminTab === 'dashboard' ? 'active' : ''}" data-admin-tab="dashboard">
           <div class="nav-pill-icon"><span class="material-symbols-rounded">dashboard</span></div>
           <span>Dashboard</span>
@@ -6879,7 +6879,7 @@ class AppController {
       </div>
 
       <!-- Tab Viewport -->
-      <div id="admin-papers-content" class="apk-admin-paper-tab-content" style="padding:0 16px 90px;">
+      <div id="admin-papers-content" class="apk-admin-paper-tab-content" style="padding:0 16px 16px;">
         ${this.adminPaperTab === 0 ? this._buildAdminLiveSessionsHTML(papers) : ''}
         ${this.adminPaperTab === 1 ? this._buildAdminPaperHintsHTML(adminPaperHints, adminPaperHintsError, this.adminSelectedPaperBatch) : ''}
         ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML(adminPaperBoards, adminPaperBoardsError, this.adminSelectedPaperBatch) : ''}
@@ -8320,7 +8320,7 @@ class AppController {
       </div>
 
       <!-- Tab Content Area -->
-      <div id="admin-sprint-content" style="padding-bottom:90px;">
+      <div id="admin-sprint-content" style="padding-bottom:16px;">
         ${this.adminSprintTab === 0 ? this._buildAdminSprintsTabHTML(dateStr, dailySprints, dailySprintsError) : this._buildAdminSprintLeaderboardHTML(dateStr, sprintAttempts, sprintAttemptsError)}
       </div>
     `;
@@ -8595,7 +8595,7 @@ class AppController {
       </div>
 
       <!-- Students List View -->
-      <div id="admin-students-list" style="padding:16px; padding-bottom:90px;"></div>
+      <div id="admin-students-list" style="padding:16px; padding-bottom:16px;"></div>
     `;
 
     const renderRows = () => {
@@ -8891,7 +8891,7 @@ class AppController {
         </div>
       </div>
 
-      <div style="padding:16px 16px 90px;">
+      <div style="padding:16px 16px 16px;">
         <div class="hero-card" style="padding:16px;">
           <div class="form-label">Announcement Title:</div>
           <input type="text" id="bc-title" class="form-textarea" style="height:40px; margin-bottom:10px;" placeholder="e.g. Paper 04 Live Exam Started!" />
