@@ -1194,11 +1194,11 @@ class AppController {
     const activeTargetYear = user.examYear || '2027 A/L';
 
     const [insight, sessions, upcomingList, studentCredits, myDesserts] = await Promise.all([
-      this.safePromise(dbService.getDailyInsight(), 2000, {}),
-      this.safePromise(dbService.getPaperSessions(activeTargetYear), 2000, this._cachedPaperSessions || []),
-      this.safePromise(dbService.getUpcomingPapers(activeTargetYear), 2000, []),
-      this.safePromise(dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName), 2000, user.credits || 0),
-      this.safePromise(dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName), 2000, this._cachedDesserts || [])
+      this.safePromise(dbService.getDailyInsight(), 3500, {}),
+      this.safePromise(dbService.getPaperSessions(activeTargetYear), 4500, this._cachedPaperSessions || []),
+      this.safePromise(dbService.getUpcomingPapers(activeTargetYear), 3500, []),
+      this.safePromise(dbService.getStudentCredits(user.studentId || user.uid || user.id, user.phone, user.studentId || user.id, studentName), 3500, user.credits || 0),
+      this.safePromise(dbService.getStudentDesserts(user.studentId || user.uid || user.id, user.phone, studentName), 3500, this._cachedDesserts || [])
     ]);
     if (sessions && sessions.length) this._cachedPaperSessions = sessions;
     if (myDesserts && myDesserts.length) this._cachedDesserts = myDesserts;
@@ -1290,6 +1290,29 @@ class AppController {
           <span>${user.streak || 1} Day${(user.streak || 1) === 1 ? '' : 's'}</span>
         </div>
       </div>
+
+      ${(liveSession || waitingSession) ? `
+        <!-- Prominent Live Exam In Progress Alert Banner (Instant One-Tap Access) -->
+        <div class="live-exam-top-banner" style="margin:0 16px 14px; background:linear-gradient(135deg, ${liveSession ? '#15803D' : '#4F46E5'} 0%, ${liveSession ? '#166534' : '#4338CA'} 100%); border-radius:18px; padding:14px 16px; color:#FFFFFF; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 8px 24px rgba(0,0,0,0.16); cursor:pointer;" onclick="window.app ? window.app.switchTab('papers') : null">
+          <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+            <div style="width:40px; height:40px; border-radius:12px; background:rgba(255,255,255,0.22); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <span class="material-symbols-rounded filled" style="font-size:24px; color:#FFFFFF;">${liveSession ? 'sensors' : 'meeting_room'}</span>
+            </div>
+            <div style="min-width:0;">
+              <div style="font-size:10.5px; font-weight:800; letter-spacing:0.8px; text-transform:uppercase; color:${liveSession ? '#86EFAC' : '#C7D2FE'};">
+                ${liveSession ? '🔴 විභාගය ක්‍රියාත්මකයි (Live Exam Now)' : '🚪 පොරොත්තු ශාලාව විවෘතයි (Waiting Room Open)'}
+              </div>
+              <div style="font-size:14px; font-weight:800; color:#FFFFFF; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${escapeHTML((liveSession || waitingSession).title)}
+              </div>
+            </div>
+          </div>
+          <button type="button" style="background:#FFFFFF; color:${liveSession ? '#15803D' : '#4F46E5'}; font-weight:800; font-size:12px; padding:8px 14px; border-radius:10px; border:none; display:flex; align-items:center; gap:4px; flex-shrink:0; cursor:pointer;">
+            <span>Enter</span>
+            <span class="material-symbols-rounded" style="font-size:15px;">arrow_forward</span>
+          </button>
+        </div>
+      ` : ''}
 
       <!-- 2. Hero Level Card (Dynamic Level, Real Points System, Mission Checkboxes) -->
       <div class="hero-card">
@@ -2518,8 +2541,8 @@ class AppController {
       const activeTargetYear = currentYear;
 
       const [sessions, paperHints] = await Promise.all([
-        this.safePromise(dbService.getPaperSessions(activeTargetYear), 2200, this._cachedPaperSessions || []),
-        this.safePromise(dbService.getPaperHints(activeTargetYear), 2200, this._cachedPaperHints || [])
+        this.safePromise(dbService.getPaperSessions(activeTargetYear), 4500, this._cachedPaperSessions || []),
+        this.safePromise(dbService.getPaperHints(activeTargetYear), 3500, this._cachedPaperHints || [])
       ]);
       if (sessions && sessions.length) this._cachedPaperSessions = sessions;
       if (paperHints && paperHints.length) this._cachedPaperHints = paperHints;

@@ -313,6 +313,42 @@ export async function getSuperPaperBatchAccess(students = []) {
   if (!students || students.length === 0) return accessMap;
 
   try {
+    // 0. Fast-Path: Supabase SECURITY DEFINER RPC get_super_paper_batch_access (10ms, bypasses RLS safely)
+    try {
+      const studentIds = students.map(s => s.studentId || s.id || s.phone || s.email).filter(Boolean);
+      const { data: batchRes, error: rpcErr } = await supabase.rpc('get_super_paper_batch_access', {
+        p_student_ids: studentIds
+      });
+
+      if (!rpcErr && Array.isArray(batchRes) && batchRes.length > 0) {
+        const resultMap = new Map();
+        batchRes.forEach(r => {
+          if (r?.student_id) {
+            resultMap.set(String(r.student_id).toLowerCase().trim(), r);
+          }
+        });
+
+        for (const st of students) {
+          const keys = [st.id, st.studentId, st.email, st.phone].filter(Boolean).map(k => String(k).toLowerCase().trim());
+          const match = keys.map(k => resultMap.get(k)).find(Boolean);
+          const hasFullAccess = match ? match.has_full_access : false;
+          const monthName = match?.month_name || 'October 2027';
+          const accData = {
+            hasFullAccess,
+            monthName,
+            courseTitle: `Super Paper Class - ${monthName}`,
+            statusText: hasFullAccess ? `Full Access (${monthName})` : 'No Access (Locked)'
+          };
+          if (st.id) accessMap.set(st.id, accData);
+          if (st.studentId) accessMap.set(st.studentId, accData);
+          if (st.phone) accessMap.set(st.phone, accData);
+        }
+        return accessMap;
+      }
+    } catch (batchErr) {
+      console.warn('[Supabase] get_super_paper_batch_access RPC note, falling back:', batchErr);
+    }
+
     // 1. Fetch latest month course for Super Paper Class 2027
     const { data: courses } = await supabase
       .from('courses')
@@ -330,19 +366,19 @@ export async function getSuperPaperBatchAccess(students = []) {
     const targetCourseId = latestMonthlyCourse.id;
     const targetMonthName = latestMonthlyCourse.month_name || 'October 2027';
 
-    // All valid courses for Super Paper Class
-    const validCourseIds = Array.from(new Set([
+    // ONLY paid monthly courses count for Full Access (e.g. crs-phy-muu3k9m4 for October 2027).
+    // NEVER include 'crs-base-super-paper-2027' as it is a free trial course assigned to all students!
+    const validPaidCourseIds = Array.from(new Set([
       targetCourseId,
       'crs-phy-muu3k9m4',
-      'crs-base-super-paper-2027',
-      ...(courses || []).map(c => c.id)
-    ].filter(Boolean)));
+      ...(courses || []).filter(c => c.id !== 'crs-base-super-paper-2027' && c.parent_course_id === 'crs-base-super-paper-2027').map(c => c.id)
+    ].filter(c => Boolean(c) && c !== 'crs-base-super-paper-2027')));
 
-    // 2. Fetch all paid/approved enrollments for any Super Paper course
+    // 2. Fetch all paid/approved enrollments for the active monthly course
     const { data: enrollments } = await supabase
       .from('enrollments')
       .select('student_id, course_id, payment_status')
-      .in('course_id', validCourseIds);
+      .in('course_id', validPaidCourseIds);
 
     const paidStudentIds = new Set();
     const cancelledStudentIds = new Set();
@@ -364,7 +400,7 @@ export async function getSuperPaperBatchAccess(students = []) {
       }
     });
 
-    // 3. Fetch profiles to check enrolled_courses in Supabase
+    // 3. Fetch profiles to check enrolled_courses for paid monthly course
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, email, phone, enrolled_courses');
@@ -378,10 +414,9 @@ export async function getSuperPaperBatchAccess(students = []) {
         try { list = JSON.parse(ec); } catch (_) {}
       }
 
+      // Must explicitly match a valid paid monthly course ID, NOT base free course
       const hasCourse = list.some(cId => 
-        validCourseIds.includes(cId) || 
-        String(cId).toLowerCase().includes('super-paper') || 
-        String(cId).toLowerCase().includes('muu3k9m4')
+        validPaidCourseIds.includes(cId) && cId !== 'crs-base-super-paper-2027'
       );
 
       if (hasCourse) {
@@ -397,7 +432,7 @@ export async function getSuperPaperBatchAccess(students = []) {
       }
     });
 
-    // 4. Fetch approved orders from broadcast_schedules in batch
+    // 4. Fetch approved orders from broadcast_schedules for paid monthly course
     const { data: orders } = await supabase
       .from('broadcast_schedules')
       .select('coursetitle, status')
@@ -410,7 +445,9 @@ export async function getSuperPaperBatchAccess(students = []) {
       try {
         const p = typeof ord.coursetitle === 'string' ? JSON.parse(ord.coursetitle) : ord.coursetitle;
         const cId = p?.courseId || p?.course_id;
-        if (validCourseIds.includes(cId) || String(p?.courseTitle || '').includes('October 2027') || String(p?.courseTitle || '').toLowerCase().includes('super paper')) {
+        const isMonthlyMatch = cId && validPaidCourseIds.includes(cId) && cId !== 'crs-base-super-paper-2027';
+        const isOctoberMatch = String(p?.courseTitle || '').includes('October 2027') || String(p?.courseTitle || '').includes('muu3k9m4');
+        if (isMonthlyMatch || isOctoberMatch) {
           if (p?.studentId) approvedOrderKeys.add(String(p.studentId).toLowerCase().trim());
           if (p?.studentPhone) {
             const ph = String(p.studentPhone).replace(/\D/g, '');
@@ -450,10 +487,10 @@ export async function getSuperPaperBatchAccess(students = []) {
           hasFullAccess = true;
         }
 
-        // Check local st.enrolledCourses array
+        // Check local st.enrolledCourses array (strictly paid monthly only)
         if (!hasFullAccess && st.enrolledCourses) {
           const list = Array.isArray(st.enrolledCourses) ? st.enrolledCourses : [];
-          if (list.some(c => validCourseIds.includes(c) || String(c).toLowerCase().includes('super-paper') || String(c).includes('muu3k9m4'))) {
+          if (list.some(c => validPaidCourseIds.includes(c) && c !== 'crs-base-super-paper-2027')) {
             hasFullAccess = true;
           }
         }
@@ -487,67 +524,24 @@ export async function getSuperPaperBatchAccess(students = []) {
 export async function grantSuperPaperAccess(student) {
   if (!student) throw new Error('Student missing');
   const sId = student.studentId || student.id;
-  const targetCourseId = 'crs-phy-muu3k9m4';
-  const baseCourseId = 'crs-base-super-paper-2027';
+  const sPhone = student.phone || '';
+  const sEmail = student.email || '';
 
-  // 1. Upsert or update enrollments table for target courses
-  const { data: existingEnr } = await supabase
-    .from('enrollments')
-    .select('id, course_id, payment_status')
-    .eq('student_id', sId)
-    .in('course_id', [targetCourseId, baseCourseId]);
-
-  const now = new Date().toISOString();
-  if (existingEnr && existingEnr.length > 0) {
-    for (const enr of existingEnr) {
-      await supabase
-        .from('enrollments')
-        .update({ payment_status: 'paid', enrolled_at: now })
-        .eq('id', enr.id);
-    }
-  } else {
-    await supabase
-      .from('enrollments')
-      .insert([
-        {
-          student_id: sId,
-          course_id: targetCourseId,
-          payment_status: 'paid',
-          enrolled_at: now,
-          attendance_mode: student.attendanceMode || 'online'
-        },
-        {
-          student_id: sId,
-          course_id: baseCourseId,
-          payment_status: 'paid',
-          enrolled_at: now,
-          attendance_mode: student.attendanceMode || 'online'
-        }
-      ]);
-  }
-
-  // 2. Update profiles table enrolled_courses if profile exists
+  // 1. Call SECURITY DEFINER RPC to bypass RLS and grant paid monthly access instantly
   try {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id, enrolled_courses')
-      .or(`id.eq.${sId},phone.eq.${student.phone || ''}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (prof) {
-      let list = Array.isArray(prof.enrolled_courses) ? prof.enrolled_courses : [];
-      if (!list.includes(targetCourseId)) list.push(targetCourseId);
-      if (!list.includes(baseCourseId)) list.push(baseCourseId);
-      await supabase
-        .from('profiles')
-        .update({ enrolled_courses: list })
-        .eq('id', prof.id);
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_grant_super_paper_access', {
+      p_student_id: String(sId),
+      p_phone: String(sPhone),
+      p_email: String(sEmail)
+    });
+    if (rpcErr) {
+      console.warn('[Supabase] admin_grant_super_paper_access RPC error:', rpcErr);
     }
   } catch (err) {
-    console.warn('[Supabase] grantSuperPaperAccess profile update notice:', err);
+    console.warn('[Supabase] admin_grant_super_paper_access RPC exception:', err);
   }
 
+  // 2. Dispatch local event so UI instantly flips badge to Full Access
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('edupeak:student-access-changed', {
       detail: { studentId: sId, action: 'granted' }
@@ -563,54 +557,24 @@ export async function grantSuperPaperAccess(student) {
 export async function revokeSuperPaperAccess(student) {
   if (!student) throw new Error('Student missing');
   const sId = student.studentId || student.id;
-  const targetCourseId = 'crs-phy-muu3k9m4';
-  const baseCourseId = 'crs-base-super-paper-2027';
+  const sPhone = student.phone || '';
+  const sEmail = student.email || '';
 
-  // 1. Update enrollments to revoked
-  const { data: existingEnr } = await supabase
-    .from('enrollments')
-    .select('id')
-    .eq('student_id', sId)
-    .in('course_id', [targetCourseId, baseCourseId]);
-
-  if (existingEnr && existingEnr.length > 0) {
-    for (const enr of existingEnr) {
-      await supabase
-        .from('enrollments')
-        .update({ payment_status: 'revoked' })
-        .eq('id', enr.id);
-    }
-  } else {
-    await supabase
-      .from('enrollments')
-      .insert({
-        student_id: sId,
-        course_id: targetCourseId,
-        payment_status: 'revoked',
-        attendance_mode: 'online'
-      });
-  }
-
-  // 2. Remove from profile enrolled_courses
+  // 1. Call SECURITY DEFINER RPC to mark enrollment as revoked and strip monthly course
   try {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id, enrolled_courses')
-      .or(`id.eq.${sId},phone.eq.${student.phone || ''}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (prof && Array.isArray(prof.enrolled_courses)) {
-      const list = prof.enrolled_courses.filter(c => c !== targetCourseId && c !== baseCourseId && !String(c).includes('super-paper'));
-      await supabase
-        .from('profiles')
-        .update({ enrolled_courses: list })
-        .eq('id', prof.id);
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('admin_revoke_super_paper_access', {
+      p_student_id: String(sId),
+      p_phone: String(sPhone),
+      p_email: String(sEmail)
+    });
+    if (rpcErr) {
+      console.warn('[Supabase] admin_revoke_super_paper_access RPC error:', rpcErr);
     }
   } catch (err) {
-    console.warn('[Supabase] revokeSuperPaperAccess profile update notice:', err);
+    console.warn('[Supabase] admin_revoke_super_paper_access RPC exception:', err);
   }
 
+  // 2. Dispatch local event so UI instantly flips badge to No Access
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('edupeak:student-access-changed', {
       detail: { studentId: sId, action: 'revoked' }

@@ -30,11 +30,11 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" />
   
   <!-- Application Stylesheets -->
-  <link rel="stylesheet" href="./css/app.css?v=1.7.7">
-  <link rel="stylesheet" href="./css/gatekeeper.css?v=1.7.7">
-  <link rel="stylesheet" href="./css/camera-scanner.css?v=1.7.7">
-  <link rel="stylesheet" href="./css/exam-room.css?v=1.7.7">
-  <link rel="stylesheet" href="./css/features.css?v=1.7.7">
+  <link rel="stylesheet" href="./css/app.css?v=1.7.8">
+  <link rel="stylesheet" href="./css/gatekeeper.css?v=1.7.8">
+  <link rel="stylesheet" href="./css/camera-scanner.css?v=1.7.8">
+  <link rel="stylesheet" href="./css/exam-room.css?v=1.7.8">
+  <link rel="stylesheet" href="./css/features.css?v=1.7.8">
 </head>
 <body>
   <!-- App Mounting Root -->
@@ -66,11 +66,18 @@
     })();
   </script>
 
-  <script type="module" src="./js/app.bundle.js?v=1.7.7"></script>
+  <script type="module" src="./js/app.bundle.js?v=1.7.8"></script>
   <!-- Service Worker Immediate Registration & Cache Refresh -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=1.7.7', { scope: './' }).then(reg => {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+      navigator.serviceWorker.register('./sw.js?v=1.7.8', { scope: './' }).then(reg => {
         reg.update();
       }).catch(() => {});
     }

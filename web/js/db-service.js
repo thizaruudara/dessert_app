@@ -1730,9 +1730,66 @@ export class DbService {
         return result;
       }
     } catch (e) {
-      console.warn('[DB] getPaperSessions note/timeout:', e?.message || e);
+      console.warn('[DB] getPaperSessions SDK timeout/note, attempting REST fallback:', e?.message || e);
     }
+
+    // ── Fallback 1: Firestore REST API (Fast HTTP fetch, bypasses SDK WebChannel latency) ──
+    try {
+      const restResp = await Promise.race([
+        fetch('https://firestore.googleapis.com/v1/projects/dessert-institute/databases/(default)/documents/paper_sessions'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('REST timeout')), 3000))
+      ]);
+      if (restResp && restResp.ok) {
+        const restJson = await restResp.json();
+        if (Array.isArray(restJson.documents) && restJson.documents.length > 0) {
+          const list = restJson.documents.map(d => {
+            const id = d.name ? d.name.split('/').pop() : null;
+            const parsed = this._parseFirestoreRestFields(d.fields);
+            return this.normalizePaperSession(parsed, id);
+          }).filter(Boolean);
+
+          let result = list;
+          if (examYear && examYear !== 'All' && examYear !== 'All Batches') {
+            result = list.filter(p => this.matchesYear(p.examYear, examYear));
+          }
+          if (result.length > 0) {
+            this.setCache(cacheKey, result);
+            try { localStorage.setItem(`edupeak_cached_${cacheKey}`, JSON.stringify(result)); } catch (_) {}
+            return result;
+          }
+        }
+      }
+    } catch (restErr) {
+      console.warn('[DB] getPaperSessions REST fallback error:', restErr?.message || restErr);
+    }
+
+    // ── Fallback 2: Cached sessions in localStorage ──
+    try {
+      const local = localStorage.getItem(`edupeak_cached_${cacheKey}`) || localStorage.getItem('edupeak_cached_paper_sessions_all');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+
     return [];
+  }
+
+  _parseFirestoreRestFields(fields) {
+    if (!fields || typeof fields !== 'object') return {};
+    const obj = {};
+    for (const [k, v] of Object.entries(fields)) {
+      if (v.stringValue !== undefined) obj[k] = v.stringValue;
+      else if (v.booleanValue !== undefined) obj[k] = v.booleanValue;
+      else if (v.integerValue !== undefined) obj[k] = Number(v.integerValue);
+      else if (v.doubleValue !== undefined) obj[k] = Number(v.doubleValue);
+      else if (v.timestampValue !== undefined) obj[k] = v.timestampValue;
+      else if (v.nullValue !== undefined) obj[k] = null;
+      else if (v.mapValue && v.mapValue.fields) obj[k] = this._parseFirestoreRestFields(v.mapValue.fields);
+      else if (v.arrayValue && v.arrayValue.values) obj[k] = v.arrayValue.values.map(item => this._parseFirestoreRestFields({ val: item }).val);
+      else obj[k] = v;
+    }
+    return obj;
   }
 
   async getPaperSession(paperId) {
