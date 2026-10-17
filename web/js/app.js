@@ -201,16 +201,27 @@ class AppController {
         try {
           const res = await authService.refreshSubscription();
           if (res && res.isSubscribed) {
+            this.currentUser = authService.currentUser || { ...this.currentUser, isSubscribed: true };
+            // Remove warning banner immediately from DOM for instant feedback
+            document.querySelectorAll('.subscription-warning-card').forEach(card => card.remove());
+            if (this._renderedTabs) {
+              this._renderedTabs.clear();
+            }
             notificationService.showLocalToast('✅ Subscription verified! Full access unlocked.');
           } else {
             notificationService.showLocalToast('⚠️ Course payment not found on edupeak.lk yet.');
           }
+        } catch (err) {
+          console.error('[App] Subscription re-check error:', err);
+          notificationService.showLocalToast('⚠️ Subscription check failed. Please retry.');
         } finally {
-          subTarget.innerHTML = origContent;
-          subTarget.style.pointerEvents = 'auto';
+          if (subTarget && subTarget.isConnected) {
+            subTarget.innerHTML = origContent;
+            subTarget.style.pointerEvents = 'auto';
+          }
         }
         if (this.currentMode === 'student') {
-          this.switchTab(this.currentTab || 'home', { historyMode: 'none' });
+          this.switchTab(this.currentTab || 'home', { historyMode: 'none', forceRefresh: true });
         }
         return;
       }
@@ -1625,17 +1636,6 @@ class AppController {
     });
 
     // Event Listeners
-    document.getElementById('btn-recheck-subscription')?.addEventListener('click', async () => {
-      const btn = document.getElementById('btn-recheck-subscription');
-      if (btn) btn.innerHTML = '<span>Checking...</span>';
-      const res = await authService.refreshSubscription();
-      if (res && res.isSubscribed) {
-        notificationService.showLocalToast('✅ Subscription verified! Full access unlocked.');
-      } else {
-        notificationService.showLocalToast('⚠️ Course payment not found on edupeak.lk yet.');
-      }
-      this.switchTab('home', { historyMode: 'none' });
-    });
     document.getElementById('act-daily-mcq')?.addEventListener('click', () => this.switchTab('home'));
     document.getElementById('btn-start-sprint-action')?.addEventListener('click', () => this.openSprintDialog());
     document.getElementById('act-ai-tutor')?.addEventListener('click', () => this.openAiTutorDialog());

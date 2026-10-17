@@ -42,14 +42,21 @@ export async function getStudentProfile(identifier) {
     if (byId) return byId;
 
     // 3. Try matching by phone
-    const { data: byPhone } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('phone', clean)
-      .limit(1)
-      .maybeSingle();
-
-    if (byPhone) return byPhone;
+    const digitsOnly = clean.replace(/\D/g, '');
+    let phoneQuery = supabase.from('profiles').select('*');
+    if (digitsOnly.length >= 9) {
+      const last9 = digitsOnly.slice(-9);
+      phoneQuery = phoneQuery.or(`phone.eq.${clean},phone.like.%${last9}`);
+    } else {
+      phoneQuery = phoneQuery.eq('phone', clean);
+    }
+    const { data: phoneRows } = await phoneQuery.limit(5);
+    if (phoneRows && phoneRows.length > 0) {
+      const best = phoneRows.find(p => Array.isArray(p.enrolled_courses) && p.enrolled_courses.some(c => String(c).includes('paper') || String(c).includes('muu3k9m4')))
+        || phoneRows.find(p => Array.isArray(p.enrolled_courses) && p.enrolled_courses.length > 0)
+        || phoneRows[0];
+      return best;
+    }
 
     return null;
   } catch (err) {
