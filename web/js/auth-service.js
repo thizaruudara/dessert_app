@@ -88,6 +88,10 @@ export class AuthService {
         } else if (sessionData?.user) {
           localStorage.removeItem('edupeak_is_logged_out');
           await this.syncProfileFromAuthUser(sessionData.user);
+          try {
+            const { notificationService } = await import('./notification-service.js');
+            notificationService.showLocalToast('✅ Authorize Success! Welcome to EduPeak App.');
+          } catch (_) {}
           return;
         }
       } else if (ssoError) {
