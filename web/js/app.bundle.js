@@ -514,7 +514,7 @@ ${H}`}var $o=class extends Error{constructor({message:e,code:n,cause:a,name:o}){
     `,document.getElementById("btn-login-edupeak")?.addEventListener("click",()=>{let n=document.getElementById("btn-login-edupeak");n&&(n.disabled=!0,n.style.opacity="0.9",n.innerHTML=`
           <div style="width:18px; height:18px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
           <span>Connecting to EduPeak.lk...</span>
-        `),Qh.redirectToEduPeakLogin(!1)}))}confirmLogout(){let e=document.getElementById("app-logout-dialog");e&&e.remove();let n=document.createElement("div");n.className="app-dialog-overlay",n.id="app-logout-dialog",n.innerHTML=`
+        `),Qh.redirectToEduPeakLogin(!0)}))}confirmLogout(){let e=document.getElementById("app-logout-dialog");e&&e.remove();let n=document.createElement("div");n.className="app-dialog-overlay",n.id="app-logout-dialog",n.innerHTML=`
       <div class="app-dialog-box">
         <div class="app-dialog-title">Log Out</div>
         <div class="app-dialog-content">

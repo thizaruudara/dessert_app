@@ -525,7 +525,7 @@ class AppController {
           <span>Connecting to EduPeak.lk...</span>
         `;
       }
-      authService.redirectToEduPeakLogin(false);
+      authService.redirectToEduPeakLogin(true);
     });
   }
 
