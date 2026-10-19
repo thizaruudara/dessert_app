@@ -195,44 +195,7 @@ export async function checkSuperPaperSubscription(
       }
     }
 
-    // 3. CHECK PROFILE'S ENROLLED_COURSES (FALLBACK):
-    if (!isPaid) {
-      let resolvedProfile = profile;
-      if (!resolvedProfile && (studentEmail || studentId)) {
-        resolvedProfile = await getStudentProfile(studentEmail || studentId);
-      }
-
-      if (resolvedProfile?.enrolled_courses) {
-        let enrolledList = [];
-        if (Array.isArray(resolvedProfile.enrolled_courses)) {
-          enrolledList = resolvedProfile.enrolled_courses;
-        } else if (typeof resolvedProfile.enrolled_courses === 'string') {
-          try {
-            enrolledList = JSON.parse(resolvedProfile.enrolled_courses);
-          } catch (_) {}
-        }
-
-        // Must explicitly match the target monthly course, NOT crs-base-super-paper-2027 and NOT generic 'super-paper'!
-        const hasMatch = enrolledList.some(cId => validMonthlyCourseIds.includes(cId));
-
-        if (hasMatch) {
-          // Verify student does not have an explicit cancellation in enrollments table
-          const { data: cancelledEnr } = await supabase
-            .from('enrollments')
-            .select('id, payment_status')
-            .in('student_id', studentKeys)
-            .in('course_id', validMonthlyCourseIds)
-            .in('payment_status', ['cancelled', 'refunded', 'revoked'])
-            .limit(1);
-
-          if (!cancelledEnr || cancelledEnr.length === 0) {
-            isPaid = true;
-          }
-        }
-      }
-    }
-
-    // 4. CHECK APPROVED ORDERS IN broadcast_schedules (order-*) (FALLBACK)
+    // 3. CHECK APPROVED ORDERS IN broadcast_schedules (order-*) (FALLBACK)
     if (!isPaid && (studentEmail || studentId)) {
       try {
         const { data: orders } = await supabase
@@ -407,39 +370,7 @@ export async function getSuperPaperBatchAccess(students = []) {
       }
     });
 
-    // 3. Fetch profiles to check enrolled_courses for paid monthly course
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, email, phone, enrolled_courses');
-
-    const profileEnrolledKeys = new Set();
-    (profiles || []).forEach(prof => {
-      const ec = prof.enrolled_courses;
-      let list = [];
-      if (Array.isArray(ec)) list = ec;
-      else if (typeof ec === 'string') {
-        try { list = JSON.parse(ec); } catch (_) {}
-      }
-
-      // Must explicitly match a valid paid monthly course ID, NOT base free course
-      const hasCourse = list.some(cId => 
-        validPaidCourseIds.includes(cId) && cId !== 'crs-base-super-paper-2027'
-      );
-
-      if (hasCourse) {
-        if (prof.id) profileEnrolledKeys.add(String(prof.id).toLowerCase().trim());
-        if (prof.email) profileEnrolledKeys.add(String(prof.email).toLowerCase().trim());
-        if (prof.phone) {
-          const ph = String(prof.phone).trim().toLowerCase();
-          profileEnrolledKeys.add(ph);
-          const d = ph.replace(/\D/g, '');
-          if (d) profileEnrolledKeys.add(d);
-          if (d.length >= 9) profileEnrolledKeys.add(d.slice(-9));
-        }
-      }
-    });
-
-    // 4. Fetch approved orders from broadcast_schedules for paid monthly course
+    // 3. Fetch approved orders from broadcast_schedules for paid monthly course
     const { data: orders } = await supabase
       .from('broadcast_schedules')
       .select('coursetitle, status')
@@ -465,7 +396,7 @@ export async function getSuperPaperBatchAccess(students = []) {
       } catch (_) {}
     });
 
-    // 5. Evaluate each student
+    // 4. Evaluate each student: strictly require paid enrollment or approved order
     for (const st of students) {
       const rawPhone = String(st.phone || '').trim();
       const phoneDigits = rawPhone.replace(/\D/g, '');
@@ -487,19 +418,6 @@ export async function getSuperPaperBatchAccess(students = []) {
         // Direct enrollment paid check
         if (keys.some(k => paidStudentIds.has(k))) {
           hasFullAccess = true;
-        }
-
-        // Profile enrolled_courses check
-        if (!hasFullAccess && keys.some(k => profileEnrolledKeys.has(k))) {
-          hasFullAccess = true;
-        }
-
-        // Check local st.enrolledCourses array (strictly paid monthly only)
-        if (!hasFullAccess && st.enrolledCourses) {
-          const list = Array.isArray(st.enrolledCourses) ? st.enrolledCourses : [];
-          if (list.some(c => validPaidCourseIds.includes(c) && c !== 'crs-base-super-paper-2027')) {
-            hasFullAccess = true;
-          }
         }
 
         // Check approved orders

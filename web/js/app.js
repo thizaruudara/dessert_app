@@ -1965,12 +1965,13 @@ class AppController {
         ? (reg.percentage || Math.round((Number(reg.marks) / totalPaperMarks) * 100))
         : (hasMcqMarks ? (reg.mcqPercentage !== undefined ? reg.mcqPercentage : Math.round((Number(reg.mcqScore) / (reg.mcqTotal || session.mcqCount || 50)) * 100)) : null);
 
+      const subStyle = this._getSubjectBadgeStyle(session.subject);
       return `
         <div class="paper-session-card" id="paper-card-${session.id}" style="${isSubmitted ? (hasReleasedMarks ? 'border-color:#16A34A; box-shadow:0 6px 20px rgba(22,163,74,0.18);' : 'border-color:#F59E0B; box-shadow:0 6px 20px rgba(245,158,11,0.15);') : (isLive ? 'border-color:#22C55E; box-shadow:0 6px 20px rgba(34,197,94,0.12);' : '')}">
           <!-- Header Row -->
           <div class="paper-card-header">
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;">
-              <span class="paper-tag-chip" style="background:rgba(99,102,241,0.1); color:#6366F1; border:1px solid rgba(99,102,241,0.25); padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap;">
+              <span class="paper-tag-chip" style="background:${subStyle.bg}; color:${subStyle.text}; border:1px solid ${subStyle.border}; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap;">
                 ${session.subject || 'A/L Physics'}
               </span>
               <span class="paper-tag-chip" style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; border:1px solid ${session.paperType === 'mcq' ? 'rgba(16,185,129,0.25)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.25)' : 'rgba(245,158,11,0.25)')}; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
@@ -2552,6 +2553,23 @@ class AppController {
       if (renderToken !== this._tabTokens['papers'] || !container.isConnected) return;
       if (this.papersTab > 1) this.papersTab = 0;
 
+      this.studentSelectedPaperSubject = this.studentSelectedPaperSubject || 'All Subjects';
+      const subjects = ['All Subjects', 'Physics', 'Chemistry', 'Combined Maths', 'O/L Science'];
+
+      const matchesSubject = (itemSubject) => {
+        if (!this.studentSelectedPaperSubject || this.studentSelectedPaperSubject === 'All Subjects') return true;
+        const s = String(itemSubject || 'Physics').toLowerCase();
+        const t = this.studentSelectedPaperSubject.toLowerCase();
+        if (t === 'physics') return s.includes('phy');
+        if (t === 'chemistry') return s.includes('chem');
+        if (t.includes('math')) return s.includes('math');
+        if (t.includes('science')) return s.includes('science') || s.includes('o/l') || s.includes('ol');
+        return s.includes(t);
+      };
+
+      const filteredSessions = (sessions || []).filter(s => matchesSubject(s.subject));
+      const filteredHints = (paperHints || []).filter(h => matchesSubject(h.subject));
+
       container.innerHTML = `
         <!-- App Bar (1:1 with paper_sessions_screen.dart lines 102-153) -->
         <div class="screen-appbar">
@@ -2601,13 +2619,13 @@ class AppController {
         ` : ''}
 
         <!-- 2-Segment Switcher Tabs (Live Sessions, Paper Hints) -->
-        <div class="sub-tabs-container" style="margin: 6px 16px 14px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="sub-tabs-container" style="margin: 6px 16px 8px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
           <button class="sub-tab-btn ${this.papersTab === 0 ? 'active' : ''}" id="tab-papers-live" style="padding:10px 8px;">
             <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
               <span class="material-symbols-rounded" style="font-size:17px;">sensors</span>
               <span style="font-size:12.5px; font-weight:700;">Live Sessions</span>
             </span>
-            <span class="tab-sub" id="tab-papers-live-sub" style="font-size:10.5px;">${this._computeLiveTabSubtitle(sessions)}</span>
+            <span class="tab-sub" id="tab-papers-live-sub" style="font-size:10.5px;">${this._computeLiveTabSubtitle(filteredSessions)}</span>
           </button>
           <button class="sub-tab-btn ${this.papersTab === 1 ? 'active' : ''}" id="tab-papers-hints" style="padding:10px 8px;">
             <span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
@@ -2618,21 +2636,46 @@ class AppController {
           </button>
         </div>
 
+        <!-- Subject Filter Pills (Physics, Chemistry, Combined Maths, O/L Science) -->
+        <div style="margin: 0 16px 12px; display:flex; align-items:center; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+          ${subjects.map(s => {
+            const isSel = (this.studentSelectedPaperSubject || 'All Subjects') === s;
+            let activeColor = '#4F46E5';
+            let activeBg = '#EEF2FF';
+            let activeBorder = '#C7D2FE';
+            if (s === 'Chemistry') { activeColor = '#059669'; activeBg = '#ECFDF5'; activeBorder = '#A7F3D0'; }
+            else if (s === 'Combined Maths') { activeColor = '#7C3AED'; activeBg = '#F5F3FF'; activeBorder = '#DDD6FE'; }
+            else if (s === 'O/L Science') { activeColor = '#D97706'; activeBg = '#FFFBEB'; activeBorder = '#FDE68A'; }
+
+            return `<button class="sub-tab-btn ${isSel ? 'active' : ''}" data-student-subject="${s}" style="padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; border:1px solid ${isSel ? activeBorder : '#E2E8F0'}; background:${isSel ? activeBg : '#FFFFFF'}; color:${isSel ? activeColor : '#64748B'}; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+              ${isSel ? '<span class="material-symbols-rounded" style="font-size:14px;">check</span>' : ''}
+              <span>${s}</span>
+            </button>`;
+          }).join('')}
+        </div>
+
         <!-- Tab 0: Live Exam Sessions View -->
         <div id="papers-tab-live-content" style="${this.papersTab === 0 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
-          ${this._buildStudentLiveSessionsHTML(sessions, registrations, user, activeTargetYear, currentYear)}
+          ${this._buildStudentLiveSessionsHTML(filteredSessions, registrations, user, activeTargetYear, currentYear)}
         </div>
 
         <!-- Tab 1: Paper Hints View -->
         <div id="papers-tab-hints-content" style="${this.papersTab === 1 ? 'display:flex; flex-direction:column; gap:16px;' : 'display:none;'}">
-          ${this._buildStudentPaperHintsHTML(paperHints, activeTargetYear, currentYear)}
+          ${this._buildStudentPaperHintsHTML(filteredHints, activeTargetYear, currentYear)}
         </div>
       `;
 
       // ── Live 1-Second Interval Ticker ──
-      this.startPapersTimer(container, sessions);
+      this.startPapersTimer(container, filteredSessions);
 
       // ── Event Handlers ──
+      container.querySelectorAll('[data-student-subject]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.studentSelectedPaperSubject = btn.dataset.studentSubject;
+          this.renderPapersScreen(container);
+        });
+      });
+
       document.getElementById('tab-papers-live')?.addEventListener('click', () => {
         this.papersTab = 0;
         this.renderPapersScreen(container);
@@ -6831,6 +6874,20 @@ class AppController {
   async renderAdminPapersScreen(container) {
     this.adminPaperTab = this.adminPaperTab ?? 0; // 0: Live Sessions, 1: Paper Hints, 2: Leaderboard
     this.adminSelectedPaperBatch = this.adminSelectedPaperBatch || 'All Batches';
+    this.adminSelectedPaperSubject = this.adminSelectedPaperSubject || 'All Subjects';
+    const subjects = ['All Subjects', 'Physics', 'Chemistry', 'Combined Maths', 'O/L Science'];
+
+    const matchesSubject = (itemSubject) => {
+      if (!this.adminSelectedPaperSubject || this.adminSelectedPaperSubject === 'All Subjects') return true;
+      const s = String(itemSubject || 'Physics').toLowerCase();
+      const t = this.adminSelectedPaperSubject.toLowerCase();
+      if (t === 'physics') return s.includes('phy');
+      if (t === 'chemistry') return s.includes('chem');
+      if (t.includes('math')) return s.includes('math');
+      if (t.includes('science')) return s.includes('science') || s.includes('o/l') || s.includes('ol');
+      return s.includes(t);
+    };
+
     if (this._adminPapersUnsub) { try { this._adminPapersUnsub(); } catch (_) {} this._adminPapersUnsub = null; }
     if (this._adminBoardsUnsub) { try { this._adminBoardsUnsub(); } catch (_) {} this._adminBoardsUnsub = null; }
     if (this._adminHintsUnsub) { try { this._adminHintsUnsub(); } catch (_) {} this._adminHintsUnsub = null; }
@@ -6860,6 +6917,10 @@ class AppController {
       }
     }
 
+    const filteredAdminPapers = (papers || []).filter(p => matchesSubject(p.subject));
+    const filteredAdminHints = (adminPaperHints || []).filter(h => matchesSubject(h.subject));
+    const filteredAdminBoards = (adminPaperBoards || []).filter(b => matchesSubject(b.subject));
+
     const subtitle = this.adminPaperTab === 0
       ? 'සජීවී විභාග සැසි සහ කැමරා අධීක්ෂණය'
       : (this.adminPaperTab === 1 ? 'Paper Hints සහ විභාග උපදෙස් කළමනාකරණය' : 'Paper ප්‍රතිඵල සහ Leaderboard නිර්මාණය');
@@ -6887,7 +6948,7 @@ class AppController {
       </div>
 
       <!-- Segmented 3-Tab Selector -->
-      <div style="padding:12px 16px 8px;">
+      <div style="padding:12px 16px 6px;">
         <div style="background:#FFFFFF; border-radius:16px; padding:4px; border:1px solid #E2E8F0; display:flex; box-shadow:0 2px 8px rgba(15,23,42,0.04);">
           <button class="apk-segmented-tab-btn ${this.adminPaperTab === 0 ? 'active' : ''}" data-paper-tab="0" style="${this.adminPaperTab === 0 ? 'background:#2563EB; color:#FFFFFF;' : ''}">
             <span class="material-symbols-rounded filled" style="font-size:16px; margin-right:4px;">sensors</span> Live Sessions
@@ -6901,16 +6962,42 @@ class AppController {
         </div>
       </div>
 
+      <!-- Subject Filter Chips (Physics, Chemistry, Combined Maths, O/L Science) -->
+      <div style="padding:4px 16px 10px; display:flex; align-items:center; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+        ${subjects.map(s => {
+          const isSel = (this.adminSelectedPaperSubject || 'All Subjects') === s;
+          let activeColor = '#2563EB';
+          let activeBg = '#EFF6FF';
+          let activeBorder = '#BFDBFE';
+          if (s === 'Chemistry') { activeColor = '#059669'; activeBg = '#ECFDF5'; activeBorder = '#A7F3D0'; }
+          else if (s === 'Combined Maths') { activeColor = '#7C3AED'; activeBg = '#F5F3FF'; activeBorder = '#DDD6FE'; }
+          else if (s === 'O/L Science') { activeColor = '#D97706'; activeBg = '#FFFBEB'; activeBorder = '#FDE68A'; }
+          
+          return `<button class="apk-chip-btn ${isSel ? 'active' : ''}" data-admin-subject="${s}" style="padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; border:1px solid ${isSel ? activeBorder : '#E2E8F0'}; background:${isSel ? activeBg : '#FFFFFF'}; color:${isSel ? activeColor : '#64748B'}; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; display:inline-flex; align-items:center; gap:4px;">
+            ${isSel ? '<span class="material-symbols-rounded" style="font-size:14px;">check</span>' : ''}
+            <span>${s}</span>
+          </button>`;
+        }).join('')}
+      </div>
+
       <!-- Tab Viewport -->
       <div id="admin-papers-content" class="apk-admin-paper-tab-content" style="padding:0 16px 16px;">
-        ${this.adminPaperTab === 0 ? this._buildAdminLiveSessionsHTML(papers) : ''}
-        ${this.adminPaperTab === 1 ? this._buildAdminPaperHintsHTML(adminPaperHints, adminPaperHintsError, this.adminSelectedPaperBatch) : ''}
-        ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML(adminPaperBoards, adminPaperBoardsError, this.adminSelectedPaperBatch) : ''}
+        ${this.adminPaperTab === 0 ? this._buildAdminLiveSessionsHTML(filteredAdminPapers) : ''}
+        ${this.adminPaperTab === 1 ? this._buildAdminPaperHintsHTML(filteredAdminHints, adminPaperHintsError, this.adminSelectedPaperBatch) : ''}
+        ${this.adminPaperTab === 2 ? this._buildAdminPaperLeaderboardHTML(filteredAdminBoards, adminPaperBoardsError, this.adminSelectedPaperBatch) : ''}
       </div>
     `;
 
     // Render FAB strictly inside the contained admin-fab-slot
     this._updateAdminPaperFab();
+
+    // Subject chip events
+    container.querySelectorAll('[data-admin-subject]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.adminSelectedPaperSubject = btn.dataset.adminSubject;
+        this.renderAdminPapersScreen(container);
+      });
+    });
 
     // Tab switcher events
     container.querySelectorAll('[data-paper-tab]').forEach(btn => {
@@ -6987,8 +7074,9 @@ class AppController {
       if (this.adminPaperTab === 0) {
         const liveSection = container.querySelector('.apk-admin-paper-tab-content');
         if (liveSection) {
-          liveSection.innerHTML = this._buildAdminLiveSessionsHTML(livePapers);
-          this._bindAdminLiveSessionActions(container, livePapers);
+          const filteredLive = (livePapers || []).filter(p => matchesSubject(p.subject));
+          liveSection.innerHTML = this._buildAdminLiveSessionsHTML(filteredLive);
+          this._bindAdminLiveSessionActions(container, filteredLive);
         }
       }
     });
@@ -7197,6 +7285,18 @@ class AppController {
     }
   }
 
+  _getSubjectBadgeStyle(subject = '') {
+    const s = String(subject || '').toLowerCase();
+    if (s.includes('chem')) {
+      return { bg: '#ECFDF5', border: '#A7F3D0', text: '#059669', name: 'Chemistry' };
+    } else if (s.includes('math')) {
+      return { bg: '#F5F3FF', border: '#DDD6FE', text: '#7C3AED', name: 'Combined Maths' };
+    } else if (s.includes('science') || s.includes('o/l') || s.includes('ol')) {
+      return { bg: '#FFFBEB', border: '#FDE68A', text: '#D97706', name: 'O/L Science' };
+    }
+    return { bg: '#EFF6FF', border: '#BFDBFE', text: '#2563EB', name: 'Physics' };
+  }
+
   _formatSessionTime(timeVal, fallback = '08:30 AM') {
     if (!timeVal) return fallback;
     try {
@@ -7286,7 +7386,7 @@ class AppController {
     const slot2Name = 'Slot 2 (Evening)';
     const slot2Start = this._formatSessionTime(session.slot2?.startTime, '04:00 PM');
     const slot2End = this._formatSessionTime(session.slot2?.endTime, '07:00 PM');
-    const slot2Count = session.slot2?.registeredCount || 0;
+    const subStyle = this._getSubjectBadgeStyle(session.subject);
 
     return `
       <div class="admin-paper-card" style="background:#FFFFFF; border-radius:16px; border:1px solid #E2E8F0; box-shadow:0 3px 12px rgba(15,23,42,0.04); margin-bottom:4px; overflow:hidden;">
@@ -7294,7 +7394,7 @@ class AppController {
         <div style="padding:14px 16px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
           <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
             <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; flex:1; min-width:0;">
-              <span class="paper-tag-chip" style="background:rgba(37,99,235,0.12); color:#2563EB; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap;">
+              <span class="paper-tag-chip" style="background:${subStyle.bg}; color:${subStyle.text}; border:1px solid ${subStyle.border}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; white-space:nowrap;">
                 ${session.subject || 'Physics'}
               </span>
               <span class="paper-tag-chip" style="background:${session.paperType === 'mcq' ? 'rgba(16,185,129,0.12)' : (session.paperType === 'mcq_essay' ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)')}; color:${session.paperType === 'mcq' ? '#059669' : (session.paperType === 'mcq_essay' ? '#7C3AED' : '#D97706')}; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
@@ -8063,7 +8163,10 @@ class AppController {
             <div>
               <div class="form-label">Subject:</div>
               <select id="hint-input-subject" class="form-textarea" style="height:40px; padding:8px;">
-                <option value="Physics" selected>Physics</option>
+                <option value="Physics" selected>Physics (භෞතික විද්‍යාව)</option>
+                <option value="Chemistry">Chemistry (රසායන විද්‍යාව)</option>
+                <option value="Combined Maths">Combined Maths (සංයුක්ත ගණිතය)</option>
+                <option value="O/L Science">O/L Science (සාමාන්‍ය පෙළ විද්‍යාව)</option>
               </select>
             </div>
             <div>
@@ -8561,7 +8664,7 @@ class AppController {
               <span style="width:6px; height:6px; border-radius:50%; background:#10B981; animation:pulse 2s infinite;"></span> Live Sync
             </span>
           </div>
-          <div style="font-size:11px; color:#64748B;">Live Student Directory & Access Controller</div>
+          <div style="font-size:11px; color:#64748B;">Live Student Directory • Access managed by edupeak.lk</div>
         </div>
         <div class="apk-appbar-right">
           <button class="btn-vault-refresh" id="btn-refresh-admin-students" title="Refresh Directory" style="background:#F1F5F9; border:none; border-radius:10px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#475569;">
@@ -8705,15 +8808,6 @@ class AppController {
                 </div>
 
                 <div style="display:flex; align-items:center; gap:6px; margin-left:8px;">
-                  <!-- Direct Access Toggle Action -->
-                  ${acc.hasFullAccess
-                    ? `<button class="apk-icon-action-btn btn-toggle-access" title="Revoke Super Paper Class Access" data-revoke-student="${st.id}" style="color:#DC2626; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;" aria-label="Revoke Access">
-                         <span class="material-symbols-rounded" style="font-size:18px;">lock</span>
-                       </button>`
-                    : `<button class="apk-icon-action-btn btn-toggle-access" title="Grant Full Super Paper Access" data-grant-student="${st.id}" style="color:#059669; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;" aria-label="Grant Access">
-                         <span class="material-symbols-rounded filled" style="font-size:18px;">key</span>
-                       </button>`
-                  }
                   <button class="apk-icon-action-btn" title="Send Custom Message" data-msg-student="${st.id}" style="color:#2563EB; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
                     <span class="material-symbols-rounded filled" style="font-size:18px;">send</span>
                   </button>
@@ -8729,82 +8823,6 @@ class AppController {
         btn.addEventListener('click', () => {
           const st = allStudents.find(x => x.id === btn.dataset.msgStudent);
           if (st) this.openSendCustomMessageModal(st);
-        });
-      });
-
-      // Grant Access Button Handler
-      listEl.querySelectorAll('[data-grant-student]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const st = allStudents.find(x => x.id === btn.dataset.grantStudent);
-          if (!st) return;
-
-          const ok = confirm(`Grant Full Access to Super Paper Class for ${st.name || st.studentId || 'this student'}?`);
-          if (!ok) return;
-
-          btn.disabled = true;
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
-          try {
-            await dbService.grantSuperPaperAccess(st);
-            notificationService.showInAppBanner('Access Granted', `Full Access granted to ${st.name || 'student'}!`, 'success');
-            
-            // Optimistically update map
-            const acc = accessMap.get(st.id) || {};
-            const targetMonth = acc.monthName || 'October 2027';
-            const updated = {
-              hasFullAccess: true,
-              monthName: targetMonth,
-              courseTitle: acc.courseTitle || `Super Paper Class - ${targetMonth}`,
-              statusText: `Full Access (${targetMonth})`
-            };
-            if (st.id) accessMap.set(st.id, updated);
-            if (st.studentId) accessMap.set(st.studentId, updated);
-            if (st.phone) accessMap.set(st.phone, updated);
-            renderRows();
-          } catch (err) {
-            console.error('[Admin] Grant access error:', err);
-            alert('Could not grant access: ' + (err.message || 'Unknown error'));
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:18px;">key</span>';
-          }
-        });
-      });
-
-      // Revoke Access Button Handler
-      listEl.querySelectorAll('[data-revoke-student]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const st = allStudents.find(x => x.id === btn.dataset.revokeStudent);
-          if (!st) return;
-
-          const ok = confirm(`Revoke Super Paper Class access for ${st.name || st.studentId || 'this student'}?`);
-          if (!ok) return;
-
-          btn.disabled = true;
-          btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px; animation:spin 0.75s linear infinite;">sync</span>';
-          try {
-            await dbService.revokeSuperPaperAccess(st);
-            notificationService.showInAppBanner('Access Revoked', `Access revoked for ${st.name || 'student'}.`, 'info');
-
-            // Optimistically update map
-            const acc = accessMap.get(st.id) || {};
-            const targetMonth = acc.monthName || 'October 2027';
-            const updated = {
-              hasFullAccess: false,
-              monthName: targetMonth,
-              courseTitle: acc.courseTitle || `Super Paper Class - ${targetMonth}`,
-              statusText: 'No Access (Locked)'
-            };
-            if (st.id) accessMap.set(st.id, updated);
-            if (st.studentId) accessMap.set(st.studentId, updated);
-            if (st.phone) accessMap.set(st.phone, updated);
-            renderRows();
-          } catch (err) {
-            console.error('[Admin] Revoke access error:', err);
-            alert('Could not revoke access: ' + (err.message || 'Unknown error'));
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">lock</span>';
-          }
         });
       });
     };
@@ -10525,7 +10543,10 @@ class AppController {
             <div style="min-width:0; width:100%; box-sizing:border-box;">
               <div class="form-label">Subject:</div>
               <select id="new-paper-subject" class="form-textarea" style="height:40px; padding:8px; width:100%; min-width:0; box-sizing:border-box;">
-                <option value="Physics" selected>Physics</option>
+                <option value="Physics" selected>Physics (භෞතික විද්‍යාව)</option>
+                <option value="Chemistry">Chemistry (රසායන විද්‍යාව)</option>
+                <option value="Combined Maths">Combined Maths (සංයුක්ත ගණිතය)</option>
+                <option value="O/L Science">O/L Science (සාමාන්‍ය පෙළ විද්‍යාව)</option>
               </select>
             </div>
             <div style="min-width:0; width:100%; box-sizing:border-box;">
@@ -11228,7 +11249,10 @@ class AppController {
             <div>
               <div class="form-label">Subject:</div>
               <select id="new-lb-subject" class="form-textarea" style="height:40px; padding:8px;">
-                <option value="Physics" selected>Physics</option>
+                <option value="Physics" selected>Physics (භෞතික විද්‍යාව)</option>
+                <option value="Chemistry">Chemistry (රසායන විද්‍යාව)</option>
+                <option value="Combined Maths">Combined Maths (සංයුක්ත ගණිතය)</option>
+                <option value="O/L Science">O/L Science (සාමාන්‍ය පෙළ විද්‍යාව)</option>
               </select>
             </div>
             <div>
@@ -11366,6 +11390,14 @@ class AppController {
         <div class="sprint-create-scroll">
           <div class="sprint-create-meta">
             <label>Title<input name="title" required value="Daily MCQ 5"></label>
+            <label>Subject
+              <select name="subject">
+                <option value="Physics" selected>Physics (භෞතික විද්‍යාව)</option>
+                <option value="Chemistry">Chemistry (රසායන විද්‍යාව)</option>
+                <option value="Combined Maths">Combined Maths (සංයුක්ත ගණිතය)</option>
+                <option value="O/L Science">O/L Science (සාමාන්‍ය පෙළ විද්‍යාව)</option>
+              </select>
+            </label>
             <label>Unit / Lesson<input name="unit" required value="Mechanics"></label>
             <label>Batch<select name="examYear"><option>All Batches</option><option>2026 A/L</option><option>2027 A/L</option><option>2028 A/L</option></select></label>
             <label>Sprint Date<input name="targetDate" type="date" required value="${this.adminSprintDate}"></label>
@@ -11409,7 +11441,7 @@ class AppController {
           unit: fields.get('unit'),
           examYear: fields.get('examYear'),
           targetDate: fields.get('targetDate'),
-          subject: 'Physics',
+          subject: fields.get('subject') || 'Physics',
           questions,
         });
         modal.remove();
