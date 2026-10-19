@@ -36,6 +36,17 @@
   <link rel="stylesheet" href="./css/camera-scanner.css?v=1.7.8">
   <link rel="stylesheet" href="./css/exam-room.css?v=1.7.8">
   <link rel="stylesheet" href="./css/features.css?v=1.7.8">
+  <!-- Early PWA Install Prompt Capture -->
+  <script>
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      window.__edupeakInstallPrompt = e;
+      if (window.pwaGatekeeper) {
+        window.pwaGatekeeper.deferredPrompt = e;
+        window.pwaGatekeeper.updateInstallButtonVisibility();
+      }
+    });
+  </script>
 </head>
 <body>
   <!-- App Mounting Root -->
@@ -68,19 +79,18 @@
   </script>
 
   <script type="module" src="./js/app.bundle.js?v=1.7.8"></script>
-  <!-- Service Worker Immediate Registration & Cache Refresh -->
+  <!-- Service Worker Safe Registration (No infinite reload loops) -->
   <script>
     if ('serviceWorker' in navigator) {
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+          .then((reg) => {
+            console.log('[SW] Service Worker registered safely');
+          })
+          .catch((err) => {
+            console.warn('[SW] Service Worker registration failed:', err);
+          });
       });
-      navigator.serviceWorker.register('./sw.js?v=1.7.8', { scope: './' }).then(reg => {
-        reg.update();
-      }).catch(() => {});
     }
   </script>
 </body>

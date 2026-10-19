@@ -472,32 +472,56 @@ class AppController {
               <span>A/L Pastry &amp; Dessert Institute 🍰</span>
             </div>
           </div>
-
-          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:24px; padding:28px 24px; box-shadow:0 14px 40px rgba(15,23,42,0.06); text-align:center; box-sizing:border-box;">
-            <div style="font-size:19px; font-weight:800; color:#1E293B; margin-bottom:8px;">
+          <div class="auth-form-card" style="width:100%; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:24px; padding:26px 22px; box-shadow:0 14px 40px rgba(15,23,42,0.06); text-align:left; box-sizing:border-box;">
+            <div style="font-size:20px; font-weight:800; color:#1E293B; margin-bottom:6px; text-align:center;">
               Student &amp; Exam Portal
             </div>
-            <p style="font-size:13px; color:#64748B; line-height:1.5; margin:0 0 24px;">
-              Sign in with your EduPeak student account to access live paper sessions, homework desserts, and student rankings.
+            <p style="font-size:13px; color:#64748B; line-height:1.5; margin:0 0 20px; text-align:center;">
+              EduPeak ගිණුමේ Email හෝ Phone Number මගින් Login වන්න.
             </p>
 
-            <button type="button" id="btn-login-edupeak" class="auth-btn-submit" style="width:100%; height:50px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; box-shadow:0 8px 22px rgba(37,99,235,0.3); transition:all 0.2s;">
-              <span>Sign In with EduPeak.lk</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                <polyline points="10 17 15 12 10 7"></polyline>
-                <line x1="15" y1="12" x2="3" y2="12"></line>
-              </svg>
+            <!-- Direct In-App Login Form -->
+            <form id="app-direct-login-form" style="display:flex; flex-direction:column; gap:13px;">
+              <div id="auth-error-box" style="display:none; background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; border-radius:12px; padding:10px 14px; font-size:13px; line-height:1.4;"></div>
+
+              <div>
+                <label style="display:block; font-size:12.5px; font-weight:700; color:#334155; margin-bottom:6px;">
+                  Email or Phone Number
+                </label>
+                <input type="text" id="input-login-identifier" placeholder="student@gmail.com හෝ 07X XXX XXXX" required autocomplete="username" style="width:100%; height:46px; background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:12px; padding:0 14px; font-size:14px; color:#0F172A; outline:none; box-sizing:border-box;">
+              </div>
+
+              <div>
+                <label style="display:block; font-size:12.5px; font-weight:700; color:#334155; margin-bottom:6px;">
+                  Password
+                </label>
+                <input type="password" id="input-login-password" placeholder="EduPeak Password එක ඇතුළත් කරන්න" required autocomplete="current-password" style="width:100%; height:46px; background:#F8FAFC; border:1.5px solid #E2E8F0; border-radius:12px; padding:0 14px; font-size:14px; color:#0F172A; outline:none; box-sizing:border-box;">
+              </div>
+
+              <button type="submit" id="btn-direct-submit" style="width:100%; height:48px; background:linear-gradient(135deg, #2563EB, #1D4ED8); color:white; border:none; border-radius:14px; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; box-shadow:0 8px 22px rgba(37,99,235,0.3); transition:all 0.2s; margin-top:4px;">
+                <span>Sign In directly 🚀</span>
+              </button>
+            </form>
+
+            <div style="display:flex; align-items:center; gap:12px; margin:20px 0 16px;">
+              <div style="flex:1; height:1px; background:#E2E8F0;"></div>
+              <span style="font-size:12px; font-weight:600; color:#94A3B8; text-transform:uppercase;">හෝ</span>
+              <div style="flex:1; height:1px; background:#E2E8F0;"></div>
+            </div>
+
+            <button type="button" id="btn-login-edupeak" style="width:100%; height:44px; background:#F8FAFC; border:1.5px solid #E2E8F0; color:#1E293B; border-radius:14px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:all 0.15s;">
+              <img src="./icons/edupeak_logo.png" style="width:18px; height:18px; object-fit:contain;" onerror="this.style.display='none'">
+              <span>Sign In with EduPeak.lk (SSO)</span>
             </button>
 
-            <div style="margin-top:22px; padding-top:18px; border-top:1px solid #F1F5F9; font-size:12.5px; color:#64748B;">
+            <div style="margin-top:20px; padding-top:16px; border-top:1px solid #F1F5F9; font-size:12.5px; color:#64748B; text-align:center;">
               Don't have an account on edupeak.lk yet?
               <br>
               <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer" style="color:#2563EB; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:5px; margin-top:6px;">
                 <span>Create an Account at edupeak.lk</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <polyline points="10 17 15 12 10 7"></polyline>
                   <line x1="10" y1="14" x2="21" y2="3"></line>
                 </svg>
               </a>
@@ -509,27 +533,80 @@ class AppController {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               <polyline points="9 12 11 14 15 10"></polyline>
             </svg>
-            <span>Single Sign-On verified with edupeak.lk &amp; Supabase Cloud</span>
+            <span>Verified with edupeak.lk &amp; Supabase Cloud Auth</span>
           </div>
         </div>
       </div>
     `;
 
-    // Handle SSO Button
+    // 1. Handle Direct In-App Login Form
+    const directForm = document.getElementById('app-direct-login-form');
+    if (directForm) {
+      directForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const identifier = document.getElementById('input-login-identifier')?.value.trim();
+        const password = document.getElementById('input-login-password')?.value;
+        const errBox = document.getElementById('auth-error-box');
+        const submitBtn = document.getElementById('btn-direct-submit');
+
+        if (!identifier || !password) return;
+
+        if (errBox) errBox.style.display = 'none';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = `
+            <div style="width:18px; height:18px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
+            <span>Signing in...</span>
+          `;
+        }
+
+        try {
+          const res = await authService.signInWithPassword(identifier, password);
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Sign In directly 🚀</span>`;
+          }
+
+          if (res && res.success) {
+            notificationService.showLocalToast('✅ සාර්ථකව Login විය! Welcome back.');
+            if (this.currentUser?.role === 'admin') {
+              this.renderAdminApp();
+            } else {
+              this.renderApp();
+            }
+          } else {
+            if (errBox) {
+              errBox.textContent = res?.error || 'Login failed. Please verify your email and password.';
+              errBox.style.display = 'block';
+            }
+          }
+        } catch (err) {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span>Sign In directly 🚀</span>`;
+          }
+          if (errBox) {
+            errBox.textContent = err?.message || 'Login error occurred. Please retry.';
+            errBox.style.display = 'block';
+          }
+        }
+      });
+    }
+
+    // 2. Handle SSO Button
     document.getElementById('btn-login-edupeak')?.addEventListener('click', () => {
       const btn = document.getElementById('btn-login-edupeak');
       if (btn) {
         btn.disabled = true;
         btn.style.opacity = '0.85';
         btn.innerHTML = `
-          <div style="width:18px; height:18px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
+          <div style="width:18px; height:18px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:#2563EB; border-radius:50%; animation:spin 0.7s linear infinite;"></div>
           <span>Opening EduPeak Login...</span>
         `;
       }
       authService.redirectToEduPeakLogin(true);
     });
   }
-
   // ── Logout In-App Confirmation Dialog (1:1 student_profile_screen.dart replica) ─
   confirmLogout() {
     const existing = document.getElementById('app-logout-dialog');

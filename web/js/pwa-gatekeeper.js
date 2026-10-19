@@ -452,11 +452,11 @@ export class PwaGatekeeper {
           <p class="gatekeeper-subtitle">${info.subtitle}</p>
         </div>
 
-        <!-- One-Tap Native Install Button (Android / Chromium only via beforeinstallprompt) -->
-        <div id="native-install-wrapper" style="margin-bottom:14px; ${(!platform.isIOS && this.deferredPrompt) ? 'display:block;' : 'display:none;'}">
-          <button id="btn-native-install" class="btn-native-install">
+        <!-- Universal One-Tap Smart Install Button (Always visible on all devices) -->
+        <div id="native-install-wrapper" style="margin-bottom:14px; display:block;">
+          <button id="btn-native-install" class="btn-native-install" type="button" aria-label="Install EduPeak App">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>EduPeak App එක දැන්ම Install කරගන්න 📲</span>
+            <span id="btn-native-install-text">${platform.isIOS ? 'EduPeak App එක Home Screen එකට Add කරගන්න 📲' : 'EduPeak App එක දැන්ම Install කරගන්න 📲'}</span>
           </button>
         </div>
 
@@ -520,9 +520,9 @@ export class PwaGatekeeper {
 
   updateInstallButtonVisibility() {
     const platform = this.detectPlatform();
-    const wrapper = document.getElementById('native-install-wrapper');
-    if (wrapper && !platform.isIOS && this.deferredPrompt) {
-      wrapper.style.display = 'block';
+    const btnText = document.getElementById('btn-native-install-text');
+    if (btnText && !platform.isIOS && this.deferredPrompt) {
+      btnText.textContent = 'EduPeak App එක දැන්ම Install කරගන්න 📲';
     }
   }
 
@@ -541,23 +541,12 @@ export class PwaGatekeeper {
       });
     }
 
-    // Native Install Button
+    // Universal Install Button (Direct install on Android/Desktop, Interactive guidance on iOS/Webviews)
     const btnNative = document.getElementById('btn-native-install');
-    if (btnNative && this.deferredPrompt) {
+    if (btnNative) {
       btnNative.addEventListener('click', async () => {
-        try {
-          this.deferredPrompt.prompt();
-          const { outcome } = await this.deferredPrompt.userChoice;
-          console.log('[PwaGatekeeper] User install prompt choice:', outcome);
-          if (outcome === 'accepted') {
-            this.deferredPrompt = null;
-            setTimeout(() => {
-              if (this.isStandaloneMode()) this.unlockApp();
-            }, 1000);
-          }
-        } catch (err) {
-          console.warn('[PwaGatekeeper] Native prompt error:', err);
-        }
+        const platform = this.detectPlatform();
+        await this.handleInstallAction(platform);
       });
     }
 
@@ -617,6 +606,108 @@ export class PwaGatekeeper {
       if (document.visibilityState === 'visible' && this.isStandaloneMode()) {
         this.unlockApp();
       }
+    });
+  }
+
+  async handleInstallAction(platform) {
+    // 1. Direct Chrome/Edge/Chromium prompt if available (Android & Desktop)
+    if (this.deferredPrompt) {
+      try {
+        this.deferredPrompt.prompt();
+        const choice = await this.deferredPrompt.userChoice;
+        console.log('[PwaGatekeeper] User install prompt choice:', choice?.outcome);
+        if (choice?.outcome === 'accepted') {
+          this.deferredPrompt = null;
+          setTimeout(() => {
+            if (this.isStandaloneMode()) this.unlockApp();
+          }, 1000);
+        }
+        return;
+      } catch (err) {
+        console.warn('[PwaGatekeeper] Native prompt error:', err);
+      }
+    }
+
+    // 2. In-App Webview (WhatsApp / Facebook / Instagram / TikTok)
+    if (platform.isInApp) {
+      if (platform.isAndroid) {
+        // Try launching external Google Chrome directly via Android Intent
+        try {
+          const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
+          window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.android.chrome;end`;
+        } catch (_) {}
+      }
+      this.highlightSteps();
+      this.copyCurrentUrlWithToast('⚠️ Social Media Browser එකෙන් App එක Install කළ නොහැක.<br>Link එක Copy විය! කරුණාකර <strong>Chrome</strong> හෝ <strong>Safari</strong> හි Open කරන්න.');
+      return;
+    }
+
+    // 3. Apple iOS (iPhone / iPad - Safari or other browser)
+    if (platform.isIOS) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate([40, 50, 40]); } catch (_) {}
+      }
+      this.highlightSteps();
+
+      const arrow = document.querySelector('.safari-arrow-indicator');
+      if (arrow) {
+        arrow.classList.add('active', 'arrow-bounce-highlight');
+        setTimeout(() => arrow.classList.remove('arrow-bounce-highlight'), 3500);
+      }
+
+      this.showGatekeeperToast('📲 <strong>iPhone / iPad Safari:</strong><br>පහළ ඇති Safari <strong>Share (⎋)</strong> බොත්තම ඔබා <strong>"Add to Home Screen" (+)</strong> තෝරන්න.');
+      return;
+    }
+
+    // 4. Android (When beforeinstallprompt has not fired or already dismissed)
+    if (platform.isAndroid) {
+      this.highlightSteps();
+      this.showGatekeeperToast('📲 <strong>Android ස්ථාපනය:</strong><br>Chrome හි ඉහළ දකුණු කෙළවරේ තිත් 3 <strong>(⋮)</strong> ඔබා <strong>"Install app"</strong> හෝ <strong>"Add to Home screen"</strong> තෝරන්න.');
+      return;
+    }
+
+    // 5. Desktop (Windows / Mac PC)
+    this.highlightSteps();
+    this.showGatekeeperToast('💻 <strong>Desktop ස්ථාපනය:</strong><br>ඉහළ URL Bar හි ඇති <strong>Install (⊕)</strong> icon එක හෝ Chrome Menu (⋮) ඔබා <strong>"Install EduPeak"</strong> තෝරන්න.');
+  }
+
+  highlightSteps() {
+    const stepCards = document.querySelectorAll('.step-card');
+    stepCards.forEach((card, idx) => {
+      card.classList.remove('step-card-pulse');
+      setTimeout(() => card.classList.add('step-card-pulse'), idx * 80);
+      setTimeout(() => card.classList.remove('step-card-pulse'), 2500 + idx * 80);
+    });
+
+    const stepsContainer = document.querySelector('.gatekeeper-steps');
+    if (stepsContainer) {
+      stepsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  showGatekeeperToast(htmlMessage) {
+    let toast = document.getElementById('gatekeeper-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'gatekeeper-toast';
+      toast.className = 'gatekeeper-toast';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = htmlMessage;
+    toast.classList.add('show');
+
+    if (this._toastTimer) clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 4500);
+  }
+
+  copyCurrentUrlWithToast(msg) {
+    const link = window.location.origin + window.location.pathname;
+    navigator.clipboard.writeText(link).then(() => {
+      this.showGatekeeperToast(`✅ <strong>Link Copied!</strong><br>${msg}`);
+    }).catch(() => {
+      prompt('EduPeak App URL:', window.location.href);
     });
   }
 }
