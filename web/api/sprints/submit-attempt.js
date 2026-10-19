@@ -1,10 +1,11 @@
 const crypto = require('crypto');
 const { getAdmin } = require('../_lib/firebase-admin');
-const { sendError, methodNotAllowed, handleCors, getBody, requireUser } = require('../_lib/http');
+const { sendError, methodNotAllowed, handleCors, getBody, requireUser, rateLimit } = require('../_lib/http');
 
 module.exports = async function handler(req, res) {
   if (handleCors(req, res)) return;
   if (req.method !== 'POST') return methodNotAllowed(res);
+  if (rateLimit(req, res, { windowMs: 60*1000, max: 15 })) return;
   try {
     const admin = getAdmin();
     const db = admin.firestore();

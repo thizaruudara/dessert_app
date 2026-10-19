@@ -11,14 +11,16 @@ module.exports = async function handler(req, res) {
     const token = await requireUser(req, admin);
     const body = getBody(req);
 
-    // Verify caller is admin
-    const callerSnap = await db.collection('users').doc(token.uid).get();
-    const callerData = callerSnap.data() || {};
-    if (callerData.role !== 'admin' && !callerData.isAdmin) {
-      const err = new Error('Only administrators can broadcast exam notifications.');
-      err.status = 403;
-      err.code = 'permission-denied';
-      throw err;
+    // Verify caller is admin via custom claim (enforced)
+    if (token.admin !== true) {
+      const callerSnap = await db.collection('users').doc(token.uid).get();
+      const callerData = callerSnap.data() || {};
+      if (callerData.role !== 'admin' && !callerData.isAdmin) {
+        const err = new Error('Only administrators can broadcast exam notifications.');
+        err.status = 403;
+        err.code = 'permission-denied';
+        throw err;
+      }
     }
 
     const paperId = String(body.paperId || '').slice(0, 160);

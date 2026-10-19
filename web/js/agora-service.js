@@ -29,17 +29,24 @@ export function getChannelName(paperId) {
   return `exam_${sanitized}`;
 }
 
-// Fetch token from server endpoint
+// Fetch token from server endpoint (authenticated; requires Firebase ID token)
 export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
   try {
     const apiBase = (typeof window !== 'undefined' && !window.location.hostname.includes('vercel.app'))
       ? 'https://edupeak-web.vercel.app/api'
       : '/api';
+    // Attach Firebase ID token if available for authenticated token minting
+    let authHeader = {};
+    try {
+      const { auth } = await import('./firebase-config.js');
+      const token = await auth.currentUser?.getIdToken?.();
+      if (token) authHeader = { 'Authorization': `Bearer ${token}` };
+    } catch (_) {}
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 1200);
     const res = await fetch(`${apiBase}/agora/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader },
       body: JSON.stringify({ channelName, uid, role }),
       signal: controller.signal
     });

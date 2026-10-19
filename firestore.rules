@@ -92,7 +92,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     match /submissions/{id} { allow read, write: if isAdmin(); }
-    match /essay_submissions/{id} { allow read, write: if true; }
+    match /essay_submissions/{id} {
+      allow create: if signedIn() && request.resource.data.studentId == request.auth.uid;
+      allow get, list: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow update, delete: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissionPhotos','submissionUrl','driveLink','answers','status','updatedAt']));
+    }
     match /dessert_reviews/{id} { allow read, write: if isAdmin(); }
     // OTP documents must only be accessed by trusted server-side code.
     match /otp_requests/{id} { allow read, write: if false; }

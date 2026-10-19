@@ -27,20 +27,26 @@ function methodNotAllowed(res, allowed = 'POST') {
   return res.status(405).json({ error: { code: 'method-not-allowed', message: 'Method not allowed.' } });
 }
 
-function handleCors(req, res) {
-  const origin = String(req.headers.origin || '');
-  const allowed = [
+function isAllowedOrigin(origin) {
+  const allowed = new Set([
     'https://app.edupeak.lk',
     'https://edupeak.lk',
     'https://edupeak-web.vercel.app',
     'https://dessert-institute.web.app',
-  ];
-  const isAllowed = allowed.includes(origin) ||
-    origin.endsWith('.vercel.app') ||
-    origin.startsWith('http://localhost:') ||
-    origin.startsWith('http://127.0.0.1:');
+  ]);
+  if (allowed.has(origin)) return true;
+  if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    return host.endsWith('.vercel.app') && (host.includes('edupeak') || host.includes('dessert'));
+  } catch (_) { return false; }
+}
 
-  if (isAllowed) {
+function handleCors(req, res) {
+  const origin = String(req.headers.origin || '');
+  if (isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -50,6 +56,31 @@ function handleCors(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Allow', 'POST, OPTIONS');
     res.status(204).end();
+    return true;
+  }
+  return false;
+}
+
+// In-memory rate limiter: key -> { count, windowStart }
+const _rateMap = new Map();
+function rateLimit(req, res, opts = {}) {
+  const windowMs = opts.windowMs || 60 * 1000;
+  const max = opts.max || 10;
+  const key = opts.key || String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim() + '|' + String(req.url || '').split('?')[0];
+  const now = Date.now();
+  // GC occasionally
+  if (_rateMap.size > 2000) {
+    for (const [k, v] of _rateMap.entries()) if (now - v.windowStart > windowMs) _rateMap.delete(k);
+  }
+  let rec = _rateMap.get(key);
+  if (!rec || now - rec.windowStart > windowMs) {
+    rec = { count: 1, windowStart: now };
+    _rateMap.set(key, rec);
+    return false;
+  }
+  rec.count++;
+  if (rec.count > max) {
+    res.status(429).json({ error: { code: 'resource-exhausted', message: 'Too many requests. Try again shortly.' } });
     return true;
   }
   return false;
@@ -102,4 +133,4 @@ async function requireUser(req, admin) {
   }
 }
 
-module.exports = { sendError, methodNotAllowed, handleCors, getBody, normalizePhone, authEmail, requireUser };
+module.exports = { sendError, methodNotAllowed, handleCors, getBody, normalizePhone, authEmail, requireUser, rateLimit, isAllowedOrigin };
