@@ -4,7 +4,9 @@
 
 import AgoraRTC from 'agora-rtc-sdk-ng';
 
-export const AGORA_APP_ID = '1a021dff70b447058f17a8881a03834e';
+// Agora App ID is never hardcoded - fetched securely from /api/agora/token (env-only + authenticated)
+let CACHED_AGORA_APP_ID = '';
+export function getAgoraAppId() { return CACHED_AGORA_APP_ID; }
 
 // Generates a deterministic positive 32-bit integer UID matching Flutter AgoraRtcService.getNumericUid
 export function getNumericUid(id) {
@@ -54,13 +56,16 @@ export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
     if (res.ok) {
       const data = await res.json();
       if (data?.result?.token) {
-        return data.result.token;
+        if (data.result.appId) CACHED_AGORA_APP_ID = String(data.result.appId).trim();
+        return { token: data.result.token, appId: data.result.appId || CACHED_AGORA_APP_ID };
       }
     }
+    if (res.status === 503) throw new Error('Agora service not configured');
   } catch (err) {
-    console.warn('[Agora] Token fetch notice (proceeding with direct client authentication):', err.message);
+    console.warn('[Agora] Token fetch failed:', err.message);
+    throw err;
   }
-  return '';
+  throw new Error('Agora token fetch failed');
 }
 
 // ── Student Broadcaster ──────────────────────────────────────────────
@@ -81,8 +86,8 @@ export class AgoraStudentBroadcaster {
       this.client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
       await this.client.setClientRole('host');
 
-      const token = await fetchAgoraToken(channelName, this.uid, 'publisher');
-      await this.client.join(AGORA_APP_ID, channelName, token || null, this.uid);
+      const tokenData = await fetchAgoraToken(channelName, this.uid, 'publisher');
+      await this.client.join(tokenData.appId, channelName, tokenData.token, this.uid);
 
       // Create video track from existing mediaStream if available, or create camera track
       if (mediaStream && mediaStream.getVideoTracks().length > 0) {
@@ -179,8 +184,8 @@ export class AgoraAdminAudience {
         if (this.onStreamChange) this.onStreamChange(Number(user.uid), user, false);
       });
 
-      const token = await fetchAgoraToken(this.channelName, adminUid, 'audience');
-      await this.client.join(AGORA_APP_ID, this.channelName, token || null, adminUid);
+      const tokenData2 = await fetchAgoraToken(this.channelName, adminUid, 'audience');
+      await this.client.join(tokenData2.appId, this.channelName, tokenData2.token, adminUid);
       this.isConnected = true;
       console.log(`[Agora Admin] Joined proctor audience on channel: ${this.channelName}`);
     } catch (err) {

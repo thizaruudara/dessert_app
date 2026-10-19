@@ -47,11 +47,11 @@ app.use(express.urlencoded({ limit: '1mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../demo')));
 
 // ── Meta WhatsApp & Gemini Config ───────────────────────────────────────────
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET;
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const VERIFY_TOKEN = String(process.env.WHATSAPP_VERIFY_TOKEN || '').trim();
+const ACCESS_TOKEN = String(process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+const WHATSAPP_APP_SECRET = String(process.env.WHATSAPP_APP_SECRET || '').trim();
+const PHONE_NUMBER_ID = String(process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || '').trim();
 
 // ── Direct HTTP OTP Dispatch Endpoint ─────────────────────────────────────────
 app.post('/api/send-otp', async (req, res) => {
@@ -80,8 +80,9 @@ const handleVerification = (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  console.log(`[Webhook Verification] mode=${mode}, token=${token}`);
+  console.log(`[Webhook Verification] mode=${mode}`);
 
+  if (!VERIFY_TOKEN) return res.status(503).send('Webhook not configured');
   if (VERIFY_TOKEN && mode === 'subscribe' && token === VERIFY_TOKEN) {
     console.log('✅ Webhook verified successfully with Meta!');
     return res.status(200).send(challenge);
@@ -357,7 +358,7 @@ async function handleMessage(message, contact) {
 
   // ── Flow 1.5: Instant OTP Request on WhatsApp ───────────────────────────────
   if (textBody.toLowerCase().includes('otp') || textBody.toLowerCase().includes('login') || textBody.toLowerCase().includes('code')) {
-    const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const randomOtp = String(crypto.randomInt(100000,1000000));
     const expiresAt = Date.now() + 10 * 60 * 1000;
 
     await db.collection('otp_verifications').doc(senderPhone).set({
@@ -503,7 +504,8 @@ Role:
 5. Format your answers clearly using WhatsApp markdown (*bold*, bullet points, numbered steps, simple formulas). Keep explanations concise and easy to understand for a student.`;
 
       // Call Gemini 3.6 Flash
-      const geminiApiKey = GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      const geminiApiKey = String(GEMINI_API_KEY || process.env.GEMINI_API_KEY || '').trim();
+      if(!geminiApiKey) { await sendWhatsAppText(from,'AI service is temporarily unavailable.'); return; }
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiApiKey}`;
       const gRes = await axios.post(geminiUrl, {
         contents: contents,
@@ -709,7 +711,7 @@ db.collection('otp_requests').onSnapshot(snapshot => {
 
       if (!phone) return;
 
-      const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const randomOtp = String(crypto.randomInt(100000,1000000));
       const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
       try {

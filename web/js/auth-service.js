@@ -222,6 +222,10 @@ export class AuthService {
   /**
    * Direct Sign In using EduPeak Email or Phone + Password
    */
+  async signInWithPassword(identifier, password) {
+    return this.loginWithIdentifierAndPassword(identifier, password);
+  }
+
   async loginWithIdentifierAndPassword(identifier, password) {
     if (!identifier || !password) {
       return { success: false, error: 'Please enter your email or phone number and password.' };

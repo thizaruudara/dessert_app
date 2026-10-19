@@ -10,30 +10,22 @@ export const DEFAULT_R2_URL = 'https://edupeak-r2-storage.thisaruudara69.workers
 
 export class StorageService {
   constructor() {
-    // Cloudflare R2 worker endpoint (defaults to live worker, overridable via window.EDUPEAK_R2_URL or localStorage)
-    this.r2Endpoint = (typeof window !== 'undefined' && (window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url'))) || DEFAULT_R2_URL;
+    // Cloudflare R2 endpoint locked to allowlist only (no localStorage injection)
+    this.r2Endpoint = DEFAULT_R2_URL;
     this.supabaseBucket = 'dessert_uploads';
   }
 
-  // Get active Cloudflare R2 endpoint URL
+  // Get active R2 endpoint - allowlist only (prevents endpoint injection via XSS/localStorage)
   getR2Endpoint() {
-    if (typeof window !== 'undefined') {
-      return window.EDUPEAK_R2_URL || localStorage.getItem('edupeak_r2_worker_url') || this.r2Endpoint || DEFAULT_R2_URL;
-    }
-    return this.r2Endpoint || DEFAULT_R2_URL;
+    const ALLOWED = new Set([DEFAULT_R2_URL]);
+    const candidate = this.r2Endpoint || DEFAULT_R2_URL;
+    return ALLOWED.has(candidate) ? candidate : DEFAULT_R2_URL;
   }
-
-  // Save or update Cloudflare R2 worker endpoint URL
+  // Save or update R2 endpoint - only allowlisted URLs accepted (localStorage override removed)
   setR2Endpoint(url) {
-    this.r2Endpoint = url ? String(url).trim().replace(/\/+$/, '') : null;
-    if (typeof window !== 'undefined') {
-      if (this.r2Endpoint) {
-        localStorage.setItem('edupeak_r2_worker_url', this.r2Endpoint);
-        window.EDUPEAK_R2_URL = this.r2Endpoint;
-      } else {
-        localStorage.removeItem('edupeak_r2_worker_url');
-      }
-    }
+    const cleaned = url ? String(url).trim().replace(/\/+$/, '') : '';
+    if (cleaned && cleaned === DEFAULT_R2_URL) this.r2Endpoint = cleaned;
+    else if (!cleaned) this.r2Endpoint = DEFAULT_R2_URL;
   }
 
   // ── Solution 2: Crisp Document Image Compression ───────────────────────────

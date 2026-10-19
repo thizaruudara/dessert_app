@@ -20,7 +20,6 @@
         <domain includeSubdomains="true">agoraio.cn</domain>
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </domain-config>
 </network-security-config>

@@ -17,7 +17,7 @@ export default {
     function isAllowedOriginFn(o) {
       if (allowedOrigins.includes(o)) return true;
       if (o.startsWith('http://localhost:') || o.startsWith('http://127.0.0.1:')) return true;
-      try {
+  try {
         const u = new URL(o);
         if (u.protocol !== 'https:') return false;
         const host = u.hostname.toLowerCase();
@@ -31,10 +31,10 @@ export default {
       return false;
     }
     const isAllowedOrigin = isAllowedOriginFn(origin);
-    const corsOrigin = isAllowedOrigin ? origin : (allowedOrigins[0]);
+    const corsOrigin = isAllowedOrigin ? origin : null;
 
     const corsHeaders = {
-      'Access-Control-Allow-Origin': corsOrigin,
+      ...(corsOrigin ? { 'Access-Control-Allow-Origin': corsOrigin } : {}),
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-EduPeak-Token',
       'Access-Control-Max-Age': '86400',
@@ -46,6 +46,7 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
+  function isValidR2Key(k){ if(!k||typeof k!=='string')return false; if(k.length>512)return false; if(k.includes('..')||k.includes('\\')||k.startsWith('/'))return false; if(/[\x00-\x1f\x7f]/.test(k))return false; if(!/^[a-zA-Z0-9_\-.\/]+$/.test(k))return false; const dotIdx=k.lastIndexOf('.'); if(dotIdx===-1)return false; const ext=k.slice(dotIdx).toLowerCase(); const ALLOWED=['.jpg','.jpeg','.png','.webp','.pdf']; return ALLOWED.includes(ext); }
     try {
       // ── 1. POST /upload - Store file in R2 (requires auth) ──────────────
       if (request.method === 'POST') {
@@ -152,6 +153,10 @@ export default {
           });
         }
 
+        // R2 GET validation
+        if (!isValidR2Key(key)) {
+          return new Response(JSON.stringify({ error: 'Invalid key' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
         const object = await env.R2_BUCKET.get(key);
         if (!object) {
           return new Response('File not found in storage', {
@@ -163,7 +168,7 @@ export default {
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set('etag', object.httpEtag);
-        headers.set('Access-Control-Allow-Origin', corsOrigin);
+        if (corsOrigin) headers.set('Access-Control-Allow-Origin', corsOrigin);
         headers.set('Vary', 'Origin');
         headers.set('Cache-Control', 'public, max-age=31536000, immutable');
         headers.set('X-Content-Type-Options', 'nosniff');
@@ -189,6 +194,10 @@ export default {
           });
         }
 
+        // R2 DELETE validation
+        if (!isValidR2Key(key)) {
+          return new Response(JSON.stringify({ error: 'Invalid key or file extension. Allowed: .jpg .jpeg .png .webp .pdf' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
         await env.R2_BUCKET.delete(key);
         return new Response(JSON.stringify({ success: true, deleted: key }), {
           status: 200,
