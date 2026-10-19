@@ -727,6 +727,124 @@ export class DbService {
       throw e;
     }
   }
+
+  async deleteEssaySubmission({ submissionId, paperId = null, studentId = null }) {
+    if (!submissionId) throw new Error('Submission ID is required');
+
+    const isRegSub = String(submissionId).startsWith('reg_');
+    const actualId = isRegSub ? String(submissionId).replace(/^reg_/, '') : submissionId;
+
+    try {
+      let resolvedPaperId = paperId;
+      let resolvedStudentId = studentId;
+
+      if (isRegSub) {
+        // actualId is formatted as `${paperId}_${studentId}`
+        const parts = actualId.split('_');
+        if (parts.length >= 2) {
+          resolvedPaperId = resolvedPaperId || parts[0];
+          resolvedStudentId = resolvedStudentId || parts.slice(1).join('_');
+        }
+
+        // Reset the registration submission in Firestore
+        const regRef = doc(db, 'paper_registrations', actualId);
+        await setDoc(regRef, {
+          status: 'registered',
+          isSubmitted: false,
+          submissionPhotos: [],
+          submissionUrl: null,
+          submittedAt: null,
+          marks: null,
+          isGraded: false,
+          adminComment: null,
+          gradedBy: null,
+          gradedAt: null,
+          questionMarks: null
+        }, { merge: true }).catch(err => {
+          console.warn('[DB] Could not reset paper_registrations submission:', err);
+        });
+
+        // Also if a matching essay_submissions document exists, delete it
+        if (resolvedPaperId && resolvedStudentId) {
+          try {
+            const q = query(
+              collection(db, 'essay_submissions'),
+              where('paperId', '==', resolvedPaperId),
+              where('studentId', '==', resolvedStudentId)
+            );
+            const snap = await getDocs(q);
+            const delPromises = [];
+            snap.forEach(d => delPromises.push(deleteDoc(d.ref)));
+            await Promise.all(delPromises);
+          } catch (_) {}
+        }
+      } else {
+        const essayRef = doc(db, 'essay_submissions', actualId);
+        try {
+          const snap = await getDoc(essayRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            resolvedPaperId = resolvedPaperId || data.paperId || null;
+            resolvedStudentId = resolvedStudentId || data.studentId || null;
+          }
+        } catch (_) {}
+
+        // Delete from essay_submissions collection
+        await deleteDoc(essayRef);
+
+        // Also reset paper_registrations if it exists
+        if (resolvedPaperId && resolvedStudentId) {
+          const regDocId = `${resolvedPaperId}_${resolvedStudentId}`;
+          try {
+            await setDoc(doc(db, 'paper_registrations', regDocId), {
+              status: 'registered',
+              isSubmitted: false,
+              submissionPhotos: [],
+              submissionUrl: null,
+              submittedAt: null,
+              marks: null,
+              isGraded: false,
+              adminComment: null,
+              gradedBy: null,
+              gradedAt: null,
+              questionMarks: null
+            }, { merge: true });
+          } catch (_) {}
+        }
+      }
+
+      // Invalidate caches
+      if (resolvedPaperId && resolvedStudentId) {
+        this.invalidateRegistrationCache(resolvedPaperId, resolvedStudentId);
+      }
+
+      // Remove from local cache
+      try {
+        let local = JSON.parse(localStorage.getItem('edupeak_local_essay_submissions') || '[]');
+        local = local.filter(d => d.id !== submissionId && d.id !== actualId);
+        localStorage.setItem('edupeak_local_essay_submissions', JSON.stringify(local));
+
+        if (resolvedPaperId && resolvedStudentId) {
+          localStorage.removeItem(`paper_submitted_${resolvedPaperId}_${resolvedStudentId}`);
+        }
+        if (resolvedPaperId) {
+          localStorage.removeItem(`paper_submitted_${resolvedPaperId}`);
+        }
+      } catch (_) {}
+
+      // Dispatch event
+      try {
+        window.dispatchEvent(new CustomEvent('edupeak:essay-deleted', {
+          detail: { submissionId, paperId: resolvedPaperId, studentId: resolvedStudentId }
+        }));
+      } catch (_) {}
+
+      return { success: true, submissionId };
+    } catch (e) {
+      console.error('[DB] deleteEssaySubmission error:', e);
+      throw e;
+    }
+  }
   // ─────────────────────────────────────────────────────────────────────────
 
   // Get student accumulated credits from local cache, submissions, and leaderboard

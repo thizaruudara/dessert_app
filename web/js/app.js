@@ -9156,6 +9156,10 @@ class AppController {
                 <span class="material-symbols-rounded" style="font-size:16px;">picture_as_pdf</span>
                 <span>PDF</span>
               </button>
+              <button class="essay-delete-btn" data-sub-id="${escapeHTML(sub.id)}" data-name="${escapeHTML(sub.studentName)}" data-paper="${escapeHTML(sub.paperTitle)}" title="Delete submission" style="background:#FEF2F2; border:1px solid #FECACA; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:800; color:#DC2626; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s ease;">
+                <span class="material-symbols-rounded" style="font-size:16px; color:#DC2626;">delete</span>
+                <span>Delete</span>
+              </button>
             </div>
           </div>
         `).join('')}
@@ -9227,9 +9231,101 @@ class AppController {
     listEl.querySelectorAll('.essay-grade-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const subId = btn.dataset.subId;
-        const sub = subs.find(s => s.id === subId);
-        if (sub) this._openEssayGradeModal(sub);
+        const sub = subs.find(s => s.id === subId) || (this._essaySubsCache || []).find(s => s.id === subId);
+        if (sub) this._openEssayGradeModal(sub, container);
       });
+    });
+
+    // Delete submission button
+    listEl.querySelectorAll('.essay-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const subId = btn.dataset.subId;
+        const sub = subs.find(s => s.id === subId) || (this._essaySubsCache || []).find(s => s.id === subId);
+        if (sub) this._confirmDeleteEssaySubmission(sub, container);
+      });
+    });
+  }
+
+  _confirmDeleteEssaySubmission(sub, container, onDeleted = null) {
+    if (!sub || !sub.id) return;
+    const escapeHTML = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+    const modal = document.createElement('div');
+    modal.className = 'app-modal modal-delete-confirm';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.75);backdrop-filter:blur(6px);z-index:10000010;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    modal.innerHTML = `
+      <div style="background:#FFFFFF;border-radius:20px;max-width:390px;width:100%;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.35);border:1px solid #FEE2E2;">
+        <div style="padding:22px 20px 16px;text-align:center;">
+          <div style="width:54px;height:54px;border-radius:50%;background:#FEF2F2;color:#DC2626;border:2px solid #FEE2E2;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+            <span class="material-symbols-rounded" style="font-size:30px;">delete_forever</span>
+          </div>
+          <div style="font-size:16px;font-weight:900;color:#0F172A;">Delete Submission?</div>
+          <div style="font-size:13px;color:#64748B;line-height:1.5;margin-top:8px;">
+            Are you sure you want to delete the answer sheet submission for <strong style="color:#0F172A;">${escapeHTML(sub.studentName || 'Student')}</strong>?
+          </div>
+          <div style="font-size:11.5px;color:#94A3B8;margin-top:4px;">
+            ${escapeHTML(sub.studentBatch || '')} • ${escapeHTML(sub.paperTitle || 'Exam Paper')}
+          </div>
+          <div style="margin-top:12px;padding:9px 12px;background:#FFF1F2;border-radius:10px;font-size:11.5px;color:#9F1239;border:1px dashed #FECDD3;text-align:left;line-height:1.4;">
+            ⚠️ This will permanently remove the uploaded images and marks. The student will be allowed to resubmit their answer sheets.
+          </div>
+        </div>
+
+        <div style="padding:12px 16px 16px;display:flex;gap:10px;border-top:1px solid #F1F5F9;background:#FAFAFA;">
+          <button id="cancel-delete-sub-btn" type="button" style="flex:1;background:#FFFFFF;border:1.5px solid #CBD5E1;border-radius:12px;padding:11px;font-size:13px;font-weight:800;color:#475569;cursor:pointer;">
+            Cancel
+          </button>
+          <button id="confirm-delete-sub-btn" type="button" style="flex:1;background:#DC2626;border:none;border-radius:12px;padding:11px;font-size:13px;font-weight:800;color:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 4px 12px rgba(220,38,38,0.25);">
+            <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+            <span>Delete</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('#cancel-delete-sub-btn')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    const confirmBtn = modal.querySelector('#confirm-delete-sub-btn');
+    confirmBtn?.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:16px;animation:spin 0.75s linear infinite;">progress_activity</span> <span>Deleting...</span>';
+      try {
+        await dbService.deleteEssaySubmission({
+          submissionId: sub.id,
+          paperId: sub.paperId,
+          studentId: sub.studentId
+        });
+
+        closeModal();
+        if (typeof onDeleted === 'function') onDeleted();
+
+        // Update in-memory cache
+        if (Array.isArray(this._essaySubsCache)) {
+          this._essaySubsCache = this._essaySubsCache.filter(s => s.id !== sub.id);
+        }
+
+        notificationService.showInAppBanner('Submission Deleted', `Submission for ${sub.studentName} was deleted.`, 'success');
+
+        // Re-filter and render
+        const q = document.getElementById('essays-search')?.value?.toLowerCase() || '';
+        const status = document.getElementById('essays-status-filter')?.value || '';
+        const filtered = (this._essaySubsCache || []).filter(s =>
+          (!q || s.studentName?.toLowerCase().includes(q) || s.paperTitle?.toLowerCase().includes(q) || s.studentBatch?.toLowerCase().includes(q)) &&
+          (!status || s.status === status)
+        );
+        this._renderEssayList(container, filtered, true);
+      } catch (err) {
+        console.error('[Admin Essays] Delete error:', err);
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:18px;">delete</span><span>Delete</span>';
+        alert('Could not delete submission: ' + (err.message || 'Error occurred'));
+      }
     });
   }
 
@@ -9390,7 +9486,7 @@ class AppController {
     }, { passive: true });
   }
 
-  _openEssayGradeModal(sub) {
+  _openEssayGradeModal(sub, container = null) {
     const escapeHTML = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
     const modal = document.createElement('div');
     modal.className = 'app-modal';
@@ -9427,9 +9523,15 @@ class AppController {
                 ${escapeHTML(sub.studentBatch)} • ${escapeHTML(sub.paperTitle)} • ${urls.length} Page(s)
               </div>
             </div>
-            <button id="grade-modal-close" style="background:#F1F5F9;border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#475569;">
-              <span class="material-symbols-rounded">close</span>
-            </button>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="grade-modal-delete" type="button" title="Delete Submission" style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:7px 11px;font-size:12px;font-weight:800;color:#DC2626;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:16px;color:#DC2626;">delete</span>
+                <span>Delete</span>
+              </button>
+              <button id="grade-modal-close" style="background:#F1F5F9;border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#475569;">
+                <span class="material-symbols-rounded">close</span>
+              </button>
+            </div>
           </div>
 
           <!-- Mobile Tab Switcher (< 768px) -->
@@ -9547,6 +9649,9 @@ class AppController {
 
       // Event listeners inside modal
       modal.querySelector('#grade-modal-close')?.addEventListener('click', () => modal.remove());
+      modal.querySelector('#grade-modal-delete')?.addEventListener('click', () => {
+        this._confirmDeleteEssaySubmission(sub, container, () => modal.remove());
+      });
       modal.querySelector('#btn-tab-preview')?.addEventListener('click', () => {
         activeMobileTab = 'preview';
         renderModal();
