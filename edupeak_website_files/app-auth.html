@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduPeak | Student App Authorization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Supabase JS CDN (Multiple fallbacks) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    if (!window.supabase) {
+      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary: #2563EB;
+      --primary-dark: #1D4ED8;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --card-border: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --text-sub: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background: radial-gradient(circle at 50% 0%, #EFF6FF 0%, #F8FAFC 55%, #F1F5F9 100%);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .auth-wrapper {
+      width: 100%;
+      max-width: 430px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .brand-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .brand-logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 22px;
+      background: #FFFFFF;
+      border: 1.5px solid #DBEAFE;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+      margin: 0 auto 12px;
+      padding: 10px;
+    }
+
+    .brand-logo-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 27px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1D4ED8;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-top: 8px;
+    }
+
+    .auth-card {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 26px;
+      padding: 30px 24px 26px;
+      box-shadow: 0 20px 45px -12px rgba(37, 99, 235, 0.1), 0 2px 6px rgba(15, 23, 42, 0.04);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, #2563EB, #3B82F6, #60A5FA);
+    }
+
+    .portal-heading {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1E293B;
+      margin-bottom: 6px;
+    }
+
+    .portal-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin: 0 0 22px;
+    }
+
+    .status-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 16px;
+      background: #F0FDF4;
+      border-radius: 16px;
+      border: 1px solid #BBF7D0;
+      margin-bottom: 16px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(37, 99, 235, 0.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: #15803D;
+      line-height: 1.4;
+    }
+
+    .form-group {
+      text-align: left;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .form-label {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .form-label i {
+      color: var(--primary);
+      font-size: 12px;
+    }
+
+    .input-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .form-input {
+      width: 100%;
+      height: 48px;
+      background: #F8FAFC;
+      border: 1.5px solid var(--card-border);
+      border-radius: 14px;
+      padding: 0 14px;
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+
+    .form-input::placeholder {
+      color: #94A3B8;
+      font-size: 13.5px;
+    }
+
+    .toggle-pwd-btn {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #94A3B8;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s;
+    }
+
+    .toggle-pwd-btn:hover {
+      color: var(--text-sub);
+    }
+
+    .btn-submit {
+      width: 100%;
+      height: 50px;
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      transition: all 0.2s ease;
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.28);
+      margin-top: 8px;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.8;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .alert-error {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      color: #DC2626;
+      padding: 11px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-bottom: 15px;
+      text-align: left;
+      line-height: 1.45;
+      display: none;
+    }
+
+    .card-footer {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid #F1F5F9;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .card-footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .card-footer a:hover {
+      text-decoration: underline;
+    }
+
+    .trust-badge {
+      margin-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #64748B;
+      font-weight: 500;
+    }
+
+    .trust-badge svg {
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-wrapper">
+    <div class="brand-header">
+      <div class="brand-logo-wrap">
+        <img src="assets/img/edupeak_logo.png" alt="EduPeak" onerror="this.onerror=null; this.src='https://app.edupeak.lk/icons/edupeak_logo.png'">
+      </div>
+      <div class="brand-title">EduPeak</div>
+      <div class="brand-tag">A/L Pastry &amp; Dessert Institute 🍰</div>
+    </div>
+
+    <div class="auth-card">
+      <div class="portal-heading">Student &amp; Exam Portal</div>
+      <p class="portal-desc">EduPeak ගිණුමේ Email හෝ Phone Number මගින් Login වන්න.</p>
+
+      <!-- Status / Success Box (Shown only during active connection verification) -->
+      <div id="statusSection" class="status-box" style="display: none;">
+        <div class="spinner"></div>
+        <div class="status-text" id="statusMessage">Checking connection...</div>
+      </div>
+
+      <!-- Login Form (Visible immediately on page load) -->
+      <div id="loginSection" style="display: block;">
+        <div id="alertError" class="alert-error"></div>
+
+        <form id="ssoLoginForm">
+          <div class="form-group">
+            <label class="form-label" for="inputIdentifier">
+              <i class="fa-solid fa-user"></i> Email or Phone Number
+            </label>
+            <div class="input-wrap">
+              <input type="text" class="form-input" id="inputIdentifier" placeholder="student@gmail.com හෝ 07X XXX XXXX" required autocomplete="username" autofocus>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="inputPassword">
+              <i class="fa-solid fa-lock"></i> Password
+            </label>
+            <div class="input-wrap">
+              <input type="password" class="form-input" id="inputPassword" placeholder="EduPeak Password එක ඇතුළත් කරන්න" required autocomplete="current-password" style="padding-right: 42px;">
+              <button type="button" class="toggle-pwd-btn" id="btnTogglePwd" aria-label="Toggle password visibility">
+                <i class="fa-regular fa-eye" id="toggleIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-submit" id="btnSubmit">
+            <i class="fa-solid fa-rocket"></i>
+            <span>Sign In &amp; Authorize App</span>
+          </button>
+        </form>
+
+        <div class="card-footer">
+          Don't have an account on edupeak.lk yet?
+          <br>
+          <a href="https://edupeak.lk" target="_blank" rel="noopener noreferrer">
+            <span>Create an Account at edupeak.lk</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px;"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="trust-badge">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        <polyline points="9 12 11 14 15 10"></polyline>
+      </svg>
+      <span>Verified with edupeak.lk &amp; Supabase Cloud Auth</span>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    // Supabase Configuration
+    const SUPABASE_URL = "https://hkonbtrxmsxisggcxpww.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhrb25idHJ4bXN4aXNnZ2N4cHd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NzYwNDMsImV4cCI6MjEwMzE1MjA0M30.VXqd0wufSQEmo_55aYEVB4WvQYyIGpQLKB5hDBfYny4";
+
+    let _authClient = null;
+
+    // Initialize Supabase safely without global collision
+    function getSupabaseClient() {
+      if (_authClient) return _authClient;
+      if (window.supabase && typeof window.supabase.createClient === 'function') {
+        _authClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        });
+        return _authClient;
+      }
+      return null;
+    }
+
+    // Toggle Password Visibility
+    const toggleBtn = document.getElementById('btnTogglePwd');
+    const pwdInput = document.getElementById('inputPassword');
+    const toggleIcon = document.getElementById('toggleIcon');
+    if (toggleBtn && pwdInput) {
+      toggleBtn.addEventListener('click', () => {
+        const isPwd = pwdInput.type === 'password';
+        pwdInput.type = isPwd ? 'text' : 'password';
+        if (toggleIcon) {
+          toggleIcon.className = isPwd ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+        }
+      });
+    }
+
+    // Get return redirect URI from query params
+    const urlParams = new URLSearchParams(window.location.search);
+    let redirectUri = urlParams.get('redirect_uri') || 'https://app.edupeak.lk/';
+
+    // Allowed origins validation
+    function isValidRedirect(url) {
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.toLowerCase();
+        return host === 'app.edupeak.lk' || 
+               host.endsWith('.edupeak.lk') || 
+               host.endsWith('.vercel.app') || 
+               host === 'localhost' || 
+               host === '127.0.0.1';
+      } catch (_) {
+        return false;
+      }
+    }
+
+    if (!isValidRedirect(redirectUri)) {
+      redirectUri = 'https://app.edupeak.lk/';
+    }
+
+    function completeAppAuthorization(session) {
+      if (!session || !session.access_token) {
+        return;
+      }
+      const statusSec = document.getElementById('statusSection');
+      const loginSec = document.getElementById('loginSection');
+      const statusMsg = document.getElementById('statusMessage');
+
+      if (statusSec) statusSec.style.display = 'flex';
+      if (loginSec) loginSec.style.display = 'none';
+      if (statusMsg) {
+        statusMsg.innerHTML = '<span style="color:#15803D; font-weight:800; font-size:16.5px;"><i class="fa-solid fa-circle-check"></i> Connection Verified!<br><span style="font-size:13.5px; color:#334155; font-weight:600;">Authorize Success! Returning to EduPeak App...</span></span>';
+      }
+
+      // Attach access token and refresh token into URL hash
+      const tokenHash = `#access_token=${encodeURIComponent(session.access_token)}&refresh_token=${encodeURIComponent(session.refresh_token || '')}&token_type=bearer`;
+      const targetUrl = redirectUri.split('#')[0] + tokenHash;
+
+      setTimeout(() => {
+        window.location.replace(targetUrl);
+      }, 450);
+    }
+
+    // Direct LocalStorage session check fallback (inspects any Supabase session in localStorage)
+    function checkLocalStorageSession() {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth_token'))) {
+            const raw = localStorage.getItem(key);
+            if (raw && (raw.includes('access_token') || raw.includes('currentSession'))) {
+              const parsed = JSON.parse(raw);
+              const session = parsed.currentSession || parsed;
+              if (session && session.access_token) {
+                return session;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    async function checkAuthAndProceed() {
+      // If prompt=login is requested, keep form open for credentials
+      const forceLogin = urlParams.get('prompt') === 'login' || urlParams.get('force') === 'true' || urlParams.get('force') === '1';
+      if (forceLogin) {
+        return;
+      }
+
+      // Silently check active session in background
+      const localSession = checkLocalStorageSession();
+      if (localSession) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (localSession.expires_at && localSession.expires_at > nowSec) {
+          completeAppAuthorization(localSession);
+          return;
+        }
+      }
+
+      const client = getSupabaseClient();
+      if (client) {
+        try {
+          const sessionPromise = client.auth.getSession();
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1000));
+          
+          const result = await Promise.race([sessionPromise, timeoutPromise]);
+          if (result && result.data && result.data.session && result.data.session.access_token) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (!result.data.session.expires_at || result.data.session.expires_at > nowSec) {
+              completeAppAuthorization(result.data.session);
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Handle form submit (Email or Phone Number + Password)
+    document.getElementById('ssoLoginForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const identifier = (document.getElementById('inputIdentifier')?.value || '').trim();
+      const password = document.getElementById('inputPassword')?.value;
+      const btn = document.getElementById('btnSubmit');
+      const errBox = document.getElementById('alertError');
+
+      if (!identifier || !password) return;
+
+      if (errBox) errBox.style.display = 'none';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Checking connection...</span>';
+      }
+
+      const client = getSupabaseClient();
+      if (!client) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-rocket"></i> <span>Sign In &amp; Authorize App</span>';
+        }
+        if (errBox) {
+          errBox.textContent = 'Network error: Supabase library not loaded. Please refresh the page.';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      try {
+        let emailToUse = identifier;
+
+        // If phone number entered (no @), look up student email in profiles table
+        if (!emailToUse.includes('@')) {
+          let cleanPhone = identifier.replace(/[^0-9]/g, '');
+          if (cleanPhone.length === 9) cleanPhone = '0' + cleanPhone;
+          const phone9 = cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone;
+
+          const { data: prof, error: profErr } = await client
+            .from('profiles')
+            .select('email')
+            .or(`phone.eq.${cleanPhone},phone.eq.${phone9},phone.eq.+94${phone9}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (prof && prof.email) {
+            emailToUse = prof.email;
+          } else {
+            throw new Error(`Could not find an EduPeak student account with "${identifier}". Please use your registered email.`);
+          }
+        }
+
+        const { data, error } = await client.auth.signInWithPassword({ email: emailToUse, password });
+        if (error) throw error;
+        if (data && data.session) {
+          completeAppAuthorization(data.session);
+        } else {
+          throw new Error('Authentication succeeded but session could not be established.');
+        }
+      } catch (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-rocket"></i> <span>Sign In &amp; Authorize App</span>';
+        }
+        if (errBox) {
+          let msg = err.message || 'Invalid email or password.';
+          if (msg.toLowerCase().includes('invalid login credentials')) {
+            msg = 'Incorrect email/phone or password. Please verify your EduPeak credentials.';
+          }
+          errBox.textContent = msg;
+          errBox.style.display = 'block';
+        }
+      }
+    });
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', checkAuthAndProceed);
+    } else {
+      checkAuthAndProceed();
+    }
+  })();
+  </script>
+</body>
+</html>
