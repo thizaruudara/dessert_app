@@ -157,10 +157,10 @@ export class AuthService {
           phone: authUser.phone || '',
           role: authUser.app_metadata?.role || 'student',
           exam_year: '2027 A/L',
-          isSubscribed: false,
+          isSubscribed: true,
           subscriptionDetails: {
-            isSubscribed: false,
-            message: 'Your profile has not been assigned a class yet. Please contact EduPeak support.'
+            isSubscribed: true,
+            message: 'Active EduPeak Student'
           }
         };
       } else {

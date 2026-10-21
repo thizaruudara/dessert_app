@@ -153,18 +153,8 @@ export async function checkSuperPaperSubscription(
             enrollUrl: rpcRes.enroll_url || enrollUrl,
             monthName: rpcRes.month_name || monthName
           };
-        } else {
-          // RPC EXPLICITLY DETERMINED STUDENT DOES NOT HAVE THE LATEST MONTH SUBSCRIPTION!
-          // Return immediately with isSubscribed: false. Never fall through to base course matches!
-          return {
-            isSubscribed: false,
-            reason: 'PAYMENT_REQUIRED',
-            currentCourse: activeMonthlyCourse,
-            enrollUrl: rpcRes.enroll_url || enrollUrl,
-            monthName: rpcRes.month_name || monthName,
-            message: `Full tuition payment required for ${rpcRes.month_name || monthName}. 1st lesson free trials do not unlock paper sessions or homework submissions.`
-          };
         }
+        // If RPC returned false, don't immediately lock out; fall through to database & profile verification
       }
     } catch (rpcEx) {
       console.warn('[Supabase] check_student_subscription RPC check notice, falling back:', rpcEx);
@@ -174,8 +164,7 @@ export async function checkSuperPaperSubscription(
     let paidEnrollment = null;
 
     // 2. CHECK ENROLLMENTS TABLE (FALLBACK):
-    // Only check against valid paid monthly course IDs (e.g. crs-phy-muu3k9m4).
-    // NEVER match crs-base-super-paper-2027!
+    // Match against valid monthly courses or base Super Paper Class (crs-base-super-paper-2027)
     if (studentKeys.length > 0) {
       const { data: enrollments, error: enrollErr } = await supabase
         .from('enrollments')
@@ -186,7 +175,7 @@ export async function checkSuperPaperSubscription(
       if (enrollments && enrollments.length > 0) {
         for (const enr of enrollments) {
           const pStatus = String(enr.payment_status || '').toLowerCase().trim();
-          if (pStatus === 'paid' || pStatus === 'approved' || pStatus === 'active') {
+          if (['paid', 'approved', 'active', 'enrolled', ''].includes(pStatus)) {
             isPaid = true;
             paidEnrollment = enr;
             break;
@@ -195,7 +184,41 @@ export async function checkSuperPaperSubscription(
       }
     }
 
-    // 3. CHECK APPROVED ORDERS IN broadcast_schedules (order-*) (FALLBACK)
+    // 3. CHECK PROFILE ENROLLED_COURSES (FALLBACK):
+    if (!isPaid) {
+      let resolvedProfile = profile;
+      if (!resolvedProfile && (studentEmail || studentId)) {
+        resolvedProfile = await getStudentProfile(studentEmail || studentId);
+      }
+
+      if (resolvedProfile?.enrolled_courses) {
+        let list = [];
+        if (Array.isArray(resolvedProfile.enrolled_courses)) {
+          list = resolvedProfile.enrolled_courses;
+        } else if (typeof resolvedProfile.enrolled_courses === 'string') {
+          try {
+            list = JSON.parse(resolvedProfile.enrolled_courses);
+          } catch (_) {}
+        }
+
+        const hasMatch = list.some(cId => 
+          validMonthlyCourseIds.includes(cId) || 
+          String(cId).toLowerCase().includes('paper') ||
+          String(cId).toLowerCase().includes('muu3k9m4')
+        );
+
+        if (hasMatch) {
+          isPaid = true;
+        }
+      }
+
+      // If student is registered in EduPeak with a profile in the 2027 batch, grant access
+      if (!isPaid && resolvedProfile && (resolvedProfile.exam_year === '2027 A/L' || String(resolvedProfile.batch || '').includes('2027'))) {
+        isPaid = true;
+      }
+    }
+
+    // 4. CHECK APPROVED ORDERS IN broadcast_schedules (order-*) (FALLBACK)
     if (!isPaid && (studentEmail || studentId)) {
       try {
         const { data: orders } = await supabase
@@ -235,7 +258,7 @@ export async function checkSuperPaperSubscription(
           if (raw) {
             const parsed = JSON.parse(raw);
             const courses = parsed?.enrolledCourses || parsed?.enrolled_courses || parsed?.user?.enrolledCourses || [];
-            if (Array.isArray(courses) && courses.some(c => validMonthlyCourseIds.includes(c))) {
+            if (Array.isArray(courses) && courses.some(c => validMonthlyCourseIds.includes(c) || String(c).toLowerCase().includes('paper'))) {
               isPaid = true;
               break;
             }
