@@ -59,6 +59,20 @@ class AppController {
       if (appIsUnlocked && (!user || isExplicitlyLoggedOut) && !authService.loading) {
         this.renderAuthScreen();
       } else if (user && !isExplicitlyLoggedOut && appIsUnlocked) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const examRoomId = urlParams.get('exam_room') || urlParams.get('student_exam');
+        if (examRoomId) {
+          const slot = urlParams.get('slot') || 'slot1';
+          if (user.role === 'admin' && urlParams.get('view') !== 'student') {
+            if (this.currentMode !== 'admin') this.renderAdminApp();
+          } else {
+            this.currentMode = 'student';
+            this.renderApp();
+          }
+          this.openStudentLiveExamRoom(examRoomId, slot);
+          return;
+        }
+
         if (user.role === 'admin') {
           if (this.currentMode !== 'admin') this.renderAdminApp();
         } else {
@@ -12527,10 +12541,9 @@ class AppController {
             <div style="font-size:11px; color:#94A3B8;">
               Connected to Session Channel: exam_${String(session.id).replace(/[^a-zA-Z0-9_]/g, '_')}
             </div>
-            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-              <span class="material-symbols-rounded filled" style="font-size:15px;">description</span>
-              <span>Test Student View</span>
-              <span class="material-symbols-rounded" style="font-size:14px;">arrow_forward</span>
+            <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Open Student Exam View in a new tab to test your camera live">
+              <span class="material-symbols-rounded filled" style="font-size:15px;">open_in_new</span>
+              <span>Test Student View (New Tab)</span>
             </button>
           </div>
         </div>
@@ -12805,12 +12818,15 @@ class AppController {
         return;
       }
 
-      // 8. Test Student View
+      // 8. Test Student View (Open in a new tab so invigilator monitor stays active!)
       const testStudentBtn = e.target.closest('#btn-hall-test-student');
       if (testStudentBtn) {
         e.preventDefault();
-        closeProctorHall();
-        this.openStudentLiveExamRoom(session.id, 'slot1');
+        const testUrl = `${window.location.origin}/?view=student&exam_room=${session.id}&slot=slot1`;
+        window.open(testUrl, '_blank');
+        if (typeof notificationService !== 'undefined') {
+          notificationService.showInAppBanner('Student View Opened', 'Student exam room opened in a new tab. Your camera will broadcast live to this monitor!', 'success', 5000);
+        }
         return;
       }
 
@@ -13362,6 +13378,8 @@ class AppController {
     let timerInterval = null;
     let isBigTimerMinimized = false;
     let facingMode = 'user'; // front / user camera
+    let selectedCameraDeviceId = null;
+    let availableVideoDevices = [];
     let now = new Date();
     let shownAlertIds = new Set();
     let studentAgoraUid = null;
@@ -13443,11 +13461,56 @@ class AppController {
         if (cameraStream) {
           cameraStream.getTracks().forEach(t => t.stop());
         }
+
+        // Query available video devices so we avoid defaulting to inactive OBS Virtual Camera
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          try {
+            const allDevs = await navigator.mediaDevices.enumerateDevices();
+            availableVideoDevices = allDevs.filter(d => d.kind === 'videoinput');
+            if (availableVideoDevices.length > 1 && !selectedCameraDeviceId) {
+              const nonVirtual = availableVideoDevices.find(d => !/obs|virtual|screen/i.test(d.label));
+              if (nonVirtual && nonVirtual.deviceId) {
+                selectedCameraDeviceId = nonVirtual.deviceId;
+              }
+            }
+          } catch (_) {}
+        }
+
+        const videoConstraints = {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        };
+        if (selectedCameraDeviceId) {
+          videoConstraints.deviceId = { exact: selectedCameraDeviceId };
+        } else {
+          videoConstraints.facingMode = facingMode;
+        }
+
         cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: videoConstraints,
           audio: false
         });
         cameraActive = true;
+
+        // Re-enumerate with labels now available after permission grant
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          try {
+            const allDevs = await navigator.mediaDevices.enumerateDevices();
+            availableVideoDevices = allDevs.filter(d => d.kind === 'videoinput');
+            const camSelect = roomContainer.querySelector('#exam-camera-select');
+            if (camSelect && availableVideoDevices.length > 1) {
+              const activeTrack = cameraStream.getVideoTracks()[0];
+              const activeDeviceId = activeTrack?.getSettings()?.deviceId || selectedCameraDeviceId;
+              camSelect.innerHTML = availableVideoDevices.map((d, idx) => `
+                <option value="${d.deviceId}" ${d.deviceId === activeDeviceId ? 'selected' : ''}>
+                  ${d.label || `Camera ${idx + 1}`}
+                </option>
+              `).join('');
+              camSelect.style.display = 'inline-block';
+            }
+          } catch (_) {}
+        }
+
         const videoEls = roomContainer.querySelectorAll('.proctor-video-feed');
         videoEls.forEach(v => {
           v.srcObject = cameraStream;
@@ -13737,10 +13800,17 @@ ${!times.isWaiting ? `
 
               <!-- 2. Camera Self-Check Box -->
               <div style="margin-top:16px; background:#1E293B; border-radius:16px; border:1px solid #334155; overflow:hidden;">
-                <div style="padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155;">
-                  <div style="display:flex; align-items:center; gap:8px;">
+                <div style="padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; flex-wrap:wrap; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span class="material-symbols-rounded" style="color:#22C55E; font-size:18px;">videocam</span>
                     <span style="font-size:12px; font-weight:600; color:#FFFFFF;">කැමරා පූර්ව පරීක්ෂාව (Self-Check)</span>
+                    <select id="exam-camera-select" style="display:${availableVideoDevices.length > 1 ? 'inline-block' : 'none'}; background:#0F172A; border:1px solid #334155; color:#38BDF8; font-size:10.5px; padding:2px 8px; border-radius:6px; outline:none; max-width:180px;">
+                      ${availableVideoDevices.map((d, idx) => `
+                        <option value="${d.deviceId}" ${d.deviceId === selectedCameraDeviceId ? 'selected' : ''}>
+                          ${d.label || `Camera ${idx + 1}`}
+                        </option>
+                      `).join('')}
+                    </select>
                   </div>
                   <div class="camera-status-pill" style="padding:3px 8px; border-radius:10px; font-size:10px; font-weight:700; ${cameraActive ? 'background:rgba(34,197,94,0.2); border:1px solid #22C55E; color:#4ADE80;' : 'background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5;'}">
                     ${cameraActive ? '<span class="material-symbols-rounded filled" style="font-size:11px; vertical-align:middle; margin-right:2px;">fiber_manual_record</span>Online' : '<span class="material-symbols-rounded filled" style="font-size:11px; vertical-align:middle; margin-right:2px;">fiber_manual_record</span>Offline'}
@@ -13994,6 +14064,12 @@ ${!times.isWaiting ? `
 
       roomContainer.querySelector('#btn-flip-self-check')?.addEventListener('click', () => {
         facingMode = facingMode === 'user' ? 'environment' : 'user';
+        selectedCameraDeviceId = null;
+        initCamera();
+      });
+
+      roomContainer.querySelector('#exam-camera-select')?.addEventListener('change', (e) => {
+        selectedCameraDeviceId = e.target.value;
         initCamera();
       });
 
