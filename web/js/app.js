@@ -15480,27 +15480,11 @@ ${!times.isWaiting ? `
             <span style="white-space:nowrap;">Alt View</span>
           </button>
 
-          <a id="btn-paper-external" href="${escapeHTML(rawPdf)}" target="_blank" rel="noopener noreferrer" style="background: linear-gradient(135deg, #2563EB, #1D4ED8); border: 1px solid #60A5FA; color: #FFFFFF; border-radius: 10px; padding: 6px 12px; font-size: 11.5px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(37,99,235,0.4);">
-            <span class="material-symbols-rounded" style="font-size: 16px;">open_in_new</span>
-            <span style="white-space:nowrap;">Open Tab (නව Tab එකක්)</span>
-          </a>
-
           <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 10px; padding: 7px 13px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
             <span class="material-symbols-rounded" style="font-size: 16px;">close</span>
             <span style="white-space: nowrap;">Return to Exam</span>
           </button>
         </div>
-      </div>
-
-      <!-- Helper Notice Banner -->
-      <div style="background: rgba(15, 23, 42, 0.98); border-bottom: 1px solid #334155; padding: 6px 16px; font-size: 11px; color: #CBD5E1; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-rounded" style="font-size: 15px; color: #38BDF8;">info</span>
-          <span>Screen එකේ ප්‍රශ්න පත්‍රය නොපෙනේ නම් හෝ Block වී ඇත්නම්, <b>Alt View</b> ඔබන්න හෝ ඉහළ ඇති <b>Open Tab</b> එකෙන් බලන්න.</span>
-        </div>
-        <a href="${escapeHTML(rawPdf)}" target="_blank" rel="noopener noreferrer" style="color: #60A5FA; font-weight: 700; text-decoration: underline; font-size: 11px; white-space: nowrap;">
-          Direct Google Drive එකෙන් අරින්න ↗
-        </a>
       </div>
 
       <!-- Main Document Viewport & Scroll Area -->
@@ -15513,7 +15497,6 @@ ${!times.isWaiting ? `
             <div style="width: 38px; height: 38px; border: 3.5px solid #334155; border-top-color: #38BDF8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
             <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;">ප්‍රශ්න පත්‍රය Load වෙමින් පවතී...</div>
             <div style="font-size: 11px; color: #94A3B8;">Loading Question Paper PDF</div>
-            <div style="font-size: 11px; color: #64748B; margin-top: 6px;">ප්‍රශ්න පත්‍රය නොපෙනේ නම් ඉහළ ඇති <b>Alt View</b> හෝ <b>Open Tab</b> භාවිතා කරන්න.</div>
           </div>
 
           <iframe id="secure-paper-iframe" src="${iframeSrc}" style="width: 100%; height: calc(100vh - 60px); min-height: 600px; border: none; background: #FFFFFF; display: block; flex: 1;" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade" loading="eager"></iframe>
