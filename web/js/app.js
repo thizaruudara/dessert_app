@@ -15325,13 +15325,13 @@ ${!times.isWaiting ? `
     const cleanUrl = String(url).trim();
     if (!cleanUrl) return '';
 
-    // 1. Google Drive URLs (convert /view, /edit, etc. to /preview)
+    // 1. Google Drive URLs (use Google Docs embed stream as default to prevent Chrome 3rd-party cookie / multi-account block)
     if (cleanUrl.includes('drive.google.com')) {
       const matchD = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
       const matchId = cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       const fileId = matchD ? matchD[1] : (matchId ? matchId[1] : null);
       if (fileId) {
-        return `https://drive.google.com/file/d/${fileId}/preview`;
+        return `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}&export=download`)}&embedded=true`;
       }
     }
 
@@ -15379,12 +15379,12 @@ ${!times.isWaiting ? `
     const viewerOptions = [];
     if (fileId) {
       viewerOptions.push({
-        name: 'Drive View',
-        url: `https://drive.google.com/file/d/${fileId}/preview`
+        name: 'Docs View (Default)',
+        url: `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}&export=download`)}&embedded=true`
       });
       viewerOptions.push({
-        name: 'Docs View',
-        url: `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}&export=download`)}&embedded=true`
+        name: 'Drive Preview',
+        url: `https://drive.google.com/file/d/${fileId}/preview`
       });
       viewerOptions.push({
         name: 'Drive Alt',
@@ -15392,12 +15392,12 @@ ${!times.isWaiting ? `
       });
     } else {
       viewerOptions.push({
-        name: 'Standard View',
-        url: iframeSrc
-      });
-      viewerOptions.push({
         name: 'Docs View',
         url: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdf)}&embedded=true`
+      });
+      viewerOptions.push({
+        name: 'Standard View',
+        url: iframeSrc
       });
     }
 
@@ -15480,9 +15480,9 @@ ${!times.isWaiting ? `
             <span style="white-space:nowrap;">Alt View</span>
           </button>
 
-          <a id="btn-paper-external" href="${escapeHTML(rawPdf)}" target="_blank" rel="noopener noreferrer" style="background: rgba(37, 99, 235, 0.25); border: 1px solid #3B82F6; color: #93C5FD; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-            <span class="material-symbols-rounded" style="font-size: 15px;">open_in_new</span>
-            <span style="white-space:nowrap;">Open Tab</span>
+          <a id="btn-paper-external" href="${escapeHTML(rawPdf)}" target="_blank" rel="noopener noreferrer" style="background: linear-gradient(135deg, #2563EB, #1D4ED8); border: 1px solid #60A5FA; color: #FFFFFF; border-radius: 10px; padding: 6px 12px; font-size: 11.5px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(37,99,235,0.4);">
+            <span class="material-symbols-rounded" style="font-size: 16px;">open_in_new</span>
+            <span style="white-space:nowrap;">Open Tab (නව Tab එකක්)</span>
           </a>
 
           <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 10px; padding: 7px 13px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
@@ -15490,6 +15490,17 @@ ${!times.isWaiting ? `
             <span style="white-space: nowrap;">Return to Exam</span>
           </button>
         </div>
+      </div>
+
+      <!-- Helper Notice Banner -->
+      <div style="background: rgba(15, 23, 42, 0.98); border-bottom: 1px solid #334155; padding: 6px 16px; font-size: 11px; color: #CBD5E1; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-rounded" style="font-size: 15px; color: #38BDF8;">info</span>
+          <span>Screen එකේ ප්‍රශ්න පත්‍රය නොපෙනේ නම් හෝ Block වී ඇත්නම්, <b>Alt View</b> ඔබන්න හෝ ඉහළ ඇති <b>Open Tab</b> එකෙන් බලන්න.</span>
+        </div>
+        <a href="${escapeHTML(rawPdf)}" target="_blank" rel="noopener noreferrer" style="color: #60A5FA; font-weight: 700; text-decoration: underline; font-size: 11px; white-space: nowrap;">
+          Direct Google Drive එකෙන් අරින්න ↗
+        </a>
       </div>
 
       <!-- Main Document Viewport & Scroll Area -->
