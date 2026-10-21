@@ -2665,19 +2665,20 @@ class AppController {
         </div>
 
         <!-- Subject Filter Pills (Physics, Chemistry, Combined Maths, O/L Science) -->
-        <div style="margin: 0 16px 12px; display:flex; align-items:center; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+        <div class="subject-filter-scroll-row" style="margin: 0 16px 12px; display:flex; align-items:center; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:4px;">
           ${subjects.map(s => {
             const isSel = (this.studentSelectedPaperSubject || 'All Subjects') === s;
-            let activeColor = '#4F46E5';
-            let activeBg = '#EEF2FF';
-            let activeBorder = '#C7D2FE';
-            if (s === 'Chemistry') { activeColor = '#059669'; activeBg = '#ECFDF5'; activeBorder = '#A7F3D0'; }
+            let activeColor = '#2563EB';
+            let activeBg = '#EFF6FF';
+            let activeBorder = '#BFDBFE';
+            if (s === 'Physics') { activeColor = '#2563EB'; activeBg = '#EFF6FF'; activeBorder = '#BFDBFE'; }
+            else if (s === 'Chemistry') { activeColor = '#059669'; activeBg = '#ECFDF5'; activeBorder = '#A7F3D0'; }
             else if (s === 'Combined Maths') { activeColor = '#7C3AED'; activeBg = '#F5F3FF'; activeBorder = '#DDD6FE'; }
             else if (s === 'O/L Science') { activeColor = '#D97706'; activeBg = '#FFFBEB'; activeBorder = '#FDE68A'; }
 
-            return `<button class="sub-tab-btn ${isSel ? 'active' : ''}" data-student-subject="${s}" style="padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; border:1px solid ${isSel ? activeBorder : '#E2E8F0'}; background:${isSel ? activeBg : '#FFFFFF'}; color:${isSel ? activeColor : '#64748B'}; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-              ${isSel ? '<span class="material-symbols-rounded" style="font-size:14px;">check</span>' : ''}
-              <span>${s}</span>
+            return `<button type="button" class="subject-chip-pill ${isSel ? 'active' : ''}" data-student-subject="${s}" style="flex:0 0 auto !important; flex-shrink:0 !important; display:inline-flex !important; flex-direction:row !important; align-items:center !important; justify-content:center !important; gap:5px !important; padding:7px 14px; border-radius:9999px; font-size:12px; font-weight:700; border:1.5px solid ${isSel ? activeBorder : '#E2E8F0'}; background:${isSel ? activeBg : '#FFFFFF'}; color:${isSel ? activeColor : '#64748B'}; cursor:pointer; white-space:nowrap !important; transition:all 0.15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.04); touch-action:manipulation;">
+              ${isSel ? '<span class="material-symbols-rounded filled" style="font-size:15px; flex-shrink:0;">check</span>' : ''}
+              <span style="white-space:nowrap;">${s}</span>
             </button>`;
           }).join('')}
         </div>
@@ -7004,7 +7005,7 @@ class AppController {
       </div>
 
       <!-- Subject Filter Chips (Physics, Chemistry, Combined Maths, O/L Science) -->
-      <div style="padding:4px 16px 10px; display:flex; align-items:center; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+      <div class="subject-filter-scroll-row" style="padding:4px 16px 10px; display:flex; align-items:center; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
         ${subjects.map(s => {
           const isSel = (this.adminSelectedPaperSubject || 'All Subjects') === s;
           let activeColor = '#2563EB';
@@ -7014,9 +7015,9 @@ class AppController {
           else if (s === 'Combined Maths') { activeColor = '#7C3AED'; activeBg = '#F5F3FF'; activeBorder = '#DDD6FE'; }
           else if (s === 'O/L Science') { activeColor = '#D97706'; activeBg = '#FFFBEB'; activeBorder = '#FDE68A'; }
           
-          return `<button class="apk-chip-btn ${isSel ? 'active' : ''}" data-admin-subject="${s}" style="padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; border:1px solid ${isSel ? activeBorder : '#E2E8F0'}; background:${isSel ? activeBg : '#FFFFFF'}; color:${isSel ? activeColor : '#64748B'}; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; display:inline-flex; align-items:center; gap:4px;">
-            ${isSel ? '<span class="material-symbols-rounded" style="font-size:14px;">check</span>' : ''}
-            <span>${s}</span>
+          return `<button type="button" class="subject-chip-pill ${isSel ? 'active' : ''}" data-admin-subject="${s}" style="flex:0 0 auto !important; flex-shrink:0 !important; display:inline-flex !important; flex-direction:row !important; align-items:center !important; justify-content:center !important; gap:5px !important; padding:7px 14px; border-radius:9999px; font-size:12px; font-weight:700; border:1.5px solid ${isSel ? activeBorder : '#E2E8F0'}; background:${isSel ? activeBg : '#FFFFFF'}; color:${isSel ? activeColor : '#64748B'}; cursor:pointer; white-space:nowrap !important; transition:all 0.15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.04); touch-action:manipulation;">
+            ${isSel ? '<span class="material-symbols-rounded filled" style="font-size:15px; flex-shrink:0;">check</span>' : ''}
+            <span style="white-space:nowrap;">${s}</span>
           </button>`;
         }).join('')}
       </div>

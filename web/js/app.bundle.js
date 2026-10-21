@@ -1474,10 +1474,10 @@ ${$}`}var vr=class extends Error{constructor({message:t,code:r,cause:o,name:l}){
         </div>
 
         <!-- Subject Filter Pills (Physics, Chemistry, Combined Maths, O/L Science) -->
-        <div style="margin: 0 16px 12px; display:flex; align-items:center; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
-          ${S.map(L=>{let U=(this.studentSelectedPaperSubject||"All Subjects")===L,H="#4F46E5",$="#EEF2FF",Z="#C7D2FE";return L==="Chemistry"?(H="#059669",$="#ECFDF5",Z="#A7F3D0"):L==="Combined Maths"?(H="#7C3AED",$="#F5F3FF",Z="#DDD6FE"):L==="O/L Science"&&(H="#D97706",$="#FFFBEB",Z="#FDE68A"),`<button class="sub-tab-btn ${U?"active":""}" data-student-subject="${L}" style="padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; border:1px solid ${U?Z:"#E2E8F0"}; background:${U?$:"#FFFFFF"}; color:${U?H:"#64748B"}; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-              ${U?'<span class="material-symbols-rounded" style="font-size:14px;">check</span>':""}
-              <span>${L}</span>
+        <div class="subject-filter-scroll-row" style="margin: 0 16px 12px; display:flex; align-items:center; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:4px;">
+          ${S.map(L=>{let U=(this.studentSelectedPaperSubject||"All Subjects")===L,H="#2563EB",$="#EFF6FF",Z="#BFDBFE";return L==="Physics"?(H="#2563EB",$="#EFF6FF",Z="#BFDBFE"):L==="Chemistry"?(H="#059669",$="#ECFDF5",Z="#A7F3D0"):L==="Combined Maths"?(H="#7C3AED",$="#F5F3FF",Z="#DDD6FE"):L==="O/L Science"&&(H="#D97706",$="#FFFBEB",Z="#FDE68A"),`<button type="button" class="subject-chip-pill ${U?"active":""}" data-student-subject="${L}" style="flex:0 0 auto !important; flex-shrink:0 !important; display:inline-flex !important; flex-direction:row !important; align-items:center !important; justify-content:center !important; gap:5px !important; padding:7px 14px; border-radius:9999px; font-size:12px; font-weight:700; border:1.5px solid ${U?Z:"#E2E8F0"}; background:${U?$:"#FFFFFF"}; color:${U?H:"#64748B"}; cursor:pointer; white-space:nowrap !important; transition:all 0.15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.04); touch-action:manipulation;">
+              ${U?'<span class="material-symbols-rounded filled" style="font-size:15px; flex-shrink:0;">check</span>':""}
+              <span style="white-space:nowrap;">${L}</span>
             </button>`}).join("")}
         </div>
 
@@ -3582,10 +3582,10 @@ Student grades, XP points, teacher feedback, and exam history will be 100% prese
       </div>
 
       <!-- Subject Filter Chips (Physics, Chemistry, Combined Maths, O/L Science) -->
-      <div style="padding:4px 16px 10px; display:flex; align-items:center; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
-        ${r.map(U=>{let H=(this.adminSelectedPaperSubject||"All Subjects")===U,$="#2563EB",Z="#EFF6FF",se="#BFDBFE";return U==="Chemistry"?($="#059669",Z="#ECFDF5",se="#A7F3D0"):U==="Combined Maths"?($="#7C3AED",Z="#F5F3FF",se="#DDD6FE"):U==="O/L Science"&&($="#D97706",Z="#FFFBEB",se="#FDE68A"),`<button class="apk-chip-btn ${H?"active":""}" data-admin-subject="${U}" style="padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; border:1px solid ${H?se:"#E2E8F0"}; background:${H?Z:"#FFFFFF"}; color:${H?$:"#64748B"}; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; display:inline-flex; align-items:center; gap:4px;">
-            ${H?'<span class="material-symbols-rounded" style="font-size:14px;">check</span>':""}
-            <span>${U}</span>
+      <div class="subject-filter-scroll-row" style="padding:4px 16px 10px; display:flex; align-items:center; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+        ${r.map(U=>{let H=(this.adminSelectedPaperSubject||"All Subjects")===U,$="#2563EB",Z="#EFF6FF",se="#BFDBFE";return U==="Chemistry"?($="#059669",Z="#ECFDF5",se="#A7F3D0"):U==="Combined Maths"?($="#7C3AED",Z="#F5F3FF",se="#DDD6FE"):U==="O/L Science"&&($="#D97706",Z="#FFFBEB",se="#FDE68A"),`<button type="button" class="subject-chip-pill ${H?"active":""}" data-admin-subject="${U}" style="flex:0 0 auto !important; flex-shrink:0 !important; display:inline-flex !important; flex-direction:row !important; align-items:center !important; justify-content:center !important; gap:5px !important; padding:7px 14px; border-radius:9999px; font-size:12px; font-weight:700; border:1.5px solid ${H?se:"#E2E8F0"}; background:${H?Z:"#FFFFFF"}; color:${H?$:"#64748B"}; cursor:pointer; white-space:nowrap !important; transition:all 0.15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.04); touch-action:manipulation;">
+            ${H?'<span class="material-symbols-rounded filled" style="font-size:15px; flex-shrink:0;">check</span>':""}
+            <span style="white-space:nowrap;">${U}</span>
           </button>`}).join("")}
       </div>
 
