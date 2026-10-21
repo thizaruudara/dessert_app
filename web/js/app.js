@@ -6099,7 +6099,7 @@ class AppController {
 
     root.innerHTML = `
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 calc(70px + env(safe-area-inset-bottom, 0px)) 0;">
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 24px 0;">
         <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>

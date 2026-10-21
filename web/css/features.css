@@ -3758,20 +3758,14 @@ html[data-theme="dark"] .splash-loading-text {
 
 /* ── Floating Action Button (FAB) & Contained Slot ── */
 #admin-fab-slot {
-  position: fixed;
+  position: absolute;
   bottom: calc(70px + env(safe-area-inset-bottom, 0px));
-  right: max(16px, calc((100vw - 430px) / 2 + 16px));
+  right: 16px;
   z-index: 110;
   pointer-events: none;
 }
 #admin-fab-slot > * {
   pointer-events: auto;
-}
-@media (min-width: 900px) {
-  #admin-fab-slot {
-    position: absolute;
-    right: 16px;
-  }
 }
 
 /* ── Admin Bottom Navigation Bar Styling (inherits .bottom-nav-bar) ── */
