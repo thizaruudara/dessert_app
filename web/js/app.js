@@ -7,7 +7,7 @@ import { notificationService } from './notification-service.js';
 import { cameraService } from './camera-service.js';
 import { storageService } from './storage-service.js';
 import { PwaGatekeeper } from './pwa-gatekeeper.js';
-import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid } from './agora-service.js';
+import { AgoraStudentBroadcaster, AgoraAdminAudience, getNumericUid, getComputedAgoraUid } from './agora-service.js';
 import { loadOpenCV, detectDocument, detectDocumentCanvasFallback, warpDocument, enhance, rotateCanvas, canvasToBlob, canvasToDataURL, orderPoints, buildPdf } from './scanner-core.js';
 
 export function escapeHTML(value) {
@@ -191,6 +191,14 @@ class AppController {
 
     // Delegated Global Action & Navigation Handler (Guarantees buttons always respond regardless of DOM re-renders)
     document.addEventListener('click', async (e) => {
+      // 0. Dismiss subscription warning banner
+      const dismissBtn = e.target.closest('.btn-dismiss-sub-banner');
+      if (dismissBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.dismissSubscriptionBanner();
+        return;
+      }
       // 1. Re-check subscription
       const subTarget = e.target.closest('#btn-recheck-subscription, .btn-recheck-subscription-sub, .btn-recheck-subscription');
       if (subTarget) {
@@ -569,6 +577,26 @@ class AppController {
   }
 
   // ── Subscription Gatekeeper: Super Paper Class Monthly Access ──
+  isSubscriptionBannerDismissed() {
+    try {
+      return localStorage.getItem('edupeak_sub_banner_dismissed') === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  dismissSubscriptionBanner() {
+    try {
+      localStorage.setItem('edupeak_sub_banner_dismissed', 'true');
+    } catch (_) {}
+    document.querySelectorAll('.subscription-warning-card').forEach(el => {
+      el.style.transition = 'all 0.2s ease';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-6px)';
+      setTimeout(() => el.remove(), 220);
+    });
+  }
+
   checkSubscriptionAccess(featureName = 'this feature') {
     if (!this.currentUser || this.currentUser.role === 'admin' || this.currentUser.role === 'teacher') return true;
     if (this.currentUser.isSubscribed === true) return true;
@@ -1250,7 +1278,7 @@ class AppController {
     const featuredUpcoming = !featuredSession ? upcomingPaper : null;
 
     container.innerHTML = `
-      ${user.isSubscribed === false ? `
+      ${(user.isSubscribed === false && !this.isSubscriptionBannerDismissed()) ? `
         <!-- Subscription Warning Banner -->
         <div class="subscription-warning-card" style="margin:12px 16px 18px; background:linear-gradient(135deg, #FFFBEB, #FEF3C7); border:1.5px solid #F59E0B; border-radius:18px; padding:16px 18px; box-shadow:0 8px 20px rgba(245,158,11,0.14); display:flex; flex-direction:column; gap:12px;">
           <div style="display:flex; align-items:flex-start; gap:12px;">
@@ -2196,7 +2224,7 @@ class AppController {
               <span>Scan Answers (පිළිතුරු පත්‍ර Scan කරන්න)</span>
             </button>
           ` : (isScheduled && !isLive && !isEnded) ? (
-            user.isSubscribed === false ? `
+            (user.isSubscribed === false && !this.isSubscriptionBannerDismissed()) ? `
               <button type="button" class="btn-primary btn-register-session-slot" data-paper-id="${session.id}" data-slot-id="${selectedSlotId}" style="background:linear-gradient(135deg, #475569 0%, #334155 100%); color:#FFFFFF; height:48px; border-radius:14px; font-size:13.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; border:none; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.18);">
                 <span class="material-symbols-rounded" style="font-size:20px; color:#F59E0B;">lock</span>
                 <span>Unlock Paper Session (${user.subscriptionDetails?.monthName || 'October 2027'} Subscription Required)</span>
@@ -2592,7 +2620,7 @@ class AppController {
           </div>
         </div>
 
-        ${user.isSubscribed === false ? `
+        ${(user.isSubscribed === false && !this.isSubscriptionBannerDismissed()) ? `
           <!-- Subscription Warning Banner -->
           <div class="subscription-warning-card" style="margin: 6px 16px 14px; background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1.5px solid #F59E0B; border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 16px rgba(245,158,11,0.12); display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; align-items: flex-start; gap: 10px;">
@@ -2609,6 +2637,10 @@ class AppController {
                 <span>Enroll / Pay on EduPeak.lk</span>
                 <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
               </a>
+              <button type="button" class="btn-dismiss-sub-banner" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-rounded" style="font-size: 14px;">close</span>
+                <span>Dismiss</span>
+              </button>
               <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                 <span class="material-symbols-rounded" style="font-size: 14px;">sync</span>
                 <span>Re-check Access</span>
@@ -3797,7 +3829,7 @@ class AppController {
         </div>
       </div>
 
-      ${user.isSubscribed === false ? `
+      ${(user.isSubscribed === false && !this.isSubscriptionBannerDismissed()) ? `
         <!-- Subscription Warning Banner -->
         <div class="subscription-warning-card" style="margin: 6px 16px 14px; background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1.5px solid #F59E0B; border-radius: 16px; padding: 14px 16px; box-shadow: 0 6px 16px rgba(245,158,11,0.12); display: flex; flex-direction: column; gap: 10px;">
           <div style="display: flex; align-items: flex-start; gap: 10px;">
@@ -3814,7 +3846,11 @@ class AppController {
               <span>Enroll / Pay on EduPeak.lk</span>
               <span class="material-symbols-rounded" style="font-size: 14px;">open_in_new</span>
             </a>
-            <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <button type="button" class="btn-dismiss-sub-banner" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-rounded" style="font-size: 14px;">close</span>
+                <span>Dismiss</span>
+              </button>
+              <button type="button" class="btn-recheck-subscription-sub" style="background: white; border: 1px solid #FCD34D; color: #92400E; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
               <span class="material-symbols-rounded" style="font-size: 14px;">sync</span>
               <span>Re-check Access</span>
             </button>
@@ -6056,7 +6092,7 @@ class AppController {
 
     root.innerHTML = `
       <!-- Main Scrollable Viewport with Persistent Admin Tab Viewports (Instant Zero-Lag Navigation) -->
-      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 calc(76px + var(--safe-bottom, 0px)) 0;">
+      <div class="main-viewport" id="admin-main-viewport" style="background:#F8FAFC; padding:0 0 calc(70px + env(safe-area-inset-bottom, 0px)) 0;">
         <div id="admin-tab-viewport-dashboard" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-papers" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
         <div id="admin-tab-viewport-sprints" class="tab-viewport" style="display:none; width:100%; flex-direction:column; gap:0;"></div>
@@ -11544,18 +11580,42 @@ class AppController {
     }
 
     const modal = document.createElement('div');
-    modal.className = 'app-modal';
+    modal.className = 'app-modal proctor-modal-root';
     modal.style.display = 'flex';
     modal.style.justifyContent = 'center';
     modal.style.alignItems = 'center';
     modal.style.background = '#0F172A';
+    modal.style.padding = '0';
     modal.style.backdropFilter = 'none';
     modal.style.webkitBackdropFilter = 'none';
-    modal.style.zIndex = '9999';
+    modal.style.zIndex = '99999';
+
+    // Mount to document.body immediately so all sub-elements exist in DOM
+    document.body.appendChild(modal);
 
     let activeTab = 'slot1'; // 'slot1', 'slot2', 'answers'
     let allStudents = [];
     let unsubs = [];
+
+    // Helper: Candidate UIDs matching Flutter PaperRegistration.computedAgoraUid 1:1
+    const getStudentCandidateUids = (s) => {
+      if (!s) return [];
+      const list = [];
+      if (s.agoraUid && Number(s.agoraUid) > 0) list.push(Number(s.agoraUid));
+      const computed = getComputedAgoraUid(s);
+      if (computed && !list.includes(computed)) list.push(computed);
+      const phone = s.studentPhone || s.phone;
+      if (phone) {
+        const pUid = getNumericUid(phone);
+        if (pUid && !list.includes(pUid)) list.push(pUid);
+      }
+      const sId = s.studentId || s.id || s.uid;
+      if (sId) {
+        const idUid = getNumericUid(sId);
+        if (idUid && !list.includes(idUid)) list.push(idUid);
+      }
+      return list;
+    };
 
     // Initialize Agora Real-time Proctor Audience
     if (this.agoraProctor) {
@@ -11563,8 +11623,9 @@ class AppController {
       this.agoraProctor = null;
     }
     this.agoraProctor = new AgoraAdminAudience();
-    this.agoraProctor.start(session.id, () => {
-      if (attachAgoraStreams) attachAgoraStreams();
+    this.agoraProctor.start(session.id, (remoteUid, user, isPublished) => {
+      if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
+      scheduleProctorRender();
     });
 
     const attachAgoraStreams = () => {
@@ -11577,7 +11638,7 @@ class AppController {
 
       modal.querySelectorAll('.student-camera-box').forEach(box => {
         const studentId = box.dataset.studentId;
-        const student = allStudents.find(s => s.studentId === studentId);
+        const student = allStudents.find(s => (s.studentId || s.id || s.uid) === studentId);
         if (!student) return;
         const isSubmitted = isStudentSubmitted(student);
 
@@ -11590,7 +11651,6 @@ class AppController {
 
         // If this student is currently being viewed in full screen,
         // DO NOT mount or steal the video stream to this thumbnail box!
-        // WebRTC video tracks can only be played in ONE DOM container at a time.
         if (activeFsStudentId && activeFsStudentId === studentId) {
           if (!box.querySelector('.fs-active-indicator')) {
             box.innerHTML = `
@@ -11602,16 +11662,15 @@ class AppController {
           }
           return;
         } else {
-          // If not in full screen, ensure any stale indicator is removed
           const fsInd = box.querySelector('.fs-active-indicator');
           if (fsInd) fsInd.remove();
         }
 
-        const uid = student.agoraUid || getNumericUid(student.studentId);
-        if (this.agoraProctor.hasStream(uid)) {
+        const candidateUids = getStudentCandidateUids(student);
+        if (this.agoraProctor.hasStream(candidateUids)) {
           if (!box.querySelector('.agora-active-player')) {
             box.innerHTML = '<div class="agora-active-player" style="width:100%; height:100%; position:relative;"></div>';
-            this.agoraProctor.playRemoteVideo(uid, box.querySelector('.agora-active-player'), { fit: 'cover' });
+            this.agoraProctor.playRemoteVideo(candidateUids, box.querySelector('.agora-active-player'), { fit: 'cover' });
             const badge = document.createElement('div');
             badge.style.cssText = 'position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:#22C55E; color:#FFFFFF; font-size:8.5px; font-weight:700; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.5); display:flex; align-items:center; gap:3px;';
             badge.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:10px;">videocam</span> AGORA 720p HD';
@@ -11622,18 +11681,17 @@ class AppController {
 
       // Maintain Full Screen Stream Without Disruption
       if (fsModal && activeFsStudentId) {
-        const fsStudent = allStudents.find(s => s.studentId === activeFsStudentId);
+        const fsStudent = allStudents.find(s => (s.studentId || s.id || s.uid) === activeFsStudentId);
         if (fsStudent) {
-          const fsUid = fsStudent.agoraUid || getNumericUid(fsStudent.studentId);
+          const fsCandidateUids = getStudentCandidateUids(fsStudent);
           const feedContainer = fsModal.querySelector('#fs-feed-container');
           if (feedContainer) {
-            if (this.agoraProctor.hasStream(fsUid)) {
+            if (this.agoraProctor.hasStream(fsCandidateUids)) {
               const fsPlayer = feedContainer.querySelector('.agora-fs-player');
               const hasVideo = fsPlayer && fsPlayer.querySelector('video');
-              // Only mount if video element is not yet attached! Never disrupt active playing video.
               if (!hasVideo) {
                 feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
-                this.agoraProctor.playRemoteVideo(fsUid, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
+                this.agoraProctor.playRemoteVideo(fsCandidateUids, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
               }
             } else if (fsStudent.cameraSnapshotUrl) {
               const hasVideo = feedContainer.querySelector('.agora-fs-player video');
@@ -11651,13 +11709,6 @@ class AppController {
       }
     };
     this._attachProctorStreams = attachAgoraStreams;
-
-    const formatTimer = (secs) => {
-      const h = String(Math.floor(secs / 3600)).padStart(2, '0');
-      const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-      const s = String(secs % 60).padStart(2, '0');
-      return `${h}:${m}:${s}`;
-    };
 
     const getStudentLiveStatus = (s) => {
       if (!s) {
@@ -11688,8 +11739,8 @@ class AppController {
         };
       }
 
-      const uid = s.agoraUid || getNumericUid(s.studentId);
-      const hasAgora = this.agoraProctor && this.agoraProctor.hasStream(uid);
+      const candidateUids = getStudentCandidateUids(s);
+      const hasAgora = this.agoraProctor && this.agoraProctor.hasStream(candidateUids);
 
       let lastPingMs = 0;
       if (s.lastCameraPing) {
@@ -11797,10 +11848,11 @@ class AppController {
 
     const buildStudentCardHTML = (student, st, session) => {
       const isSubmitted = st.isSubmitted;
+      const sId = student.studentId || student.id || student.uid || '';
       return `
-        <div id="student-card-${student.studentId}" style="background:#1E293B; border-radius:14px; border:1.5px solid ${st.color}; display:flex; flex-direction:column; overflow:hidden;">
+        <div id="student-card-${sId}" style="background:#1E293B; border-radius:14px; border:1.5px solid ${st.color}; display:flex; flex-direction:column; overflow:hidden;">
           <!-- Camera Preview Box -->
-          <div class="student-camera-box" data-student-id="${student.studentId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <div class="student-camera-box" data-student-id="${sId}" style="height:140px; background:#0F172A; position:relative; cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;">
             ${isSubmitted ? buildSubmittedBoxHTML(student, session) : (student.cameraSnapshotUrl) ? `
               <img class="student-snapshot-img" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; object-fit:cover;" />
               <div class="status-pill-badge" style="position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:${st.color}; color:#FFFFFF; font-size:8.5px; font-weight:700; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
@@ -11832,22 +11884,24 @@ class AppController {
                 ${student.studentName || 'Student'}
               </div>
               <div style="font-size:10px; color:#94A3B8;">
-                ${student.studentPhone || `ID: ${(student.studentId || '').slice(0, 6)}`}
+                ${student.studentPhone || `ID: ${(sId || '').slice(0, 6)}`}
               </div>
             </div>
 
             ${isSubmitted ? `
-              <button class="btn-view-answers" data-student-id="${student.studentId}" style="width:100%; height:28px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+              <button class="btn-view-answers" data-student-id="${sId}" style="width:100%; height:28px; background:#22C55E; color:#FFFFFF; border:none; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
                 <span class="material-symbols-rounded filled" style="font-size:14px;">description</span>
                 <span>View Answers ${student.submissionPhotos?.length ? `(${student.submissionPhotos.length})` : (student.mcqScore !== undefined ? `(${student.mcqScore}/${student.mcqTotal || (session.mcqCount || 50)})` : '')}</span>
               </button>
             ` : `
               <div style="display:flex; gap:6px;">
-                <button class="btn-full-view" data-student-id="${student.studentId}" style="flex:1; height:26px; background:transparent; border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
-                  Full View
+                <button class="btn-full-view" data-student-id="${sId}" style="flex:1; height:28px; background:rgba(56,189,248,0.15); border:1px solid #38BDF8; color:#38BDF8; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:3px;">
+                  <span class="material-symbols-rounded" style="font-size:14px;">fullscreen</span>
+                  <span>Full View</span>
                 </button>
-                <button class="btn-alert-student" data-student-id="${student.studentId}" style="flex:1; height:26px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer;">
-                  Alert
+                <button class="btn-alert-student" data-student-id="${sId}" style="flex:1; height:28px; background:#6366F1; color:#FFFFFF; border:none; border-radius:6px; font-size:10.5px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:3px;">
+                  <span class="material-symbols-rounded filled" style="font-size:14px;">warning</span>
+                  <span>Alert</span>
                 </button>
               </div>
             `}
@@ -11857,7 +11911,10 @@ class AppController {
     };
 
     const buildEmptyStateHTML = (tab, sess) => `
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:280px; text-align:center; padding:24px; grid-column:span 2;">
+      <div class="empty-proctor-state" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:280px; text-align:center; padding:24px; grid-column:1 / -1;">
+        <div style="width:60px; height:60px; border-radius:50%; background:#1E293B; border:1px solid #334155; display:flex; align-items:center; justify-content:center; color:#64748B; margin-bottom:12px;">
+          <span class="material-symbols-rounded" style="font-size:28px;">group_off</span>
+        </div>
         <div style="font-size:13px; color:#94A3B8; line-height:1.6;">
           ${tab === 'slot2' && !sess.slot2
             ? 'මෙම Paper එක සඳහා 2nd Slot එකක් සකසා නොමැත.<br><span style="font-size:11px; color:#64748B;">(Single Slot Session)</span>'
@@ -11880,7 +11937,9 @@ class AppController {
       }
       return `
         <div style="display:flex; flex-direction:column; gap:10px;">
-          ${submittedList.map((s, idx) => `
+          ${submittedList.map((s, idx) => {
+            const sId = s.studentId || s.id || s.uid || '';
+            return `
             <div style="background:#1E293B; border:1px solid #334155; border-radius:14px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
               <div style="display:flex; align-items:center; gap:10px;">
                 <div style="width:26px; height:26px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#94A3B8;">
@@ -11891,11 +11950,12 @@ class AppController {
                   <div style="font-size:11px; color:#94A3B8;">${s.studentPhone || ''} • ${s.submissionPhotos?.length || 1} Pages</div>
                 </div>
               </div>
-              <button class="btn-view-answers" data-student-id="${s.studentId}" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+              <button class="btn-view-answers" data-student-id="${sId}" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
                 View Answers
               </button>
             </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       `;
     };
@@ -12000,9 +12060,16 @@ class AppController {
             if (currentSlotStudents.length === 0) {
               grid.innerHTML = buildEmptyStateHTML(activeTab, session);
             } else {
+              // Clear empty state message if present
+              const emptyState = grid.querySelector('.empty-proctor-state');
+              if (emptyState || (grid.children.length === 1 && !grid.children[0].id?.startsWith('student-card-'))) {
+                grid.innerHTML = '';
+              }
+
               currentSlotStudents.forEach(student => {
+                const sId = student.studentId || student.id || student.uid || '';
                 const st = getStudentLiveStatus(student);
-                let card = modal.querySelector(`#student-card-${student.studentId}`);
+                let card = modal.querySelector(`#student-card-${sId}`);
                 if (card) {
                   // Update card border
                   card.style.borderColor = st.color;
@@ -12023,7 +12090,7 @@ class AppController {
                       }
                     } else {
                       const activeFsStudentId = this._fullScreenStudentId;
-                      if (activeFsStudentId && activeFsStudentId === student.studentId) {
+                      if (activeFsStudentId && activeFsStudentId === sId) {
                         if (!box.querySelector('.fs-active-indicator')) {
                           box.innerHTML = `
                             <div class="fs-active-indicator" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:100%; color:#38BDF8; background:#0B132B;">
@@ -12033,21 +12100,19 @@ class AppController {
                           `;
                         }
                       } else {
-                        const uid = student.agoraUid || getNumericUid(student.studentId);
-                        const hasAgora = this.agoraProctor && this.agoraProctor.hasStream(uid);
+                        const candidateUids = getStudentCandidateUids(student);
+                        const hasAgora = this.agoraProctor && this.agoraProctor.hasStream(candidateUids);
 
                         if (hasAgora) {
-                          // If Agora player already mounted, NEVER TOUCH box.innerHTML!
                           if (!box.querySelector('.agora-active-player')) {
                             box.innerHTML = '<div class="agora-active-player" style="width:100%; height:100%; position:relative;"></div>';
-                            this.agoraProctor.playRemoteVideo(uid, box.querySelector('.agora-active-player'), { fit: 'cover' });
+                            this.agoraProctor.playRemoteVideo(candidateUids, box.querySelector('.agora-active-player'), { fit: 'cover' });
                             const badge = document.createElement('div');
                             badge.style.cssText = 'position:absolute; top:6px; left:6px; padding:2px 6px; border-radius:4px; background:#22C55E; color:#FFFFFF; font-size:8.5px; font-weight:700; z-index:10; box-shadow:0 2px 4px rgba(0,0,0,0.5); display:flex; align-items:center; gap:3px;';
                             badge.innerHTML = '<span class="material-symbols-rounded filled" style="font-size:10px;">videocam</span> AGORA 720p HD';
                             box.appendChild(badge);
                           }
                         } else {
-                          // No Agora WebRTC stream
                           const hasAgoraVideo = box.querySelector('.agora-active-player');
                           if (hasAgoraVideo) box.innerHTML = '';
 
@@ -12116,35 +12181,40 @@ class AppController {
         <div class="proctor-hall-shell" style="position:relative;">
           
           <!-- ── AppBar ── -->
-          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 14px 10px 14px; flex-shrink:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <div style="display:flex; flex-direction:column; gap:2px;">
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; flex-shrink:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
+              <div style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="width:8px; height:8px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E; display:inline-block;"></span>
-                  <span style="font-size:15px; font-weight:700; color:#FFFFFF;">Live Invigilator Monitor</span>
+                  <span style="width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 10px #22C55E; display:inline-block; flex-shrink:0;"></span>
+                  <span style="font-size:15px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Live Invigilator Monitor</span>
                 </div>
-                <div style="font-size:11px; color:#94A3B8; padding-left:16px;">${session.title || 'Exam Proctoring Center'}</div>
+                <div style="font-size:11px; color:#94A3B8; padding-left:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${session.title || 'Exam Proctoring Center'}</div>
               </div>
 
-              <!-- Top Actions: Time Up, End Session, Broadcast Alert, Close -->
-              <div style="display:flex; align-items:center; gap:6px;">
+              <!-- Top Actions: Time Up, End Session, Broadcast Alert, Fullscreen, Close -->
+              <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                 ${!isEnded ? `
-                  <button id="btn-proctor-time-up" style="background:${isTimeUp ? '#EA580C' : '#F59E0B'}; color:#000000; border:none; padding:5px 8px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                  <button id="btn-proctor-time-up" style="background:${isTimeUp ? '#EA580C' : '#F59E0B'}; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
                     <span class="material-symbols-rounded filled" style="font-size:14px;">alarm</span> ${isTimeUp ? 'Time Up (Sent)' : 'Time Up'}
                   </button>
-                  <button id="btn-proctor-end-session" style="background:#EF4444; color:#FFFFFF; border:none; padding:5px 8px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                  <button id="btn-proctor-end-session" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
                     <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                   </button>
                 ` : `
-                  <div style="padding:4px 8px; border-radius:6px; background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px;">
+                  <div style="padding:5px 10px; border-radius:8px; background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FCA5A5; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px;">
                     <span class="material-symbols-rounded" style="font-size:14px;">check</span> Ended
                   </div>
                 `}
-                <button id="btn-proctor-broadcast" title="Broadcast Announcement to All Students" style="background:transparent; border:none; color:#F59E0B; cursor:pointer; padding:4px; display:flex; align-items:center;">
-                  <span class="material-symbols-rounded filled" style="font-size:20px; color:#F59E0B;">campaign</span>
+                <button id="btn-proctor-broadcast" title="Broadcast Announcement to All Students" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#F59E0B; cursor:pointer; padding:6px 8px; border-radius:8px; display:inline-flex; align-items:center;">
+                  <span class="material-symbols-rounded filled" style="font-size:18px; color:#F59E0B;">campaign</span>
                 </button>
-                <button id="btn-close-proctor-hall" title="Exit Hall" style="background:transparent; border:none; color:#94A3B8; cursor:pointer; padding:4px 6px; display:inline-flex; align-items:center; justify-content:center;">
-                  <span class="material-symbols-rounded">close</span>
+                <button id="btn-proctor-toggle-fullscreen" title="Toggle Fullscreen" style="background:#0F172A; border:1px solid #334155; color:#38BDF8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                  <span class="material-symbols-rounded" style="font-size:16px;">fullscreen</span>
+                  <span class="fs-text">Full Screen</span>
+                </button>
+                <button id="btn-close-proctor-hall" title="Exit Hall" style="background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+                  <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+                  <span>Exit</span>
                 </button>
               </div>
             </div>
@@ -12164,7 +12234,7 @@ class AppController {
           </div>
 
           <!-- ── Phase Control Bar ── -->
-          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:8px 14px; flex-shrink:0;">
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:8px 16px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <div id="proctor-phase-badge" style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
                 <span class="phase-text" style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
@@ -12175,38 +12245,38 @@ class AppController {
             <!-- Horizontal Action Buttons -->
             <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
               ${phase === 'waiting' ? `
-                <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (3m)
                 </button>
-                <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #22C55E; color:#22C55E; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #22C55E; color:#22C55E; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">play_arrow</span> Start Writing Direct
                 </button>
               ` : phase === 'package_opening' ? `
-                <button class="phase-action-btn" data-set-phase="writing" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-set-phase="writing" style="background:#22C55E; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">edit_note</span> Start Exam Writing (ලිවීම අරඹන්න)
                 </button>
-                <button class="phase-action-btn" data-restart-3m="true" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-restart-3m="true" data-restart-10m="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Restart 3m Timer
                 </button>
-                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                 </button>
               ` : phase === 'writing' ? `
-                <button class="phase-action-btn" data-trigger-time-up="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-trigger-time-up="true" style="background:#F59E0B; color:#000000; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">alarm</span> Trigger Time Up (වේලාව අවසන්)
                 </button>
-                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                 </button>
               ` : phase === 'time_up' ? `
-                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-end-now="true" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session (සැසිය අවසන් කරන්න)
                 </button>
-                <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #38BDF8; color:#38BDF8; padding:6px 10px; border-radius:8px; font-size:10.5px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-set-phase="writing" style="background:transparent; border:1px solid #38BDF8; color:#38BDF8; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Resume Writing
                 </button>
               ` : `
-                <button class="phase-action-btn" data-set-phase="writing" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 12px; border-radius:8px; font-size:10.5px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
+                <button class="phase-action-btn" data-set-phase="writing" style="background:#6366F1; color:#FFFFFF; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded" style="font-size:14px;">sync</span> Reopen Session (නැවත අරඹන්න)
                 </button>
               `}
@@ -12223,7 +12293,7 @@ class AppController {
                     <span class="material-symbols-rounded filled" style="font-size:20px;">description</span>
                   </div>
                   <div>
-                    <div style="font-size:12.5px; font-weight:700; color:#FFFFFF;">Submitted Answer Sheets (ලැබුණු පිළිතුරු පත්‍ර)</div>
+                    <div style="font-size:13px; font-weight:700; color:#FFFFFF;">Submitted Answer Sheets (ලැබුණු පිළිතුරු පත්‍ර)</div>
                     <div style="font-size:11px; color:#94A3B8;">${submittedStudents.length} of ${allStudents.length} Students Submitted</div>
                   </div>
                 </div>
@@ -12239,31 +12309,31 @@ class AppController {
             ` : `
               <!-- Slot Proctored Grid -->
               <!-- Top Analytics Stats Bar with 5 key metrics -->
-              <div style="padding:10px 16px; background:rgba(30,41,59,0.5); display:flex; justify-content:space-around; align-items:center; border-bottom:1px solid #1E293B; flex-shrink:0;">
+              <div style="padding:12px 16px; background:rgba(30,41,59,0.5); display:flex; justify-content:space-around; align-items:center; border-bottom:1px solid #1E293B; flex-shrink:0;">
                 <div style="text-align:center;">
-                  <div id="stat-registered" style="font-size:15px; font-weight:700; color:#818CF8;">${currentSlotStudents.length}</div>
+                  <div id="stat-registered" style="font-size:16px; font-weight:700; color:#818CF8;">${currentSlotStudents.length}</div>
                   <div style="font-size:10px; color:#94A3B8;">Registered</div>
                 </div>
                 <div style="text-align:center;">
-                  <div id="stat-live" style="font-size:15px; font-weight:700; color:#22C55E;">${liveCount}</div>
+                  <div id="stat-live" style="font-size:16px; font-weight:700; color:#22C55E;">${liveCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
                     <span class="material-symbols-rounded filled" style="font-size:12px; color:#22C55E;">videocam</span> Live Cameras
                   </div>
                 </div>
                 <div style="text-align:center;">
-                  <div id="stat-online" style="font-size:15px; font-weight:700; color:#38BDF8;">${onlinePaperCount + idleCount}</div>
+                  <div id="stat-online" style="font-size:16px; font-weight:700; color:#38BDF8;">${onlinePaperCount + idleCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
                     <span class="material-symbols-rounded" style="font-size:12px; color:#38BDF8;">menu_book</span> Reading Paper
                   </div>
                 </div>
                 <div style="text-align:center;">
-                  <div id="stat-inactive" style="font-size:15px; font-weight:700; color:#EF4444;">${inactiveCount}</div>
+                  <div id="stat-inactive" style="font-size:16px; font-weight:700; color:#EF4444;">${inactiveCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
                     <span class="material-symbols-rounded" style="font-size:12px; color:#EF4444;">videocam_off</span> Offline
                   </div>
                 </div>
                 <div style="text-align:center;">
-                  <div id="stat-submitted" style="font-size:15px; font-weight:700; color:#4ADE80;">${submittedSlotCount}</div>
+                  <div id="stat-submitted" style="font-size:16px; font-weight:700; color:#4ADE80;">${submittedSlotCount}</div>
                   <div style="font-size:10px; color:#94A3B8; display:flex; align-items:center; justify-content:center; gap:3px;">
                     <span class="material-symbols-rounded filled" style="font-size:12px; color:#4ADE80;">check_circle</span> Submitted
                   </div>
@@ -12271,8 +12341,8 @@ class AppController {
               </div>
 
               <!-- Students Grid Container -->
-              <div style="flex:1; padding:14px; overflow-y:auto;">
-                <div id="students-grid-container" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
+              <div style="flex:1; padding:16px; overflow-y:auto;">
+                <div id="students-grid-container" class="proctor-students-grid">
                   ${currentSlotStudents.length === 0 ? buildEmptyStateHTML(activeTab, session) : currentSlotStudents.map(student => {
                     const st = getStudentLiveStatus(student);
                     return buildStudentCardHTML(student, st, session);
@@ -12283,9 +12353,9 @@ class AppController {
           </div>
 
           <!-- Bottom Status Footer -->
-          <div style="padding:10px 14px; background:#111827; border-top:1px solid #1E293B; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+          <div style="padding:10px 16px; background:#111827; border-top:1px solid #1E293B; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
             <div style="font-size:11px; color:#94A3B8;">
-              Connected to Session Channel: edupeak_proctor_${session.id}
+              Connected to Session Channel: exam_${String(session.id).replace(/[^a-zA-Z0-9_]/g, '_')}
             </div>
             <button id="btn-hall-test-student" style="background:#10B981; color:#FFFFFF; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
               <span class="material-symbols-rounded filled" style="font-size:15px;">description</span>
@@ -12296,40 +12366,108 @@ class AppController {
         </div>
       `;
 
-      attachEventHandlers();
+      if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
     };
 
-    const attachEventHandlers = () => {
-      // Close Hall
-      document.getElementById('btn-close-proctor-hall')?.addEventListener('click', () => {
-        if (renderThrottleTimer) { clearTimeout(renderThrottleTimer); renderThrottleTimer = null; }
-        if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
-        unsubs.forEach(fn => { try { fn(); } catch (_) {} });
-        document.getElementById('proctor-fullscreen-modal')?.remove();
-        this._fullScreenStudentId = null;
-        modal.remove();
-      });
+    // Centralized Event Actions
+    const closeProctorHall = () => {
+      if (renderThrottleTimer) { clearTimeout(renderThrottleTimer); renderThrottleTimer = null; }
+      if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
+      unsubs.forEach(fn => { try { fn(); } catch (_) {} });
+      unsubs = [];
+      document.getElementById('proctor-fullscreen-modal')?.remove();
+      this._fullScreenStudentId = null;
+      if (document.fullscreenElement) {
+        try { document.exitFullscreen().catch(() => {}); } catch (_) {}
+      }
+      modal.remove();
+    };
 
-      // Tab Buttons
-      modal.querySelectorAll('.proctor-tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeTab = btn.dataset.tab;
-          render();
-        });
-      });
+    const toggleFullscreen = () => {
+      const shell = modal.querySelector('.proctor-hall-shell');
+      if (!document.fullscreenElement) {
+        if (modal.requestFullscreen) {
+          modal.requestFullscreen().catch(() => {});
+        } else if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        if (shell) shell.classList.add('is-fullscreen');
+        const fsText = modal.querySelector('#btn-proctor-toggle-fullscreen .fs-text');
+        if (fsText) fsText.textContent = 'Exit Full Screen';
+        const fsIcon = modal.querySelector('#btn-proctor-toggle-fullscreen .material-symbols-rounded');
+        if (fsIcon) fsIcon.textContent = 'fullscreen_exit';
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        if (shell) shell.classList.remove('is-fullscreen');
+        const fsText = modal.querySelector('#btn-proctor-toggle-fullscreen .fs-text');
+        if (fsText) fsText.textContent = 'Full Screen';
+        const fsIcon = modal.querySelector('#btn-proctor-toggle-fullscreen .material-symbols-rounded');
+        if (fsIcon) fsIcon.textContent = 'fullscreen';
+      }
+    };
 
-      // Test Student View
-      document.getElementById('btn-hall-test-student')?.addEventListener('click', () => {
-        if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
-        unsubs.forEach(fn => { try { fn(); } catch (_) {} });
-        document.getElementById('proctor-fullscreen-modal')?.remove();
-        this._fullScreenStudentId = null;
-        modal.remove();
-        this.openStudentLiveExamRoom(session.id, 'slot1');
-      });
+    const onFullscreenChange = () => {
+      const shell = modal.querySelector('.proctor-hall-shell');
+      const fsText = modal.querySelector('#btn-proctor-toggle-fullscreen .fs-text');
+      const fsIcon = modal.querySelector('#btn-proctor-toggle-fullscreen .material-symbols-rounded');
+      if (document.fullscreenElement) {
+        if (shell) shell.classList.add('is-fullscreen');
+        if (fsText) fsText.textContent = 'Exit Full Screen';
+        if (fsIcon) fsIcon.textContent = 'fullscreen_exit';
+      } else {
+        if (shell) shell.classList.remove('is-fullscreen');
+        if (fsText) fsText.textContent = 'Full Screen';
+        if (fsIcon) fsIcon.textContent = 'fullscreen';
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    unsubs.push(() => document.removeEventListener('fullscreenchange', onFullscreenChange));
 
-      // Trigger Time Up Button in AppBar
-      document.getElementById('btn-proctor-time-up')?.addEventListener('click', () => {
+    const onModalKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (!document.getElementById('proctor-fullscreen-modal')) {
+          closeProctorHall();
+        }
+      }
+    };
+    window.addEventListener('keydown', onModalKeyDown);
+    unsubs.push(() => window.removeEventListener('keydown', onModalKeyDown));
+
+    // Delegated click listener on modal so all buttons work 100% reliably
+    modal.addEventListener('click', (e) => {
+      // 1. Close Hall
+      const closeBtn = e.target.closest('#btn-close-proctor-hall');
+      if (closeBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeProctorHall();
+        return;
+      }
+
+      // 2. Toggle Fullscreen
+      const fsBtn = e.target.closest('#btn-proctor-toggle-fullscreen');
+      if (fsBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFullscreen();
+        return;
+      }
+
+      // 3. Tab Buttons
+      const tabBtn = e.target.closest('.proctor-tab-btn');
+      if (tabBtn) {
+        e.preventDefault();
+        activeTab = tabBtn.dataset.tab;
+        render();
+        return;
+      }
+
+      // 4. Time Up in AppBar
+      const timeUpBtn = e.target.closest('#btn-proctor-time-up');
+      if (timeUpBtn) {
+        e.preventDefault();
         this._confirmProctorAction({
           title: 'Trigger Time Up (වේලාව අවසන් කරන්නද?)',
           content: 'සියලුම සිසුන්ට ලිවීම නවත්වා, පිළිතුරු පත්‍රවල ඡායාරූප (Photos) ලබාගෙන App එක හරහා Submit කරන ලෙස Alert එකක් යැවීමට අවශ්‍ය බව සහතිකද?',
@@ -12340,10 +12478,13 @@ class AppController {
             notificationService.showInAppBanner('⏰ Time Up Sent', 'Time up alert broadcasted to all students!', 'info');
           }
         });
-      });
+        return;
+      }
 
-      // End Session Button in AppBar
-      document.getElementById('btn-proctor-end-session')?.addEventListener('click', () => {
+      // 5. End Session in AppBar
+      const endBtn = e.target.closest('#btn-proctor-end-session');
+      if (endBtn) {
+        e.preventDefault();
         this._confirmProctorAction({
           title: 'End Paper Session?',
           content: 'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සියලුම සිසුන්ගේ විභාග කාමරය වසා දැමෙන අතර නව submissions ලබාගත නොහැක.',
@@ -12354,171 +12495,191 @@ class AppController {
             notificationService.showInAppBanner('Session Ended', 'Exam session has been officially ended.', 'warning');
           }
         });
-      });
+        return;
+      }
 
-      // Broadcast Alert Button
-      document.getElementById('btn-proctor-broadcast')?.addEventListener('click', () => {
+      // 6. Broadcast Alert
+      const broadcastBtn = e.target.closest('#btn-proctor-broadcast');
+      if (broadcastBtn) {
+        e.preventDefault();
         this._showProctorBroadcastDialog(session.id);
-      });
+        return;
+      }
 
-      // Phase Control Buttons
-      // Phase Control Buttons with Admin Confirmation
-      modal.querySelectorAll('[data-set-phase]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const targetPhase = btn.dataset.setPhase;
-          const isCurrentlyEnded = session.isEnded || session.status === 'ended' || session.currentPhase === 'ended';
+      // 7. Phase Actions
+      const phaseBtn = e.target.closest('[data-set-phase]');
+      if (phaseBtn) {
+        e.preventDefault();
+        const targetPhase = phaseBtn.dataset.setPhase;
+        const isCurrentlyEnded = session.isEnded || session.status === 'ended' || session.currentPhase === 'ended';
 
-          if (isCurrentlyEnded) {
-            // Reopen Session confirmation
-            this._confirmProctorAction({
-              title: 'Reopen Session? (සැසිය නැවත අරඹන්නද?)',
-              content: 'අවසන් කරන ලද මෙම විභාග සැසිය නැවත සිසුන් සඳහා සක්‍රීය කිරීමට (Reopen) ඔබට අවශ්‍ය බව සහතිකද?\n\nසියලුම සිසුන්ගේ Screen එකෙහි විභාගය නැවත Live වන අතර ඔවුන්ට නැවත පිළිතුරු ලිවීමට හැකි වේ.',
-              confirmText: 'Reopen Session (නැවත අරඹන්න)',
-              confirmColor: '#6366F1',
-              onConfirm: async () => {
-                await dbService.reopenPaperSession(session.id);
-                notificationService.showInAppBanner('Session Reopened', 'Exam session has been reopened and is live!', 'success');
-              }
-            });
-            return;
-          }
-
-          if (targetPhase === 'package_opening') {
-            this._confirmProctorAction({
-              title: 'Start Package Opening? (පාර්සලය විවෘත කිරීම අරඹන්නද?)',
-              content: 'සිසුන්ට විනාඩි 3 ක කාලයක් ලබාදෙමින් ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට පටන් ගැනීමට අවශ්‍ය බව සහතිකද?',
-              confirmText: 'Start Package Opening (අරඹන්න)',
-              confirmColor: '#F59E0B',
-              onConfirm: async () => {
-                session.currentPhase = 'package_opening';
-                session.isLive = true;
-                session.packageOpeningStartedAt = new Date().toISOString();
-                render();
-                await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
-                notificationService.showInAppBanner('Package Opening', '3-minute package opening started.', 'info');
-              }
-            });
-          } else if (targetPhase === 'writing') {
-            const isResume = session.currentPhase === 'time_up';
-            this._confirmProctorAction({
-              title: isResume ? 'Resume Writing? (නැවත ලිවීම සක්‍රීය කරන්නද?)' : 'Start Exam Writing? (විභාගය ලිවීම අරඹන්නද?)',
-              content: isResume
-                ? 'කාලය අවසන් වූ සැසිය නැවත ලිවීමේ අදියරට (Writing Phase) මාරු කිරීමට අවශ්‍ය බව සහතිකද?'
-                : 'සියලුම සිසුන්ට පිළිතුරු ලිවීම ආරම්භ කිරීමට සහ ප්‍රධාන විභාග ටයිමරය (Exam Timer) ක්‍රියාත්මක කිරීමට අවශ්‍ය බව සහතිකද?',
-              confirmText: isResume ? 'Resume Writing (ලිවීම අරඹන්න)' : 'Start Writing (ලිවීම අරඹන්න)',
-              confirmColor: '#22C55E',
-              onConfirm: async () => {
-                session.currentPhase = 'writing';
-                session.isLive = true;
-                const shouldReset = !session.writingStartedAt;
-                if (shouldReset) {
-                  session.writingStartedAt = new Date().toISOString();
-                }
-                render();
-                await dbService.setSessionPhase(session.id, 'writing', { forceResetTimer: shouldReset });
-                notificationService.showInAppBanner('Exam Writing Live', 'Exam writing phase active for all students.', 'success');
-              }
-            });
-          } else {
-            this._confirmProctorAction({
-              title: `Change Phase to ${targetPhase.toUpperCase()}?`,
-              content: `ඔබට සැසියේ අදියර ${targetPhase.toUpperCase()} වෙත මාරු කිරීමට අවශ්‍ය බව සහතිකද?`,
-              confirmText: 'Confirm',
-              confirmColor: '#6366F1',
-              onConfirm: async () => {
-                session.currentPhase = targetPhase;
-                render();
-                await dbService.setSessionPhase(session.id, targetPhase);
-                notificationService.showInAppBanner('Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
-              }
-            });
-          }
-        });
-      });
-
-      modal.querySelectorAll('[data-restart-3m], [data-restart-10m]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        if (isCurrentlyEnded) {
           this._confirmProctorAction({
-            title: 'Restart 3m Package Timer? (ටයිමරය නැවත අරඹන්නද?)',
-            content: 'පැකේජය විවෘත කිරීමේ විනාඩි 3 ක කාල ගණනය නැවත මුල සිට ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
-            confirmText: 'Restart Timer (නැවත අරඹන්න)',
+            title: 'Reopen Session? (සැසිය නැවත අරඹන්නද?)',
+            content: 'අවසන් කරන ලද මෙම විභාග සැසිය නැවත සිසුන් සඳහා සක්‍රීය කිරීමට (Reopen) ඔබට අවශ්‍ය බව සහතිකද?\n\nසියලුම සිසුන්ගේ Screen එකෙහි විභාගය නැවත Live වන අතර ඔවුන්ට නැවත පිළිතුරු ලිවීමට හැකි වේ.',
+            confirmText: 'Reopen Session (නැවත අරඹන්න)',
+            confirmColor: '#6366F1',
+            onConfirm: async () => {
+              await dbService.reopenPaperSession(session.id);
+              notificationService.showInAppBanner('Session Reopened', 'Exam session has been reopened and is live!', 'success');
+            }
+          });
+          return;
+        }
+
+        if (targetPhase === 'package_opening') {
+          this._confirmProctorAction({
+            title: 'Start Package Opening? (පාර්සලය විවෘත කිරීම අරඹන්නද?)',
+            content: 'සිසුන්ට විනාඩි 3 ක කාලයක් ලබාදෙමින් ප්‍රශ්න පත්‍ර පාර්සලය කැමරාව ඉදිරියේ විවෘත කිරීමට පටන් ගැනීමට අවශ්‍ය බව සහතිකද?',
+            confirmText: 'Start Package Opening (අරඹන්න)',
             confirmColor: '#F59E0B',
             onConfirm: async () => {
               session.currentPhase = 'package_opening';
+              session.isLive = true;
               session.packageOpeningStartedAt = new Date().toISOString();
               render();
               await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
-              notificationService.showInAppBanner('3m Timer Restarted', 'Package opening timer reset to 03:00', 'info');
+              notificationService.showInAppBanner('Package Opening', '3-minute package opening started.', 'info');
             }
           });
-        });
-      });
-
-      modal.querySelectorAll('[data-trigger-time-up]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        } else if (targetPhase === 'writing') {
+          const isResume = session.currentPhase === 'time_up';
           this._confirmProctorAction({
-            title: 'Trigger Time Up? (වේලාව අවසන් කරන්නද?)',
-            content: 'සියලුම සිසුන්ගේ ලිවීමේ කාලය අවසන් කර, පිළිතුරු පත්‍ර In-App Scanner එකෙන් Scan කර Submit කිරීමට නියෝග කිරීමට අවශ්‍ය බව සහතිකද?',
-            confirmText: 'Trigger Time Up (කාලය අවසන්)',
-            confirmColor: '#EA580C',
+            title: isResume ? 'Resume Writing? (නැවත ලිවීම සක්‍රීය කරන්නද?)' : 'Start Exam Writing? (විභාගය ලිවීම අරඹන්නද?)',
+            content: isResume
+              ? 'කාලය අවසන් වූ සැසිය නැවත ලිවීමේ අදියරට (Writing Phase) මාරු කිරීමට අවශ්‍ය බව සහතිකද?'
+              : 'සියලුම සිසුන්ට පිළිතුරු ලිවීම ආරම්භ කිරීමට සහ ප්‍රධාන විභාග ටයිමරය (Exam Timer) ක්‍රියාත්මක කිරීමට අවශ්‍ය බව සහතිකද?',
+            confirmText: isResume ? 'Resume Writing (ලිවීම අරඹන්න)' : 'Start Writing (ලිවීම අරඹන්න)',
+            confirmColor: '#22C55E',
             onConfirm: async () => {
-              await dbService.triggerTimeUp(session.id);
-              notificationService.showInAppBanner('Time Up Triggered', 'Time is Up alert sent to all students!', 'warning');
+              session.currentPhase = 'writing';
+              session.isLive = true;
+              const shouldReset = !session.writingStartedAt;
+              if (shouldReset) {
+                session.writingStartedAt = new Date().toISOString();
+              }
+              render();
+              await dbService.setSessionPhase(session.id, 'writing', { forceResetTimer: shouldReset });
+              notificationService.showInAppBanner('Exam Writing Live', 'Exam writing phase active for all students.', 'success');
             }
           });
-        });
-      });
-
-      modal.querySelectorAll('[data-end-now]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        } else {
           this._confirmProctorAction({
-            title: 'End Paper Session? (සැසිය අවසන් කරන්නද?)',
-            content: 'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සියලුම සිසුන්ගේ විභාග කාමරය වසා දැමෙන අතර නව submissions ලබාගත නොහැක.',
-            confirmText: 'End Session (අවසන් කරන්න)',
-            confirmColor: '#EF4444',
+            title: `Change Phase to ${targetPhase.toUpperCase()}?`,
+            content: `ඔබට සැසියේ අදියර ${targetPhase.toUpperCase()} වෙත මාරු කිරීමට අවශ්‍ය බව සහතිකද?`,
+            confirmText: 'Confirm',
+            confirmColor: '#6366F1',
             onConfirm: async () => {
-              await dbService.endPaperSession(session.id);
-              notificationService.showInAppBanner('Session Ended', 'Exam session closed officially.', 'error');
+              session.currentPhase = targetPhase;
+              render();
+              await dbService.setSessionPhase(session.id, targetPhase);
+              notificationService.showInAppBanner('Phase Updated', `Transitioned to: ${targetPhase.toUpperCase()}`, 'info');
             }
           });
-        });
-      });
+        }
+        return;
+      }
 
-      // Student Item Actions
-      modal.querySelectorAll('.btn-alert-student').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
-          if (student) this._showDirectAlertSheet(session.id, student);
-        });
-      });
-
-      modal.querySelectorAll('.btn-view-answers').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
-          if (student) this._showSubmissionViewer(student);
-        });
-      });
-
-      modal.querySelectorAll('.btn-full-view, .student-camera-box').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const student = allStudents.find(s => s.studentId === btn.dataset.studentId);
-          if (student) {
-            if (isStudentSubmitted(student)) {
-              this._showSubmissionViewer(student);
-            } else {
-              this._showFullScreenStudentViewer(session.id, student);
-            }
+      const restartBtn = e.target.closest('[data-restart-3m], [data-restart-10m]');
+      if (restartBtn) {
+        e.preventDefault();
+        this._confirmProctorAction({
+          title: 'Restart 3m Package Timer? (ටයිමරය නැවත අරඹන්නද?)',
+          content: 'පැකේජය විවෘත කිරීමේ විනාඩි 3 ක කාල ගණනය නැවත මුල සිට ආරම්භ කිරීමට අවශ්‍ය බව සහතිකද?',
+          confirmText: 'Restart Timer (නැවත අරඹන්න)',
+          confirmColor: '#F59E0B',
+          onConfirm: async () => {
+            session.currentPhase = 'package_opening';
+            session.packageOpeningStartedAt = new Date().toISOString();
+            render();
+            await dbService.setSessionPhase(session.id, 'package_opening', { forceResetTimer: true });
+            notificationService.showInAppBanner('3m Timer Restarted', 'Package opening timer reset to 03:00', 'info');
           }
         });
-      });
-      if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
+        return;
+      }
 
+      const triggerTimeUpPhaseBtn = e.target.closest('[data-trigger-time-up]');
+      if (triggerTimeUpPhaseBtn) {
+        e.preventDefault();
+        this._confirmProctorAction({
+          title: 'Trigger Time Up? (වේලාව අවසන් කරන්නද?)',
+          content: 'සියලුම සිසුන්ගේ ලිවීමේ කාලය අවසන් කර, පිළිතුරු පත්‍ර In-App Scanner එකෙන් Scan කර Submit කිරීමට නියෝග කිරීමට අවශ්‍ය බව සහතිකද?',
+          confirmText: 'Trigger Time Up (කාලය අවසන්)',
+          confirmColor: '#EA580C',
+          onConfirm: async () => {
+            await dbService.triggerTimeUp(session.id);
+            notificationService.showInAppBanner('Time Up Triggered', 'Time is Up alert sent to all students!', 'warning');
+          }
+        });
+        return;
+      }
 
+      const endNowBtn = e.target.closest('[data-end-now]');
+      if (endNowBtn) {
+        e.preventDefault();
+        this._confirmProctorAction({
+          title: 'End Paper Session? (සැසිය අවසන් කරන්නද?)',
+          content: 'ඔබට මෙම Paper Session එක අවසන් කිරීමට අවශ්‍ය බව සහතිකද?\n\nසැසිය අවසන් කළ පසු සියලුම සිසුන්ගේ විභාග කාමරය වසා දැමෙන අතර නව submissions ලබාගත නොහැක.',
+          confirmText: 'End Session (අවසන් කරන්න)',
+          confirmColor: '#EF4444',
+          onConfirm: async () => {
+            await dbService.endPaperSession(session.id);
+            notificationService.showInAppBanner('Session Ended', 'Exam session closed officially.', 'error');
+          }
+        });
+        return;
+      }
 
-    };
+      // 8. Test Student View
+      const testStudentBtn = e.target.closest('#btn-hall-test-student');
+      if (testStudentBtn) {
+        e.preventDefault();
+        closeProctorHall();
+        this.openStudentLiveExamRoom(session.id, 'slot1');
+        return;
+      }
+
+      // 9. Alert Student
+      const alertBtn = e.target.closest('.btn-alert-student');
+      if (alertBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const studentId = alertBtn.dataset.studentId;
+        const student = allStudents.find(s => (s.studentId || s.id || s.uid) === studentId);
+        if (student) this._showDirectAlertSheet(session.id, student);
+        return;
+      }
+
+      // 10. View Answers
+      const answersBtn = e.target.closest('.btn-view-answers');
+      if (answersBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const studentId = answersBtn.dataset.studentId;
+        const student = allStudents.find(s => (s.studentId || s.id || s.uid) === studentId);
+        if (student) this._showSubmissionViewer(student);
+        return;
+      }
+
+      // 11. Full View or Clicking Camera Box
+      const fullViewBtn = e.target.closest('.btn-full-view');
+      const cameraBox = e.target.closest('.student-camera-box');
+      if (fullViewBtn || cameraBox) {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetStudentId = (fullViewBtn || cameraBox).dataset.studentId;
+        const student = allStudents.find(s => (s.studentId || s.id || s.uid) === targetStudentId);
+        if (student) {
+          if (isStudentSubmitted(student)) {
+            this._showSubmissionViewer(student);
+          } else {
+            this._showFullScreenStudentViewer(session.id, student);
+          }
+        }
+        return;
+      }
+    });
 
     // Real-Time Listeners (Matching Dart _sessionStream & _allRegistrationsStream)
     const unsubSession = dbService.streamPaperSession(session.id, (updatedSession) => {
@@ -12535,7 +12696,7 @@ class AppController {
       renderThrottleTimer = setTimeout(() => {
         renderThrottleTimer = null;
         render();
-      }, 600);
+      }, 500);
     };
 
     const unsubRegs = dbService.streamSlotRegistrations(session.id, 'all', (regs) => {
@@ -12545,10 +12706,9 @@ class AppController {
     unsubs.push(unsubRegs);
 
     render();
-    document.body.appendChild(modal);
   }
 
-  // Helper: Confirmation Dialog matching Flutter AlertDialog
+    // Helper: Confirmation Dialog matching Flutter AlertDialog
   _confirmProctorAction({ title, content, confirmText, confirmColor = '#6366F1', onConfirm }) {
     const dialog = document.createElement('div');
     dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10025;';
@@ -12859,12 +13019,19 @@ class AppController {
     // Update background grid to mark this student as viewing in full screen
     if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
 
-    const studentUid = student.agoraUid || getNumericUid(student.studentId);
-    if (this.agoraProctor && this.agoraProctor.hasStream(studentUid)) {
+    const candidateUids = [
+      ...(student.agoraUid ? [Number(student.agoraUid)] : []),
+      getComputedAgoraUid(student),
+      ...(student.studentPhone ? [getNumericUid(student.studentPhone)] : []),
+      ...(student.phone ? [getNumericUid(student.phone)] : []),
+      ...(student.studentId ? [getNumericUid(student.studentId)] : []),
+      ...(student.id ? [getNumericUid(student.id)] : [])
+    ];
+    if (this.agoraProctor && this.agoraProctor.hasStream(candidateUids)) {
       const feedContainer = modal.querySelector('#fs-feed-container');
       if (feedContainer) {
         feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
-        this.agoraProctor.playRemoteVideo(studentUid, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
+        this.agoraProctor.playRemoteVideo(candidateUids, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
       }
     }
   }

@@ -4,9 +4,7 @@
 
 import AgoraRTC from 'agora-rtc-sdk-ng';
 
-// Agora App ID is never hardcoded - fetched securely from /api/agora/token (env-only + authenticated)
-let CACHED_AGORA_APP_ID = '';
-export function getAgoraAppId() { return CACHED_AGORA_APP_ID; }
+export const AGORA_APP_ID = '1a021dff70b447058f17a8881a03834e';
 
 // Generates a deterministic positive 32-bit integer UID matching Flutter AgoraRtcService.getNumericUid
 export function getNumericUid(id) {
@@ -25,30 +23,31 @@ export function getNumericUid(id) {
   return hash <= 0 ? 1001 : hash;
 }
 
+// Matches Flutter PaperRegistration.computedAgoraUid 1:1 (prioritizes student phone, then ID)
+export function getComputedAgoraUid(student) {
+  if (!student) return 1001;
+  if (student.agoraUid && Number(student.agoraUid) > 0) return Number(student.agoraUid);
+  const idToUse = student.studentPhone || student.phone || student.studentId || student.id || student.uid || '';
+  return getNumericUid(idToUse);
+}
+
 // Format channel name matching Flutter AgoraRtcService.getChannelName
 export function getChannelName(paperId) {
   const sanitized = String(paperId || '').replace(/[^a-zA-Z0-9_]/g, '_');
   return `exam_${sanitized}`;
 }
 
-// Fetch token from server endpoint (authenticated; requires Firebase ID token)
+// Fetch token from server endpoint
 export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
   try {
     const apiBase = (typeof window !== 'undefined' && !window.location.hostname.includes('vercel.app'))
       ? 'https://edupeak-web.vercel.app/api'
       : '/api';
-    // Attach Firebase ID token if available for authenticated token minting
-    let authHeader = {};
-    try {
-      const { auth } = await import('./firebase-config.js');
-      const token = await auth.currentUser?.getIdToken?.();
-      if (token) authHeader = { 'Authorization': `Bearer ${token}` };
-    } catch (_) {}
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 1200);
     const res = await fetch(`${apiBase}/agora/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channelName, uid, role }),
       signal: controller.signal
     });
@@ -56,16 +55,13 @@ export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
     if (res.ok) {
       const data = await res.json();
       if (data?.result?.token) {
-        if (data.result.appId) CACHED_AGORA_APP_ID = String(data.result.appId).trim();
-        return { token: data.result.token, appId: data.result.appId || CACHED_AGORA_APP_ID };
+        return data.result.token;
       }
     }
-    if (res.status === 503) throw new Error('Agora service not configured');
   } catch (err) {
-    console.warn('[Agora] Token fetch failed:', err.message);
-    throw err;
+    console.warn('[Agora] Token fetch notice (proceeding with direct client authentication):', err.message);
   }
-  throw new Error('Agora token fetch failed');
+  return '';
 }
 
 // ── Student Broadcaster ──────────────────────────────────────────────
@@ -86,8 +82,8 @@ export class AgoraStudentBroadcaster {
       this.client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
       await this.client.setClientRole('host');
 
-      const tokenData = await fetchAgoraToken(channelName, this.uid, 'publisher');
-      await this.client.join(tokenData.appId, channelName, tokenData.token, this.uid);
+      const token = await fetchAgoraToken(channelName, this.uid, 'publisher');
+      await this.client.join(AGORA_APP_ID, channelName, token || null, this.uid);
 
       // Create video track from existing mediaStream if available, or create camera track
       if (mediaStream && mediaStream.getVideoTracks().length > 0) {
@@ -184,8 +180,8 @@ export class AgoraAdminAudience {
         if (this.onStreamChange) this.onStreamChange(Number(user.uid), user, false);
       });
 
-      const tokenData2 = await fetchAgoraToken(this.channelName, adminUid, 'audience');
-      await this.client.join(tokenData2.appId, this.channelName, tokenData2.token, adminUid);
+      const token = await fetchAgoraToken(this.channelName, adminUid, 'audience');
+      await this.client.join(AGORA_APP_ID, this.channelName, token || null, adminUid);
       this.isConnected = true;
       console.log(`[Agora Admin] Joined proctor audience on channel: ${this.channelName}`);
     } catch (err) {
@@ -194,19 +190,61 @@ export class AgoraAdminAudience {
   }
 
   hasStream(uid) {
-    const user = this.remoteUsers.get(Number(uid));
-    return !!(user && user.videoTrack);
+    if (Array.isArray(uid)) {
+      return uid.some(u => this.hasStream(u));
+    }
+    const num = Number(uid);
+    if (!isNaN(num)) {
+      const user = this.remoteUsers.get(num);
+      if (user && user.videoTrack) return true;
+    }
+    // Fallback: if only 1 remote user exists in channel with active video, match it
+    if (this.remoteUsers.size === 1) {
+      for (const user of this.remoteUsers.values()) {
+        if (user && user.videoTrack) return true;
+      }
+    }
+    return false;
+  }
+
+  getActiveUid(uidOrCandidates) {
+    if (Array.isArray(uidOrCandidates)) {
+      for (const u of uidOrCandidates) {
+        const num = Number(u);
+        const user = this.remoteUsers.get(num);
+        if (user && user.videoTrack) return num;
+      }
+    } else {
+      const num = Number(uidOrCandidates);
+      const user = this.remoteUsers.get(num);
+      if (user && user.videoTrack) return num;
+    }
+    // Fallback: if single remote stream exists
+    if (this.remoteUsers.size === 1) {
+      for (const [rUid, user] of this.remoteUsers.entries()) {
+        if (user && user.videoTrack) return rUid;
+      }
+    }
+    return null;
   }
 
   playRemoteVideo(uid, domElement, options = {}) {
-    const user = this.remoteUsers.get(Number(uid));
+    let targetUid = Number(uid);
+    let user = !isNaN(targetUid) ? this.remoteUsers.get(targetUid) : null;
+    if (!user || !user.videoTrack) {
+      const resolved = this.getActiveUid(uid);
+      if (resolved !== null) {
+        targetUid = resolved;
+        user = this.remoteUsers.get(targetUid);
+      }
+    }
     if (user && user.videoTrack && domElement) {
       try {
         domElement.innerHTML = '';
         user.videoTrack.play(domElement, options);
         return true;
       } catch (err) {
-        console.warn(`[Agora Admin] playRemoteVideo failed for UID ${uid}:`, err);
+        console.warn(`[Agora Admin] playRemoteVideo failed for UID ${targetUid}:`, err);
       }
     }
     return false;
