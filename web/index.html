@@ -14,7 +14,7 @@
   <meta name="theme-color" content="#F8FAFC">
   <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: dark)">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebasestorage.app https://*.supabase.co https://*.agora.io https://*.sd-rtn.com wss://*.agora.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebasestorage.app https://*.supabase.co https://*.agora.io https://*.sd-rtn.com wss://*.agora.io; frame-src 'self' https://drive.google.com https://docs.google.com https://*.google.com https://*.googleusercontent.com https://*.firebasestorage.app https://firebasestorage.googleapis.com blob: data:; base-uri 'self'; form-action 'self'">
   
   <!-- Apple Touch Icons & Web Manifest -->
   <link rel="manifest" href="./manifest.json">
@@ -31,11 +31,11 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" />
   
   <!-- Application Stylesheets -->
-  <link rel="stylesheet" href="./css/app.css?v=1.7.9">
-  <link rel="stylesheet" href="./css/gatekeeper.css?v=1.7.9">
-  <link rel="stylesheet" href="./css/camera-scanner.css?v=1.7.9">
-  <link rel="stylesheet" href="./css/exam-room.css?v=1.7.9">
-  <link rel="stylesheet" href="./css/features.css?v=1.7.9">
+  <link rel="stylesheet" href="./css/app.css?v=1.8.0">
+  <link rel="stylesheet" href="./css/gatekeeper.css?v=1.8.0">
+  <link rel="stylesheet" href="./css/camera-scanner.css?v=1.8.0">
+  <link rel="stylesheet" href="./css/exam-room.css?v=1.8.0">
+  <link rel="stylesheet" href="./css/features.css?v=1.8.0">
   <!-- Early PWA Install Prompt Capture -->
   <script>
     window.addEventListener('beforeinstallprompt', function(e) {
@@ -78,7 +78,7 @@
     })();
   </script>
 
-  <script type="module" src="./js/app.bundle.js?v=1.7.9"></script>
+  <script type="module" src="./js/app.bundle.js?v=1.8.0"></script>
   <!-- Service Worker Safe Registration (No infinite reload loops) -->
   <script>
     if ('serviceWorker' in navigator) {

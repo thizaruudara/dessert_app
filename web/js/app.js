@@ -15369,6 +15369,38 @@ ${!times.isWaiting ? `
       iframeSrc += (iframeSrc.includes('#') ? '' : '#toolbar=0&navpanes=0&scrollbar=1');
     }
 
+    let fileId = null;
+    if (rawPdf.includes('drive.google.com')) {
+      const matchD = rawPdf.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const matchId = rawPdf.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      fileId = matchD ? matchD[1] : (matchId ? matchId[1] : null);
+    }
+
+    const viewerOptions = [];
+    if (fileId) {
+      viewerOptions.push({
+        name: 'Drive View',
+        url: `https://drive.google.com/file/d/${fileId}/preview`
+      });
+      viewerOptions.push({
+        name: 'Docs View',
+        url: `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}&export=download`)}&embedded=true`
+      });
+      viewerOptions.push({
+        name: 'Drive Alt',
+        url: `https://drive.google.com/file/d/${fileId}/preview?usp=sharing`
+      });
+    } else {
+      viewerOptions.push({
+        name: 'Standard View',
+        url: iframeSrc
+      });
+      viewerOptions.push({
+        name: 'Docs View',
+        url: `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdf)}&embedded=true`
+      });
+    }
+
     const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
     const studentName = student.name || student.displayName || 'EduPeak Student';
     const studentPhone = student.phone || student.phoneNumber || student.studentId || '';
@@ -15466,10 +15498,11 @@ ${!times.isWaiting ? `
         <div id="secure-paper-zoom-target" style="width: 100%; min-height: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; transform-origin: top center; transition: transform 0.15s ease-out; position: relative;">
           
           <!-- Loading Spinner Indicator -->
-          <div id="paper-loading-indicator" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0F172A; z-index: 10; color: #FFFFFF;">
+          <div id="paper-loading-indicator" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0F172A; z-index: 10; color: #FFFFFF; text-align: center; padding: 20px;">
             <div style="width: 38px; height: 38px; border: 3.5px solid #334155; border-top-color: #38BDF8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
             <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;">ප්‍රශ්න පත්‍රය Load වෙමින් පවතී...</div>
             <div style="font-size: 11px; color: #94A3B8;">Loading Question Paper PDF</div>
+            <div style="font-size: 11px; color: #64748B; margin-top: 6px;">ප්‍රශ්න පත්‍රය නොපෙනේ නම් ඉහළ ඇති <b>Alt View</b> හෝ <b>Open Tab</b> භාවිතා කරන්න.</div>
           </div>
 
           <iframe id="secure-paper-iframe" src="${iframeSrc}" style="width: 100%; height: calc(100vh - 60px); min-height: 600px; border: none; background: #FFFFFF; display: block; flex: 1;" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade" loading="eager"></iframe>
@@ -15530,20 +15563,19 @@ ${!times.isWaiting ? `
       }, 4500);
     });
 
-    let currentViewerMode = 'drive';
-    modal.querySelector('#btn-paper-alt-viewer')?.addEventListener('click', () => {
-      if (!iframe) return;
+    let currentViewerIdx = 0;
+    const altBtn = modal.querySelector('#btn-paper-alt-viewer');
+    altBtn?.addEventListener('click', () => {
+      if (!iframe || viewerOptions.length <= 1) return;
+      currentViewerIdx = (currentViewerIdx + 1) % viewerOptions.length;
+      const opt = viewerOptions[currentViewerIdx];
       if (loader) loader.style.display = 'flex';
-      if (currentViewerMode === 'drive') {
-        currentViewerMode = 'docs';
-        iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdf)}&embedded=true`;
-      } else {
-        currentViewerMode = 'drive';
-        iframe.src = iframeSrc;
-      }
+      iframe.src = opt.url;
+      const labelSpan = altBtn.querySelector('span:not(.material-symbols-rounded)');
+      if (labelSpan) labelSpan.textContent = opt.name;
       setTimeout(() => {
         if (loader) loader.style.display = 'none';
-      }, 4500);
+      }, 3500);
     });
 
     const zoomTarget = modal.querySelector('#secure-paper-zoom-target');
