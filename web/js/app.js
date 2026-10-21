@@ -12377,6 +12377,7 @@ class AppController {
 
       if (typeof attachAgoraStreams === 'function') attachAgoraStreams();
     };
+    this._renderProctorHall = render;
 
     // Centralized Event Actions
     const closeProctorHall = () => {
@@ -12386,6 +12387,8 @@ class AppController {
       unsubs = [];
       document.getElementById('proctor-fullscreen-modal')?.remove();
       this._fullScreenStudentId = null;
+      this._renderProctorHall = null;
+      this._attachProctorStreams = null;
       if (document.fullscreenElement) {
         try { document.exitFullscreen().catch(() => {}); } catch (_) {}
       }
@@ -12720,7 +12723,7 @@ class AppController {
     // Helper: Confirmation Dialog matching Flutter AlertDialog
   _confirmProctorAction({ title, content, confirmText, confirmColor = '#6366F1', onConfirm }) {
     const dialog = document.createElement('div');
-    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10025;';
+    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:2147483647; font-family:Poppins,sans-serif;';
     dialog.innerHTML = `
       <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:380px; color:#FFFFFF; font-family:'Poppins',sans-serif; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
         <div style="font-size:15px; font-weight:700; margin-bottom:10px;">${title}</div>
@@ -12736,13 +12739,14 @@ class AppController {
       dialog.remove();
       if (onConfirm) await onConfirm();
     };
-    document.body.appendChild(dialog);
+    const mountTarget = document.fullscreenElement || document.body;
+    mountTarget.appendChild(dialog);
   }
 
   // Helper: Broadcast Announcement Dialog (_showBroadcastDialog)
   _showProctorBroadcastDialog(paperId) {
     const dialog = document.createElement('div');
-    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:10025;';
+    dialog.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:center; z-index:2147483647; font-family:Poppins,sans-serif;';
     dialog.innerHTML = `
       <div style="background:#1E293B; border-radius:16px; border:1px solid #334155; padding:20px; width:90%; max-width:400px; color:#FFFFFF; font-family:'Poppins',sans-serif;">
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -12770,13 +12774,14 @@ class AppController {
       });
       notificationService.showInAppBanner('Broadcast Sent', 'Announcement sent to all students!', 'info');
     };
-    document.body.appendChild(dialog);
+    const mountTarget = document.fullscreenElement || document.body;
+    mountTarget.appendChild(dialog);
   }
 
   // Helper: Direct Proctor Alert Sheet (_showDirectMessageSheet)
   _showDirectAlertSheet(paperId, student) {
     const sheet = document.createElement('div');
-    sheet.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:flex-end; z-index:10020;';
+    sheet.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; justify-content:center; align-items:flex-end; z-index:2147483647; font-family:Poppins,sans-serif;';
     const quickWarnings = [
       'කරුණාකර ඔබගේ මේසය සහ පිළිතුරු පත්‍රය පෙනෙන සේ කැමරාව සකසන්න. (Please adjust camera angle)',
       'ඔබගේ මුහුණ සහ පරිසරය පැහැදිලිව නොපෙනේ. (Please improve lighting/position)',
@@ -12784,12 +12789,16 @@ class AppController {
       'කරුණාකර අවධානයෙන් පිළිතුරු ලියන්න. වෙනත් කටයුතු වලින් වළකින්න.'
     ];
 
+    const studentName = student.studentName || student.name || 'Student';
+    const studentPhone = student.studentPhone || student.phone || '';
+    const studentId = student.studentId || student.id || student.uid || '';
+
     sheet.innerHTML = `
-      <div style="background:#1E293B; border-radius:20px 20px 0 0; border:1px solid #334155; padding:20px; width:100%; max-width:440px; color:#FFFFFF; font-family:'Poppins',sans-serif; box-sizing:border-box;">
+      <div style="background:#1E293B; border-radius:20px 20px 0 0; border:1px solid #334155; padding:20px; width:100%; max-width:440px; color:#FFFFFF; font-family:'Poppins',sans-serif; box-sizing:border-box; box-shadow:0 -10px 40px rgba(0,0,0,0.5);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div>
             <div style="font-size:14px; font-weight:700; color:#FFFFFF;">Direct Proctor Alert (ශිෂ්‍යයාට පණිවිඩයක්)</div>
-            <div style="font-size:11px; color:#94A3B8;">To: ${student.studentName} (${student.studentPhone || ''})</div>
+            <div style="font-size:11px; color:#94A3B8;">To: ${studentName} (${studentPhone})</div>
           </div>
           <button id="sheet-close-btn" style="background:transparent; border:none; color:#94A3B8; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
             <span class="material-symbols-rounded">close</span>
@@ -12825,29 +12834,32 @@ class AppController {
       sheet.remove();
       await dbService.sendProctorAlert({
         paperId,
-        studentId: student.studentId,
-        studentPhone: student.studentPhone,
+        studentId,
+        studentPhone,
         senderName: 'Admin / Examiner',
         message: msg,
         type: 'warning'
       });
-      notificationService.showInAppBanner('Alert Sent', `Alert sent to ${student.studentName}!`, 'info');
+      notificationService.showInAppBanner('Alert Sent', `Alert sent to ${studentName}!`, 'info');
     };
-    document.body.appendChild(sheet);
+    const mountTarget = document.fullscreenElement || document.body;
+    mountTarget.appendChild(sheet);
   }
 
   // Helper: Submission Viewer (_showStudentSubmissionViewer)
   _showSubmissionViewer(student) {
     const modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:10020;';
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:2147483647; font-family:Poppins,sans-serif;';
     const photos = student.submissionPhotos || [];
+    const studentName = student.studentName || student.name || 'Student';
+    const studentPhone = student.studentPhone || student.phone || '';
 
     modal.innerHTML = `
-      <div style="background:#1E293B; border-radius:20px; border:1px solid #334155; width:92%; max-width:440px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; font-family:'Poppins',sans-serif; color:#FFFFFF;">
+      <div style="background:#1E293B; border-radius:20px; border:1px solid #334155; width:92%; max-width:440px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; font-family:'Poppins',sans-serif; color:#FFFFFF; box-shadow:0 20px 40px rgba(0,0,0,0.6);">
         <div style="padding:14px 16px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <div style="font-size:14px; font-weight:700;">${student.studentName}</div>
-            <div style="font-size:11px; color:#94A3B8;">${student.studentPhone || ''} • Submitted ${photos.length} Pages</div>
+            <div style="font-size:14px; font-weight:700;">${studentName}</div>
+            <div style="font-size:11px; color:#94A3B8;">${studentPhone} • Submitted ${photos.length} Pages</div>
           </div>
           <button id="view-ans-close" style="background:transparent; border:none; color:#94A3B8; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
             <span class="material-symbols-rounded">close</span>
@@ -12892,7 +12904,8 @@ class AppController {
     `;
 
     modal.querySelector('#view-ans-close').onclick = () => modal.remove();
-    document.body.appendChild(modal);
+    const mountTarget = document.fullscreenElement || document.body;
+    mountTarget.appendChild(modal);
   }
 
   // Helper: Full Screen Student Viewer (_showFullScreenStudentViewer)
@@ -12900,12 +12913,13 @@ class AppController {
     const existing = document.getElementById('proctor-fullscreen-modal');
     if (existing) existing.remove();
 
-    this._fullScreenStudentId = student.studentId;
+    const sId = student.studentId || student.id || student.uid || '';
+    this._fullScreenStudentId = sId;
 
     const modal = document.createElement('div');
     modal.id = 'proctor-fullscreen-modal';
-    modal.dataset.studentId = student.studentId;
-    modal.style.cssText = 'position:fixed; inset:0; background:#0F172A; display:flex; flex-direction:column; z-index:10002; font-family:Poppins,sans-serif; user-select:none;';
+    modal.dataset.studentId = sId;
+    modal.style.cssText = 'position:fixed; inset:0; width:100vw; height:100vh; background:#0F172A; display:flex; flex-direction:column; z-index:2147483640; font-family:Poppins,sans-serif; user-select:none; overflow:hidden;';
     modal.innerHTML = `
       <!-- Top Bar Header with Back & Exit controls -->
       <div style="background:#1E293B; padding:max(12px, env(safe-area-inset-top, 12px)) 16px 12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; gap:12px; flex-shrink:0;">
@@ -12915,7 +12929,7 @@ class AppController {
         </button>
 
         <div style="flex:1; min-width:0; text-align:center;">
-          <div style="font-size:14px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${student.studentName || 'Student'}</div>
+          <div style="font-size:14px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${student.studentName || student.name || 'Student'}</div>
           <div style="font-size:11px; color:#38BDF8; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
             <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#22C55E; box-shadow:0 0 6px #22C55E;"></span>
             <span>Surveillance Monitor • Slot: ${student.selectedSlot || 'slot1'}</span>
@@ -12983,10 +12997,6 @@ class AppController {
         }
       }
 
-      if (document.fullscreenElement) {
-        try { document.exitFullscreen().catch(() => {}); } catch (_) {}
-      }
-
       this._fullScreenStudentId = null;
       modal.remove();
 
@@ -13023,7 +13033,8 @@ class AppController {
       this._showSubmissionViewer(student);
     });
 
-    document.body.appendChild(modal);
+    const mountTarget = document.fullscreenElement || document.body;
+    mountTarget.appendChild(modal);
 
     // Update background grid to mark this student as viewing in full screen
     if (typeof this._attachProctorStreams === 'function') this._attachProctorStreams();
