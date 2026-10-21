@@ -3,6 +3,7 @@
 // and multi-stream live surveillance monitoring for proctors, matching Flutter 1:1.
 
 import AgoraRTC from 'agora-rtc-sdk-ng';
+import { auth } from './firebase-config.js';
 
 export const AGORA_APP_ID = '1a021dff70b447058f17a8881a03834e';
 
@@ -40,14 +41,20 @@ export function getChannelName(paperId) {
 // Fetch token from server endpoint
 export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
   try {
-    const apiBase = (typeof window !== 'undefined' && !window.location.hostname.includes('vercel.app'))
-      ? 'https://edupeak-web.vercel.app/api'
-      : '/api';
+    const headers = { 'Content-Type': 'application/json' };
+    const user = auth?.currentUser;
+    if (user && typeof user.getIdToken === 'function') {
+      try {
+        const idToken = await user.getIdToken();
+        if (idToken) headers.Authorization = `Bearer ${idToken}`;
+      } catch (_) {}
+    }
+
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1200);
-    const res = await fetch(`${apiBase}/agora/token`, {
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch('/api/agora/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ channelName, uid, role }),
       signal: controller.signal
     });

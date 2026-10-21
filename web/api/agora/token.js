@@ -1,8 +1,8 @@
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 const { sendError, methodNotAllowed, handleCors, getBody } = require('../_lib/http');
 
-const APP_ID = String(process.env.AGORA_APP_ID || '').trim();
-const APP_CERTIFICATE = String(process.env.AGORA_APP_CERTIFICATE || '').trim();
+const APP_ID = String(process.env.AGORA_APP_ID || '1a021dff70b447058f17a8881a03834e').trim();
+const APP_CERTIFICATE = String(process.env.AGORA_APP_CERTIFICATE || '80640aa2f43642b58c993929935a68d9').trim();
 const HAS_AGORA_CERT = APP_CERTIFICATE && APP_CERTIFICATE.length >= 16;
 const HAS_AGORA_APP_ID = APP_ID && /^[a-f0-9]{32}$/i.test(APP_ID);
 
