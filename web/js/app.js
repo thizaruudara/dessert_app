@@ -15188,6 +15188,11 @@ ${!times.isWaiting ? `
     }
 
     const embedUrl = this.formatPdfViewerUrl(rawPdf);
+    let iframeSrc = embedUrl;
+    if (!iframeSrc.includes('drive.google.com') && !iframeSrc.includes('docs.google.com')) {
+      iframeSrc += (iframeSrc.includes('#') ? '' : '#toolbar=0&navpanes=0&scrollbar=1');
+    }
+
     const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
     const studentName = student.name || student.displayName || 'EduPeak Student';
     const studentPhone = student.phone || student.phoneNumber || student.studentId || '';
@@ -15224,7 +15229,7 @@ ${!times.isWaiting ? `
 
     modal.innerHTML = `
       <!-- Secure Header Bar -->
-      <div style="background: rgba(15, 23, 42, 0.96); border-bottom: 1px solid #334155; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 50; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+      <div style="background: rgba(15, 23, 42, 0.96); border-bottom: 1px solid #334155; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; z-index: 50; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
         <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
           <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #2563EB, #1D4ED8); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(37,99,235,0.4);">
             <span class="material-symbols-rounded filled" style="font-size: 20px; color: #FFFFFF;">description</span>
@@ -15241,24 +15246,39 @@ ${!times.isWaiting ? `
         </div>
 
         <!-- Zoom & Viewport Controls -->
-        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; border-radius: 10px; padding: 2px 4px;">
-            <button id="btn-paper-zoom-out" title="Zoom Out" style="background: transparent; border: none; color: #E2E8F0; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
-              <span class="material-symbols-rounded" style="font-size: 19px;">remove</span>
+            <button id="btn-paper-zoom-out" title="Zoom Out" style="background: transparent; border: none; color: #E2E8F0; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
+              <span class="material-symbols-rounded" style="font-size: 18px;">remove</span>
             </button>
-            <span id="lbl-paper-zoom-val" style="font-size: 12px; font-weight: 700; color: #60A5FA; min-width: 48px; text-align: center; font-family: monospace;">100%</span>
-            <button id="btn-paper-zoom-in" title="Zoom In" style="background: transparent; border: none; color: #E2E8F0; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
-              <span class="material-symbols-rounded" style="font-size: 19px;">add</span>
+            <span id="lbl-paper-zoom-val" style="font-size: 11.5px; font-weight: 700; color: #60A5FA; min-width: 44px; text-align: center; font-family: monospace;">100%</span>
+            <button id="btn-paper-zoom-in" title="Zoom In" style="background: transparent; border: none; color: #E2E8F0; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
+              <span class="material-symbols-rounded" style="font-size: 18px;">add</span>
             </button>
           </div>
 
-          <button id="btn-paper-zoom-reset" title="Reset Zoom" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #94A3B8; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-            <span class="material-symbols-rounded" style="font-size: 16px;">restart_alt</span>
+          <button id="btn-paper-zoom-reset" title="Reset Zoom" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #94A3B8; border-radius: 10px; padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px;">
+            <span class="material-symbols-rounded" style="font-size: 15px;">restart_alt</span>
             <span style="white-space:nowrap;">100%</span>
           </button>
 
-          <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
-            <span class="material-symbols-rounded" style="font-size: 17px;">close</span>
+          <button id="btn-paper-reload" title="Reload PDF" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #38BDF8; border-radius: 10px; padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px;">
+            <span class="material-symbols-rounded" style="font-size: 15px;">refresh</span>
+            <span style="white-space:nowrap;">Reload</span>
+          </button>
+
+          <button id="btn-paper-alt-viewer" title="Switch Viewer Engine" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #F59E0B; border-radius: 10px; padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px;">
+            <span class="material-symbols-rounded" style="font-size: 15px;">swap_horiz</span>
+            <span style="white-space:nowrap;">Alt View</span>
+          </button>
+
+          <a id="btn-paper-external" href="${escapeHTML(rawPdf)}" target="_blank" rel="noopener noreferrer" style="background: rgba(37, 99, 235, 0.25); border: 1px solid #3B82F6; color: #93C5FD; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+            <span class="material-symbols-rounded" style="font-size: 15px;">open_in_new</span>
+            <span style="white-space:nowrap;">Open Tab</span>
+          </a>
+
+          <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 10px; padding: 7px 13px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
+            <span class="material-symbols-rounded" style="font-size: 16px;">close</span>
             <span style="white-space: nowrap;">Return to Exam</span>
           </button>
         </div>
@@ -15267,8 +15287,16 @@ ${!times.isWaiting ? `
       <!-- Main Document Viewport & Scroll Area -->
       <div id="secure-paper-scroll-container" style="flex: 1; width: 100%; height: 100%; overflow: auto; position: relative; background: #0F172A; display: flex; justify-content: center; align-items: flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom;">
         <!-- Scalable Paper Content Wrapper -->
-        <div id="secure-paper-zoom-target" style="width: 100%; min-height: 100%; display: flex; flex-direction: column; align-items: center; transform-origin: top center; transition: transform 0.15s ease-out; position: relative;">
-          <iframe id="secure-paper-iframe" src="${embedUrl}#toolbar=0&navpanes=0&scrollbar=1" style="width: 100%; height: calc(100vh - 58px); min-height: 600px; border: none; background: #FFFFFF; display: block;" sandbox="allow-scripts allow-same-origin allow-forms" loading="eager"></iframe>
+        <div id="secure-paper-zoom-target" style="width: 100%; min-height: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; transform-origin: top center; transition: transform 0.15s ease-out; position: relative;">
+          
+          <!-- Loading Spinner Indicator -->
+          <div id="paper-loading-indicator" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0F172A; z-index: 10; color: #FFFFFF;">
+            <div style="width: 38px; height: 38px; border: 3.5px solid #334155; border-top-color: #38BDF8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;">ප්‍රශ්න පත්‍රය Load වෙමින් පවතී...</div>
+            <div style="font-size: 11px; color: #94A3B8;">Loading Question Paper PDF</div>
+          </div>
+
+          <iframe id="secure-paper-iframe" src="${iframeSrc}" style="width: 100%; height: calc(100vh - 60px); min-height: 600px; border: none; background: #FFFFFF; display: block; flex: 1;" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade" loading="eager"></iframe>
         </div>
 
         <!-- Indelible Security Watermark Diagonal Overlay -->
@@ -15301,6 +15329,46 @@ ${!times.isWaiting ? `
       pipVideo.srcObject = cameraStream;
       pipVideo.play().catch(() => {});
     }
+
+    const iframe = modal.querySelector('#secure-paper-iframe');
+    const loader = modal.querySelector('#paper-loading-indicator');
+
+    if (iframe) {
+      iframe.addEventListener('load', () => {
+        if (loader) loader.style.display = 'none';
+      });
+      setTimeout(() => {
+        if (loader) loader.style.display = 'none';
+      }, 4500);
+    }
+
+    modal.querySelector('#btn-paper-reload')?.addEventListener('click', () => {
+      if (loader) loader.style.display = 'flex';
+      if (iframe) {
+        const cur = iframe.src;
+        iframe.src = 'about:blank';
+        setTimeout(() => { iframe.src = cur; }, 80);
+      }
+      setTimeout(() => {
+        if (loader) loader.style.display = 'none';
+      }, 4500);
+    });
+
+    let currentViewerMode = 'drive';
+    modal.querySelector('#btn-paper-alt-viewer')?.addEventListener('click', () => {
+      if (!iframe) return;
+      if (loader) loader.style.display = 'flex';
+      if (currentViewerMode === 'drive') {
+        currentViewerMode = 'docs';
+        iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(rawPdf)}&embedded=true`;
+      } else {
+        currentViewerMode = 'drive';
+        iframe.src = iframeSrc;
+      }
+      setTimeout(() => {
+        if (loader) loader.style.display = 'none';
+      }, 4500);
+    });
 
     const zoomTarget = modal.querySelector('#secure-paper-zoom-target');
     const zoomLabel = modal.querySelector('#lbl-paper-zoom-val');
