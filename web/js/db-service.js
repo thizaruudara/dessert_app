@@ -527,6 +527,24 @@ export class DbService {
 
     // 3. Keep paper_registrations in sync so live exam room marks it submitted
     if (paperId && studentId) {
+      let combinedPhotos = mediaUrls || [];
+      let subCount = 1;
+
+      try {
+        const regRef = doc(db, 'paper_registrations', `${paperId}_${studentId}`);
+        const existingSnap = await getDoc(regRef).catch(() => null);
+        if (existingSnap && existingSnap.exists()) {
+          const prevData = existingSnap.data() || {};
+          const prevPhotos = Array.isArray(prevData.submissionPhotos) ? prevData.submissionPhotos : (prevData.submissionUrl ? [prevData.submissionUrl] : []);
+          const merged = [...prevPhotos];
+          (mediaUrls || []).forEach(u => {
+            if (u && !merged.includes(u)) merged.push(u);
+          });
+          combinedPhotos = merged;
+          subCount = (Number(prevData.submissionCount) || 1) + (prevPhotos.length > 0 ? 1 : 0);
+        }
+      } catch (_) {}
+
       const regData = {
         paperId,
         studentId,
@@ -534,8 +552,10 @@ export class DbService {
         status: 'submitted',
         isSubmitted: true,
         submittedAt: nowIso,
-        submissionPhotos: mediaUrls || [],
-        submissionUrl: mediaUrls && mediaUrls[0] ? mediaUrls[0] : null
+        lastSubmittedAt: nowIso,
+        submissionCount: subCount,
+        submissionPhotos: combinedPhotos,
+        submissionUrl: combinedPhotos[0] || (mediaUrls && mediaUrls[0]) || null
       };
 
       // Instantly update cache so client immediately renders "Submitted"
@@ -2469,31 +2489,60 @@ export class DbService {
           updates.isSubmitted = true;
           updates.isCameraActive = false;
           if (!updates.submittedAt) updates.submittedAt = serverTimestamp();
+          updates.lastSubmittedAt = serverTimestamp();
         } else if (status === 'in_exam') {
           updates.status = 'in_exam';
           updates.joinedAt = serverTimestamp();
+          updates.isCameraActive = isCameraActive !== undefined ? isCameraActive : true;
+          updates.isOnline = true;
         } else {
           updates.status = status;
         }
       }
       if (submissionPhotos && Array.isArray(submissionPhotos) && submissionPhotos.length > 0) {
-        updates.submissionPhotos = submissionPhotos;
-        updates.submissionUrl = submissionPhotos[0];
         updates.isSubmitted = true;
         updates.status = 'submitted';
         updates.isCameraActive = false;
+        updates.lastSubmittedAt = serverTimestamp();
       }
 
-      // Safeguard: Check existing record so a submitted student can NEVER be reverted back to 'in_exam'
+      // Check existing record to merge submissions and support re-joining active sessions
       try {
         const existingSnap = await getDoc(regRef);
         if (existingSnap.exists()) {
           const prev = existingSnap.data() || {};
-          if (prev.isSubmitted === true || prev.status === 'submitted' || prev.submittedAt || (prev.submissionPhotos && prev.submissionPhotos.length > 0) || prev.mcqScore !== undefined) {
-            updates.isSubmitted = true;
-            updates.status = 'submitted';
-            updates.isCameraActive = false;
-            updates.cameraSnapshotUrl = null;
+
+          // If submitting photos, merge new pages with previous ones so earlier pages are preserved
+          if (submissionPhotos && Array.isArray(submissionPhotos) && submissionPhotos.length > 0) {
+            const prevPhotos = Array.isArray(prev.submissionPhotos) ? prev.submissionPhotos : (prev.submissionUrl ? [prev.submissionUrl] : []);
+            const mergedPhotos = [...prevPhotos];
+            submissionPhotos.forEach(url => {
+              if (url && !mergedPhotos.includes(url)) mergedPhotos.push(url);
+            });
+            updates.submissionPhotos = mergedPhotos;
+            updates.submissionUrl = mergedPhotos[0] || submissionPhotos[0];
+            updates.submissionCount = (Number(prev.submissionCount) || 1) + (prevPhotos.length > 0 ? 1 : 0);
+          } else if (prev.submissionPhotos && prev.submissionPhotos.length > 0 && !updates.submissionPhotos) {
+            updates.submissionPhotos = prev.submissionPhotos;
+            updates.submissionUrl = prev.submissionUrl || prev.submissionPhotos[0];
+          }
+
+          // Merge MCQ answers if previously saved
+          if (mcqAnswers && prev.mcqAnswers) {
+            updates.mcqAnswers = { ...prev.mcqAnswers, ...mcqAnswers };
+          }
+
+          // If student has re-entered the exam room (status: 'in_exam'), do NOT override with 'submitted' or disable camera!
+          if (status === 'in_exam') {
+            updates.status = 'in_exam';
+            updates.isCameraActive = isCameraActive !== undefined ? isCameraActive : true;
+            updates.isOnline = true;
+            updates.hasPreviousSubmission = prev.isSubmitted === true || prev.status === 'submitted' || !!prev.submittedAt || (prev.submissionPhotos && prev.submissionPhotos.length > 0);
+          } else if (status !== 'in_exam' && (prev.isSubmitted === true || prev.status === 'submitted')) {
+            if (!updates.status || updates.status === 'offline') {
+              updates.isSubmitted = true;
+              updates.status = 'submitted';
+            }
           }
         }
       } catch (_) {}

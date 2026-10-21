@@ -2204,10 +2204,18 @@ class AppController {
 
           <!-- Action Buttons -->
           ${isSubmitted ? `
-            <button class="btn-primary" style="background:#0F172A; border:1.5px solid ${hasReleasedMarks ? '#22C55E' : '#F59E0B'}; color:${hasReleasedMarks ? '#4ADE80' : '#FBBF24'}; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${session.id}">
-              <span class="material-symbols-rounded filled" style="font-size:18px; color:${hasReleasedMarks ? '#22C55E' : '#F59E0B'};">${hasReleasedMarks ? 'verified' : 'hourglass_top'}</span>
-              <span>${hasReleasedMarks ? `Marks: ${studentMarks} / ${totalPaperMarks} (${marksPercentage}%) • View Details (විස්තර බලන්න)` : (session.paperType === 'mcq' && hasMcqMarks ? `Marks: ${studentMarks}/${totalPaperMarks} • View Details` : `Submitted • Marks: Pending (ලකුණු ලබාදීමට නියමිතයි)`)}</span>
-            </button>
+            <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+              <button class="btn-primary" style="background:#0F172A; border:1.5px solid ${hasReleasedMarks ? '#22C55E' : '#F59E0B'}; color:${hasReleasedMarks ? '#4ADE80' : '#FBBF24'}; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${session.id}">
+                <span class="material-symbols-rounded filled" style="font-size:18px; color:${hasReleasedMarks ? '#22C55E' : '#F59E0B'};">${hasReleasedMarks ? 'verified' : 'hourglass_top'}</span>
+                <span>${hasReleasedMarks ? `Marks: ${studentMarks} / ${totalPaperMarks} (${marksPercentage}%) • View Details (විස්තර බලන්න)` : (session.paperType === 'mcq' && hasMcqMarks ? `Marks: ${studentMarks}/${totalPaperMarks} • View Details` : `Submitted • Marks: Pending (ලකුණු ලබාදීමට නියමිතයි)`)}</span>
+              </button>
+              ${!isEnded ? `
+                <button class="btn-primary" style="background:linear-gradient(135deg, #16A34A 0%, #15803D 100%); color:#FFFFFF; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; font-weight:700; border:none; cursor:pointer;" data-enter-exam="${session.id}">
+                  <span class="material-symbols-rounded filled" style="font-size:18px;">videocam</span>
+                  <span>Re-enter Exam Room / Continue Writing (නැවත සම්බන්ධ වන්න)</span>
+                </button>
+              ` : ''}
+            </div>
           ` : isPackageOpening ? `
             <button class="btn-primary" style="background:#D97706; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-enter-exam="${session.id}">
               <span class="material-symbols-rounded" style="font-size:18px;">inventory_2</span>
@@ -2355,23 +2363,12 @@ class AppController {
         if (!this.checkSubscriptionAccess('Live Paper Writing Sessions')) return;
         const paperId = btn.dataset.enterExam;
         const reg = registrations.get(paperId);
-        const uId = user.uid || user.id || 's_default';
-        const sId = user.studentId || '';
-        const uPhone = user.phone || user.phoneNumber || '';
-        const isSub = localStorage.getItem(`paper_submitted_${paperId}`) === 'true' ||
-          localStorage.getItem(`paper_submitted_${paperId}_${uId}`) === 'true' ||
-          (sId && localStorage.getItem(`paper_submitted_${paperId}_${sId}`) === 'true') ||
-          (uPhone && localStorage.getItem(`paper_submitted_${paperId}_${uPhone}`) === 'true') ||
-          reg?.status === 'submitted' ||
-          reg?.isSubmitted === true ||
-          !!reg?.submittedAt ||
-          (Array.isArray(reg?.submissionPhotos) && reg.submissionPhotos.length > 0) ||
-          reg?.mcqScore !== undefined;
+        const session = sessions.find(s => s.id === paperId);
+        const isEnded = session && (session.status === 'completed' || session.currentPhase === 'ended');
 
-        if (isSub) {
-          notificationService.showInAppBanner('Answer Sheet Submitted', 'You have already submitted this exam paper. Re-entry is not allowed.', 'info');
-          const sess = sessions.find(s => s.id === paperId);
-          this.showSubmissionDetailsDialog(sess || { id: paperId, title: 'Exam Paper' }, reg || { paperId, isSubmitted: true });
+        if (isEnded) {
+          notificationService.showInAppBanner('Exam Session Ended', 'This exam session has already concluded. You can view your submission details below.', 'info');
+          this.showSubmissionDetailsDialog(session || { id: paperId, title: 'Exam Paper' }, reg || { paperId, isSubmitted: true });
           return;
         }
 
@@ -5543,13 +5540,22 @@ class AppController {
           const btn = card.querySelector('[data-enter-exam], [data-scan-answers]');
           if (btn) {
             btn.outerHTML = `
-              <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${paperId}">
-                <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
-                <span>Submitted (${finalUrls.length} Pages) • View Details (විස්තර බලන්න)</span>
-              </button>
+              <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+                <button class="btn-primary" style="background:#1E293B; border:1.5px solid #22C55E; color:#4ADE80; padding:12px; display:flex; align-items:center; justify-content:center; gap:8px;" data-view-sub="${paperId}">
+                  <span class="material-symbols-rounded filled" style="font-size:18px; color:#22C55E;">check_circle</span>
+                  <span>Submitted (${finalUrls.length} Pages) • View Details (විස්තර බලන්න)</span>
+                </button>
+                <button class="btn-primary" style="background:linear-gradient(135deg, #16A34A 0%, #15803D 100%); color:#FFFFFF; padding:11px; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:12px; font-weight:700; border:none; cursor:pointer;" data-enter-exam="${paperId}">
+                  <span class="material-symbols-rounded filled" style="font-size:18px;">videocam</span>
+                  <span>Re-enter Exam Room / Continue Writing (නැවත සම්බන්ධ වන්න)</span>
+                </button>
+              </div>
             `;
             card.querySelector(`[data-view-sub="${paperId}"]`)?.addEventListener('click', () => {
               this.showSubmissionDetailsDialog(session || { id: paperId, title: paperTitle }, record || { paperId, studentId, status: 'submitted', isSubmitted: true, submissionPhotos: finalUrls });
+            });
+            card.querySelector(`[data-enter-exam="${paperId}"]`)?.addEventListener('click', () => {
+              this.openLiveExamRoom(paperId);
             });
           }
           const banner = card.querySelector('.phase-status-banner-box');
@@ -11825,6 +11831,8 @@ class AppController {
 
     const isStudentSubmitted = (s) => {
       if (!s) return false;
+      // If student has re-entered and is actively inside the exam room, they are currently in exam
+      if (s.status === 'in_exam') return false;
       return s.status === 'submitted' ||
              s.isSubmitted === true ||
              !!s.submittedAt ||
@@ -13046,25 +13054,6 @@ class AppController {
     const uId = student.uid || student.id || '';
     const sId = student.studentId || '';
 
-    // Fast-path guard: Check if already submitted locally
-    const isLocalSubmitted = localStorage.getItem(`paper_submitted_${paperId}`) === 'true' ||
-      localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' ||
-      (uId && localStorage.getItem(`paper_submitted_${paperId}_${uId}`) === 'true') ||
-      (sId && localStorage.getItem(`paper_submitted_${paperId}_${sId}`) === 'true') ||
-      (studentPhone && localStorage.getItem(`paper_submitted_${paperId}_${studentPhone}`) === 'true');
-
-    if (isLocalSubmitted) {
-      if (typeof notificationService !== 'undefined') {
-        notificationService.showInAppBanner('Answer Sheet Submitted', 'You have already submitted this exam paper. Re-entry is not allowed. (ඔබ දැනටමත් පිළිතුරු පත්‍රය භාර දී ඇත.)', 'info');
-      }
-      const [sess, reg] = await Promise.all([
-        dbService.getPaperSession(paperId).catch(() => null),
-        dbService.getStudentRegistration(paperId, studentId).catch(() => null)
-      ]);
-      this.showSubmissionDetailsDialog(sess || { id: paperId, title: 'Exam Paper' }, reg || { paperId, studentId, isSubmitted: true });
-      return;
-    }
-
     // Fullscreen View Container matching Flutter Scaffold - Mount immediately for instant responsive UX!
     const roomContainer = document.createElement('div');
     roomContainer.id = 'live-exam-room-root';
@@ -13089,30 +13078,30 @@ class AppController {
       dbService.getPaperSession(paperId).catch(() => null)
     ]);
 
+    const isSessionEnded = session && (session.status === 'completed' || session.currentPhase === 'ended');
     const isRegSubmitted = existingReg && (
       existingReg.isSubmitted === true ||
       existingReg.status === 'submitted' ||
       existingReg.submittedAt ||
       existingReg.mcqScore !== undefined ||
       existingReg.mcqAnswers ||
+      (Array.isArray(existingReg.submissionPhotos) && existingReg.submissionPhotos.length > 0) ||
       (Array.isArray(existingReg.photoUrls) && existingReg.photoUrls.length > 0)
     );
 
-    if (isRegSubmitted) {
-      localStorage.setItem(`paper_submitted_${paperId}`, 'true');
-      localStorage.setItem(`paper_submitted_${paperId}_${studentId}`, 'true');
-      if (uId) localStorage.setItem(`paper_submitted_${paperId}_${uId}`, 'true');
-      if (sId) localStorage.setItem(`paper_submitted_${paperId}_${sId}`, 'true');
-      if (studentPhone) localStorage.setItem(`paper_submitted_${paperId}_${studentPhone}`, 'true');
-      if (typeof dbService !== 'undefined' && dbService.invalidateRegistrationCache) {
-        dbService.invalidateRegistrationCache(paperId, studentId, studentPhone);
-      }
+    if (isRegSubmitted && isSessionEnded) {
       roomContainer.remove();
       if (typeof notificationService !== 'undefined') {
-        notificationService.showInAppBanner('Answer Sheet Submitted', 'You have already submitted this exam paper. Re-entry is not allowed. (ඔබ දැනටමත් පිළිතුරු පත්‍රය භාර දී ඇත.)', 'info');
+        notificationService.showInAppBanner('Exam Session Ended', 'This exam session has concluded. You can view your submission details below.', 'info');
       }
       this.showSubmissionDetailsDialog(session || { id: paperId, title: 'Exam Paper' }, existingReg);
       return;
+    }
+
+    if (isRegSubmitted && !isSessionEnded) {
+      if (typeof notificationService !== 'undefined') {
+        notificationService.showInAppBanner('Live Exam Room Rejoined', 'ඔබ නැවත විභාග ශාලාවට සම්බන්ධ විය. ඔබට පිළිතුරු ලිවීම ඉදිරියට ගෙන යාමට හෝ අමතර පිටු Submit කිරීමට හැකිය.', 'success', 5000);
+      }
     }
 
     if (!session) {
@@ -13187,29 +13176,6 @@ class AppController {
     // Heartbeat function matching Flutter _sendHeartbeat
     const sendHeartbeat = async (isActive) => {
       try {
-        const isAlreadySubmitted = localStorage.getItem(`paper_submitted_${paperId}_${studentId}`) === 'true' ||
-          localStorage.getItem(`paper_submitted_${paperId}`) === 'true' ||
-          (uId && localStorage.getItem(`paper_submitted_${paperId}_${uId}`) === 'true') ||
-          (sId && localStorage.getItem(`paper_submitted_${paperId}_${sId}`) === 'true') ||
-          (studentPhone && localStorage.getItem(`paper_submitted_${paperId}_${studentPhone}`) === 'true');
-
-        if (isAlreadySubmitted) {
-          await dbService.updateCameraHeartbeat({
-            paperId,
-            studentId,
-            studentName,
-            studentPhone,
-            slotId: slotId || 'slot1',
-            isCameraActive: false,
-            isOnline: false,
-            agoraUid: studentAgoraUid || getNumericUid(studentId),
-            cameraSnapshotUrl: null,
-            status: 'submitted',
-            isSubmitted: true
-          });
-          return;
-        }
-
         // Periodically refresh thumbnail snapshot every 15s to keep Firestore bandwidth lightweight
         const nowMs = Date.now();
         if (isActive && (nowMs - lastSnapTime >= 15000 || !cachedSnap)) {
@@ -13920,7 +13886,20 @@ ${!times.isWaiting ? `
         this.studentBroadcaster.stop();
         this.studentBroadcaster = null;
       }
-      sendHeartbeat(false);
+      if (!isSubmitted) {
+        dbService.updateCameraHeartbeat({
+          paperId,
+          studentId,
+          studentName,
+          studentPhone,
+          slotId: slotId || 'slot1',
+          isCameraActive: false,
+          isOnline: false,
+          agoraUid: studentAgoraUid || getNumericUid(studentId),
+          cameraSnapshotUrl: null,
+          status: 'offline'
+        }).catch(() => {});
+      }
       roomContainer.remove();
 
       if (isSubmitted) {
