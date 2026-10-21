@@ -15572,90 +15572,122 @@ ${!times.isWaiting ? `
     window.addEventListener('keydown', handleKeyDown, true);
 
     let currentZoom = 1.0;
+    let isGestureMode = true; // default gesture mode active for 2-finger pinch zoom & 1-finger pan
 
     modal.innerHTML = `
-      <!-- Secure Header Bar -->
-      <div style="background: rgba(15, 23, 42, 0.96); border-bottom: 1px solid #334155; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; z-index: 50; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
-        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-          <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #2563EB, #1D4ED8); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(37,99,235,0.4);">
-            <span class="material-symbols-rounded filled" style="font-size: 20px; color: #FFFFFF;">description</span>
-          </div>
-          <div style="min-width: 0;">
-            <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: min(340px, 45vw);">
-              ${escapeHTML(paperTitle)}
+      <!-- Secure Header Bar (2 responsive rows with iOS safe area) -->
+      <div style="background: rgba(15, 23, 42, 0.96); border-bottom: 1px solid #334155; padding: max(8px, env(safe-area-inset-top, 8px)) max(12px, env(safe-area-inset-right, 12px)) 8px max(12px, env(safe-area-inset-left, 12px)); display: flex; flex-direction: column; gap: 8px; z-index: 50; flex-shrink: 0; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+        <!-- Row 1: Document title & ALWAYS-VISIBLE Close Button -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1;">
+            <div style="width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #2563EB, #1D4ED8); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(37,99,235,0.4);">
+              <span class="material-symbols-rounded filled" style="font-size: 19px; color: #FFFFFF;">description</span>
             </div>
-            <div style="font-size: 10px; color: #94A3B8; display: flex; align-items: center; gap: 6px;">
-              <span style="color: #4ADE80; font-weight: 600;">● Secure Proctored View</span>
-              <span style="opacity: 0.6;">• Zoom & Scroll Enabled</span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHTML(paperTitle)}
+              </div>
+              <div style="font-size: 10px; color: #94A3B8; display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <span style="color: #4ADE80; font-weight: 700;">● Secure View</span>
+                <span style="opacity: 0.6;">• 2-Finger Zoom & Pan</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Zoom & Viewport Controls -->
-        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; border-radius: 10px; padding: 2px 4px;">
-            <button id="btn-paper-zoom-out" title="Zoom Out" style="background: transparent; border: none; color: #E2E8F0; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
-              <span class="material-symbols-rounded" style="font-size: 18px;">remove</span>
-            </button>
-            <span id="lbl-paper-zoom-val" style="font-size: 11.5px; font-weight: 700; color: #60A5FA; min-width: 44px; text-align: center; font-family: monospace;">100%</span>
-            <button id="btn-paper-zoom-in" title="Zoom In" style="background: transparent; border: none; color: #E2E8F0; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: 800;">
-              <span class="material-symbols-rounded" style="font-size: 18px;">add</span>
-            </button>
-          </div>
-
-          <button id="btn-paper-zoom-reset" title="Reset Zoom" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #94A3B8; border-radius: 10px; padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px;">
-            <span class="material-symbols-rounded" style="font-size: 15px;">restart_alt</span>
-            <span style="white-space:nowrap;">100%</span>
-          </button>
-
-          <button id="btn-paper-reload" title="Reload PDF" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #38BDF8; border-radius: 10px; padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px;">
-            <span class="material-symbols-rounded" style="font-size: 15px;">refresh</span>
-            <span style="white-space:nowrap;">Reload</span>
-          </button>
-
-          <button id="btn-paper-alt-viewer" title="Switch Viewer Engine" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #F59E0B; border-radius: 10px; padding: 6px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px;">
-            <span class="material-symbols-rounded" style="font-size: 15px;">swap_horiz</span>
-            <span style="white-space:nowrap;">Alt View</span>
-          </button>
-
-          <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 10px; padding: 7px 13px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
+          <!-- Return to Exam Button pinned to the top right of Row 1 so it NEVER overflows off screen -->
+          <button id="btn-close-secure-paper" style="background: #DC2626; color: #FFFFFF; border: none; border-radius: 8px; padding: 7px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(220,38,38,0.45); transition: background 0.15s ease;">
             <span class="material-symbols-rounded" style="font-size: 16px;">close</span>
             <span style="white-space: nowrap;">Return to Exam</span>
           </button>
         </div>
+
+        <!-- Row 2: Zoom Controls & Viewport Utilities (horizontally scrollable without breaking page) -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px;">
+          <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+            <!-- Zoom +/- Controls -->
+            <div style="display: flex; align-items: center; background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; border-radius: 8px; padding: 2px 3px;">
+              <button id="btn-paper-zoom-out" title="Zoom Out" style="background: transparent; border: none; color: #E2E8F0; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                <span class="material-symbols-rounded" style="font-size: 17px;">remove</span>
+              </button>
+              <span id="lbl-paper-zoom-val" style="font-size: 11px; font-weight: 700; color: #60A5FA; min-width: 40px; text-align: center; font-family: monospace;">100%</span>
+              <button id="btn-paper-zoom-in" title="Zoom In" style="background: transparent; border: none; color: #E2E8F0; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                <span class="material-symbols-rounded" style="font-size: 17px;">add</span>
+              </button>
+            </div>
+
+            <!-- Reset to 100% -->
+            <button id="btn-paper-zoom-reset" title="Reset Zoom to 100%" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #94A3B8; border-radius: 8px; padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px; height: 32px;">
+              <span class="material-symbols-rounded" style="font-size: 15px;">restart_alt</span>
+              <span style="white-space:nowrap;">100%</span>
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+            <!-- Gesture Mode Toggle: Pinch Zoom vs Page Scroll -->
+            <button id="btn-paper-touch-mode" title="Toggle Pinch Zoom or Page Scroll mode" style="background: rgba(37, 99, 235, 0.28); border: 1px solid #3B82F6; color: #93C5FD; border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; height: 32px;">
+              <span class="material-symbols-rounded" style="font-size: 15px;">pinch</span>
+              <span id="lbl-paper-touch-mode" style="white-space:nowrap;">Pinch Zoom: ON</span>
+            </button>
+
+            <!-- Reload PDF -->
+            <button id="btn-paper-reload" title="Reload PDF" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #38BDF8; border-radius: 8px; padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px; height: 32px;">
+              <span class="material-symbols-rounded" style="font-size: 15px;">refresh</span>
+              <span style="white-space:nowrap;">Reload</span>
+            </button>
+
+            <!-- Engine Switcher -->
+            <button id="btn-paper-alt-viewer" title="Switch Viewer Engine" style="background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: #F59E0B; border-radius: 8px; padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px; height: 32px;">
+              <span class="material-symbols-rounded" style="font-size: 15px;">swap_horiz</span>
+              <span style="white-space:nowrap;">Alt View</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Main Document Viewport & Scroll Area -->
-      <div id="secure-paper-scroll-container" style="flex: 1; width: 100%; height: 100%; overflow: auto; position: relative; background: #0F172A; display: flex; justify-content: center; align-items: flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom;">
-        <!-- Scalable Paper Content Wrapper -->
-        <div id="secure-paper-zoom-target" style="width: 100%; min-height: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; transform-origin: top center; transition: transform 0.15s ease-out; position: relative;">
+      <div id="secure-paper-scroll-container" style="flex: 1; width: 100%; height: 100%; overflow: auto; position: relative; background: #0B0F19; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom;">
+        
+        <!-- Sized Spacer that governs natural scrollWidth & scrollHeight in all 2D directions -->
+        <div id="secure-paper-zoom-spacer" style="position: relative; width: 100%; height: 100%; min-width: 100%; min-height: 100%; transform-origin: 0 0;">
           
-          <!-- Loading Spinner Indicator -->
-          <div id="paper-loading-indicator" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0F172A; z-index: 10; color: #FFFFFF; text-align: center; padding: 20px;">
-            <div style="width: 38px; height: 38px; border: 3.5px solid #334155; border-top-color: #38BDF8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-            <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;">ප්‍රශ්න පත්‍රය Load වෙමින් පවතී...</div>
-            <div style="font-size: 11px; color: #94A3B8;">Loading Question Paper PDF</div>
+          <!-- Zoom Target with Top-Left Transform Origin (prevents negative coordinate offset & left cutoff) -->
+          <div id="secure-paper-zoom-target" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; will-change: transform; display: flex; flex-direction: column; background: #FFFFFF;">
+            
+            <!-- Loading Spinner Indicator -->
+            <div id="paper-loading-indicator" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0F172A; z-index: 10; color: #FFFFFF; text-align: center; padding: 20px;">
+              <div style="width: 36px; height: 36px; border: 3.5px solid #334155; border-top-color: #38BDF8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+              <div style="font-size: 13.5px; font-weight: 700; color: #FFFFFF;">ප්‍රශ්න පත්‍රය Load වෙමින් පවතී...</div>
+              <div style="font-size: 11px; color: #94A3B8;">Loading Question Paper PDF</div>
+            </div>
+
+            <iframe id="secure-paper-iframe" src="${iframeSrc}" style="width: 100%; height: 100%; min-height: 100%; border: none; background: #FFFFFF; display: block; flex: 1;" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade" loading="eager"></iframe>
+
+            <!-- Security Watermark Overlay (inside zoom target so it scales accurately with the paper) -->
+            <div id="secure-watermark-overlay" style="position: absolute; inset: 0; pointer-events: none; z-index: 20; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 80px 40px; transform: rotate(-24deg) scale(1.4); opacity: 0.13; user-select: none;">
+              ${Array.from({ length: 36 }).map(() => `
+                <div style="text-align: center; line-height: 1.45; font-family: monospace; font-weight: 800; color: #DC2626; font-size: 12px;">
+                  <div>${escapeHTML(studentName)}</div>
+                  <div style="font-size: 10.5px; color: #1E293B;">${escapeHTML(studentPhone)}</div>
+                  <div style="font-size: 8.5px; letter-spacing: 1px; color: #64748B;">EDUPEAK EXAM • CONFIDENTIAL • DO NOT SHARE</div>
+                </div>
+              `).join('')}
+            </div>
           </div>
 
-          <iframe id="secure-paper-iframe" src="${iframeSrc}" style="width: 100%; height: calc(100vh - 60px); min-height: 600px; border: none; background: #FFFFFF; display: block; flex: 1;" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade" loading="eager"></iframe>
+          <!-- Touch Gesture Layer: Captures 2-finger pinch zoom and 1-finger pan anywhere over the PDF -->
+          <div id="secure-paper-gesture-overlay" style="position: absolute; inset: 0; z-index: 30; touch-action: none; cursor: grab; background: transparent;"></div>
         </div>
 
-        <!-- Indelible Security Watermark Diagonal Overlay -->
-        <div id="secure-watermark-overlay" style="position: absolute; inset: 0; pointer-events: none; z-index: 20; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 80px 40px; transform: rotate(-24deg) scale(1.4); opacity: 0.13; user-select: none;">
-          ${Array.from({ length: 36 }).map(() => `
-            <div style="text-align: center; line-height: 1.45; font-family: monospace; font-weight: 800; color: #DC2626; font-size: 12.5px;">
-              <div>${escapeHTML(studentName)}</div>
-              <div style="font-size: 11px; color: #1E293B;">${escapeHTML(studentPhone)}</div>
-              <div style="font-size: 9px; letter-spacing: 1px; color: #64748B;">EDUPEAK EXAM • CONFIDENTIAL • DO NOT SHARE</div>
-            </div>
-          `).join('')}
+        <!-- Floating Quick-Toast Notification -->
+        <div id="secure-paper-toast" style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 40; background: rgba(15, 23, 42, 0.92); border: 1px solid #3B82F6; color: #93C5FD; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; pointer-events: none; opacity: 0; transition: opacity 0.25s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.5); text-align: center; white-space: nowrap;">
+          🖐️ Pinch with 2 fingers to zoom • 1 finger to pan
         </div>
       </div>
 
-      <!-- Small Proctored Live Camera PiP Feed -->
-      <div id="secure-paper-pip-box" style="position: fixed; bottom: 20px; right: 20px; z-index: 60; width: 140px; height: 105px; border-radius: 12px; overflow: hidden; border: 2px solid #22C55E; box-shadow: 0 8px 24px rgba(0,0,0,0.6); background: #000000; display: flex; flex-direction: column;">
+      <!-- Small Proctored Live Camera PiP Feed (Draggable) -->
+      <div id="secure-paper-pip-box" style="position: fixed; bottom: 20px; right: 20px; z-index: 60; width: 135px; height: 100px; border-radius: 12px; overflow: hidden; border: 2px solid #22C55E; box-shadow: 0 8px 24px rgba(0,0,0,0.6); background: #000000; display: flex; flex-direction: column; cursor: move; touch-action: none;">
         <video id="secure-paper-pip-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #1E293B;"></video>
-        <div style="position: absolute; top: 4px; left: 6px; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.7); border-radius: 4px; padding: 2px 5px; font-size: 9px; color: #4ADE80; font-weight: 700;">
+        <div style="position: absolute; top: 4px; left: 6px; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.7); border-radius: 4px; padding: 2px 5px; font-size: 9px; color: #4ADE80; font-weight: 700; pointer-events: none;">
           <span style="width: 6px; height: 6px; border-radius: 50%; background: #22C55E; display: inline-block;"></span>
           <span>PROCTORED</span>
         </div>
@@ -15669,6 +15701,46 @@ ${!times.isWaiting ? `
     if (cameraStream && pipVideo) {
       pipVideo.srcObject = cameraStream;
       pipVideo.play().catch(() => {});
+    }
+
+    // Make PiP video box draggable by touch / pointer so it never obstructs paper questions
+    const pipBox = modal.querySelector('#secure-paper-pip-box');
+    if (pipBox) {
+      let isDraggingPip = false;
+      let pipStartX = 0, pipStartY = 0;
+      let pipInitLeft = 0, pipInitTop = 0;
+
+      const onPipPointerDown = (e) => {
+        isDraggingPip = true;
+        const rect = pipBox.getBoundingClientRect();
+        pipStartX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        pipStartY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+        pipInitLeft = rect.left;
+        pipInitTop = rect.top;
+        pipBox.style.bottom = 'auto';
+        pipBox.style.right = 'auto';
+        pipBox.style.left = `${pipInitLeft}px`;
+        pipBox.style.top = `${pipInitTop}px`;
+      };
+
+      const onPipPointerMove = (e) => {
+        if (!isDraggingPip) return;
+        const curX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        const curY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+        const newLeft = Math.max(10, Math.min(window.innerWidth - 145, pipInitLeft + (curX - pipStartX)));
+        const newTop = Math.max(60, Math.min(window.innerHeight - 110, pipInitTop + (curY - pipStartY)));
+        pipBox.style.left = `${newLeft}px`;
+        pipBox.style.top = `${newTop}px`;
+      };
+
+      const onPipPointerUp = () => { isDraggingPip = false; };
+
+      pipBox.addEventListener('mousedown', onPipPointerDown);
+      window.addEventListener('mousemove', onPipPointerMove);
+      window.addEventListener('mouseup', onPipPointerUp);
+      pipBox.addEventListener('touchstart', onPipPointerDown, { passive: true });
+      window.addEventListener('touchmove', onPipPointerMove, { passive: true });
+      window.addEventListener('touchend', onPipPointerUp);
     }
 
     const iframe = modal.querySelector('#secure-paper-iframe');
@@ -15705,26 +15777,267 @@ ${!times.isWaiting ? `
       iframe.src = opt.url;
       const labelSpan = altBtn.querySelector('span:not(.material-symbols-rounded)');
       if (labelSpan) labelSpan.textContent = opt.name;
+      showToast(`Switched engine to ${opt.name}`);
       setTimeout(() => {
         if (loader) loader.style.display = 'none';
       }, 3500);
     });
 
+    // Viewport & Zoom Setup
+    const scrollContainer = modal.querySelector('#secure-paper-scroll-container');
+    const zoomSpacer = modal.querySelector('#secure-paper-zoom-spacer');
     const zoomTarget = modal.querySelector('#secure-paper-zoom-target');
+    const gestureOverlay = modal.querySelector('#secure-paper-gesture-overlay');
     const zoomLabel = modal.querySelector('#lbl-paper-zoom-val');
+    const toast = modal.querySelector('#secure-paper-toast');
+    const touchModeBtn = modal.querySelector('#btn-paper-touch-mode');
+    const touchModeLabel = modal.querySelector('#lbl-paper-touch-mode');
 
-    const setZoom = (val) => {
-      currentZoom = Math.max(0.6, Math.min(2.5, Math.round(val * 100) / 100));
-      zoomLabel.textContent = `${Math.round(currentZoom * 100)}%`;
+    let toastTimer = null;
+    const showToast = (msg, duration = 3000) => {
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.style.opacity = '1';
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+      }, duration);
+    };
+
+    // Show initial helper toast
+    setTimeout(() => {
+      showToast('🖐️ Pinch with 2 fingers to zoom • 1 finger to pan', 4000);
+    }, 600);
+
+    const applyZoom = (val, focalX, focalY) => {
+      const newZoom = Math.max(0.6, Math.min(3.5, Math.round(val * 100) / 100));
+      const oldZoom = currentZoom;
+      currentZoom = newZoom;
+      if (zoomLabel) zoomLabel.textContent = `${Math.round(currentZoom * 100)}%`;
+
+      const cWidth = scrollContainer ? scrollContainer.clientWidth : window.innerWidth;
+      const cHeight = scrollContainer ? scrollContainer.clientHeight : (window.innerHeight - 80);
+      const scaledWidth = Math.round(cWidth * currentZoom);
+      const scaledHeight = Math.round(cHeight * currentZoom);
+
+      if (zoomSpacer) {
+        zoomSpacer.style.width = `${scaledWidth}px`;
+        zoomSpacer.style.height = `${scaledHeight}px`;
+      }
       if (zoomTarget) {
+        zoomTarget.style.width = `${cWidth}px`;
+        zoomTarget.style.height = `${cHeight}px`;
+        zoomTarget.style.transformOrigin = '0 0';
         zoomTarget.style.transform = `scale(${currentZoom})`;
-        zoomTarget.style.width = currentZoom > 1 ? `${currentZoom * 100}%` : '100%';
+      }
+      if (gestureOverlay) {
+        gestureOverlay.style.width = `${scaledWidth}px`;
+        gestureOverlay.style.height = `${scaledHeight}px`;
+      }
+
+      // Adjust scroll offset to keep focal point pinned
+      if (scrollContainer && focalX !== undefined && focalY !== undefined && oldZoom > 0) {
+        const ratio = newZoom / oldZoom;
+        scrollContainer.scrollLeft = Math.max(0, (scrollContainer.scrollLeft + focalX) * ratio - focalX);
+        scrollContainer.scrollTop = Math.max(0, (scrollContainer.scrollTop + focalY) * ratio - focalY);
       }
     };
 
-    modal.querySelector('#btn-paper-zoom-in')?.addEventListener('click', () => setZoom(currentZoom + 0.15));
-    modal.querySelector('#btn-paper-zoom-out')?.addEventListener('click', () => setZoom(currentZoom - 0.15));
-    modal.querySelector('#btn-paper-zoom-reset')?.addEventListener('click', () => setZoom(1.0));
+    const setZoom = (val) => {
+      if (!isGestureMode) setGestureMode(true);
+      const cWidth = scrollContainer ? scrollContainer.clientWidth : window.innerWidth;
+      const cHeight = scrollContainer ? scrollContainer.clientHeight : (window.innerHeight - 80);
+      applyZoom(val, cWidth / 2, cHeight / 2);
+    };
+
+    modal.querySelector('#btn-paper-zoom-in')?.addEventListener('click', () => setZoom(currentZoom + 0.25));
+    modal.querySelector('#btn-paper-zoom-out')?.addEventListener('click', () => setZoom(currentZoom - 0.25));
+    modal.querySelector('#btn-paper-zoom-reset')?.addEventListener('click', () => {
+      applyZoom(1.0, 0, 0);
+      if (scrollContainer) {
+        scrollContainer.scrollLeft = 0;
+        scrollContainer.scrollTop = 0;
+      }
+    });
+
+    const setGestureMode = (active) => {
+      isGestureMode = active;
+      if (isGestureMode) {
+        if (gestureOverlay) gestureOverlay.style.display = 'block';
+        if (touchModeBtn) {
+          touchModeBtn.style.background = 'rgba(37, 99, 235, 0.28)';
+          touchModeBtn.style.borderColor = '#3B82F6';
+          touchModeBtn.style.color = '#93C5FD';
+        }
+        if (touchModeLabel) touchModeLabel.textContent = 'Pinch Zoom: ON';
+        showToast('🖐️ Pinch Zoom Active: 2 fingers zoom, 1 to pan');
+      } else {
+        if (gestureOverlay) gestureOverlay.style.display = 'none';
+        if (touchModeBtn) {
+          touchModeBtn.style.background = 'rgba(30, 41, 59, 0.9)';
+          touchModeBtn.style.borderColor = '#475569';
+          touchModeBtn.style.color = '#94A3B8';
+        }
+        if (touchModeLabel) touchModeLabel.textContent = 'Page Scroll: ON';
+        showToast('👆 Page Scroll Active: Touch to scroll pages');
+      }
+    };
+
+    touchModeBtn?.addEventListener('click', () => {
+      setGestureMode(!isGestureMode);
+    });
+
+    // Touch gesture physics: 2-finger pinch zoom + 1-finger panning + double-tap zoom
+    let isTouching = false;
+    let touchStartDist = 0;
+    let touchStartZoom = 1.0;
+    let touchFocalContentX = 0;
+    let touchFocalContentY = 0;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let lastTapTime = 0;
+
+    if (gestureOverlay && scrollContainer) {
+      gestureOverlay.addEventListener('touchstart', (e) => {
+        isTouching = true;
+        const rect = scrollContainer.getBoundingClientRect();
+
+        if (e.touches.length === 1) {
+          lastTouchX = e.touches[0].clientX;
+          lastTouchY = e.touches[0].clientY;
+
+          const now = Date.now();
+          if (now - lastTapTime < 320) {
+            // Double tap: toggle between 1.8x and 1.0x
+            const tapX = e.touches[0].clientX - rect.left;
+            const tapY = e.touches[0].clientY - rect.top;
+            if (currentZoom < 1.3) {
+              applyZoom(1.8, tapX, tapY);
+            } else {
+              applyZoom(1.0, tapX, tapY);
+              scrollContainer.scrollLeft = 0;
+              scrollContainer.scrollTop = 0;
+            }
+            lastTapTime = 0;
+          } else {
+            lastTapTime = now;
+          }
+        } else if (e.touches.length >= 2) {
+          const t1 = e.touches[0];
+          const t2 = e.touches[1];
+          touchStartDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY) || 1;
+          touchStartZoom = currentZoom;
+
+          const midX = (t1.clientX + t2.clientX) / 2;
+          const midY = (t1.clientY + t2.clientY) / 2;
+          lastTouchX = midX;
+          lastTouchY = midY;
+
+          const midInContainerX = midX - rect.left;
+          const midInContainerY = midY - rect.top;
+
+          touchFocalContentX = (scrollContainer.scrollLeft + midInContainerX) / (currentZoom || 1);
+          touchFocalContentY = (scrollContainer.scrollTop + midInContainerY) / (currentZoom || 1);
+        }
+      }, { passive: false });
+
+      gestureOverlay.addEventListener('touchmove', (e) => {
+        if (!isTouching) return;
+        e.preventDefault();
+
+        const rect = scrollContainer.getBoundingClientRect();
+
+        if (e.touches.length === 1) {
+          // 1 finger 2D pan
+          const curX = e.touches[0].clientX;
+          const curY = e.touches[0].clientY;
+          const dx = curX - lastTouchX;
+          const dy = curY - lastTouchY;
+
+          scrollContainer.scrollLeft -= dx;
+          scrollContainer.scrollTop -= dy;
+
+          lastTouchX = curX;
+          lastTouchY = curY;
+        } else if (e.touches.length >= 2) {
+          // 2 finger pinch zoom
+          const t1 = e.touches[0];
+          const t2 = e.touches[1];
+          const curDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+          if (touchStartDist > 10 && curDist > 10) {
+            const scaleRatio = curDist / touchStartDist;
+            const targetZoom = Math.max(0.65, Math.min(3.5, touchStartZoom * scaleRatio));
+
+            const midX = (t1.clientX + t2.clientX) / 2;
+            const midY = (t1.clientY + t2.clientY) / 2;
+            const midInContainerX = midX - rect.left;
+            const midInContainerY = midY - rect.top;
+
+            applyZoom(targetZoom);
+
+            scrollContainer.scrollLeft = Math.max(0, touchFocalContentX * targetZoom - midInContainerX);
+            scrollContainer.scrollTop = Math.max(0, touchFocalContentY * targetZoom - midInContainerY);
+
+            lastTouchX = midX;
+            lastTouchY = midY;
+          }
+        }
+      }, { passive: false });
+
+      const onTouchEnd = (e) => {
+        if (e.touches.length === 0) {
+          isTouching = false;
+        } else if (e.touches.length === 1) {
+          lastTouchX = e.touches[0].clientX;
+          lastTouchY = e.touches[0].clientY;
+        }
+      };
+
+      gestureOverlay.addEventListener('touchend', onTouchEnd);
+      gestureOverlay.addEventListener('touchcancel', () => { isTouching = false; });
+
+      // Mouse drag pan support for laptop/desktop
+      let isMouseDown = false;
+      let mouseStartX = 0, mouseStartY = 0;
+      gestureOverlay.addEventListener('mousedown', (e) => {
+        isMouseDown = true;
+        mouseStartX = e.clientX;
+        mouseStartY = e.clientY;
+        gestureOverlay.style.cursor = 'grabbing';
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isMouseDown) return;
+        const dx = e.clientX - mouseStartX;
+        const dy = e.clientY - mouseStartY;
+        scrollContainer.scrollLeft -= dx;
+        scrollContainer.scrollTop -= dy;
+        mouseStartX = e.clientX;
+        mouseStartY = e.clientY;
+      });
+      window.addEventListener('mouseup', () => {
+        isMouseDown = false;
+        if (gestureOverlay) gestureOverlay.style.cursor = 'grab';
+      });
+
+      // Trackpad / mouse wheel zoom
+      gestureOverlay.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || Math.abs(e.deltaY) > 50) {
+          e.preventDefault();
+          const rect = scrollContainer.getBoundingClientRect();
+          const focalX = e.clientX - rect.left;
+          const focalY = e.clientY - rect.top;
+          const delta = e.deltaY > 0 ? -0.15 : 0.15;
+          applyZoom(currentZoom + delta, focalX, focalY);
+        }
+      }, { passive: false });
+    }
+
+    // Initialize layout sizing
+    applyZoom(1.0, 0, 0);
+    window.addEventListener('resize', () => {
+      applyZoom(currentZoom);
+    });
 
     const closeSecureModal = () => {
       if (keepAliveTimer) clearInterval(keepAliveTimer);
