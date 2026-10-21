@@ -11603,6 +11603,153 @@ class AppController {
     let activeTab = 'slot1'; // 'slot1', 'slot2', 'answers'
     let allStudents = [];
     let unsubs = [];
+    let timerInterval = null;
+
+    // Helper: Parse any date format (Firestore Timestamp, ISO String, or Date)
+    const parseSessionDate = (val) => {
+      if (!val) return null;
+      if (typeof val.toDate === 'function') return val.toDate();
+      if (typeof val === 'object' && val.seconds !== undefined) return new Date(val.seconds * 1000);
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    // Calculate time metrics matching live student room 1:1
+    const calculateProctorTimes = () => {
+      const isEnded = session.isEnded || session.status === 'completed' || session.currentPhase === 'ended';
+      const isTimeUp = session.isTimeUp || session.currentPhase === 'time_up';
+      const isWaiting = session.currentPhase === 'waiting' || session.status === 'scheduled';
+      const isPackageOpening = session.currentPhase === 'package_opening';
+      const isWriting = session.currentPhase === 'writing' || (!isWaiting && !isPackageOpening && !isTimeUp && !isEnded);
+
+      // Package opening 3 mins countdown (180s)
+      let pkgSecsLeft = 180;
+      if (isPackageOpening) {
+        let startTime = parseSessionDate(session.packageOpeningStartedAt);
+        if (!startTime) {
+          const cached = localStorage.getItem(`paper_pkg_start_${session.id}`);
+          if (cached) startTime = parseSessionDate(cached);
+        }
+        if (startTime) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - startTime.getTime()) / 1000));
+          pkgSecsLeft = Math.max(0, 180 - elapsed);
+        }
+      }
+
+      // Exam Writing countdown (durationMinutes * 60)
+      const totalWritingSecs = (session.durationMinutes || 150) * 60;
+      let writingSecsLeft = totalWritingSecs;
+      let isOvertime = false;
+      let overtimeSecs = 0;
+
+      if (isWriting) {
+        let startTime = parseSessionDate(session.writingStartedAt);
+        if (!startTime) {
+          const cached = localStorage.getItem(`paper_writing_start_${session.id}`);
+          if (cached) startTime = parseSessionDate(cached);
+        }
+        if (startTime) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - startTime.getTime()) / 1000));
+          if (elapsed > totalWritingSecs) {
+            isOvertime = true;
+            overtimeSecs = elapsed - totalWritingSecs;
+            writingSecsLeft = 0;
+          } else {
+            writingSecsLeft = totalWritingSecs - elapsed;
+          }
+        }
+      }
+
+      return { isEnded, isTimeUp, isWaiting, isPackageOpening, isWriting, isOvertime, pkgSecsLeft, writingSecsLeft, overtimeSecs, totalWritingSecs };
+    };
+
+    const getProctorCountdownHTML = (times) => {
+      if (!times) return '';
+      if (times.isPackageOpening) {
+        const m = String(Math.floor(times.pkgSecsLeft / 60)).padStart(2, '0');
+        const s = String(times.pkgSecsLeft % 60).padStart(2, '0');
+        const isExpired = times.pkgSecsLeft <= 0;
+        const bg = isExpired ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)';
+        const border = isExpired ? '#EF4444' : '#F59E0B';
+        const color = isExpired ? '#FCA5A5' : '#FBBF24';
+        const digitsColor = isExpired ? '#EF4444' : '#F59E0B';
+        const label = isExpired ? '00:00 (3m Time Expired)' : `${m}:${s}`;
+        return `
+          <div id="proctor-timer-pill" style="display:inline-flex; align-items:center; gap:6px; background:${bg}; border:1.5px solid ${border}; padding:4px 12px; border-radius:10px; font-family:'Fira Code',monospace,sans-serif;">
+            <span class="material-symbols-rounded filled" style="font-size:16px; color:${digitsColor};">inventory_2</span>
+            <span style="font-size:11px; font-weight:600; color:${color};">Package Opening:</span>
+            <span id="proctor-timer-digits" style="font-size:14px; font-weight:800; color:${digitsColor}; letter-spacing:0.5px;">${label}</span>
+          </div>
+        `;
+      }
+
+      if (times.isWriting) {
+        if (times.isOvertime) {
+          const h = String(Math.floor(times.overtimeSecs / 3600)).padStart(2, '0');
+          const m = String(Math.floor((times.overtimeSecs % 3600) / 60)).padStart(2, '0');
+          const s = String(times.overtimeSecs % 60).padStart(2, '0');
+          const timeStr = Math.floor(times.overtimeSecs / 3600) > 0 ? `+${h}:${m}:${s}` : `+${m}:${s}`;
+          return `
+            <div id="proctor-timer-pill" style="display:inline-flex; align-items:center; gap:6px; background:rgba(239,68,68,0.25); border:1.5px solid #EF4444; padding:4px 12px; border-radius:10px; font-family:'Fira Code',monospace,sans-serif;">
+              <span class="material-symbols-rounded filled" style="font-size:16px; color:#EF4444;">alarm</span>
+              <span style="font-size:11px; font-weight:700; color:#FCA5A5;">Overtime:</span>
+              <span id="proctor-timer-digits" style="font-size:14px; font-weight:800; color:#EF4444; letter-spacing:0.5px;">${timeStr}</span>
+            </div>
+          `;
+        }
+
+        const h = String(Math.floor(times.writingSecsLeft / 3600)).padStart(2, '0');
+        const m = String(Math.floor((times.writingSecsLeft % 3600) / 60)).padStart(2, '0');
+        const s = String(times.writingSecsLeft % 60).padStart(2, '0');
+        const timeStr = Math.floor(times.writingSecsLeft / 3600) > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+        const isUrgent = times.writingSecsLeft < 900;
+        const bg = isUrgent ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.18)';
+        const border = isUrgent ? '#EF4444' : '#22C55E';
+        const color = isUrgent ? '#FCA5A5' : '#86EFAC';
+        const digitsColor = isUrgent ? '#EF4444' : '#22C55E';
+        return `
+          <div id="proctor-timer-pill" style="display:inline-flex; align-items:center; gap:6px; background:${bg}; border:1.5px solid ${border}; padding:4px 12px; border-radius:10px; font-family:'Fira Code',monospace,sans-serif;">
+            <span class="material-symbols-rounded filled" style="font-size:16px; color:${digitsColor};">edit_note</span>
+            <span style="font-size:11px; font-weight:600; color:${color};">Time Remaining:</span>
+            <span id="proctor-timer-digits" style="font-size:14px; font-weight:800; color:${digitsColor}; letter-spacing:0.5px;">${timeStr}</span>
+          </div>
+        `;
+      }
+
+      if (times.isTimeUp) {
+        return `
+          <div id="proctor-timer-pill" style="display:inline-flex; align-items:center; gap:6px; background:rgba(234,88,12,0.2); border:1.5px solid #EA580C; padding:4px 12px; border-radius:10px; font-family:'Fira Code',monospace,sans-serif;">
+            <span class="material-symbols-rounded filled" style="font-size:16px; color:#EA580C;">alarm_on</span>
+            <span style="font-size:11px; font-weight:700; color:#FB923C;">Time Up</span>
+            <span style="font-size:11px; color:#FED7AA;">(Submissions Open)</span>
+          </div>
+        `;
+      }
+
+      if (times.isEnded) {
+        return `
+          <div id="proctor-timer-pill" style="display:inline-flex; align-items:center; gap:6px; background:rgba(239,68,68,0.15); border:1px solid #EF4444; padding:4px 12px; border-radius:10px;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:#EF4444;">check_circle</span>
+            <span style="font-size:11px; font-weight:700; color:#FCA5A5;">Session Ended</span>
+          </div>
+        `;
+      }
+
+      return `
+        <div id="proctor-timer-pill" style="display:inline-flex; align-items:center; gap:6px; background:rgba(148,163,184,0.1); border:1px solid #475569; padding:4px 10px; border-radius:10px;">
+          <span class="material-symbols-rounded" style="font-size:15px; color:#94A3B8;">schedule</span>
+          <span style="font-size:11px; font-weight:600; color:#94A3B8;">Duration: ${session.durationMinutes || 150}m</span>
+        </div>
+      `;
+    };
+
+    const updateProctorTimerTick = () => {
+      const times = calculateProctorTimes();
+      const el = modal.querySelector('#proctor-countdown-container');
+      if (el) el.innerHTML = getProctorCountdownHTML(times);
+      const appbarEl = modal.querySelector('#proctor-appbar-countdown');
+      if (appbarEl) appbarEl.innerHTML = getProctorCountdownHTML(times);
+    };
 
     // Helper: Candidate UIDs matching Flutter PaperRegistration.computedAgoraUid 1:1
     const getStudentCandidateUids = (s) => {
@@ -12022,6 +12169,7 @@ class AppController {
 
       const isEnded = session.isEnded || phase === 'ended';
       const isTimeUp = session.isTimeUp || phase === 'time_up';
+      const times = calculateProctorTimes();
 
       const shell = modal.querySelector('.proctor-hall-shell');
       const currentTab = modal.dataset.currentTab;
@@ -12039,6 +12187,11 @@ class AppController {
             textEl.innerHTML = phaseLabel;
           }
         }
+
+        const countdownEl = modal.querySelector('#proctor-countdown-container');
+        if (countdownEl) countdownEl.innerHTML = getProctorCountdownHTML(times);
+        const appbarCountdownEl = modal.querySelector('#proctor-appbar-countdown');
+        if (appbarCountdownEl) appbarCountdownEl.innerHTML = getProctorCountdownHTML(times);
 
         // 2. Update Stats counts
         const elReg = modal.querySelector('#stat-registered');
@@ -12193,9 +12346,12 @@ class AppController {
           <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; flex-shrink:0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
               <div style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;">
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                   <span style="width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 10px #22C55E; display:inline-block; flex-shrink:0;"></span>
                   <span style="font-size:15px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Live Invigilator Monitor</span>
+                  <div id="proctor-appbar-countdown" style="display:inline-flex; align-items:center;">
+                    ${getProctorCountdownHTML(times)}
+                  </div>
                 </div>
                 <div style="font-size:11px; color:#94A3B8; padding-left:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${session.title || 'Exam Proctoring Center'}</div>
               </div>
@@ -12244,9 +12400,14 @@ class AppController {
 
           <!-- ── Phase Control Bar ── -->
           <div style="background:#1E293B; border-bottom:1px solid #334155; padding:8px 16px; flex-shrink:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <div id="proctor-phase-badge" style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
-                <span class="phase-text" style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <div id="proctor-phase-badge" style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
+                  <span class="phase-text" style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
+                </div>
+                <div id="proctor-countdown-container" style="display:inline-flex; align-items:center;">
+                  ${getProctorCountdownHTML(times)}
+                </div>
               </div>
               <div style="font-size:10px; font-weight:600; color:#64748B;">Manual Phase Controls</div>
             </div>
@@ -12381,6 +12542,7 @@ class AppController {
 
     // Centralized Event Actions
     const closeProctorHall = () => {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
       if (renderThrottleTimer) { clearTimeout(renderThrottleTimer); renderThrottleTimer = null; }
       if (this.agoraProctor) { this.agoraProctor.stop(); this.agoraProctor = null; }
       unsubs.forEach(fn => { try { fn(); } catch (_) {} });
@@ -12718,6 +12880,8 @@ class AppController {
     unsubs.push(unsubRegs);
 
     render();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(updateProctorTimerTick, 1000);
   }
 
     // Helper: Confirmation Dialog matching Flutter AlertDialog
