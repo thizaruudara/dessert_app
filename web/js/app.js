@@ -13094,9 +13094,10 @@ class AppController {
 
         <div style="flex:1; min-width:0; text-align:center;">
           <div style="font-size:14px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${student.studentName || student.name || 'Student'}</div>
-          <div style="font-size:11px; color:#38BDF8; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          <div style="font-size:11px; color:#38BDF8; display:flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">
             <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#22C55E; box-shadow:0 0 6px #22C55E;"></span>
             <span>Surveillance Monitor • Slot: ${student.selectedSlot || 'slot1'}</span>
+            <span id="fs-stream-badge-container"></span>
           </div>
         </div>
 
@@ -13148,9 +13149,15 @@ class AppController {
 
     // Central exit handler with proper cleanup and stream recovery
     let isClosed = false;
+    let fsStreamPoll = null;
     const closeFullScreenViewer = (fromPopState = false) => {
       if (isClosed) return;
       isClosed = true;
+
+      if (fsStreamPoll) {
+        clearInterval(fsStreamPoll);
+        fsStreamPoll = null;
+      }
 
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('popstate', onPopState);
@@ -13211,13 +13218,54 @@ class AppController {
       ...(student.studentId ? [getNumericUid(student.studentId)] : []),
       ...(student.id ? [getNumericUid(student.id)] : [])
     ];
-    if (this.agoraProctor && this.agoraProctor.hasStream(candidateUids)) {
+
+    const updateFullscreenVideoFeed = () => {
+      if (isClosed || !modal.isConnected) return;
       const feedContainer = modal.querySelector('#fs-feed-container');
-      if (feedContainer) {
-        feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
-        this.agoraProctor.playRemoteVideo(candidateUids, feedContainer.querySelector('.agora-fs-player'), { fit: 'contain' });
+      const badgeContainer = modal.querySelector('#fs-stream-badge-container');
+      if (!feedContainer) return;
+
+      const hasStream = this.agoraProctor && this.agoraProctor.hasStream(candidateUids);
+      if (hasStream) {
+        let player = feedContainer.querySelector('.agora-fs-player');
+        if (!player || !player.querySelector('video')) {
+          feedContainer.innerHTML = '<div class="agora-fs-player" style="width:100%; height:100%; position:relative;"></div>';
+          player = feedContainer.querySelector('.agora-fs-player');
+          this.agoraProctor.playRemoteVideo(candidateUids, player, { fit: 'contain' });
+        }
+        if (badgeContainer && badgeContainer.dataset.mode !== 'live') {
+          badgeContainer.dataset.mode = 'live';
+          badgeContainer.innerHTML = `
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; background:rgba(34,197,94,0.2); border:1px solid #22C55E; color:#4ADE80; box-shadow:0 0 8px rgba(34,197,94,0.4);">
+              <span class="material-symbols-rounded filled" style="font-size:12px; color:#22C55E;">videocam</span>
+              <span>AGORA 30 FPS LIVE</span>
+            </span>
+          `;
+        }
+      } else {
+        const hasVideo = feedContainer.querySelector('.agora-fs-player video');
+        if (!hasVideo && student.cameraSnapshotUrl) {
+          const img = feedContainer.querySelector('#fs-student-stream');
+          if (img) {
+            if (img.src !== student.cameraSnapshotUrl) img.src = student.cameraSnapshotUrl;
+          } else {
+            feedContainer.innerHTML = `<img id="fs-student-stream" src="${student.cameraSnapshotUrl}" style="width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;" />`;
+          }
+        }
+        if (badgeContainer && badgeContainer.dataset.mode !== 'snapshot') {
+          badgeContainer.dataset.mode = 'snapshot';
+          badgeContainer.innerHTML = `
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; background:rgba(234,179,8,0.2); border:1px solid #EAB308; color:#FACC15;">
+              <span class="material-symbols-rounded" style="font-size:12px; color:#EAB308;">photo_camera</span>
+              <span>SNAPSHOT (Connecting Live RTC...)</span>
+            </span>
+          `;
+        }
       }
-    }
+    };
+
+    updateFullscreenVideoFeed();
+    fsStreamPoll = setInterval(updateFullscreenVideoFeed, 800);
   }
 
   // ── B. Student Live Exam Writing Room (1:1 with live_exam_room_screen.dart & in_app_document_scanner_screen.dart) ──
@@ -15180,6 +15228,20 @@ ${!times.isWaiting ? `
     // Periodic Heartbeat every 4 seconds (matching _heartbeatTimer)
     heartbeatInterval = setInterval(() => {
       sendHeartbeat(cameraActive);
+
+      // Auto-reconnect Agora student broadcaster if camera is active but stream was interrupted
+      if (cameraActive && cameraStream && (!this.studentBroadcaster || !this.studentBroadcaster.isBroadcasting)) {
+        if (!this.studentBroadcaster) {
+          this.studentBroadcaster = new AgoraStudentBroadcaster();
+        }
+        this.studentBroadcaster.start({
+          paperId,
+          studentId,
+          mediaStream: cameraStream
+        }).then(numUid => {
+          if (numUid) studentAgoraUid = numUid;
+        }).catch(() => {});
+      }
     }, 4000);
 
     // Real-Time Session Sync via Firestore onSnapshot

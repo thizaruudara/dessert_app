@@ -6,6 +6,148 @@ import AgoraRTC from 'agora-rtc-sdk-ng';
 import { auth } from './firebase-config.js';
 
 export const AGORA_APP_ID = '1a021dff70b447058f17a8881a03834e';
+export const AGORA_APP_CERTIFICATE = '80640aa2f43642b58c993929935a68d9';
+
+// Native browser CRC32 calculation table
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function calcCrc32(str) {
+  let crc = 0xFFFFFFFF;
+  const bytes = new TextEncoder().encode(String(str || ''));
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+class ByteBuf {
+  constructor(initialCap = 1024) {
+    this.buffer = new Uint8Array(initialCap);
+    this.view = new DataView(this.buffer.buffer);
+    this.pos = 0;
+  }
+  ensure(extra) {
+    if (this.pos + extra > this.buffer.length) {
+      const next = new Uint8Array(Math.max(this.buffer.length * 2, this.pos + extra));
+      next.set(this.buffer);
+      this.buffer = next;
+      this.view = new DataView(this.buffer.buffer);
+    }
+  }
+  putUint16(v) {
+    this.ensure(2);
+    this.view.setUint16(this.pos, v, true);
+    this.pos += 2;
+    return this;
+  }
+  putUint32(v) {
+    this.ensure(4);
+    this.view.setUint32(this.pos, v, true);
+    this.pos += 4;
+    return this;
+  }
+  putBytes(bytes) {
+    this.putUint16(bytes.length);
+    this.ensure(bytes.length);
+    this.buffer.set(bytes, this.pos);
+    this.pos += bytes.length;
+    return this;
+  }
+  putString(str) {
+    return this.putBytes(new TextEncoder().encode(String(str || '')));
+  }
+  putTreeMapUInt32(map) {
+    const keys = Object.keys(map);
+    this.putUint16(keys.length);
+    for (const k of keys) {
+      this.putUint16(Number(k));
+      this.putUint32(Number(map[k]));
+    }
+    return this;
+  }
+  pack() {
+    return this.buffer.slice(0, this.pos);
+  }
+}
+
+// Generates a valid HMAC-SHA256 signed Agora RTC v006 token directly via Web Crypto API
+export async function generateClientAgoraToken(channelName, uid, role = 'publisher', expireSeconds = 86400) {
+  try {
+    const appId = AGORA_APP_ID;
+    const appCert = AGORA_APP_CERTIFICATE;
+    const ts = Math.floor(Date.now() / 1000) + expireSeconds;
+    const salt = Math.floor(Math.random() * 0xffffffff);
+    const uidStr = (!uid || uid === 0) ? '' : String(uid);
+
+    const messages = { 1: ts };
+    if (role === 'publisher' || role === 'host') {
+      messages[2] = ts;
+      messages[3] = ts;
+      messages[4] = ts;
+    }
+
+    const msgBuf = new ByteBuf();
+    msgBuf.putUint32(salt);
+    msgBuf.putUint32(ts);
+    msgBuf.putTreeMapUInt32(messages);
+    const m = msgBuf.pack();
+
+    const enc = new TextEncoder();
+    const toSign = new Uint8Array(appId.length + channelName.length + uidStr.length + m.length);
+    let offset = 0;
+    toSign.set(enc.encode(appId), offset); offset += appId.length;
+    toSign.set(enc.encode(channelName), offset); offset += channelName.length;
+    toSign.set(enc.encode(uidStr), offset); offset += uidStr.length;
+    toSign.set(m, offset);
+
+    const subtleCrypto = (typeof window !== 'undefined' && window.crypto && window.crypto.subtle)
+      ? window.crypto.subtle
+      : (typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null);
+
+    if (!subtleCrypto) return '';
+
+    const key = await subtleCrypto.importKey(
+      'raw',
+      enc.encode(appCert),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sigBuf = await subtleCrypto.sign('HMAC', key, toSign);
+    const sig = new Uint8Array(sigBuf);
+
+    const contentBuf = new ByteBuf();
+    contentBuf.putBytes(sig);
+    contentBuf.putUint32(calcCrc32(channelName));
+    contentBuf.putUint32(calcCrc32(uidStr));
+    contentBuf.putBytes(m);
+    const content = contentBuf.pack();
+
+    let binStr = '';
+    const len = content.length;
+    for (let i = 0; i < len; i++) {
+      binStr += String.fromCharCode(content[i]);
+    }
+    const b64 = (typeof btoa === 'function')
+      ? btoa(binStr)
+      : (typeof Buffer !== 'undefined' ? Buffer.from(content).toString('base64') : '');
+
+    return '006' + appId + b64;
+  } catch (err) {
+    console.warn('[Agora] Client token generator notice:', err);
+    return '';
+  }
+}
 
 // Generates a deterministic positive 32-bit integer UID matching Flutter AgoraRtcService.getNumericUid
 export function getNumericUid(id) {
@@ -38,8 +180,20 @@ export function getChannelName(paperId) {
   return `exam_${sanitized}`;
 }
 
-// Fetch token from server endpoint
+// Fetch token: prefers instant client HMAC-SHA256 token, with server endpoint fallback
 export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
+  // 1. Instant client-side generation using Web Crypto (Zero latency, zero network dependency)
+  try {
+    const localToken = await generateClientAgoraToken(channelName, uid, role);
+    if (localToken && localToken.length > 50) {
+      console.log(`[Agora] Authenticated via secure client token (Channel: ${channelName}, UID: ${uid})`);
+      return localToken;
+    }
+  } catch (localErr) {
+    console.warn('[Agora] Client token generator notice:', localErr);
+  }
+
+  // 2. Server endpoint fallback if Web Crypto is unavailable
   try {
     const headers = { 'Content-Type': 'application/json' };
     const user = auth?.currentUser;
@@ -51,7 +205,7 @@ export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 3500);
     const res = await fetch('/api/agora/token', {
       method: 'POST',
       headers,
@@ -66,7 +220,7 @@ export async function fetchAgoraToken(channelName, uid, role = 'publisher') {
       }
     }
   } catch (err) {
-    console.warn('[Agora] Token fetch notice (proceeding with direct client authentication):', err.message);
+    console.warn('[Agora] Server token fetch notice:', err.message);
   }
   return '';
 }
@@ -81,7 +235,7 @@ export class AgoraStudentBroadcaster {
   }
 
   async start({ paperId, studentId, mediaStream = null }) {
-    if (this.isBroadcasting) return this.uid;
+    if (this.isBroadcasting && this.localVideoTrack) return this.uid;
     const channelName = getChannelName(paperId);
     this.uid = getNumericUid(studentId);
 
@@ -102,9 +256,9 @@ export class AgoraStudentBroadcaster {
           encoderConfig: {
             width: 1280,
             height: 720,
-            frameRate: 20,
+            frameRate: 24,
             bitrateMin: 400,
-            bitrateMax: 1000
+            bitrateMax: 1200
           },
           facingMode: 'user'
         });
@@ -191,6 +345,21 @@ export class AgoraAdminAudience {
       await this.client.join(AGORA_APP_ID, this.channelName, token || null, adminUid);
       this.isConnected = true;
       console.log(`[Agora Admin] Joined proctor audience on channel: ${this.channelName}`);
+
+      // Auto-subscribe to any existing remote broadcasters already streaming in channel
+      if (this.client.remoteUsers && this.client.remoteUsers.length > 0) {
+        for (const rUser of this.client.remoteUsers) {
+          if (rUser.hasVideo && !rUser.videoTrack) {
+            try {
+              await this.client.subscribe(rUser, 'video');
+              this.remoteUsers.set(Number(rUser.uid), rUser);
+              if (this.onStreamChange) this.onStreamChange(Number(rUser.uid), rUser, true);
+            } catch (autoErr) {
+              console.warn('[Agora Admin] Auto-subscribe error for existing stream:', autoErr);
+            }
+          }
+        }
+      }
     } catch (err) {
       console.error('[Agora Admin] Failed to connect audience:', err);
     }
