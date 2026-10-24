@@ -12366,26 +12366,36 @@ class AppController {
         <div class="proctor-hall-shell" style="position:relative;">
           
           <!-- ── AppBar ── -->
-          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:12px 16px; flex-shrink:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
-              <div style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;">
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <span style="width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 10px #22C55E; display:inline-block; flex-shrink:0;"></span>
-                  <span style="font-size:15px; font-weight:700; color:#FFFFFF; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Live Invigilator Monitor</span>
-                  <div id="proctor-appbar-countdown" style="display:inline-flex; align-items:center;">
-                    ${getProctorCountdownHTML(times)}
-                  </div>
+          <div style="background:#1E293B; border-bottom:1px solid #334155; padding:10px 14px; flex-shrink:0;">
+            <!-- Row 1: Brand/Title + Close Button -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                <span style="width:10px; height:10px; border-radius:50%; background:#22C55E; box-shadow:0 0 10px #22C55E; display:inline-block; flex-shrink:0;"></span>
+                <div style="min-width:0;">
+                  <div style="font-size:14px; font-weight:700; color:#FFFFFF; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Live Invigilator Monitor</div>
+                  <div style="font-size:11px; color:#94A3B8; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${session.title || 'Exam Proctoring Center'}</div>
                 </div>
-                <div style="font-size:11px; color:#94A3B8; padding-left:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${session.title || 'Exam Proctoring Center'}</div>
               </div>
 
-              <!-- Top Actions: Time Up, End Session, Broadcast Alert, Fullscreen, Close -->
-              <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <button id="btn-close-proctor-hall" title="Exit Hall" style="background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; flex-shrink:0; transition:background 0.15s ease;">
+                <span class="material-symbols-rounded" style="font-size:16px;">close</span>
+                <span>Exit</span>
+              </button>
+            </div>
+
+            <!-- Row 2: Live Countdown & Main Actions (Responsive, Non-overlapping) -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div id="proctor-appbar-countdown" style="display:inline-flex; align-items:center; min-height:30px;">
+                ${getProctorCountdownHTML(times)}
+              </div>
+
+              <!-- Top Actions: Time Up, End Session, Broadcast Alert -->
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 ${!isEnded ? `
-                  <button id="btn-proctor-time-up" style="background:${isTimeUp ? '#EA580C' : '#F59E0B'}; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                  <button id="btn-proctor-time-up" style="background:${isTimeUp ? '#EA580C' : '#F59E0B'}; color:#000000; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap;">
                     <span class="material-symbols-rounded filled" style="font-size:14px;">alarm</span> ${isTimeUp ? 'Time Up (Sent)' : 'Time Up'}
                   </button>
-                  <button id="btn-proctor-end-session" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                  <button id="btn-proctor-end-session" style="background:#EF4444; color:#FFFFFF; border:none; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap;">
                     <span class="material-symbols-rounded filled" style="font-size:14px;">cancel</span> End Session
                   </button>
                 ` : `
@@ -12396,19 +12406,11 @@ class AppController {
                 <button id="btn-proctor-broadcast" title="Broadcast Announcement to All Students" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#F59E0B; cursor:pointer; padding:6px 8px; border-radius:8px; display:inline-flex; align-items:center;">
                   <span class="material-symbols-rounded filled" style="font-size:18px; color:#F59E0B;">campaign</span>
                 </button>
-                <button id="btn-proctor-toggle-fullscreen" title="Toggle Fullscreen" style="background:#0F172A; border:1px solid #334155; color:#38BDF8; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-                  <span class="material-symbols-rounded" style="font-size:16px;">fullscreen</span>
-                  <span class="fs-text">Full Screen</span>
-                </button>
-                <button id="btn-close-proctor-hall" title="Exit Hall" style="background:rgba(239,68,68,0.2); border:1px solid #EF4444; color:#FFFFFF; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px;">
-                  <span class="material-symbols-rounded" style="font-size:16px;">close</span>
-                  <span>Exit</span>
-                </button>
               </div>
             </div>
 
             <!-- TabBar: Slot 1, Slot 2, Answers (Count) -->
-            <div style="display:flex; border-bottom:1px solid #334155;">
+            <div style="display:flex; border-bottom:1px solid #334155; margin-top:8px;">
               <button class="proctor-tab-btn" data-tab="slot1" style="flex:1; padding:10px 0; background:none; border:none; border-bottom:${activeTab === 'slot1' ? '3px solid #6366F1' : '3px solid transparent'}; color:${activeTab === 'slot1' ? '#FFFFFF' : '#94A3B8'}; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
                 <span class="material-symbols-rounded filled" style="font-size:15px; color:#F59E0B;">wb_sunny</span> ${session.slot2 ? 'Slot 1' : 'Slot 1 (Live)'}
               </button>
@@ -12428,15 +12430,12 @@ class AppController {
                 <div id="proctor-phase-badge" style="padding:4px 8px; border-radius:8px; background:${phaseColor}25; border:1px solid ${phaseColor}; display:flex; align-items:center; gap:6px;">
                   <span class="phase-text" style="font-size:11px; font-weight:700; color:${phaseColor};">${phaseLabel}</span>
                 </div>
-                <div id="proctor-countdown-container" style="display:inline-flex; align-items:center;">
-                  ${getProctorCountdownHTML(times)}
-                </div>
               </div>
               <div style="font-size:10px; font-weight:600; color:#64748B;">Manual Phase Controls</div>
             </div>
 
             <!-- Horizontal Action Buttons -->
-            <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap; padding-bottom:2px;">
               ${phase === 'waiting' ? `
                 <button class="phase-action-btn" data-set-phase="package_opening" style="background:#F59E0B; color:#000000; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px;">
                   <span class="material-symbols-rounded filled" style="font-size:14px;">inventory_2</span> Start Package Opening (3m)
