@@ -44,3 +44,6 @@ Thumbs.db
 webhook/node_modules/
 webhook/cloudflared.exe
 
+
+.vercel
+.env*

@@ -4,3 +4,6 @@
 
 .env*
 # js/app.bundle.js
+
+.vercel
+.env*

@@ -7785,17 +7785,17 @@ class AppController {
       let configured = 0;
       let html = '';
       for (let q = 1; q <= mcqCount; q++) {
-        const cur = editKey[q] || null;
-        if (cur !== null) configured++;
+        const cur = editKey[q];
+        const curArr = Array.isArray(cur) ? cur : (cur != null ? [cur] : []);
+        if (curArr.length > 0) configured++;
         html += `
-          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 8px; border-radius:8px; background:#F8FAFC; border:1px solid #E2E8F0;">
-            <span style="font-size:11.5px; font-weight:700; color:#334155; min-width:28px;">${String(q).padStart(2, '0')})</span>
-            <div style="display:flex; gap:3px;">
-              ${[1, 2, 3, 4, 5].map(opt => `
-                <button type="button" class="btn-edit-opt" data-q="${q}" data-opt="${opt}" style="width:28px; height:28px; border-radius:50%; border:1px solid ${cur === opt ? '#16A34A' : '#CBD5E1'}; background:${cur === opt ? '#16A34A' : '#FFFFFF'}; color:${cur === opt ? '#FFFFFF' : '#334155'}; font-size:11px; font-weight:700; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">
-                  ${opt}
-                </button>
-              `).join('')}
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 10px; border-radius:8px; background:#F8FAFC; border:1px solid #E2E8F0;">
+            <span style="font-size:11.5px; font-weight:700; color:#334155; min-width:26px; flex-shrink:0;">${String(q).padStart(2, '0')})</span>
+            <div style="display:flex; gap:4px; flex-wrap:nowrap;">
+              ${[1, 2, 3, 4, 5].map(opt => {
+                const sel = curArr.includes(opt);
+                return `<button type="button" class="btn-edit-opt" data-q="${q}" data-opt="${opt}" style="width:26px; height:26px; border-radius:6px; border:1.5px solid ${sel ? '#16A34A' : '#CBD5E1'}; background:${sel ? '#16A34A' : '#FFFFFF'}; color:${sel ? '#FFFFFF' : '#334155'}; font-size:11px; font-weight:700; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease; flex-shrink:0;">${opt}</button>`;
+              }).join('')}
             </div>
           </div>
         `;
@@ -7807,8 +7807,13 @@ class AppController {
         b.addEventListener('click', () => {
           const q = Number(b.dataset.q);
           const opt = Number(b.dataset.opt);
-          if (editKey[q] === opt) delete editKey[q];
-          else editKey[q] = opt;
+          let arr = Array.isArray(editKey[q]) ? [...editKey[q]] : (editKey[q] != null ? [editKey[q]] : []);
+          const idx = arr.indexOf(opt);
+          if (idx >= 0) arr.splice(idx, 1); else arr.push(opt);
+          arr.sort((a, b) => a - b);
+          if (arr.length === 0) delete editKey[q];
+          else if (arr.length === 1) editKey[q] = arr[0];
+          else editKey[q] = arr;
           renderGrid();
         });
       });
@@ -7834,7 +7839,7 @@ class AppController {
             </button>
           </div>
 
-          <div id="edit-admin-mcq-grid" style="max-height:300px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+          <div id="edit-admin-mcq-grid" style="max-height:360px; overflow-y:auto; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:4px;"></div>
 
           <div style="display:flex; gap:10px; margin-top:8px;">
             <button class="apk-btn-primary" id="btn-cancel-edit-mcq" style="flex:1; background:#F1F5F9; color:#475569; box-shadow:none;">
@@ -10698,7 +10703,7 @@ class AppController {
                 <span id="admin-ans-status-badge" style="font-size:10.5px; font-weight:700; color:#DC2626;">⚠️ Answers Required</span>
               </div>
 
-              <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; overflow-x:hidden; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:6px; width:100%; box-sizing:border-box;"></div>
+              <div id="admin-mcq-key-grid" style="max-height:220px; overflow-y:auto; overflow-x:hidden; background:#FFFFFF; border:1px solid #BBF7D0; border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:4px; width:100%; box-sizing:border-box;"></div>
             </div>
 
             <!-- Hint shown when Answer Key tick is unchecked -->
@@ -10901,17 +10906,17 @@ class AppController {
       let configuredCount = 0;
       let html = '';
       for (let q = 1; q <= currentMcqCount; q++) {
-        const currentAns = adminAnswerKey[q] || null;
-        if (currentAns !== null) configuredCount++;
+        const currentAns = adminAnswerKey[q]; // may be number, array, or undefined
+        const currentArr = Array.isArray(currentAns) ? currentAns : (currentAns != null ? [currentAns] : []);
+        if (currentArr.length > 0) configuredCount++;
         html += `
-          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 8px; border-radius:8px; background:#F8FAFC; border:1px solid #E2E8F0;">
-            <span style="font-size:11.5px; font-weight:700; color:#334155; min-width:28px;">${String(q).padStart(2, '0')})</span>
-            <div style="display:flex; gap:3px;">
-              ${[1, 2, 3, 4, 5].map(opt => `
-                <button type="button" class="btn-admin-opt" data-q="${q}" data-opt="${opt}" style="width:28px; height:28px; border-radius:50%; border:1px solid ${currentAns === opt ? '#16A34A' : '#CBD5E1'}; background:${currentAns === opt ? '#16A34A' : '#FFFFFF'}; color:${currentAns === opt ? '#FFFFFF' : '#334155'}; font-size:11px; font-weight:700; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;">
-                  ${opt}
-                </button>
-              `).join('')}
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 10px; border-radius:8px; background:#F8FAFC; border:1px solid #E2E8F0;">
+            <span style="font-size:11.5px; font-weight:700; color:#334155; min-width:26px; flex-shrink:0;">${String(q).padStart(2, '0')})</span>
+            <div style="display:flex; gap:4px; flex-wrap:nowrap;">
+              ${[1, 2, 3, 4, 5].map(opt => {
+                const sel = currentArr.includes(opt);
+                return `<button type="button" class="btn-admin-opt" data-q="${q}" data-opt="${opt}" style="width:26px; height:26px; border-radius:6px; border:1.5px solid ${sel ? '#16A34A' : '#CBD5E1'}; background:${sel ? '#16A34A' : '#FFFFFF'}; color:${sel ? '#FFFFFF' : '#334155'}; font-size:11px; font-weight:700; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease; flex-shrink:0;">${opt}</button>`;
+              }).join('')}
             </div>
           </div>
         `;
@@ -10933,11 +10938,13 @@ class AppController {
         btn.addEventListener('click', () => {
           const q = Number(btn.dataset.q);
           const opt = Number(btn.dataset.opt);
-          if (adminAnswerKey[q] === opt) {
-            delete adminAnswerKey[q];
-          } else {
-            adminAnswerKey[q] = opt;
-          }
+          let arr = Array.isArray(adminAnswerKey[q]) ? [...adminAnswerKey[q]] : (adminAnswerKey[q] != null ? [adminAnswerKey[q]] : []);
+          const idx = arr.indexOf(opt);
+          if (idx >= 0) arr.splice(idx, 1); else arr.push(opt);
+          arr.sort((a, b) => a - b);
+          if (arr.length === 0) delete adminAnswerKey[q];
+          else if (arr.length === 1) adminAnswerKey[q] = arr[0]; // keep single as number for backward compat
+          else adminAnswerKey[q] = arr;
           renderAdminMcqKeyGrid();
         });
       });
@@ -11084,9 +11091,9 @@ class AppController {
       if ((paperType === 'mcq' || paperType === 'mcq_essay') && answerKeyEnforced) {
         const missing = [];
         for (let q = 1; q <= mcqCount; q++) {
-          if (!adminAnswerKey[q]) {
-            missing.push(q);
-          }
+          const v = adminAnswerKey[q];
+          const hasAns = Array.isArray(v) ? v.length > 0 : (v != null && v !== 0);
+          if (!hasAns) missing.push(q);
         }
         if (missing.length > 0) {
           alert(`⚠️ කරුණාකර සියලුම MCQ ප්‍රශ්න ${mcqCount} සඳහාම පිළිතුරු ලබා දෙන්න!\n\nපිළිතුරු නොමැති ප්‍රශ්න (${missing.length}): Q${missing.slice(0, 15).join(', Q')}${missing.length > 15 ? '...' : ''}\n\n💡 Answer Key එක පසුව ඇතුළත් කිරීමට අවශ්‍ය නම්, ඉහත 'Pre-set MCQ Answer Key' Tick එක අක්‍රීය (Uncheck) කර Create කරන්න.`);
@@ -11097,7 +11104,9 @@ class AppController {
       // Filter adminAnswerKey to only include keys up to mcqCount
       const cleanAnswerKey = {};
       for (let q = 1; q <= mcqCount; q++) {
-        if (adminAnswerKey[q]) cleanAnswerKey[q] = adminAnswerKey[q];
+        const v = adminAnswerKey[q];
+        const hasAns = Array.isArray(v) ? v.length > 0 : (v != null && v !== 0);
+        if (hasAns) cleanAnswerKey[q] = v;
       }
 
       // Convert date + time strings to ISO timestamps for slot1 and slot2
@@ -14575,9 +14584,10 @@ ${!times.isWaiting ? `
 
             for (let q = 1; q <= totalQs; q++) {
               const studentAns = studentAnswers[q] !== undefined ? Number(studentAnswers[q]) : null;
-              const correctAns = answerKey[q] !== undefined ? Number(answerKey[q]) : null;
+              const rawCorrect = answerKey[q] !== undefined ? answerKey[q] : null;
+              const correctArr = rawCorrect === null ? null : (Array.isArray(rawCorrect) ? rawCorrect.map(Number) : [Number(rawCorrect)]);
               const isAnswered = studentAns !== null;
-              const isCorrect = isAnswered && correctAns !== null && studentAns === correctAns;
+              const isCorrect = isAnswered && correctArr !== null && correctArr.includes(studentAns);
 
               if (!isAnswered) unansweredCount++;
               else if (isCorrect) correctCount++;
@@ -14586,7 +14596,7 @@ ${!times.isWaiting ? `
               reviewDetails.push({
                 questionNumber: q,
                 studentAnswer: studentAns,
-                correctAnswer: correctAns,
+                correctAnswer: correctArr !== null ? (correctArr.length === 1 ? correctArr[0] : correctArr) : null,
                 isCorrect,
                 isAnswered
               });
@@ -14841,13 +14851,14 @@ ${!times.isWaiting ? `
             const reviewDetails = [];
             for (let q = 1; q <= totalQs; q++) {
               const studentAns = studentAnswers[q] !== undefined ? Number(studentAnswers[q]) : null;
-              const correctAns = answerKey[q] !== undefined ? Number(answerKey[q]) : null;
+              const rawCorrect = answerKey[q] !== undefined ? answerKey[q] : null;
+              const correctArr = rawCorrect === null ? null : (Array.isArray(rawCorrect) ? rawCorrect.map(Number) : [Number(rawCorrect)]);
               const isAnswered = studentAns !== null;
-              const isCorrect = isAnswered && correctAns !== null && studentAns === correctAns;
+              const isCorrect = isAnswered && correctArr !== null && correctArr.includes(studentAns);
               if (!isAnswered) unansweredCount++;
               else if (isCorrect) correctCount++;
               else wrongCount++;
-              reviewDetails.push({ questionNumber: q, studentAnswer: studentAns, correctAnswer: correctAns, isCorrect, isAnswered });
+              reviewDetails.push({ questionNumber: q, studentAnswer: studentAns, correctAnswer: correctArr !== null ? (correctArr.length === 1 ? correctArr[0] : correctArr) : null, isCorrect, isAnswered });
             }
 
             const percentage = totalQs > 0 ? Math.round((correctCount / totalQs) * 100) : 0;
